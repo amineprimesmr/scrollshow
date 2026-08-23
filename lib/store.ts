@@ -16,6 +16,9 @@ const emptyStore = (): StoreData => ({
   users: [],
   accounts: [],
   runs: [],
+  channels: [],
+  posts: [],
+  media: [],
 });
 
 function memory(): StoreData {
@@ -60,10 +63,22 @@ function useBlob() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
+function normalize(data: StoreData): StoreData {
+  data.channels ||= [];
+  data.posts ||= [];
+  data.media ||= [];
+  data.accounts ||= [];
+  data.runs ||= [];
+  data.users ||= [];
+  return data;
+}
+
 export async function readStore(): Promise<StoreData> {
   const cached = globalStore.__scrollshow;
-  if (cached && (cached.users.length || cached.accounts.length)) return cached;
-  const data = useBlob() ? await readBlob() : await readLocal();
+  if (cached && (cached.users.length || cached.accounts.length || cached.channels?.length)) {
+    return normalize(cached);
+  }
+  const data = normalize(useBlob() ? await readBlob() : await readLocal());
   globalStore.__scrollshow = data;
   return data;
 }
@@ -140,4 +155,4 @@ export function publicUser(user: User) {
   };
 }
 
-export type { Account, Run, StoreData, User };
+export type { Account, Channel, MediaItem, Run, StoreData, StudioPost, User };

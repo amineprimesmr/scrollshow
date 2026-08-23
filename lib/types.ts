@@ -31,10 +31,45 @@ export type Run = {
   createdAt: string;
 };
 
+export type Channel = {
+  id: string;
+  userId: string;
+  platform: string;
+  name: string;
+  handle: string;
+  avatar: string;
+};
+
+export type StudioPost = {
+  id: string;
+  userId: string;
+  channelIds: string[];
+  body: string;
+  date: string;
+  time: string;
+  status: "draft" | "scheduled" | "published";
+  image: string;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+};
+
+export type MediaItem = {
+  id: string;
+  userId: string;
+  url: string;
+  name: string;
+  createdAt: string;
+};
+
 export type StoreData = {
   users: User[];
   accounts: Account[];
   runs: Run[];
+  channels: Channel[];
+  posts: StudioPost[];
+  media: MediaItem[];
 };
 
 export type SessionUser = {
