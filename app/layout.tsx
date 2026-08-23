@@ -25,19 +25,15 @@ export const metadata: Metadata = {
   },
   description:
     "ScrollShow connects TikTok via Login Kit and publishes photo carousels with the Content Posting API.",
-  manifest: "/site.webmanifest",
+  manifest: "/site.webmanifest?v=3",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "48x48" },
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-1024.png", sizes: "1024x1024", type: "image/png" },
+      { url: "/favicon.svg?v=3", type: "image/svg+xml" },
+      { url: "/favicon-32.png?v=3", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.ico?v=3", sizes: "48x48" },
     ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180" },
-      { url: "/icon-1024.png", sizes: "1024x1024" },
-    ],
-    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png?v=3", sizes: "180x180" }],
+    shortcut: "/favicon.ico?v=3",
   },
   openGraph: {
     title: "ScrollShow",
