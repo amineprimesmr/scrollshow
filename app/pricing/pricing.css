@@ -56,9 +56,11 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-pricing__hero h1 {
-  margin: 0;
-  font-size: clamp(36px, 6vw, 56px);
+  margin: 0 auto;
+  max-width: 18ch;
+  font-size: clamp(28px, 5vw, 48px);
   letter-spacing: -0.05em;
+  line-height: 1.08;
   font-weight: 800;
 }
 
@@ -272,6 +274,193 @@ html:has(.ss-pricing) body.grain {
   color: #7c3aed;
 }
 
+.ss-upsell {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgb(17 17 17 / 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.ss-upsell__card {
+  width: min(560px, 100%);
+  background: #fff;
+  color: #111;
+  border-radius: 28px;
+  box-shadow: 0 24px 80px rgb(17 17 17 / 0.18);
+  padding: 36px 32px 28px;
+  text-align: center;
+}
+
+.ss-upsell__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #f8d5e4;
+  color: #c43b73;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ss-upsell__title {
+  margin: 16px 0 0;
+  font-family: var(--font-serif), "Iowan Old Style", Georgia, serif;
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+
+.ss-upsell__lead {
+  margin: 10px 0 0;
+  color: #5b616c;
+  font-size: 16px;
+}
+
+.ss-upsell__lead b {
+  color: #111;
+}
+
+.ss-upsell__list {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+
+.ss-upsell__list li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: #2d323b;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ss-upsell__list i {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid #111;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.ss-upsell__deal {
+  margin: 24px 0 0;
+  padding: 18px 18px 14px;
+  border-radius: 18px;
+  background: #f4f4f5;
+  text-align: left;
+}
+
+.ss-upsell__deal-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ss-upsell__deal small {
+  display: block;
+  color: #8b8f98;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ss-upsell__prices {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ss-upsell__prices s {
+  color: #9aa0aa;
+  font-size: 20px;
+}
+
+.ss-upsell__prices strong {
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.ss-upsell__prices em {
+  color: #6b7280;
+  font-style: normal;
+  font-size: 15px;
+}
+
+.ss-upsell__save {
+  color: #c43b73;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.ss-upsell__deal p {
+  margin: 10px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.ss-upsell__deal p b {
+  color: #111;
+}
+
+.ss-upsell__primary,
+.ss-upsell__secondary {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.ss-upsell__primary {
+  margin-top: 20px;
+  border: 0;
+  background: #111;
+  color: #fff;
+}
+
+.ss-upsell__secondary {
+  margin-top: 10px;
+  border: 1px solid #e7e7ea;
+  background: #fff;
+  color: #111;
+}
+
+.ss-upsell__primary:disabled,
+.ss-upsell__secondary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ss-upsell__note {
+  margin: 14px 0 0;
+  color: #9aa0aa;
+  font-size: 13px;
+}
+
 @media (max-width: 900px) {
   .ss-pricing__grid {
     grid-template-columns: 1fr;
@@ -279,5 +468,14 @@ html:has(.ss-pricing) body.grain {
 
   .ss-price-card.is-popular {
     transform: none;
+  }
+
+  .ss-upsell__card {
+    padding: 28px 20px 22px;
+  }
+
+  .ss-upsell__deal-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

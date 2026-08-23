@@ -119,3 +119,15 @@ export function formatEuro(cents: number) {
   const value = cents / 100;
   return value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+export function yearlyOffer(plan: PaidPlan) {
+  const item = PLANS[plan];
+  const billedIfMonthly = item.monthly * 12;
+  return {
+    billedIfMonthly,
+    yearly: item.yearly,
+    save: billedIfMonthly - item.yearly,
+    perMonth: Math.round(item.yearly / 12),
+    perDay: Math.round(item.yearly / 365),
+  };
+}

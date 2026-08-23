@@ -1,7 +1,7 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
-import { formatEuro, PLANS, TRIAL_DAYS, type BillingInterval, type PaidPlan } from "@/lib/plans";
+import { formatEuro, PLANS, TRIAL_DAYS, yearlyOffer, type BillingInterval, type PaidPlan } from "@/lib/plans";
 import { prefersEnglish, t } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ export default function PricingPage() {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [pending, setPending] = useState<string>("");
   const [email, setEmail] = useState("");
+  const [upsell, setUpsell] = useState<PaidPlan | null>(null);
 
   useEffect(() => {
     setEnglish(prefersEnglish());
@@ -23,12 +24,21 @@ export default function PricingPage() {
       .catch(() => {});
   }, []);
 
-  async function choose(plan: PaidPlan) {
-    setPending(plan);
+  useEffect(() => {
+    if (!upsell) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setUpsell(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [upsell]);
+
+  async function checkout(plan: PaidPlan, nextInterval: BillingInterval) {
+    setPending(`${plan}-${nextInterval}`);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan, interval }),
+      body: JSON.stringify({ plan, interval: nextInterval }),
     });
     const json = await res.json().catch(() => ({}));
     setPending("");
@@ -41,6 +51,14 @@ export default function PricingPage() {
       return;
     }
     alert(json.error || t("Paiement indisponible.", "Checkout is unavailable.", english));
+  }
+
+  function choose(plan: PaidPlan) {
+    if (interval === "month") {
+      setUpsell(plan);
+      return;
+    }
+    void checkout(plan, "year");
   }
 
   return (
@@ -57,7 +75,7 @@ export default function PricingPage() {
       </nav>
 
       <header className="ss-pricing__hero">
-        <h1>{t("Choisis ton plan", "Select plan", english)}</h1>
+        <h1>{t("Choisis un abonnement après ton essai offert de 3 jours", "Choose a plan after your 3-day free trial", english)}</h1>
         <p>
           {t(
             `Débloque ScrollShow. ${TRIAL_DAYS} jours d’essai offerts sur chaque offre.`,
@@ -104,8 +122,8 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <button className="ss-price-card__cta" type="button" disabled={pending === id} onClick={() => choose(id)}>
-                {pending === id ? "…" : t("Choisir", "Choose", english)}
+              <button className="ss-price-card__cta" type="button" disabled={pending.startsWith(id)} onClick={() => choose(id)}>
+                {pending.startsWith(id) ? "…" : t("Commencer pour 0€", "Start for €0", english)}
               </button>
             </article>
           );
@@ -117,6 +135,112 @@ export default function PricingPage() {
         <a href="mailto:hello@scrollshow.io">{t("Écris à hello@scrollshow.io", "Email hello@scrollshow.io", english)}</a>
         {interval === "year" ? ` · ${t("Facturé une fois par an.", "Billed once a year.", english)}` : ""}
       </p>
+
+      {upsell ? <AnnualUpsell plan={upsell} english={english} pending={pending} onClose={() => setUpsell(null)} onChoose={checkout} /> : null}
     </main>
+  );
+}
+
+function AnnualUpsell({
+  plan,
+  english,
+  pending,
+  onClose,
+  onChoose,
+}: {
+  plan: PaidPlan;
+  english: boolean;
+  pending: string;
+  onClose: () => void;
+  onChoose: (plan: PaidPlan, interval: BillingInterval) => void;
+}) {
+  const item = PLANS[plan];
+  const offer = yearlyOffer(plan);
+  const name = english ? item.nameEn : item.name;
+  const busyYear = pending === `${plan}-year`;
+  const busyMonth = pending === `${plan}-month`;
+
+  return (
+    <div className="ss-upsell" role="presentation" onClick={onClose}>
+      <div
+        className="ss-upsell__card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ss-upsell-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="ss-upsell__badge">{t("2+ mois offerts", "2+ months free", english)}</span>
+        <h2 id="ss-upsell-title" className="ss-upsell__title">
+          {t("Prends toute l’année, aujourd’hui.", "Get your whole year of ScrollShow, today.", english)}
+        </h2>
+        <p className="ss-upsell__lead">
+          {t("Passe ", "Switch ", english)}
+          <b>{name}</b>
+          {t(" en annuel avant de payer.", " to annual before you check out.", english)}
+        </p>
+
+        <ul className="ss-upsell__list">
+          <li>
+            <i aria-hidden>✓</i>
+            <span>
+              {t(
+                "Toute l’année tout de suite. Les 12 mois sont activés dès l’upgrade, pas mois par mois.",
+                "Your full year, upfront. All 12 months are added the moment you upgrade, rather than released month by month.",
+                english,
+              )}
+            </span>
+          </li>
+          <li>
+            <i aria-hidden>✓</i>
+            <span>
+              {t("2+ mois offerts par rapport au mensuel.", "Get 2+ months free versus paying monthly.", english)}
+            </span>
+          </li>
+          <li>
+            <i aria-hidden>✓</i>
+            <span>
+              {t(
+                "Un seul paiement pour l’année. Pas de prélèvement mensuel, pas d’interruption.",
+                "One payment for the year. No monthly charges, no payment interruptions.",
+                english,
+              )}
+            </span>
+          </li>
+        </ul>
+
+        <div className="ss-upsell__deal">
+          <div className="ss-upsell__deal-row">
+            <div>
+              <small>{t("Annuel", "Annual", english)}</small>
+              <div className="ss-upsell__prices">
+                <s>{formatEuro(offer.billedIfMonthly)} €</s>
+                <strong>{formatEuro(offer.yearly)} €</strong>
+                <em>{t("/an", "/year", english)}</em>
+              </div>
+            </div>
+            <b className="ss-upsell__save">
+              {t("Économise", "Save", english)} {formatEuro(offer.save)} €
+            </b>
+          </div>
+          <p>
+            {t("soit", "that’s", english)} <b>{formatEuro(offer.perMonth)} €{t("/mois", "/mo", english)}</b>
+            {" · "}
+            {t("environ", "about", english)} {formatEuro(offer.perDay)} €{t("/jour", "/day", english)}
+            {" · "}
+            {t("facturé une fois par an", "billed once a year", english)}
+          </p>
+        </div>
+
+        <button className="ss-upsell__primary" type="button" disabled={Boolean(pending)} onClick={() => onChoose(plan, "year")}>
+          {busyYear ? "…" : t("Passer à l’annuel et économiser 20 %", "Go annual and save 20%", english)}
+        </button>
+        <button className="ss-upsell__secondary" type="button" disabled={Boolean(pending)} onClick={() => onChoose(plan, "month")}>
+          {busyMonth ? "…" : t("Continuer en mensuel", "Continue with monthly billing", english)}
+        </button>
+        <p className="ss-upsell__note">
+          {t("Ce tarif annuel n’est disponible qu’ici, au checkout.", "This annual price is only available here, at checkout.", english)}
+        </p>
+      </div>
+    </div>
   );
 }
