@@ -155,4 +155,4 @@ export function publicUser(user: User) {
   };
 }
 
-export type { Account, Channel, MediaItem, Run, StoreData, StudioPost, User };
+export type { Account, Run, StoreData, User };
