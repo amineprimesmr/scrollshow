@@ -26,11 +26,16 @@ export default function PricingPage() {
 
   useEffect(() => {
     if (!upsell) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setUpsell(null);
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [upsell]);
 
   async function checkout(plan: PaidPlan, nextInterval: BillingInterval) {
@@ -169,6 +174,9 @@ function AnnualUpsell({
         aria-labelledby="ss-upsell-title"
         onClick={(event) => event.stopPropagation()}
       >
+        <button className="ss-upsell__close" type="button" onClick={onClose} aria-label={t("Fermer", "Close", english)}>
+          ×
+        </button>
         <span className="ss-upsell__badge">{t("2+ mois offerts", "2+ months free", english)}</span>
         <h2 id="ss-upsell-title" className="ss-upsell__title">
           {t("Prends toute l’année, aujourd’hui.", "Get your whole year of ScrollShow, today.", english)}
@@ -193,7 +201,11 @@ function AnnualUpsell({
           <li>
             <i aria-hidden>✓</i>
             <span>
-              {t("2+ mois offerts par rapport au mensuel.", "Get 2+ months free versus paying monthly.", english)}
+              {t(
+                `2+ mois offerts : ${formatEuro(offer.perMonth)} €/mois au lieu de ${formatEuro(item.monthly)} € × 12.`,
+                `Get 2+ months free: ${formatEuro(offer.perMonth)} €/mo instead of ${formatEuro(item.monthly)} € × 12.`,
+                english,
+              )}
             </span>
           </li>
           <li>
@@ -208,25 +220,43 @@ function AnnualUpsell({
           </li>
         </ul>
 
+        <div className="ss-upsell__compare">
+          <div>
+            <small>{t("Mensuel", "Monthly", english)}</small>
+            <b>{formatEuro(item.monthly)} €</b>
+            <span>{t("/mois", "/mo", english)}</span>
+            <em>
+              {formatEuro(offer.billedIfMonthly)} €{t("/an", "/year", english)}
+            </em>
+          </div>
+          <i aria-hidden>→</i>
+          <div className="is-win">
+            <small>{t("Annuel", "Annual", english)}</small>
+            <b>{formatEuro(offer.perMonth)} €</b>
+            <span>{t("/mois", "/mo", english)}</span>
+            <em>
+              {formatEuro(offer.yearly)} €{t("/an", "/year", english)}
+            </em>
+          </div>
+        </div>
+
         <div className="ss-upsell__deal">
           <div className="ss-upsell__deal-row">
-            <div>
-              <small>{t("Annuel", "Annual", english)}</small>
-              <div className="ss-upsell__prices">
-                <s>{formatEuro(offer.billedIfMonthly)} €</s>
-                <strong>{formatEuro(offer.yearly)} €</strong>
-                <em>{t("/an", "/year", english)}</em>
-              </div>
-            </div>
+            <small>{t("Annuel", "Annual", english)}</small>
             <b className="ss-upsell__save">
               {t("Économise", "Save", english)} {formatEuro(offer.save)} €
             </b>
           </div>
+          <div className="ss-upsell__prices">
+            <s>{formatEuro(offer.billedIfMonthly)} €</s>
+            <strong>{formatEuro(offer.yearly)} €</strong>
+            <em>{t("/an", "/year", english)}</em>
+          </div>
           <p>
-            {t("soit", "that’s", english)} <b>{formatEuro(offer.perMonth)} €{t("/mois", "/mo", english)}</b>
-            {" · "}
+            {t("soit", "about", english)} <b>{formatEuro(offer.perMonth)} €{t("/mois", "/mo", english)}</b>
+            {" — "}
             {t("environ", "about", english)} {formatEuro(offer.perDay)} €{t("/jour", "/day", english)}
-            {" · "}
+            {" — "}
             {t("facturé une fois par an", "billed once a year", english)}
           </p>
         </div>
