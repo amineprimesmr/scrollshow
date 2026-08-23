@@ -37,7 +37,7 @@ async function readBlob(): Promise<StoreData> {
 
 async function writeBlob(data: StoreData) {
   await put(BLOB_NAME, JSON.stringify(data), {
-    access: "private",
+    access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
