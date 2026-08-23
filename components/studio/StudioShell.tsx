@@ -1,11 +1,13 @@
 "use client";
 
-import { PLATFORMS } from "@/lib/platforms";
+import { prefersEnglish, t } from "@/lib/i18n";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
+import { StudioFlash } from "./StudioFlash";
 
 const NAV = [
   { href: "/app", label: "Calendar", icon: "▦" },
@@ -24,7 +26,13 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
+  const [english, setEnglish] = useState(false);
   const title = NAV.find((item) => item.href === pathname)?.label || "Calendar";
+  const live = channels.filter((item) => item.connected);
+
+  useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
 
   return (
     <div className="ss-studio">
@@ -44,7 +52,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <h2>Channels</h2>
         <div className="ss-channels__actions">
           <button className="ss-btn-ghost" onClick={() => setAddOpen(true)}>
-            Add Channel
+            {t("Connecter TikTok", "Connect TikTok", english)}
           </button>
           <button className="ss-btn-ghost" onClick={() => setAddOpen(true)} aria-label="Connect">
             ↗
@@ -65,8 +73,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         >
           <img src="/logo.svg" alt="" />
           <span>
-            <b>All channels</b>
-            <span>{channels.length} connected</span>
+            <b>{t("Tous les comptes", "All channels", english)}</b>
+            <span>{t(`${live.length} connecté${live.length > 1 ? "s" : ""}`, `${live.length} connected`, english)}</span>
           </span>
         </button>
         {channels.map((channel) => (
@@ -79,7 +87,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             <span>
               <b>{channel.name}</b>
               <span>
-                {PLATFORMS.find((item) => item.id === channel.platform)?.name} · @{channel.handle}
+                TikTok · @{channel.handle}
+                {channel.connected ? "" : ` · ${t("à connecter", "not connected", english)}`}
               </span>
             </span>
           </button>
@@ -103,6 +112,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
+        <Suspense fallback={null}>
+          <StudioFlash />
+        </Suspense>
         {children}
       </section>
       <AddChannelModal />

@@ -123,8 +123,8 @@ function ViewsHero({ english }: { english: boolean }) {
           </h1>
           <p className="af-ld-hero-sub">
             {t(
-              "Ces TikToks tournent déjà. Tu les copies, tu les postes, tu encaisse.",
-              "These TikToks already work. Copy them, post them, get paid.",
+              "Connecte TikTok, prévisualise tes carrousels, choisis la privacy, publie.",
+              "Connect TikTok, preview carousels, set privacy, publish.",
               english,
             )}
           </p>
@@ -154,17 +154,17 @@ export function Landing() {
       id: "what",
       q: t("C’est quoi ScrollShow ?", "What is ScrollShow?", english),
       a: t(
-        "Un QG de recherche pour les comptes TikTok photo-slideshow. Tu trouves les formats qui cartonnent, tu les classes, tu les réutilises.",
-        "A research HQ for TikTok photo-slideshow accounts. Find winning formats, file them, reuse them.",
+        "Un outil web pour connecter ton TikTok (Login Kit), voir tes stats et tes posts, puis publier un carrousel photo (Content Posting API).",
+        "A web tool to connect your TikTok (Login Kit), view stats and posts, then publish a photo carousel (Content Posting API).",
         english,
       ),
     },
     {
       id: "how",
-      q: t("Comment je trouve des comptes ?", "How do I find accounts?", english),
+      q: t("Comment je publie sur TikTok ?", "How do I post to TikTok?", english),
       a: t(
-        "Tu lances une découverte par mots-clés, tu ajoutes les @ qui valent le coup, et tu notes Keep / Watch / Skip.",
-        "Start a keyword discovery, add the @ handles worth studying, and mark Keep / Watch / Skip.",
+        "Tu crées un espace, tu cliques Continuer avec TikTok, tu choisis tes slides et la privacy, puis Publier maintenant.",
+        "Create a workspace, click Continue with TikTok, pick slides and privacy, then Publish now.",
         english,
       ),
     },
@@ -249,8 +249,8 @@ export function Landing() {
                     <span>TikTok</span>
                   </div>
                 </div>
-                <h3>2 - {t("Lance une découverte", "Start a discovery", english)}</h3>
-                <p>{t("Mots-clés, pistes de comptes, notes. Tout tombe dans la bibliothèque.", "Keywords, account leads, notes. Everything lands in the library.", english)}</p>
+                <h3>2 - {t("Connecte TikTok", "Connect TikTok", english)}</h3>
+                <p>{t("Login Kit officiel. Profil, stats, liste de posts — les 6 scopes.", "Official Login Kit. Profile, stats, post list — all 6 scopes.", english)}</p>
               </article>
               <article className="af-ld-step-card">
                 <div className="af-ld-step-visual">
@@ -259,8 +259,8 @@ export function Landing() {
                     <span className="af-ld-step-earn__pill">Watch · Skip</span>
                   </div>
                 </div>
-                <h3>3 - {t("Juge et réutilise", "Judge and reuse", english)}</h3>
-                <p>{t("Keep / Watch / Skip. Le format qui cartonne devient ton prochain post.", "Keep / Watch / Skip. The format that wins becomes your next post.", english)}</p>
+                <h3>3 - {t("Publie le carrousel", "Publish the carousel", english)}</h3>
+                <p>{t("Privacy, disclosure, Direct Post. Tes stats reviennent dans Analytics.", "Privacy, disclosure, Direct Post. Stats land back in Analytics.", english)}</p>
               </article>
             </div>
           </div>
@@ -421,6 +421,9 @@ export function Landing() {
                 </li>
                 <li>
                   <Link href="/privacy">{t("Confidentialité", "Privacy", english)}</Link>
+                </li>
+                <li>
+                  <Link href="/support">Support</Link>
                 </li>
               </ul>
             </section>

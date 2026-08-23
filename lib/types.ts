@@ -38,6 +38,14 @@ export type Channel = {
   name: string;
   handle: string;
   avatar: string;
+  connected?: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  openId?: string;
+  expiresAt?: number;
+  followers?: number;
+  likes?: number;
+  videoCount?: number;
 };
 
 export type StudioPost = {

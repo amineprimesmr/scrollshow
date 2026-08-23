@@ -1,20 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { prefersEnglish, t } from "@/lib/i18n";
+import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "./StudioContext";
 
 export function AnalyticsView() {
-  const { posts, activeChannel } = useStudio();
+  const { posts, channels, activeChannel } = useStudio();
+  const [profile, setProfile] = useState<Record<string, any> | null>(null);
+  const [videos, setVideos] = useState<any[]>([]);
   const visible = posts.filter((post) => activeChannel === "all" || post.channelIds.includes(activeChannel));
-  const totals = useMemo(
-    () => ({
+  const connected = channels.some((item) => item.connected);
+  const totals = useMemo(() => {
+    if (videos.length) {
+      return videos.reduce(
+        (sum, video) => ({
+          views: sum.views + Number(video.view_count || 0),
+          likes: sum.likes + Number(video.like_count || 0),
+          comments: sum.comments + Number(video.comment_count || 0),
+          shares: sum.shares + Number(video.share_count || 0),
+        }),
+        { views: 0, likes: 0, comments: 0, shares: 0 },
+      );
+    }
+    return {
       views: visible.reduce((sum, post) => sum + post.views, 0),
       likes: visible.reduce((sum, post) => sum + post.likes, 0),
       comments: visible.reduce((sum, post) => sum + post.comments, 0),
       shares: visible.reduce((sum, post) => sum + post.shares, 0),
-    }),
-    [visible],
-  );
+    };
+  }, [visible, videos]);
+
+  useEffect(() => {
+    if (!connected) return;
+    fetch("/api/tiktok/me")
+      .then((res) => res.json())
+      .then((json) => setProfile(json.user || null))
+      .catch(() => undefined);
+    fetch("/api/tiktok/videos")
+      .then((res) => res.json())
+      .then((json) => setVideos(Array.isArray(json.videos) ? json.videos : []))
+      .catch(() => undefined);
+  }, [connected]);
 
   const cards = [
     { label: "Views", value: totals.views, color: "linear-gradient(135deg,#c4b5fd,#7c3aed)" },
@@ -24,7 +50,19 @@ export function AnalyticsView() {
   ];
 
   return (
-    <div className="ss-metrics">
+    <div>
+      {profile ? (
+        <div className="ss-panel">
+          <h2>
+            {profile.display_name || profile.username} · user.info.basic / profile / stats
+          </h2>
+          <p>
+            @{profile.username} · {Number(profile.follower_count || 0).toLocaleString()} followers ·{" "}
+            {Number(profile.likes_count || 0).toLocaleString()} likes · {Number(profile.video_count || 0)} videos
+          </p>
+        </div>
+      ) : null}
+      <div className="ss-metrics">
       {cards.map((card) => (
         <article key={card.label} className="ss-metric">
           <span>• {card.label}</span>
@@ -32,6 +70,21 @@ export function AnalyticsView() {
           <b>{card.value.toLocaleString("en-US")}</b>
         </article>
       ))}
+      </div>
+      {videos.length ? (
+        <div className="ss-media-grid">
+          {videos.map((video) => (
+            <figure key={video.id}>
+              <img src={video.cover_image_url || "/assets/tiktoks/01-glowup-188k.png"} alt="" />
+              <figcaption>
+                {video.title || video.video_description || video.id}
+                <br />
+                {Number(video.view_count || 0).toLocaleString()} · video.list
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -134,15 +187,26 @@ export function PlugsView() {
 }
 
 export function IntegrationsView() {
+  const { channels } = useStudio();
+  const [english, setEnglish] = useState(false);
+  const connected = channels.some((item) => item.connected);
+
+  useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
+
   return (
     <div className="ss-panel">
-      <h2>Integrations</h2>
-      <p>API, webhooks, n8n, Make, Zapier — connect tes workflows ScrollShow.</p>
+      <h2>TikTok</h2>
+      <p>
+        Login Kit + Content Posting API — user.info.basic, user.info.profile, user.info.stats,
+        video.list, video.upload, video.publish.
+      </p>
       <div className="ss-form">
-        <input readOnly value="https://scrollshow.io/api/studio" />
-        <button className="ss-btn-purple" type="button">
-          Copy endpoint
-        </button>
+        <input readOnly value={connected ? t("TikTok connecté", "TikTok connected", english) : t("TikTok non connecté", "TikTok not connected", english)} />
+        <a className="ss-btn-purple" href="/api/tiktok/oauth/start">
+          {connected ? t("Reconnecter TikTok", "Reconnect TikTok", english) : t("Connecter TikTok", "Connect TikTok", english)}
+        </a>
       </div>
     </div>
   );
@@ -217,10 +281,17 @@ export function BillingView() {
 }
 
 export function SettingsView() {
-  const { user } = useStudio();
+  const { user, channels, reload } = useStudio();
+  const [english, setEnglish] = useState(false);
+  const live = channels.filter((item) => item.connected);
+
+  useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
+
   return (
     <div className="ss-panel">
-      <h2>Settings</h2>
+      <h2>{t("Réglages", "Settings", english)}</h2>
       <p>
         <strong>{user?.name}</strong>
         <br />
@@ -228,6 +299,33 @@ export function SettingsView() {
         <br />
         Plan {user?.plan === "pro" ? "Pro" : "Free"}
       </p>
+      <h3>{t("Compte TikTok", "TikTok account", english)}</h3>
+      {live.length ? (
+        live.map((channel) => (
+          <p key={channel.id}>
+            @{channel.handle} · {channel.followers || 0} followers
+          </p>
+        ))
+      ) : (
+        <p>{t("Aucun compte connecté.", "No account connected.", english)}</p>
+      )}
+      <div className="ss-form-actions">
+        <a className="ss-btn-purple" href="/api/tiktok/oauth/start">
+          {t("Connecter TikTok", "Connect TikTok", english)}
+        </a>
+        {live.length ? (
+          <button
+            className="ss-btn-ghost"
+            type="button"
+            onClick={async () => {
+              await fetch("/api/tiktok/disconnect", { method: "POST" });
+              reload();
+            }}
+          >
+            {t("Déconnecter", "Disconnect", english)}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

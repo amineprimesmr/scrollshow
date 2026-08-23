@@ -16,15 +16,15 @@ const serif = Newsreader({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"),
   title: {
-    default: "ScrollShow — Research HQ for TikTok slideshows",
+    default: "ScrollShow — Connect TikTok, publish carousels",
     template: "%s · ScrollShow",
   },
   description:
-    "Trouve, analyse et classe les comptes TikTok photo-slideshow. ScrollShow est le QG de recherche des carrousels.",
-  icons: { icon: "/favicon.svg" },
+    "ScrollShow connects TikTok via Login Kit and publishes photo carousels with the Content Posting API.",
+  icons: { icon: "/favicon.svg", apple: "/icon-1024.png" },
   openGraph: {
     title: "ScrollShow",
-    description: "Le QG de recherche des carrousels TikTok.",
+    description: "Connect TikTok. Preview carousels. Set privacy. Publish. View stats.",
     url: "https://scrollshow.io",
     siteName: "ScrollShow",
     locale: "fr_FR",

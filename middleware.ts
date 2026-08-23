@@ -1,10 +1,11 @@
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio"];
+const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/tiktok"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/api/tiktok/oauth/start") return NextResponse.next();
   const needsAuth = PROTECTED.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   if (!needsAuth) return NextResponse.next();
 
@@ -38,5 +39,7 @@ export const config = {
     "/api/runs/:path*",
     "/api/studio",
     "/api/studio/:path*",
+    "/api/tiktok",
+    "/api/tiktok/:path*",
   ],
 };

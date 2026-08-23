@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -27,7 +28,8 @@ export default function LoginPage() {
       setError("Email ou mot de passe incorrect.");
       return;
     }
-    router.push("/app");
+    const next = params.get("next") || "/app";
+    router.push(next.startsWith("/") ? next : "/app");
   }
 
   return (
@@ -48,5 +50,13 @@ export default function LoginPage() {
         Pas de compte ? <Link href="/signup">Créer un espace</Link>
       </p>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

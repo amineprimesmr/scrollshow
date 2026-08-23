@@ -394,6 +394,62 @@ html:has(.ss-studio) body.grain {
   margin: 0 0 16px;
 }
 
+.ss-dialog--narrow {
+  width: min(480px, 100%);
+}
+
+.ss-lead {
+  margin: 0 0 14px;
+  color: var(--ss-muted);
+  line-height: 1.45;
+}
+
+.ss-scope-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-scope-list li {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--ss-purple-soft);
+  color: #5b21b6;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ss-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ss-flash {
+  margin: 0 22px 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.ss-flash.is-error {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+a.ss-btn-purple {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .ss-platforms {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
