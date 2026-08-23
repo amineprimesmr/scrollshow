@@ -1,11 +1,13 @@
-export type Plan = "free" | "pro";
+export type { Plan } from "./plans";
 
 export type User = {
   id: string;
   email: string;
   name: string;
   passwordHash: string;
-  plan: Plan;
+  plan: import("./plans").Plan;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
   createdAt: string;
 };
 
@@ -84,5 +86,5 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string;
-  plan: Plan;
+  plan: import("./plans").Plan;
 };

@@ -269,13 +269,42 @@ export function AffiliateView() {
 }
 
 export function BillingView() {
+  const { user } = useStudio();
+  const [english, setEnglish] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const plan = user?.plan || "free";
+
+  useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
+
+  async function openPortal() {
+    setBusy(true);
+    const res = await fetch("/api/stripe/portal", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (json.url) window.location.href = json.url;
+    else window.location.href = "/pricing";
+  }
+
   return (
     <div className="ss-panel">
-      <h2>Billing</h2>
-      <p>Free · 2 channels. Pro 29 €/mois · 30 channels, posts illimités.</p>
-      <a className="ss-btn-purple" href="/pricing">
-        Upgrade to Pro
-      </a>
+      <h2>{t("Facturation", "Billing", english)}</h2>
+      <p>
+        {t("Plan actuel", "Current plan", english)} : <b>{plan === "free" ? "Free" : plan}</b>
+        <br />
+        {t("Essai 3 jours offert sur Starter, Creator et Pro.", "3-day free trial on Starter, Creator, and Pro.", english)}
+      </p>
+      <div className="ss-form-actions">
+        <a className="ss-btn-purple" href="/pricing">
+          {t("Voir les tarifs", "See plans", english)}
+        </a>
+        {plan !== "free" ? (
+          <button className="ss-btn-ghost" type="button" disabled={busy} onClick={openPortal}>
+            {busy ? "…" : t("Gérer l’abonnement", "Manage subscription", english)}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

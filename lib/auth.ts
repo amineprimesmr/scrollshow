@@ -1,7 +1,8 @@
 import { compare, hash } from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
-import type { Plan, SessionUser } from "./types";
+import { isPaidPlan, type Plan } from "./plans";
+import type { SessionUser } from "./types";
 
 const COOKIE = "ss_session";
 
@@ -42,7 +43,7 @@ export async function readSession(): Promise<SessionUser | null> {
       id: payload.sub,
       email: payload.email,
       name: typeof payload.name === "string" ? payload.name : "",
-      plan: payload.plan === "pro" ? "pro" : "free",
+      plan: isPaidPlan(String(payload.plan)) ? (payload.plan as Plan) : "free",
     };
   } catch {
     return null;
@@ -65,5 +66,8 @@ export async function clearSessionCookie() {
 }
 
 export function canAddAccount(plan: Plan, count: number) {
-  return plan === "pro" || count < 10;
+  if (plan === "starter") return count < 1;
+  if (plan === "creator") return count < 3;
+  if (plan === "pro") return true;
+  return count < 10;
 }
