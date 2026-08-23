@@ -10,6 +10,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
@@ -38,4 +39,8 @@ export async function POST(request: Request) {
 
   await setSessionCookie(publicUser(user));
   return NextResponse.json({ user: publicUser(user) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "server";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

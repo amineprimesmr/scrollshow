@@ -4,7 +4,13 @@ import path from "node:path";
 import type { Account, Run, StoreData, User } from "./types";
 
 const BLOB_NAME = "scrollshow-store.json";
-const LOCAL_PATH = path.join(process.cwd(), ".data", "store.json");
+
+const globalStore = globalThis as typeof globalThis & { __scrollshow?: StoreData };
+
+function filePath() {
+  const root = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), ".data");
+  return path.join(root, "store.json");
+}
 
 const emptyStore = (): StoreData => ({
   users: [],
@@ -12,18 +18,24 @@ const emptyStore = (): StoreData => ({
   runs: [],
 });
 
+function memory(): StoreData {
+  if (!globalStore.__scrollshow) globalStore.__scrollshow = emptyStore();
+  return globalStore.__scrollshow;
+}
+
 async function readLocal(): Promise<StoreData> {
   try {
-    const raw = await readFile(LOCAL_PATH, "utf8");
+    const raw = await readFile(filePath(), "utf8");
     return JSON.parse(raw) as StoreData;
   } catch {
-    return emptyStore();
+    return memory();
   }
 }
 
 async function writeLocal(data: StoreData) {
-  await mkdir(path.dirname(LOCAL_PATH), { recursive: true });
-  await writeFile(LOCAL_PATH, JSON.stringify(data), "utf8");
+  const target = filePath();
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, JSON.stringify(data), "utf8");
 }
 
 async function readBlob(): Promise<StoreData> {
@@ -49,12 +61,21 @@ function useBlob() {
 }
 
 export async function readStore(): Promise<StoreData> {
-  return useBlob() ? readBlob() : readLocal();
+  const cached = globalStore.__scrollshow;
+  if (cached && (cached.users.length || cached.accounts.length)) return cached;
+  const data = useBlob() ? await readBlob() : await readLocal();
+  globalStore.__scrollshow = data;
+  return data;
 }
 
 export async function writeStore(data: StoreData) {
-  if (useBlob()) await writeBlob(data);
-  else await writeLocal(data);
+  globalStore.__scrollshow = data;
+  try {
+    if (useBlob()) await writeBlob(data);
+    else await writeLocal(data);
+  } catch {
+    // Memory still holds the workspace if disk/blob is unavailable.
+  }
 }
 
 export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>) {
