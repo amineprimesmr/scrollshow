@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/components/BrandMark";
 import { prefersEnglish, t } from "@/lib/i18n";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     <div className="ss-studio">
       <nav className="ss-rail">
         <Link href="/">
-          <img src="/logo.svg" alt="ScrollShow" className="ss-rail__logo" />
+          <BrandMark size={36} className="ss-rail__logo" />
         </Link>
         {NAV.map((item) => (
           <Link key={item.href} href={item.href} className={pathname === item.href ? "is-active" : ""}>
@@ -71,7 +72,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`}
           onClick={() => setActiveChannel("all")}
         >
-          <img src="/logo.svg" alt="" />
+          <BrandMark size={28} alt="" />
           <span>
             <b>{t("Tous les comptes", "All channels", english)}</b>
             <span>{t(`${live.length} connecté${live.length > 1 ? "s" : ""}`, `${live.length} connected`, english)}</span>

@@ -1,10 +1,12 @@
+import { BrandMark } from "@/components/BrandMark";
 import Link from "next/link";
 
 export default function PricingPage() {
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
-      <Link href="/" className="text-sm text-[var(--muted)]">
-        ← ScrollShow
+      <Link href="/" className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+        <BrandMark size={28} />
+        ScrollShow
       </Link>
       <h1 className="serif mt-8 text-5xl">Tarifs</h1>
       <p className="mt-4 max-w-xl text-[var(--muted)]">

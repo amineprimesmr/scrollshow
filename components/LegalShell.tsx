@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { BrandMark } from "@/components/BrandMark";
 import { prefersEnglish, t } from "@/lib/i18n";
 import "@/app/legal.css";
 
@@ -19,7 +20,7 @@ export async function LegalShell({
     <main className="ss-legal">
       <div className="ss-legal__inner">
         <Link href="/" className="ss-legal__brand">
-          <img src="/logo.svg" width={36} height={36} alt="ScrollShow" />
+          <BrandMark size={36} />
           <span>ScrollShow</span>
         </Link>
         <h1>{t(titleFr, titleEn, english)}</h1>

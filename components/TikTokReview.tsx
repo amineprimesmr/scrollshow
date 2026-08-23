@@ -1,6 +1,7 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
+import { BrandMark } from "@/components/BrandMark";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import "@/app/review/review.css";
@@ -35,7 +36,7 @@ export function TikTokReview() {
     <main className="ss-review">
       <header className="ss-review__bar">
         <Link href="/" className="ss-review__brand">
-          <img src="/logo.svg" alt="ScrollShow" />
+          <BrandMark size={32} />
           ScrollShow
         </Link>
         <span>{t("Démo review TikTok (sans login)", "TikTok review demo (no login)", english)}</span>

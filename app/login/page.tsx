@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/components/BrandMark";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -34,8 +35,9 @@ function LoginForm() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <Link href="/" className="mb-8 text-sm text-[var(--muted)]">
-        ← ScrollShow
+      <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+        <BrandMark size={28} />
+        ScrollShow
       </Link>
       <h1 className="serif text-4xl">Connexion</h1>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">

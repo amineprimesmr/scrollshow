@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/components/BrandMark";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -37,8 +38,9 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <Link href="/" className="mb-8 text-sm text-[var(--muted)]">
-        ← ScrollShow
+      <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+        <BrandMark size={28} />
+        ScrollShow
       </Link>
       <h1 className="serif text-4xl">Créer un espace</h1>
       <p className="mt-3 text-[var(--muted)]">Gratuit. 10 comptes. Ta bibliothèque démarre avec 3 exemples.</p>

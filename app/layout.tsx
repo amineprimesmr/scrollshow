@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 
@@ -6,6 +6,10 @@ const sans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
 });
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+};
 
 const serif = Newsreader({
   subsets: ["latin"],
@@ -21,7 +25,20 @@ export const metadata: Metadata = {
   },
   description:
     "ScrollShow connects TikTok via Login Kit and publishes photo carousels with the Content Posting API.",
-  icons: { icon: "/favicon.svg", apple: "/icon-1024.png" },
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-1024.png", sizes: "1024x1024", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180" },
+      { url: "/icon-1024.png", sizes: "1024x1024" },
+    ],
+    shortcut: "/favicon.ico",
+  },
   openGraph: {
     title: "ScrollShow",
     description: "Connect TikTok. Preview carousels. Set privacy. Publish. View stats.",
@@ -29,6 +46,13 @@ export const metadata: Metadata = {
     siteName: "ScrollShow",
     locale: "fr_FR",
     type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "ScrollShow" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ScrollShow",
+    description: "Connect TikTok. Preview carousels. Set privacy. Publish. View stats.",
+    images: ["/og.png"],
   },
 };
 

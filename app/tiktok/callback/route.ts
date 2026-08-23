@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         platform: "tiktok",
         name: profile.display_name || profile.username || "TikTok",
         handle: profile.username || "tiktok",
-        avatar: profile.avatar_url || profile.avatar_url_100 || "/logo.svg",
+        avatar: profile.avatar_url || profile.avatar_url_100 || "/logo.png",
         connected: true,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
@@ -57,7 +57,11 @@ export async function GET(request: Request) {
     (await cookies()).delete("ss_oauth_state");
     return NextResponse.redirect(`${site}/app?connected=1`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "oauth";
-    return NextResponse.redirect(`${site}/app?error=${encodeURIComponent(message.slice(0, 160))}`);
+    const raw = error instanceof Error ? error.message : "oauth";
+    let code = "oauth";
+    if (raw.includes("invalid_client")) code = "invalid_client";
+    else if (raw.includes("invalid_grant") || raw.includes("invalid_code")) code = "invalid_grant";
+    else if (raw.includes("access_denied")) code = "access_denied";
+    return NextResponse.redirect(`${site}/app?error=${code}`);
   }
 }

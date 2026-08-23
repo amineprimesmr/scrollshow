@@ -38,7 +38,7 @@ function t(fr: string, en: string, english: boolean) {
 }
 
 function Logo({ size = 22 }: { size?: number }) {
-  return <img src="/logo.svg" alt="" width={size} height={size} style={{ borderRadius: 6 }} />;
+  return <img src="/logo.png" alt="" width={size} height={size} className="af-app-icon" />;
 }
 
 function CtaDot() {
