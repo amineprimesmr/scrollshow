@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Newsreader } from "next/font/google";
+import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const sans = Geist({
+const sans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
 });
 
 const serif = Newsreader({
   subsets: ["latin"],
+  style: ["normal", "italic"],
   variable: "--font-serif",
 });
 

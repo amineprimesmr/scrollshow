@@ -16,8 +16,17 @@ body {
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
   min-height: 100vh;
+}
+
+html:has(.af-ld) body {
+  background: #f3f3f4;
+  color: #0a0a0a;
+}
+
+html:has(.af-ld) body.grain {
+  background-image: none;
 }
 
 .serif {
