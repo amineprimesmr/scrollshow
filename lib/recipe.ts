@@ -20,6 +20,7 @@ export const overlayInputSchema = z.object({
   align: z.enum(["left", "center", "right"]).optional(),
   width: z.number().optional(),
   lineHeight: z.number().optional(),
+  backdrop: z.string().optional(),
 });
 
 export const slideInputSchema = z.object({
@@ -95,6 +96,7 @@ export function defaultOverlay(partial?: Partial<SlideOverlay>): SlideOverlay {
     align: partial?.align || "center",
     width: partial?.width ?? 86,
     lineHeight: partial?.lineHeight ?? 1.05,
+    backdrop: partial?.backdrop,
   };
 }
 
@@ -286,7 +288,10 @@ export function overlayStyle(overlay: SlideOverlay, canvasWidth: number) {
     fontWeight: overlay.fontWeight,
     lineHeight: overlay.lineHeight ?? 1.05,
     whiteSpace: "pre-wrap" as const,
-    textShadow: "0 2px 12px rgb(0 0 0 / 0.45)",
+    textShadow: overlay.backdrop ? "none" : "0 2px 12px rgb(0 0 0 / 0.45)",
+    background: overlay.backdrop || "transparent",
+    padding: overlay.backdrop ? "0.12em 0.4em" : undefined,
+    borderRadius: overlay.backdrop ? 12 : undefined,
     pointerEvents: "none" as const,
   };
 }

@@ -81,6 +81,7 @@ export type SlideOverlay = {
   align: OverlayAlign;
   width?: number;
   lineHeight?: number;
+  backdrop?: string;
 };
 
 export type CarouselSlide = {

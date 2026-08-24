@@ -27,12 +27,15 @@ const PRIVACY = [
 function rebuildCopy(code: string, english: boolean) {
   if (code === "ai_gateway_missing") {
     return t(
-      "Le modèle du site n’est pas branché. Ajoute AI_GATEWAY_API_KEY dans .env.local (Vercel → AI Gateway), ou lance reconstruct_post depuis le MCP.",
-      "The site model is not connected. Add AI_GATEWAY_API_KEY to .env.local (Vercel → AI Gateway), or run reconstruct_post from MCP.",
+      "Le modèle du site n’est pas branché. Active AI Gateway sur le projet Vercel, ou ajoute AI_GATEWAY_API_KEY.",
+      "The site model is not connected. Enable AI Gateway on the Vercel project, or add AI_GATEWAY_API_KEY.",
       english,
     );
   }
-  return t("Impossible de recréer les calques éditables.", "Could not rebuild the editable layers.", english);
+  if (code === "image_missing") {
+    return t("Impossible de lire les images importées.", "Could not read the imported images.", english);
+  }
+  return t("Impossible de recréer les calques éditables. Réessaie dans un instant.", "Could not rebuild the editable layers. Try again in a moment.", english);
 }
 
 export function CreatePostModal() {

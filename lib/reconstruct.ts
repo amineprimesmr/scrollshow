@@ -20,25 +20,28 @@ export class ReconstructError extends Error {
   }
 }
 
+const num = z.union([z.number(), z.string()]);
+
 const analyzedOverlaySchema = z.object({
   text: z.string(),
-  fontFamily: z.string(),
-  fontSize: z.number(),
-  fontWeight: z.number(),
-  color: z.string(),
-  x: z.number(),
-  y: z.number(),
-  align: z.enum(["left", "center", "right"]),
-  width: z.number(),
-  lineHeight: z.number().optional(),
+  fontFamily: z.string().optional(),
+  fontSize: num.optional(),
+  fontWeight: num.optional(),
+  color: z.string().optional(),
+  x: num.optional(),
+  y: num.optional(),
+  align: z.string().optional(),
+  width: num.optional(),
+  lineHeight: num.optional(),
+  backdrop: z.string().optional(),
 });
 
 const analyzedSlideSchema = z.object({
-  backgroundType: z.enum(["solid", "gradient", "photo"]),
+  backgroundType: z.string(),
   backgroundColor: z.string(),
   backgroundColor2: z.string().optional(),
-  keepPhoto: z.boolean(),
-  fontFamily: z.string(),
+  keepPhoto: z.boolean().optional(),
+  fontFamily: z.string().optional(),
   overlays: z.array(analyzedOverlaySchema).max(12),
 });
 
@@ -46,8 +49,13 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function namedHex(value: string, fallback = "#ffffff") {
-  const raw = value.trim().toLowerCase();
+function asNumber(value: unknown, fallback: number) {
+  const n = typeof value === "number" ? value : Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function namedHex(value: string | undefined, fallback = "#ffffff") {
+  const raw = String(value || "").trim().toLowerCase();
   const named: Record<string, string> = {
     white: "#ffffff",
     black: "#000000",
@@ -73,7 +81,7 @@ function namedHex(value: string, fallback = "#ffffff") {
 
 function gatewayMissing(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /api key|unauthoriz|ai_gateway|oidc|forbidden|401|403|credential/i.test(message);
+  return /api key|unauthoriz|ai_gateway|oidc|forbidden|401|403|credential|missing.*key|no.*key|loadapikey|authentication/i.test(message);
 }
 
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>) {
@@ -92,6 +100,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: num
 async function analyzeSlide(imageUrl: string) {
   const file = await readSlideBytes(imageUrl);
   if (!file) throw new ReconstructError("image_missing", 400);
+  const mediaType = file.contentType.startsWith("image/") ? file.contentType : "image/jpeg";
   const result = await generateText({
     model: MODEL,
     maxOutputTokens: 2000,
@@ -116,11 +125,16 @@ Rules:
 - x and y are percentages of the canvas. They are the anchor of the text block (center if align=center, left edge if align=left, right edge if align=right). y is the vertical center of the block.
 - width is the text box width as a percentage of the canvas (usually 78-92).
 - If the background is a flat color or simple gradient, keepPhoto=false and set backgroundColor (and backgroundColor2 for a gradient).
-- If the background is a real photograph, keepPhoto=true and still extract the texts.
+- If the background is a real photograph, keepPhoto=true, keep the photo, still extract the texts, and set backdrop to a hex color that covers the original baked text behind each overlay.
 - Prefer 1-4 overlay blocks, not one overlay per word.
-- Colors as #rrggbb.`,
+- Colors as #rrggbb.
+- align is left, center or right.`,
           },
-          { type: "image", image: file.bytes, mediaType: file.contentType },
+          {
+            type: "file",
+            mediaType,
+            data: new Uint8Array(file.bytes),
+          },
         ],
       },
     ],
@@ -131,6 +145,7 @@ Rules:
 
 function toSlide(current: CarouselSlide, analyzed: z.infer<typeof analyzedSlideSchema>): CarouselSlide {
   const overlays = analyzed.overlays.filter((overlay) => overlay.text.trim());
+  const keepPhoto = Boolean(analyzed.keepPhoto) || String(analyzed.backgroundType).toLowerCase() === "photo";
   if (!overlays.length) {
     return defaultSlide(current.image, {
       id: current.id,
@@ -144,23 +159,25 @@ function toSlide(current: CarouselSlide, analyzed: z.infer<typeof analyzedSlideS
     sourceImage: current.sourceImage || current.image,
     backgroundColor: namedHex(analyzed.backgroundColor, "#111111"),
     backgroundColor2: analyzed.backgroundColor2 ? namedHex(analyzed.backgroundColor2, namedHex(analyzed.backgroundColor)) : undefined,
-    keepPhoto: false,
+    keepPhoto,
     html: undefined,
     css: undefined,
-    overlays: overlays.map((overlay) =>
-        defaultOverlay({
-          text: overlay.text.replace(/\r\n/g, "\n").trim(),
-          fontFamily: closestFont(overlay.fontFamily),
-          fontSize: clamp(Math.round(overlay.fontSize), 18, 200),
-          fontWeight: clamp(Math.round(overlay.fontWeight), 400, 900),
-          color: namedHex(overlay.color),
-          x: clamp(overlay.x, 4, 96),
-          y: clamp(overlay.y, 4, 96),
-          align: overlay.align,
-          width: clamp(overlay.width, 40, 96),
-          lineHeight: clamp(overlay.lineHeight || 1.05, 0.85, 1.5),
-        }),
-      ),
+    overlays: overlays.map((overlay) => {
+      const align = overlay.align === "left" || overlay.align === "right" ? overlay.align : "center";
+      return defaultOverlay({
+        text: overlay.text.replace(/\r\n/g, "\n").trim(),
+        fontFamily: closestFont(overlay.fontFamily || ""),
+        fontSize: clamp(Math.round(asNumber(overlay.fontSize, 64)), 18, 200),
+        fontWeight: clamp(Math.round(asNumber(overlay.fontWeight, 800)), 400, 900),
+        color: namedHex(overlay.color),
+        x: clamp(asNumber(overlay.x, 50), 4, 96),
+        y: clamp(asNumber(overlay.y, 78), 4, 96),
+        align,
+        width: clamp(asNumber(overlay.width, 86), 40, 96),
+        lineHeight: clamp(asNumber(overlay.lineHeight, 1.05), 0.85, 1.5),
+        backdrop: keepPhoto ? namedHex(overlay.backdrop, "#000000") : overlay.backdrop ? namedHex(overlay.backdrop) : undefined,
+      });
+    }),
   });
 }
 
@@ -183,6 +200,7 @@ export async function reconstructRecipe(recipe: CarouselRecipe): Promise<Carouse
       slides,
     };
   } catch (error) {
+    console.error("[reconstruct]", error);
     if (error instanceof ReconstructError) throw error;
     if (gatewayMissing(error)) throw new ReconstructError("ai_gateway_missing", 503);
     throw new ReconstructError("reconstruct_failed", 500);

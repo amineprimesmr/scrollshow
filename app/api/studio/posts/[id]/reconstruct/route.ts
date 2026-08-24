@@ -2,6 +2,7 @@ import { AgentError, agentReconstructPost } from "@/lib/agent";
 import { readSession } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(
@@ -15,6 +16,7 @@ export async function POST(
     const post = await agentReconstructPost(user, id);
     return NextResponse.json({ post, recipe: post.recipe });
   } catch (error) {
+    console.error("[reconstruct:route]", error);
     const message = error instanceof AgentError ? error.message : "reconstruct_failed";
     const status = error instanceof AgentError ? error.status : 500;
     return NextResponse.json({ error: message }, { status });

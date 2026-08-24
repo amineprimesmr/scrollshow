@@ -118,7 +118,10 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
                 lineHeight: overlay.lineHeight ?? 1.05,
                 textAlign: overlay.align,
                 whiteSpace: "pre-wrap",
-                textShadow: "0 2px 12px rgba(0,0,0,0.45)",
+                textShadow: overlay.backdrop ? "none" : "0 2px 12px rgba(0,0,0,0.45)",
+                background: overlay.backdrop || "transparent",
+                padding: overlay.backdrop ? 16 : 0,
+                borderRadius: overlay.backdrop ? 16 : 0,
               }}
             >
               {overlay.text}
