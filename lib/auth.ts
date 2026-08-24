@@ -2,6 +2,7 @@ import { compare, hash } from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { isPaidPlan, type Plan } from "./plans";
+import { publicUser, readStore } from "./store";
 import type { SessionUser } from "./types";
 
 const COOKIE = "ss_session";
@@ -65,9 +66,22 @@ export async function clearSessionCookie() {
   (await cookies()).delete(COOKIE);
 }
 
+export async function refreshSessionFromStore(): Promise<SessionUser | null> {
+  const session = await readSession();
+  if (!session) return null;
+  const data = await readStore();
+  const stored = data.users.find((item) => item.id === session.id);
+  if (!stored) return session;
+  const user = publicUser(stored);
+  if (user.plan !== session.plan || user.name !== session.name || user.email !== session.email) {
+    await setSessionCookie(user);
+  }
+  return user;
+}
+
 export function canAddAccount(plan: Plan, count: number) {
   if (plan === "starter") return count < 1;
   if (plan === "creator") return count < 3;
   if (plan === "pro") return true;
-  return count < 10;
+  return false;
 }

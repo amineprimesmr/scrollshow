@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!code) return NextResponse.redirect(`${site}/app?error=missing_code`);
 
   const user = await readSession();
-  if (!user) return NextResponse.redirect(`${site}/login?next=/app`);
+  if (!user) return NextResponse.redirect(`${site}/signup?mode=signin&next=/app`);
 
   const expected = (await cookies()).get("ss_oauth_state")?.value || "";
   if (expected && state && expected !== state) {

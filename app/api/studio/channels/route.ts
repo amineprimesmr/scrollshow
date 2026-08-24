@@ -1,5 +1,5 @@
 import { readSession } from "@/lib/auth";
-import { PLATFORMS } from "@/lib/platforms";
+import { isPlatformId, platformById } from "@/lib/platforms";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -15,9 +15,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
-  const platform = PLATFORMS.some((item) => item.id === parsed.data.platform)
-    ? parsed.data.platform
-    : "tiktok";
+  const platform = isPlatformId(parsed.data.platform) ? parsed.data.platform : "tiktok";
 
   const channel = await updateStore((data) => {
     const created = {
@@ -26,7 +24,7 @@ export async function POST(request: Request) {
       platform,
       name: parsed.data.name,
       handle: parsed.data.handle.replace(/^@/, ""),
-      avatar: "/assets/avatars/leo.png",
+      avatar: platformById(platform)?.logo || "/assets/avatars/leo.png",
     };
     data.channels.unshift(created);
     return created;

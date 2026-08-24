@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const user = await readSession();
-  if (!user) return NextResponse.redirect(new URL("/login?next=/pricing", request.url));
+  if (!user) return NextResponse.redirect(new URL("/signup?mode=signin&next=/pricing", request.url));
 
   const sessionId = new URL(request.url).searchParams.get("session_id");
   if (!sessionId) return NextResponse.redirect(new URL("/pricing", request.url));
@@ -31,5 +31,5 @@ export async function GET(request: Request) {
   });
 
   if (updated) await setSessionCookie(publicUser(updated));
-  return NextResponse.redirect(new URL("/app/billing?upgraded=1", request.url));
+  return NextResponse.redirect(new URL("/app", request.url));
 }

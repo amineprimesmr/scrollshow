@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "scrollshow": {
+      "url": "https://scrollshow.io/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:SCROLLSHOW_API_KEY}"
+      }
+    }
+  }
+}

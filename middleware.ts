@@ -1,7 +1,9 @@
+import { signupUrl } from "@/lib/auth-urls";
+import { hasStudioAccess } from "@/lib/plans";
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/tiktok"];
+const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/tiktok", "/api/keys"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -15,17 +17,31 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const dest = signupUrl({
+      mode: "signin",
+      next: `${pathname}${request.nextUrl.search}`,
+    });
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   try {
-    await jwtVerify(token, new TextEncoder().encode(secret));
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    if (!hasStudioAccess(typeof payload.plan === "string" ? payload.plan : undefined)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "payment_required" }, { status: 402 });
+      }
+      return NextResponse.redirect(new URL("/pricing", request.url));
+    }
     return NextResponse.next();
   } catch {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/login", request.url));
+    const dest = signupUrl({
+      mode: "signin",
+      next: `${pathname}${request.nextUrl.search}`,
+    });
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 }
 
@@ -41,5 +57,7 @@ export const config = {
     "/api/studio/:path*",
     "/api/tiktok",
     "/api/tiktok/:path*",
+    "/api/keys",
+    "/api/keys/:path*",
   ],
 };

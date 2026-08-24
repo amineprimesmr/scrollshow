@@ -4,7 +4,8 @@ export type User = {
   id: string;
   email: string;
   name: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
   plan: import("./plans").Plan;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
@@ -73,6 +74,16 @@ export type MediaItem = {
   createdAt: string;
 };
 
+export type ApiKey = {
+  id: string;
+  userId: string;
+  name: string;
+  prefix: string;
+  hash: string;
+  createdAt: string;
+  lastUsedAt?: string;
+};
+
 export type StoreData = {
   users: User[];
   accounts: Account[];
@@ -80,6 +91,7 @@ export type StoreData = {
   channels: Channel[];
   posts: StudioPost[];
   media: MediaItem[];
+  apiKeys: ApiKey[];
 };
 
 export type SessionUser = {

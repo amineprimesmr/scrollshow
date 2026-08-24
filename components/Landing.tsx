@@ -8,10 +8,8 @@ const REELS = [
   { src: "/assets/tiktoks/02-foods-107k.png", slot: 2 },
   { src: "/assets/tiktoks/03-guide-178k.png", slot: 3 },
   { src: "/assets/tiktoks/07-pov-98k.png", slot: 4 },
-  { src: "/assets/tiktoks/05-beach-39k.png", slot: 5 },
-  { src: "/assets/tiktoks/06-water-25k.png", slot: 6 },
-  { src: "/assets/tiktoks/04-marlon-65k.png", slot: 7 },
-  { src: "/assets/tiktoks/08-car-16k.png", slot: 8 },
+  { src: "/assets/tiktoks/04-marlon-65k.png", slot: 5 },
+  { src: "/assets/tiktoks/08-car-16k.png", slot: 6 },
 ];
 
 const AVATARS = [
@@ -129,7 +127,7 @@ function ViewsHero({ english }: { english: boolean }) {
             )}
           </p>
           <div className="af-ld-hero-cta-wrap">
-            <Link href="/signup" className="af-ld-hero-cta">
+            <Link href="/pricing" className="af-ld-hero-cta">
               <Logo size={28} />
               <span className="af-ld-hero-cta__label">{t("Créer mon espace", "Create my workspace", english)}</span>
             </Link>
@@ -143,10 +141,28 @@ function ViewsHero({ english }: { english: boolean }) {
 export function Landing() {
   const [english, setEnglish] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
   const baseId = useId();
 
   useEffect(() => {
     setEnglish(prefersEnglish());
+  }, []);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    const inner = nav?.querySelector<HTMLElement>(".af-ld-topnav__inner");
+    if (!nav || !inner) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const onScroll = () => {
+      const p = reduce ? 0 : Math.min(1, Math.max(0, window.scrollY / 180));
+      nav.style.setProperty("--nav-p", p.toFixed(3));
+      const frost = `blur(${(p * 14).toFixed(1)}px) saturate(${(1 + p * 0.2).toFixed(2)})`;
+      inner.style.backdropFilter = frost;
+      inner.style.webkitBackdropFilter = frost;
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const faq = [
@@ -170,10 +186,10 @@ export function Landing() {
     },
     {
       id: "free",
-      q: t("C’est gratuit ?", "Is it free?", english),
+      q: t("Je dois payer ?", "Do I have to pay?", english),
       a: t(
-        "Oui. Le plan Free donne 10 comptes. Pro à 29 €/mois enlève la limite.",
-        "Yes. Free includes 10 accounts. Pro at €29/month removes the cap.",
+        "3 jours d’essai offerts sur Starter, Creator et Pro. Ensuite un abonnement est obligatoire pour ouvrir le studio.",
+        "3-day trial on Starter, Creator, and Pro. After that a subscription is required to open the studio.",
         english,
       ),
     },
@@ -181,13 +197,13 @@ export function Landing() {
 
   return (
     <div className="af-ld">
-      <header className="af-ld-topnav">
+      <header ref={navRef} className="af-ld-topnav">
         <div className="af-ld-topnav__inner">
           <Link className="af-ld-brand" href="/">
             <Logo />
             <span>ScrollShow</span>
           </Link>
-          <Link className="af-ld-topnav__cta" href="/signup">
+          <Link className="af-ld-topnav__cta" href="/signup?mode=signin">
             {t("Se connecter · S'inscrire", "Log in · Sign up", english)}
           </Link>
         </div>
@@ -221,7 +237,7 @@ export function Landing() {
                     )}
                   </span>
                 </p>
-                <Link href="/signup" className="af-ld-dark-cta">
+                <Link href="/pricing" className="af-ld-dark-cta">
                   <CtaDot />
                   {t("Commencer", "Get started", english)}
                   <span aria-hidden>›</span>
@@ -238,7 +254,7 @@ export function Landing() {
                   </div>
                 </div>
                 <h3>1 - {t("Crée ton espace", "Create your workspace", english)}</h3>
-                <p>{t("Compte gratuit, 10 comptes, 3 exemples déjà classés.", "Free account, 10 slots, 3 sample accounts already filed.", english)}</p>
+                <p>{t("Choisis un plan, 3 jours d’essai, puis tu ouvres le studio.", "Pick a plan, 3-day trial, then you open the studio.", english)}</p>
               </article>
               <article className="af-ld-step-card">
                 <div className="af-ld-step-visual">
@@ -266,6 +282,27 @@ export function Landing() {
           </div>
         </section>
 
+        <section id="reseaux" className="af-ld-networks" aria-label={t("Plateformes", "Platforms", english)}>
+          <p className="af-ld-networks__title">
+            {t("Les automatisations fonctionnent avec", "Automations work with", english)}
+          </p>
+          <ul className="af-ld-networks__row">
+            {[
+              { id: "tiktok", name: "TikTok", src: "/assets/platforms/tiktok.png" },
+              { id: "instagram", name: "Instagram", src: "/assets/platforms/instagram.png" },
+              { id: "facebook", name: "Facebook", src: "/assets/platforms/facebook.png" },
+              { id: "x", name: "X", src: "/assets/platforms/x.png" },
+            ].map((brand) => (
+              <li key={brand.id}>
+                <span className={`af-ld-networks__brand${brand.id === "x" ? " is-x" : ""}`}>
+                  <img src={brand.src} alt="" width={36} height={36} />
+                  {brand.name}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section id="offre" className="af-ld-offer">
           <div className="af-ld-offer__inner">
             <h2>
@@ -286,16 +323,16 @@ export function Landing() {
               </span>
             </div>
             <article className="af-ld-offer__card">
-              <p className="af-ld-offer__kicker">{t("Plan Free — accès immédiat", "Free plan — instant access", english)}</p>
+              <p className="af-ld-offer__kicker">{t("Essai 3 jours — puis un abonnement", "3-day trial — then a subscription", english)}</p>
               <p className="af-ld-offer__price-row">
                 <span className="af-ld-offer__price">0 €</span>
-                <span>{t("puis 29 € / mois en Pro", "then €29 / month on Pro", english)}</span>
+                <span>{t("pendant 3 jours, ensuite à partir de 29,99 € / mois", "for 3 days, then from €29.99 / month", english)}</span>
               </p>
               <ul>
                 {[
                   t("Bibliothèque Keep / Watch / Skip", "Keep / Watch / Skip library", english),
                   t("Découvertes par mots-clés", "Keyword discoveries", english),
-                  t("10 comptes en Free, illimité en Pro", "10 accounts on Free, unlimited on Pro", english),
+                  t("Starter, Creator ou Pro — tu choisis avant d’entrer", "Starter, Creator, or Pro — you choose before you enter", english),
                   t("FR + EN", "FR + EN", english),
                 ].map((item) => (
                   <li key={item}>
@@ -304,7 +341,7 @@ export function Landing() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup" className="af-ld-offer__cta">
+              <Link href="/pricing" className="af-ld-offer__cta">
                 <CtaDot />
                 {t("Créer mon espace", "Create my workspace", english)}
                 <span aria-hidden>›</span>
@@ -371,7 +408,7 @@ export function Landing() {
                   <span>{t("Créateurs ScrollShow", "ScrollShow creators", english)}</span>
                 </span>
               </div>
-              <Link href="/signup" className="af-ld-closing__cta">
+              <Link href="/pricing" className="af-ld-closing__cta">
                 <CtaDot />
                 {t("Créer mon espace", "Create my workspace", english)}
                 <span aria-hidden>›</span>
@@ -406,10 +443,13 @@ export function Landing() {
                   <a href="#comment">{t("Méthode", "Method", english)}</a>
                 </li>
                 <li>
+                  <a href="#reseaux">{t("Plateformes", "Platforms", english)}</a>
+                </li>
+                <li>
                   <Link href="/pricing">{t("Tarifs", "Pricing", english)}</Link>
                 </li>
                 <li>
-                  <Link href="/login">{t("Connexion", "Log in", english)}</Link>
+                  <Link href="/signup?mode=signin">{t("Connexion", "Log in", english)}</Link>
                 </li>
               </ul>
             </section>

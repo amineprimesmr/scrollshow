@@ -1,4 +1,4 @@
-import { put, list } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Account, Run, StoreData, User } from "./types";
@@ -19,6 +19,7 @@ const emptyStore = (): StoreData => ({
   channels: [],
   posts: [],
   media: [],
+  apiKeys: [],
 });
 
 function memory(): StoreData {
@@ -42,25 +43,25 @@ async function writeLocal(data: StoreData) {
 }
 
 async function readBlob(): Promise<StoreData> {
-  const { blobs } = await list({ prefix: BLOB_NAME });
-  const file = blobs.find((item) => item.pathname === BLOB_NAME);
-  if (!file) return emptyStore();
-  const res = await fetch(file.url, { cache: "no-store" });
-  if (!res.ok) return emptyStore();
-  return (await res.json()) as StoreData;
+  const result = await get(BLOB_NAME, { access: "private", useCache: false });
+  if (!result?.stream) return emptyStore();
+  const raw = await new Response(result.stream).text();
+  if (!raw.trim()) return emptyStore();
+  return JSON.parse(raw) as StoreData;
 }
 
 async function writeBlob(data: StoreData) {
   await put(BLOB_NAME, JSON.stringify(data), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
+    cacheControlMaxAge: 60,
   });
 }
 
 function useBlob() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 }
 
 function normalize(data: StoreData): StoreData {
@@ -70,6 +71,7 @@ function normalize(data: StoreData): StoreData {
   data.accounts ||= [];
   data.runs ||= [];
   data.users ||= [];
+  data.apiKeys ||= [];
   return data;
 }
 

@@ -1,8 +1,8 @@
-import { readSession } from "@/lib/auth";
+import { refreshSessionFromStore } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const user = await readSession();
+  const user = await refreshSessionFromStore();
   if (!user) return NextResponse.json({ user: null }, { status: 401 });
   return NextResponse.json({ user });
 }

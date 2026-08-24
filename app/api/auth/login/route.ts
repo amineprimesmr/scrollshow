@@ -16,7 +16,13 @@ export async function POST(request: Request) {
 
   const data = await readStore();
   const user = findUserByEmail(data, parsed.data.email);
-  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+  if (!user) {
+    return NextResponse.json({ error: "credentials" }, { status: 401 });
+  }
+  if (!user.passwordHash) {
+    return NextResponse.json({ error: "google" }, { status: 401 });
+  }
+  if (!(await verifyPassword(parsed.data.password, user.passwordHash))) {
     return NextResponse.json({ error: "credentials" }, { status: 401 });
   }
 

@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) {
-    return NextResponse.json({ error: "auth", login: "/login?next=/pricing" }, { status: 401 });
+    return NextResponse.json({ error: "auth", login: "/signup?next=/pricing" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({}));

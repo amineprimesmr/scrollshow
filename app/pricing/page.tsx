@@ -1,10 +1,10 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
-import { formatEuro, PLANS, TRIAL_DAYS, yearlyOffer, type BillingInterval, type PaidPlan } from "@/lib/plans";
+import { formatEuro, hasStudioAccess, isPaidPlan, PLANS, TRIAL_DAYS, yearlyOffer, type BillingInterval, type PaidPlan } from "@/lib/plans";
 import { prefersEnglish, t } from "@/lib/i18n";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./pricing.css";
 
 const ORDER: PaidPlan[] = ["starter", "creator", "pro"];
@@ -14,14 +14,21 @@ export default function PricingPage() {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [pending, setPending] = useState<string>("");
   const [email, setEmail] = useState("");
+  const [plan, setPlan] = useState("");
+  const [ready, setReady] = useState(false);
   const [upsell, setUpsell] = useState<PaidPlan | null>(null);
+  const autoStart = useRef(false);
 
   useEffect(() => {
     setEnglish(prefersEnglish());
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : { user: null }))
-      .then((json) => setEmail(json.user?.email || ""))
-      .catch(() => {});
+      .then((json) => {
+        setEmail(json.user?.email || "");
+        setPlan(json.user?.plan || "");
+      })
+      .catch(() => {})
+      .finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
@@ -48,7 +55,8 @@ export default function PricingPage() {
     const json = await res.json().catch(() => ({}));
     setPending("");
     if (res.status === 401) {
-      window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
+      const next = `/pricing?plan=${plan}&interval=${nextInterval}`;
+      window.location.href = `/signup?next=${encodeURIComponent(next)}`;
       return;
     }
     if (json.url) {
@@ -66,6 +74,16 @@ export default function PricingPage() {
     void checkout(plan, "year");
   }
 
+  useEffect(() => {
+    if (!ready || autoStart.current || !email || hasStudioAccess(plan)) return;
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("plan") || "";
+    if (!isPaidPlan(wanted)) return;
+    autoStart.current = true;
+    const nextInterval: BillingInterval = params.get("interval") === "year" ? "year" : "month";
+    void checkout(wanted, nextInterval);
+  }, [ready, email, plan]);
+
   return (
     <main className="ss-pricing">
       <nav className="ss-pricing__nav">
@@ -75,18 +93,30 @@ export default function PricingPage() {
         </Link>
         <div className="ss-pricing__nav-meta">
           {email ? <span>{email}</span> : null}
-          <Link href={email ? "/app" : "/login"}>{email ? t("Studio", "Studio", english) : t("Connexion", "Log in", english)}</Link>
+          {hasStudioAccess(plan) ? (
+            <Link href="/app">{t("Studio", "Studio", english)}</Link>
+          ) : (
+            <Link href={email ? "/pricing" : "/signup?mode=signin"}>
+              {email ? t("Compte créé", "Account ready", english) : t("Connexion", "Log in", english)}
+            </Link>
+          )}
         </div>
       </nav>
 
       <header className="ss-pricing__hero">
         <h1>{t("Choisis un abonnement après ton essai offert de 3 jours", "Choose a plan after your 3-day free trial", english)}</h1>
         <p>
-          {t(
-            `Débloque ScrollShow. ${TRIAL_DAYS} jours d’essai offerts sur chaque offre.`,
-            `Unlock ScrollShow. ${TRIAL_DAYS}-day free trial on every plan.`,
-            english,
-          )}
+          {email && !hasStudioAccess(plan)
+            ? t(
+                "Ton compte est créé. Choisis un plan pour ouvrir le studio.",
+                "Your account is ready. Choose a plan to open the studio.",
+                english,
+              )
+            : t(
+                `Débloque ScrollShow. ${TRIAL_DAYS} jours d’essai offerts sur chaque offre.`,
+                `Unlock ScrollShow. ${TRIAL_DAYS}-day free trial on every plan.`,
+                english,
+              )}
         </p>
         <div className="ss-pricing__toggle">
           <button type="button" className={interval === "month" ? "is-on" : ""} onClick={() => setInterval("month")}>

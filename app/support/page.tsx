@@ -21,7 +21,7 @@ function Fr() {
       </p>
       <h2>Connexion TikTok</h2>
       <p>
-        Crée un compte sur <a href="https://scrollshow.io/signup">scrollshow.io/signup</a>, ouvre l’espace, puis
+        Crée un compte, choisis un plan sur <a href="https://scrollshow.io/pricing">scrollshow.io/pricing</a>, ouvre le studio, puis
         « Continuer avec TikTok ». La redirection officielle est{" "}
         <code>https://scrollshow.io/tiktok/callback</code>.
       </p>
@@ -43,7 +43,7 @@ function En() {
       </p>
       <h2>Connect TikTok</h2>
       <p>
-        Create an account at <a href="https://scrollshow.io/signup">scrollshow.io/signup</a>, open the workspace,
+        Create an account, pick a plan at <a href="https://scrollshow.io/pricing">scrollshow.io/pricing</a>, open the studio,
         then “Continue with TikTok”. Official redirect: <code>https://scrollshow.io/tiktok/callback</code>.
       </p>
       <h2>Disconnect</h2>

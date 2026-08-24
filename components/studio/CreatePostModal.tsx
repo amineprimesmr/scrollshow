@@ -1,6 +1,7 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
+import { platformName } from "@/lib/platforms";
 import { useEffect, useState } from "react";
 import { useStudio } from "./StudioContext";
 
@@ -147,7 +148,7 @@ export function CreatePostModal() {
                       );
                     }}
                   />
-                  {channel.name}
+                  {channel.name} · {platformName(channel.platform)}
                 </label>
               ))}
             </div>
@@ -157,6 +158,15 @@ export function CreatePostModal() {
               <a href="/api/tiktok/oauth/start">{t("Continuer avec TikTok", "Continue with TikTok", english)}</a>
             </p>
           )}
+          {connected.some((channel) => channel.platform !== "tiktok") ? (
+            <p className="ss-lead">
+              {t(
+                "La publication live est TikTok pour l’instant. Instagram, Facebook et X se connectent déjà.",
+                "Live publishing is TikTok for now. Instagram, Facebook, and X can already be connected.",
+                english,
+              )}
+            </p>
+          ) : null}
           <select value={image} onChange={(event) => setImage(event.target.value)}>
             {media.map((item) => (
               <option key={item.id} value={item.url}>

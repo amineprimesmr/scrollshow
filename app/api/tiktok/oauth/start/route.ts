@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const site = process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io";
   const user = await readSession();
   if (!user) {
-    return NextResponse.redirect(new URL("/login?next=/api/tiktok/oauth/start", site));
+    return NextResponse.redirect(new URL("/signup?mode=signin&next=/api/tiktok/oauth/start", site));
   }
   const state = `ss_${user.id}_${crypto.randomUUID()}`;
   (await cookies()).set("ss_oauth_state", state, {

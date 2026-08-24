@@ -443,7 +443,8 @@ html:has(.ss-studio) body.grain {
   color: #991b1b;
 }
 
-a.ss-btn-purple {
+a.ss-btn-purple,
+a.ss-btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -536,4 +537,159 @@ a.ss-btn-purple {
     border-right: 0;
     border-bottom: 1px solid var(--ss-line);
   }
+}
+
+.ss-dev-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.ss-dev-fresh {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 18px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.ss-dev-fresh code,
+.ss-dev-keys code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.ss-dev-keys {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-dev-keys li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+.ss-dev-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 10px;
+}
+
+.ss-dev-tabs button {
+  padding: 7px 12px;
+  border: 1px solid var(--ss-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ss-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ss-dev-tabs button.is-active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.ss-pre {
+  overflow: auto;
+  margin: 0 0 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #111118;
+  color: #f5f5f5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ss-network-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 8px 22px 22px;
+}
+
+.ss-network-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 18px;
+  border: 1px solid var(--ss-line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.ss-network-card header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ss-network-card h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.ss-network-card p {
+  margin: 0;
+  color: var(--ss-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ss-network-card__status {
+  font-weight: 650;
+  color: var(--ss-ink) !important;
+}
+
+.ss-platform-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ss-platform-logo.is-x {
+  padding: 2px;
+}
+
+.ss-platforms .ss-platform-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.ss-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ss-badge.is-review {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.ss-badge.is-ready {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.ss-badge.is-wait {
+  background: #f4f4f5;
+  color: #52525b;
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
+import { familyConfigured, PLATFORMS, platformName, type PlatformAvailability } from "@/lib/platforms";
 import { useEffect, useMemo, useState } from "react";
+import { DeveloperAccess } from "./DeveloperAccess";
 import { useStudio } from "./StudioContext";
 
 export function AnalyticsView() {
@@ -109,8 +111,10 @@ export function AgentView() {
   const [out, setOut] = useState("");
 
   return (
-    <div className="ss-panel">
-      <h2>AI Agent</h2>
+    <>
+      <DeveloperAccess />
+      <div className="ss-panel">
+      <h2>Caption</h2>
       <p>Génère une caption, puis envoie-la dans Create Post.</p>
       <div className="ss-form">
         <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Écris un carousel glow-up…" />
@@ -155,6 +159,7 @@ export function AgentView() {
         ) : null}
       </div>
     </div>
+    </>
   );
 }
 
@@ -186,29 +191,84 @@ export function PlugsView() {
   );
 }
 
-export function IntegrationsView() {
+export function IntegrationsView({ availability }: { availability: PlatformAvailability }) {
   const { channels } = useStudio();
   const [english, setEnglish] = useState(false);
-  const connected = channels.some((item) => item.connected);
 
   useEffect(() => {
     setEnglish(prefersEnglish());
   }, []);
 
   return (
-    <div className="ss-panel">
-      <h2>TikTok</h2>
-      <p>
-        Login Kit + Content Posting API — user.info.basic, user.info.profile, user.info.stats,
-        video.list, video.upload, video.publish.
-      </p>
-      <div className="ss-form">
-        <input readOnly value={connected ? t("TikTok connecté", "TikTok connected", english) : t("TikTok non connecté", "TikTok not connected", english)} />
-        <a className="ss-btn-purple" href="/api/tiktok/oauth/start">
-          {connected ? t("Reconnecter TikTok", "Reconnect TikTok", english) : t("Connecter TikTok", "Connect TikTok", english)}
-        </a>
+    <>
+      <div className="ss-network-grid">
+        {PLATFORMS.map((platform) => {
+          const connected = channels.some((item) => item.platform === platform.id && item.connected);
+          const configured = familyConfigured(platform.family, availability);
+          const badge =
+            platform.lifecycle === "pending_review"
+              ? t("En revue", "In review", english)
+              : configured
+                ? t("Prêt", "Ready", english)
+                : t("Clés à brancher", "Keys needed", english);
+          const badgeClass =
+            platform.lifecycle === "pending_review" ? "is-review" : configured ? "is-ready" : "is-wait";
+          return (
+            <article key={platform.id} className="ss-network-card">
+              <header>
+                <img
+                  src={platform.logo}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className={platform.id === "x" ? "ss-platform-logo is-x" : "ss-platform-logo"}
+                />
+                <div>
+                  <h2>{platform.name}</h2>
+                  <span className={`ss-badge ${badgeClass}`}>{badge}</span>
+                </div>
+              </header>
+              <p>
+                {platform.family === "tiktok"
+                  ? t(
+                      "Login Kit + Content Posting. L’app est en revue : le sandbox marche déjà.",
+                      "Login Kit + Content Posting. The app is in review: sandbox already works.",
+                      english,
+                    )
+                  : platform.family === "meta"
+                    ? t(
+                        "Une app Meta pour Instagram et Facebook. Redirect : /api/auth/meta/callback",
+                        "One Meta app for Instagram and Facebook. Redirect: /api/auth/meta/callback",
+                        english,
+                      )
+                    : t(
+                        "OAuth 2.0 PKCE. Redirect : /api/auth/x/callback",
+                        "OAuth 2.0 PKCE. Redirect: /api/auth/x/callback",
+                        english,
+                      )}
+              </p>
+              <p className="ss-network-card__status">
+                {connected
+                  ? t("Compte connecté", "Account connected", english)
+                  : configured
+                    ? t("Pas encore connecté", "Not connected yet", english)
+                    : platform.family === "tiktok"
+                      ? t("Ajoute TIKTOK_CLIENT_KEY et TIKTOK_CLIENT_SECRET.", "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET.", english)
+                      : platform.family === "meta"
+                        ? t("Ajoute META_APP_ID et META_APP_SECRET.", "Add META_APP_ID and META_APP_SECRET.", english)
+                        : t("Ajoute X_CLIENT_ID et X_CLIENT_SECRET.", "Add X_CLIENT_ID and X_CLIENT_SECRET.", english)}
+              </p>
+              <a className="ss-btn-purple" href={platform.connectPath}>
+                {connected
+                  ? t(`Reconnecter ${platform.name}`, `Reconnect ${platform.name}`, english)
+                  : t(`Connecter ${platform.name}`, `Connect ${platform.name}`, english)}
+              </a>
+            </article>
+          );
+        })}
       </div>
-    </div>
+      <DeveloperAccess />
+    </>
   );
 }
 
@@ -326,32 +386,37 @@ export function SettingsView() {
         <br />
         {user?.email}
         <br />
-        Plan {user?.plan === "pro" ? "Pro" : "Free"}
+        Plan {user?.plan && user.plan !== "free" ? user.plan : "—"}
       </p>
-      <h3>{t("Compte TikTok", "TikTok account", english)}</h3>
+      <h3>{t("Comptes connectés", "Connected accounts", english)}</h3>
       {live.length ? (
         live.map((channel) => (
           <p key={channel.id}>
-            @{channel.handle} · {channel.followers || 0} followers
+            {platformName(channel.platform)} · @{channel.handle}
+            {channel.followers ? ` · ${channel.followers} followers` : ""}
           </p>
         ))
       ) : (
         <p>{t("Aucun compte connecté.", "No account connected.", english)}</p>
       )}
       <div className="ss-form-actions">
-        <a className="ss-btn-purple" href="/api/tiktok/oauth/start">
-          {t("Connecter TikTok", "Connect TikTok", english)}
+        <a className="ss-btn-ghost" href="/app/integrations">
+          {t("Intégrations", "Integrations", english)}
+        </a>
+        <a className="ss-btn-purple" href="/app/integrations">
+          {t("Ajouter un compte", "Add an account", english)}
         </a>
         {live.length ? (
           <button
             className="ss-btn-ghost"
             type="button"
             onClick={async () => {
+              await Promise.all(live.map((channel) => fetch(`/api/studio/channels/${channel.id}`, { method: "DELETE" })));
               await fetch("/api/tiktok/disconnect", { method: "POST" });
               reload();
             }}
           >
-            {t("Déconnecter", "Disconnect", english)}
+            {t("Tout déconnecter", "Disconnect all", english)}
           </button>
         ) : null}
       </div>

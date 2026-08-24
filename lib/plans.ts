@@ -99,6 +99,10 @@ export function isPaidPlan(plan: string | undefined): plan is PaidPlan {
   return plan === "starter" || plan === "creator" || plan === "pro";
 }
 
+export function hasStudioAccess(plan: string | undefined) {
+  return isPaidPlan(plan);
+}
+
 export function parsePlan(value: unknown): Plan {
   return isPaidPlan(String(value)) ? String(value) as PaidPlan : "free";
 }

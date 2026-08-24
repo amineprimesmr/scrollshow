@@ -2,6 +2,7 @@
 
 import { BrandMark } from "@/components/BrandMark";
 import { prefersEnglish, t } from "@/lib/i18n";
+import { platformById, platformName } from "@/lib/platforms";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -53,7 +54,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <h2>Channels</h2>
         <div className="ss-channels__actions">
           <button className="ss-btn-ghost" onClick={() => setAddOpen(true)}>
-            {t("Connecter TikTok", "Connect TikTok", english)}
+            {t("Ajouter un compte", "Add an account", english)}
           </button>
           <button className="ss-btn-ghost" onClick={() => setAddOpen(true)} aria-label="Connect">
             ↗
@@ -84,11 +85,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             className={`ss-channel ${activeChannel === channel.id ? "is-active" : ""}`}
             onClick={() => setActiveChannel(channel.id)}
           >
-            <img src={channel.avatar} alt="" />
+            <img src={channel.avatar || platformById(channel.platform)?.logo || "/logo.png"} alt="" />
             <span>
               <b>{channel.name}</b>
               <span>
-                TikTok · @{channel.handle}
+                {platformName(channel.platform)} · @{channel.handle}
                 {channel.connected ? "" : ` · ${t("à connecter", "not connected", english)}`}
               </span>
             </span>
