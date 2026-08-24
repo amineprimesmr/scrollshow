@@ -10,6 +10,7 @@ import {
   agentMedia,
   agentChannels,
   agentPublish,
+  agentReconstructPost,
   agentReport,
   agentUpdatePost,
   agentUpdateRecipe,
@@ -18,7 +19,7 @@ import {
 import { agentCatch, agentOptions, agentResponse, requireAgentUser } from "@/lib/agent-http";
 import { NextResponse } from "next/server";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export function OPTIONS() {
   return agentOptions();
@@ -85,6 +86,9 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
     }
     if (head === "posts" && id && body.fork) {
       return agentResponse({ post: await agentForkPost(user, id) }, 201);
+    }
+    if (head === "posts" && slug[2] === "reconstruct" && id) {
+      return agentResponse({ post: await agentReconstructPost(user, id) });
     }
     if (head === "posts" && slug[2] === "fork" && id) {
       return agentResponse({ post: await agentForkPost(user, id) }, 201);

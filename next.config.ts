@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["tesseract.js"],
   turbopack: {
     root: path.join(__dirname),
   },

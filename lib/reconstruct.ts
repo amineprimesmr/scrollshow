@@ -1,6 +1,7 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { readSlideBytes } from "./media-files";
+import { reconstructWithOcr } from "./ocr-slide";
 import {
   closestFont,
   defaultOverlay,
@@ -206,10 +207,15 @@ export async function reconstructRecipe(recipe: CarouselRecipe): Promise<Carouse
       slides,
     };
   } catch (error) {
-    console.error("[reconstruct]", error);
-    if (error instanceof ReconstructError) throw error;
-    const gated = gatewayMissing(error);
-    if (gated) throw new ReconstructError(gated, 503);
-    throw new ReconstructError("reconstruct_failed", 500);
+    console.error("[reconstruct] vision failed, falling back to OCR", error);
+    try {
+      return await reconstructWithOcr(recipe);
+    } catch (ocrError) {
+      console.error("[reconstruct] OCR fallback failed", ocrError);
+      if (error instanceof ReconstructError) throw error;
+      const gated = gatewayMissing(error);
+      if (gated) throw new ReconstructError(gated, 503);
+      throw new ReconstructError("reconstruct_failed", 500);
+    }
   }
 }
