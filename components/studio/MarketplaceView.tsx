@@ -70,13 +70,17 @@ export function MarketplaceView() {
     const json = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) {
-      setMessage(
-        json.error === "not_tiktok"
-          ? t("Colle un lien TikTok.", "Paste a TikTok link.", english)
-          : json.error === "no_slides" || json.error === "tiktok_not_found"
-            ? t("Impossible de lire ce TikTok. Vérifie qu’il est public.", "Could not read that TikTok. Make sure it is public.", english)
-            : t("Import impossible.", "Import failed.", english),
-      );
+      const errors: Record<string, [string, string]> = {
+        not_tiktok: ["Colle un lien TikTok.", "Paste a TikTok link."],
+        invalid_url: ["Colle un lien TikTok.", "Paste a TikTok link."],
+        url_required: ["Colle un lien TikTok.", "Paste a TikTok link."],
+        no_slides: ["Impossible de lire les slides. Vérifie que le TikTok est public.", "Could not read the slides. Make sure the TikTok is public."],
+        tiktok_not_found: ["Impossible de lire ce TikTok. Vérifie qu’il est public.", "Could not read that TikTok. Make sure it is public."],
+        image_download_failed: ["Les images TikTok n’ont pas pu être copiées.", "The TikTok images could not be copied."],
+        image_store_failed: ["Les slides ont été lues mais pas enregistrées.", "The slides were read but could not be saved."],
+      };
+      const copy = errors[String(json.error)] || ["Import impossible.", "Import failed."];
+      setMessage(t(copy[0], copy[1], english));
       return;
     }
     setUrl("");

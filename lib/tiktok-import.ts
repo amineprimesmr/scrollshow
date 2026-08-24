@@ -55,11 +55,15 @@ export function parseTikTokUrl(raw: string) {
 
 async function resolveUrl(input: string) {
   const start = parseTikTokUrl(input);
-  const res = await fetch(start, {
-    headers: tiktokHeaders(),
-    redirect: "follow",
-  });
-  return res.url || start;
+  try {
+    const res = await fetch(start, {
+      headers: tiktokHeaders(),
+      redirect: "follow",
+    });
+    return res.url || start;
+  } catch {
+    return start;
+  }
 }
 
 function decodeHtml(value: string) {
@@ -75,10 +79,15 @@ function decodeHtml(value: string) {
 function scriptJson(html: string, id: string) {
   const match = html.match(new RegExp(`<script[^>]*id="${id}"[^>]*>([\\s\\S]*?)</script>`));
   if (!match?.[1]) return null;
+  const raw = match[1].trim();
   try {
-    return JSON.parse(decodeHtml(match[1].trim()));
+    return JSON.parse(raw);
   } catch {
-    return null;
+    try {
+      return JSON.parse(decodeHtml(raw));
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -182,7 +191,11 @@ async function downloadImage(url: string) {
   const bytes = Buffer.from(await res.arrayBuffer());
   if (bytes.length < 32) throw new ImportError("image_download_failed");
   const contentType = res.headers.get("content-type") || "image/jpeg";
-  return savePublicImage(bytes, contentType, url);
+  try {
+    return await savePublicImage(bytes, contentType, url);
+  } catch {
+    throw new ImportError("image_store_failed");
+  }
 }
 
 export async function importTikTokFromUrl(input: string): Promise<ImportedTikTok> {
