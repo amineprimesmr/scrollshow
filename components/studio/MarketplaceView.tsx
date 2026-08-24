@@ -268,7 +268,7 @@ export function MarketplaceView() {
             return (
               <article key={item.id} className="ss-market-card">
                 <button type="button" className="ss-market-card__cover" onClick={() => (mine ? edit(item) : void fork(item.id))}>
-                  <SlidePreview slide={recipe.slides[0]} recipe={recipe} width={220} />
+                  <SlidePreview slide={recipe.slides[0]} recipe={recipe} width={220} original={Boolean(recipe.slides[0]?.keepPhoto)} />
                 </button>
                 <div className="ss-market-card__body">
                   <p>{item.body || item.caption}</p>
@@ -291,7 +291,7 @@ export function MarketplaceView() {
                         {t("Utiliser ce format", "Use this format", english)}
                       </button>
                     )}
-                    {mine && needsReconstruct(recipe) ? (
+                    {mine && (needsReconstruct(recipe) || recipe.origin === "import" || recipe.origin === "fork") ? (
                       <button className="ss-btn-ghost" type="button" disabled={busy === item.id} onClick={() => void reconstruct(item)}>
                         {busy === item.id ? "…" : t("Recréer en éditable", "Rebuild as editable", english)}
                       </button>

@@ -288,7 +288,9 @@ export function overlayStyle(overlay: SlideOverlay, canvasWidth: number) {
     fontWeight: overlay.fontWeight,
     lineHeight: overlay.lineHeight ?? 1.05,
     whiteSpace: "pre-wrap" as const,
-    textShadow: overlay.backdrop ? "none" : "0 2px 12px rgb(0 0 0 / 0.45)",
+    textShadow: overlay.backdrop
+      ? "none"
+      : "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 10px rgb(0 0 0 / 0.45)",
     background: overlay.backdrop || "transparent",
     padding: overlay.backdrop ? "0.12em 0.4em" : undefined,
     borderRadius: overlay.backdrop ? 12 : undefined,
@@ -331,13 +333,28 @@ export function publicRecipe(post: StudioPost) {
 }
 
 export function needsReconstruct(recipe: CarouselRecipe) {
-  if (recipe.editable) return false;
   if (recipe.origin !== "import" && recipe.origin !== "fork") return false;
-  return !recipe.slides.some((slide) => slide.overlays.some((overlay) => overlay.text.trim()));
+  const overlays = recipe.slides.flatMap((slide) => slide.overlays);
+  const hasText = overlays.some((overlay) => overlay.text.trim());
+  if (!recipe.editable || !hasText) return !hasText;
+  return overlays.some((overlay) => overlayLooksBroken(overlay.text));
+}
+
+function overlayLooksBroken(text: string) {
+  const compact = text.replace(/\s/g, "");
+  if (!compact) return false;
+  const letters = (text.match(/[A-Za-zÀ-ÿ0-9]/g) || []).length;
+  if (compact.length >= 6 && letters / Math.max(1, compact.length) < 0.55) return true;
+  return /[\\|=~]{2,}/.test(text);
 }
 
 export function needsRasterize(recipe: CarouselRecipe) {
-  return Boolean(recipe.editable) && recipe.slides.some((slide) => slide.overlays.some((overlay) => overlay.text.trim()));
+  return (
+    Boolean(recipe.editable) &&
+    recipe.slides.some(
+      (slide) => !slide.keepPhoto && slide.overlays.some((overlay) => overlay.text.trim()),
+    )
+  );
 }
 
 export function slidePreviewImage(slide: CarouselSlide) {

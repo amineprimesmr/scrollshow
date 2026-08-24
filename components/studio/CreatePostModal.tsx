@@ -81,7 +81,7 @@ export function CreatePostModal() {
       setRecipe(next);
       setSlideIndex(0);
       setMessage("");
-      setShowOriginal(false);
+      setShowOriginal(Boolean(next.slides.some((item) => item.keepPhoto)));
       return;
     }
     const settings = user?.settings;
@@ -299,10 +299,10 @@ export function CreatePostModal() {
                   : rebuildError
                     ? rebuildError
                     : recipe.editable
-                      ? t("Les textes et le fond sont éditables. Change une ligne : l’aperçu se met à jour.", "Texts and background are editable. Change a line and the preview updates.", english)
+                      ? t("Les textes sont extraits. L’aperçu montre la photo originale. Modifie une ligne à droite si besoin.", "Texts are extracted. The preview shows the original photo. Edit a line on the right if you need.", english)
                       : t("Import brut : le texte est encore dans l’image. Recrée-le pour extraire les textes éditables.", "Raw import: text is still inside the image. Rebuild it to extract editable texts.", english)}
               </p>
-              {editing?.id && (baked || rebuildError) && !rebuilding ? (
+              {editing?.id && (baked || rebuildError || recipe.origin === "import" || recipe.origin === "fork") && !rebuilding ? (
                 <button className="ss-btn-purple" type="button" onClick={() => void reconstruct()}>
                   {t("Recréer en éditable", "Rebuild as editable", english)}
                 </button>

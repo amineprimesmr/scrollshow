@@ -63,7 +63,7 @@ export default async function Page({ params }: Params) {
       <div className="ss-share__slides">
         {recipe.slides.map((slide, index) => (
           <figure key={slide.id}>
-            <SlidePreview slide={slide} recipe={recipe} width={220} />
+            <SlidePreview slide={slide} recipe={recipe} width={220} original={Boolean(slide.keepPhoto)} />
             <figcaption>Slide {index + 1}</figcaption>
           </figure>
         ))}
