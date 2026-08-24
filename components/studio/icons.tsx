@@ -73,11 +73,11 @@ export function IconCard(props: IconProps) {
 export function IconSettings(props: IconProps) {
   return (
     <Svg {...props}>
-      <circle cx="12" cy="12" r="3" {...stroke} />
       <path
-        d="M12 3.5v2.2M12 18.3V20.5M4.8 6.7l1.6 1.6M17.6 15.7l1.6 1.6M3.5 12h2.2M18.3 12H20.5M4.8 17.3l1.6-1.6M17.6 8.3l1.6-1.6"
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
         {...stroke}
       />
+      <circle cx="12" cy="12" r="3" {...stroke} />
     </Svg>
   );
 }
@@ -94,6 +94,51 @@ export function IconLogout(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M15 5h3.5A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5H15M10 8l-4 4 4 4M6 12h10" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconUser(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="8" r="3.2" {...stroke} />
+      <path d="M5.5 19.2c1.2-3.2 3.4-4.8 6.5-4.8s5.3 1.6 6.5 4.8" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconLock(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" {...stroke} />
+      <path d="M8 11V8.2a4 4 0 0 1 8 0V11" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconKey(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="8" cy="14" r="3.2" {...stroke} />
+      <path d="M11 14h9v3M17 14v3" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconAlert(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4.5 3.8 19h16.4L12 4.5Z" {...stroke} />
+      <path d="M12 10v4.5M12 16.8v.6" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconMcp(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="3" {...stroke} />
+      <path d="M7 9.5 9.5 12 7 14.5M12 14.5h5" {...stroke} />
     </Svg>
   );
 }

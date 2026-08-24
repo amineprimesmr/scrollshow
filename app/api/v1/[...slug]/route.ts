@@ -2,7 +2,9 @@ import {
   agentAnalytics,
   agentCreatePost,
   agentDeletePost,
+  agentForkPost,
   agentGetAccount,
+  agentGetRecipe,
   agentLibrary,
   agentListPosts,
   agentMedia,
@@ -10,6 +12,7 @@ import {
   agentPublish,
   agentReport,
   agentUpdatePost,
+  agentUpdateRecipe,
   agentWhoami,
 } from "@/lib/agent";
 import { agentCatch, agentOptions, agentResponse, requireAgentUser } from "@/lib/agent-http";
@@ -42,6 +45,11 @@ export async function GET(request: Request, context: { params: Promise<{ slug?: 
       });
     }
     if (head === "library" && id) return agentResponse({ account: await agentGetAccount(user, id) });
+    if (head === "posts" && id === "recipe" ) return agentResponse({ error: "not_found" }, 404);
+    if (head === "posts" && id) {
+      return agentResponse(await agentGetRecipe(user, id));
+    }
+    if (head === "recipe" && id) return agentResponse(await agentGetRecipe(user, id));
     return agentResponse({ error: "not_found" }, 404);
   } catch (error) {
     return agentCatch(error);
@@ -65,10 +73,24 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
             status: body.status,
             image: body.image,
             photo_images: body.photo_images,
+            origin: body.origin,
+            recipe: body.recipe,
           }),
         },
         201,
       );
+    }
+    if (head === "posts" && id === "fork") {
+      return agentResponse({ error: "not_found" }, 404);
+    }
+    if (head === "posts" && id && body.fork) {
+      return agentResponse({ post: await agentForkPost(user, id) }, 201);
+    }
+    if (head === "posts" && slug[2] === "fork" && id) {
+      return agentResponse({ post: await agentForkPost(user, id) }, 201);
+    }
+    if (head === "recipe" && id) {
+      return agentResponse(await agentUpdateRecipe(user, id, body));
     }
     if (head === "publish" && !id) {
       return agentResponse(
@@ -103,6 +125,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug?
         status: body.status,
         channelId: body.channelId || body.channel_id,
         image: body.image,
+        photo_images: body.photo_images,
+        recipe: body.recipe,
       }),
     });
   } catch (error) {

@@ -899,6 +899,12 @@ html.page-affiliate #affiliate-root {
   filter: invert(1);
 }
 
+.af-ld-networks__brand.is-facebook img {
+  width: 2.55rem;
+  height: 2.55rem;
+  margin: -0.25rem;
+}
+
 /* ── Offer ── */
 
 .af-ld-offer {

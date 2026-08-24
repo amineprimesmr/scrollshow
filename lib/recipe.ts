@@ -1,0 +1,288 @@
+import { z } from "zod";
+import { siteUrl } from "./stripe";
+import type {
+  CarouselRecipe,
+  CarouselSlide,
+  OverlayAlign,
+  SlideOverlay,
+  StudioPost,
+} from "./types";
+
+export const overlayInputSchema = z.object({
+  id: z.string().optional(),
+  text: z.string().optional(),
+  fontFamily: z.string().optional(),
+  fontSize: z.number().optional(),
+  fontWeight: z.union([z.number(), z.string()]).optional(),
+  color: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  align: z.enum(["left", "center", "right"]).optional(),
+  width: z.number().optional(),
+  lineHeight: z.number().optional(),
+});
+
+export const slideInputSchema = z.object({
+  id: z.string().optional(),
+  image: z.string().optional(),
+  html: z.string().optional(),
+  css: z.string().optional(),
+  overlays: z.array(overlayInputSchema).optional(),
+});
+
+export const recipeInputSchema = z.object({
+  version: z.literal(1).optional(),
+  origin: z.enum(["ai", "manual", "import", "fork"]).optional(),
+  fontFamily: z.string().optional(),
+  html: z.string().optional(),
+  css: z.string().optional(),
+  prompt: z.string().optional(),
+  replaceSlides: z.boolean().optional(),
+  slides: z.array(slideInputSchema).optional(),
+});
+
+export type RecipeInput = z.infer<typeof recipeInputSchema>;
+
+export const RECIPE_FONTS = [
+  "Inter",
+  "Montserrat",
+  "Poppins",
+  "Oswald",
+  "Anton",
+  "Bebas Neue",
+  "Outfit",
+  "DM Sans",
+  "Playfair Display",
+  "Arial",
+  "Impact",
+] as const;
+
+export const GOOGLE_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=DM+Sans:wght@400;700;800&family=Montserrat:wght@400;700;800;900&family=Oswald:wght@400;600;700&family=Outfit:wght@400;700;800&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@400;600;700;800&display=swap";
+
+const DEFAULT_FONT = "Montserrat";
+
+export function newId() {
+  return crypto.randomUUID();
+}
+
+export function newShareId() {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+}
+
+export function fontStack(family: string) {
+  if (family === "Impact") return `Impact, Haettenschweiler, "Arial Black", sans-serif`;
+  if (family === "Arial") return `Arial, Helvetica, sans-serif`;
+  if (family === "Bebas Neue") return `"Bebas Neue", Impact, sans-serif`;
+  return `"${family}", Inter, ui-sans-serif, system-ui, sans-serif`;
+}
+
+export function defaultOverlay(partial?: Partial<SlideOverlay>): SlideOverlay {
+  return {
+    id: partial?.id || newId(),
+    text: partial?.text || "",
+    fontFamily: partial?.fontFamily || DEFAULT_FONT,
+    fontSize: partial?.fontSize ?? 64,
+    fontWeight: partial?.fontWeight ?? 800,
+    color: partial?.color || "#ffffff",
+    x: partial?.x ?? 50,
+    y: partial?.y ?? 78,
+    align: partial?.align || "center",
+    width: partial?.width ?? 86,
+    lineHeight: partial?.lineHeight ?? 1.05,
+  };
+}
+
+export function defaultSlide(
+  image: string,
+  partial?: Partial<Omit<CarouselSlide, "overlays">> & { overlays?: Array<Partial<SlideOverlay>> },
+): CarouselSlide {
+  return {
+    id: partial?.id || newId(),
+    image,
+    html: partial?.html,
+    css: partial?.css,
+    overlays: (partial?.overlays || []).map((overlay) => defaultOverlay(overlay)),
+  };
+}
+
+export function recipeFromPhotos(
+  photos: string[],
+  origin: CarouselRecipe["origin"] = "manual",
+  extra?: RecipeInput | Partial<CarouselRecipe>,
+): CarouselRecipe {
+  const extraSlides = extra?.slides || [];
+  const slides = (photos.length ? photos : ["/assets/tiktoks/01-glowup-188k.png"]).map((image, index) =>
+    defaultSlide(image, extraSlides[index] as Partial<CarouselSlide> | undefined),
+  );
+  return normalizeRecipe({
+    version: 1,
+    origin: extra?.origin || origin,
+    fontFamily: extra?.fontFamily || DEFAULT_FONT,
+    html: extra?.html,
+    css: extra?.css,
+    prompt: extra?.prompt,
+    slides,
+  });
+}
+
+export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | undefined, origin: CarouselRecipe["origin"] = "manual"): CarouselRecipe {
+  const slides = (input?.slides || [])
+    .map((slide) => {
+      if (!slide?.image && !slide?.html) return null;
+      return defaultSlide(slide.image || "", {
+        id: slide.id,
+        html: slide.html,
+        css: slide.css,
+        overlays: slide.overlays,
+      });
+    })
+    .filter(Boolean) as CarouselSlide[];
+  return {
+    version: 1,
+    origin: input?.origin || origin,
+    fontFamily: input?.fontFamily || DEFAULT_FONT,
+    html: input?.html,
+    css: input?.css,
+    prompt: input?.prompt,
+    slides: slides.length ? slides : [defaultSlide("/assets/tiktoks/01-glowup-188k.png")],
+  };
+}
+
+export function ensureRecipe(post: Pick<StudioPost, "image" | "origin" | "recipe">): CarouselRecipe {
+  if (post.recipe?.slides?.length) return normalizeRecipe(post.recipe, post.origin || post.recipe.origin || "manual");
+  return recipeFromPhotos(post.image ? [post.image] : [], post.origin || "manual");
+}
+
+export function photosOf(recipe: CarouselRecipe) {
+  return recipe.slides.map((slide) => slide.image).filter(Boolean);
+}
+
+export function coverOf(post: Pick<StudioPost, "image" | "recipe">) {
+  return post.recipe?.slides?.[0]?.image || post.image || "/assets/tiktoks/01-glowup-188k.png";
+}
+
+export function cloneRecipe(recipe: CarouselRecipe): CarouselRecipe {
+  return normalizeRecipe({
+    ...recipe,
+    slides: recipe.slides.map((slide) => ({
+      ...slide,
+      id: newId(),
+      overlays: slide.overlays.map((overlay) => ({ ...overlay, id: newId() })),
+    })),
+  });
+}
+
+export function applyRecipePatch(
+  current: CarouselRecipe,
+  patch: (Partial<CarouselRecipe> | RecipeInput) & { replaceSlides?: boolean },
+): CarouselRecipe {
+  const next = normalizeRecipe({
+    ...current,
+    origin: patch.origin || current.origin,
+    fontFamily: patch.fontFamily || current.fontFamily,
+    html: patch.html ?? current.html,
+    css: patch.css ?? current.css,
+    prompt: patch.prompt ?? current.prompt,
+    slides: current.slides,
+  });
+  if (!patch.slides?.length) return next;
+  if (patch.replaceSlides) {
+    next.slides = normalizeRecipe({ ...next, slides: patch.slides }).slides;
+    return next;
+  }
+  next.slides = next.slides.map((slide, index) => {
+    const incoming = patch.slides?.find((item) => item.id && item.id === slide.id) || patch.slides?.[index];
+    if (!incoming) return slide;
+    return defaultSlide(incoming.image || slide.image, {
+      id: slide.id,
+      html: incoming.html ?? slide.html,
+      css: incoming.css ?? slide.css,
+      overlays: mergeOverlays(slide.overlays, incoming.overlays),
+    });
+  });
+  const extras = patch.slides.filter((slide) => slide.id && !next.slides.some((item) => item.id === slide.id));
+  if (extras.length) next.slides.push(...normalizeRecipe({ slides: extras }).slides);
+  return next;
+}
+
+function mergeOverlays(current: SlideOverlay[], incoming?: Array<Partial<SlideOverlay>>) {
+  if (!incoming?.length) return current;
+  const byId = new Map(incoming.filter((item) => item.id).map((item) => [item.id as string, item]));
+  const merged = current.map((overlay, index) => {
+    const patch = byId.get(overlay.id) || incoming[index];
+    if (!patch) return overlay;
+    return defaultOverlay({ ...overlay, ...patch, id: overlay.id });
+  });
+  incoming.forEach((item) => {
+    if (item.id && !merged.some((overlay) => overlay.id === item.id)) {
+      merged.push(defaultOverlay(item));
+    }
+  });
+  return merged;
+}
+
+export function sharePath(shareId: string) {
+  return `/r/${shareId}`;
+}
+
+export function publicShareUrl(shareId: string) {
+  return `${siteUrl().replace(/\/$/, "")}${sharePath(shareId)}`;
+}
+
+export function recipeJsonUrl(shareId: string) {
+  return `${siteUrl().replace(/\/$/, "")}/api/r/${shareId}`;
+}
+
+export function overlayStyle(overlay: SlideOverlay, canvasWidth: number) {
+  const scale = canvasWidth / 1080;
+  const align = overlay.align || "center";
+  return {
+    position: "absolute" as const,
+    left: `${overlay.x}%`,
+    top: `${overlay.y}%`,
+    width: `${overlay.width ?? 86}%`,
+    transform: align === "left" ? "translate(0, -50%)" : align === "right" ? "translate(-100%, -50%)" : "translate(-50%, -50%)",
+    textAlign: align as OverlayAlign,
+    color: overlay.color,
+    fontFamily: fontStack(overlay.fontFamily),
+    fontSize: `${Math.max(10, overlay.fontSize * scale)}px`,
+    fontWeight: overlay.fontWeight,
+    lineHeight: overlay.lineHeight ?? 1.05,
+    whiteSpace: "pre-wrap" as const,
+    textShadow: "0 2px 12px rgb(0 0 0 / 0.45)",
+    pointerEvents: "none" as const,
+  };
+}
+
+export function publicRecipe(post: StudioPost) {
+  const recipe = ensureRecipe(post);
+  const shareId = post.shareId || "";
+  const imported = post.origin === "import" || recipe.origin === "import";
+  return {
+    id: post.id,
+    shareId: shareId || null,
+    shareUrl: shareId ? publicShareUrl(shareId) : null,
+    jsonUrl: shareId ? recipeJsonUrl(shareId) : null,
+    caption: post.body,
+    date: post.date,
+    time: post.time,
+    status: post.status,
+    origin: post.origin || recipe.origin,
+    visibility: post.visibility || "private",
+    kind: post.kind || "photo",
+    tiktokUrl: post.tiktokUrl || null,
+    tiktokId: post.tiktokId || null,
+    authorHandle: post.authorHandle || null,
+    authorName: post.authorName || null,
+    authorAvatar: post.authorAvatar || null,
+    musicTitle: post.musicTitle || null,
+    musicAuthor: post.musicAuthor || null,
+    image: coverOf(post),
+    photo_images: photosOf(recipe),
+    recipe,
+    instruction: imported
+      ? "PIXEL-PERFECT import. Use these exact photo_images and this exact caption. Do not redraw, restyle, change font, size, or layout. The slides already contain the original text. Only swap an image if the user asked."
+      : "This is the exact source of an existing ScrollShow TikTok. Do not generate a new template. Keep fontFamily, overlay positions, html and css. Change only the texts or images requested, then call update_recipe with this id.",
+  };
+}

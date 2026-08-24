@@ -1,4 +1,4 @@
-import { SettingsView } from "@/components/studio/StudioPages";
+import { SettingsView } from "@/components/studio/SettingsView";
 
 export default function Page() {
   return <SettingsView />;

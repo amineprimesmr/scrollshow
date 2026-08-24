@@ -22,7 +22,8 @@ export function AddChannelModal() {
       <div className="ss-dialog ss-dialog--narrow" onClick={(event) => event.stopPropagation()}>
         <h2>{t("Ajouter un compte", "Add an account", english)}</h2>
         <p className="ss-lead">
-          {t("Connecte TikTok pour publier tes carrousels depuis le calendrier.", "Connect TikTok to publish carousels from the calendar.", english)}
+          {t("Connecte un compte depuis Connexions, ou continue ici.", "Connect an account from Connections, or continue here.", english)}{" "}
+          <a href="/app/integrations">{t("Ouvrir Connexions", "Open Connections", english)}</a>
         </p>
         <div className="ss-platforms">
           {PLATFORMS.map((item) => (
@@ -37,7 +38,7 @@ export function AddChannelModal() {
                 alt=""
                 width={28}
                 height={28}
-                className={item.id === "x" ? "ss-platform-logo is-x" : "ss-platform-logo"}
+                className={`ss-platform-logo${item.id === "x" ? " is-x" : ""}${item.id === "facebook" ? " is-facebook" : ""}`}
               />
               {item.name}
             </button>

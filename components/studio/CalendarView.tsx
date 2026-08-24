@@ -1,5 +1,6 @@
 "use client";
 
+import { dateInTimeZone } from "@/lib/settings";
 import { useMemo, useState } from "react";
 import { useStudio } from "./StudioContext";
 
@@ -13,40 +14,45 @@ function ymd(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function startOfMonth(year: number, month: number) {
+function startOfMonth(year: number, month: number, weekStartsOn: 0 | 1) {
   const date = new Date(year, month, 1);
-  const day = (date.getDay() + 6) % 7;
+  const day = (date.getDay() - weekStartsOn + 7) % 7;
   date.setDate(date.getDate() - day);
   return date;
 }
 
-function startOfWeek(date: Date) {
+function startOfWeek(date: Date, weekStartsOn: 0 | 1) {
   const start = new Date(date);
-  const day = (start.getDay() + 6) % 7;
+  const day = (start.getDay() - weekStartsOn + 7) % 7;
   start.setDate(start.getDate() - day);
   start.setHours(0, 0, 0, 0);
   return start;
 }
 
 export function CalendarView() {
-  const { posts, activeChannel, setEditing, setPostOpen } = useStudio();
+  const { posts, activeChannel, setEditing, setPostOpen, user, english } = useStudio();
   const [cursor, setCursor] = useState(() => new Date());
   const [mode, setMode] = useState<"day" | "week" | "month">("month");
-  const locale = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("fr") ? "fr-FR" : "en-US";
-  const dow = locale.startsWith("fr") ? DOW_FR : DOW_EN;
-  const today = ymd(new Date());
+  const locale = english ? "en-US" : "fr-FR";
+  const weekStartsOn = user?.settings.weekStartsOn === 0 ? 0 : 1;
+  const dowBase = locale.startsWith("fr") ? DOW_FR : DOW_EN;
+  const dow = weekStartsOn === 0 ? [dowBase[6], ...dowBase.slice(0, 6)] : dowBase;
+  const today = dateInTimeZone(user?.settings.timezone || "Europe/Paris");
 
-  const visible = posts.filter((post) => activeChannel === "all" || post.channelIds.includes(activeChannel));
+  const visible = posts.filter(
+    (post) =>
+      post.inCalendar !== false && (activeChannel === "all" || post.channelIds.includes(activeChannel)),
+  );
 
   const cells = useMemo(() => {
-    const start = startOfMonth(cursor.getFullYear(), cursor.getMonth());
+    const start = startOfMonth(cursor.getFullYear(), cursor.getMonth(), weekStartsOn);
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(start);
       date.setDate(start.getDate() + index);
       const key = ymd(date);
       return { date, key, inMonth: date.getMonth() === cursor.getMonth() };
     });
-  }, [cursor]);
+  }, [cursor, weekStartsOn]);
 
   const label = cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
@@ -56,7 +62,7 @@ export function CalendarView() {
   }
 
   if (mode === "week") {
-    const start = startOfWeek(cursor);
+    const start = startOfWeek(cursor, weekStartsOn);
     const week = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(start);
       date.setDate(start.getDate() + index);

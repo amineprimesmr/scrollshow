@@ -1,5 +1,5 @@
-import { MediaView } from "@/components/studio/StudioPages";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <MediaView />;
+  redirect("/app/marketplace");
 }

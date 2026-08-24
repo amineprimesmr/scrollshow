@@ -7,9 +7,24 @@ import {
   listVideos,
   publicChannel,
 } from "./tiktok";
+import {
+  applyRecipePatch,
+  cloneRecipe,
+  coverOf,
+  ensureRecipe,
+  newShareId,
+  photosOf,
+  publicRecipe,
+  publicShareUrl,
+  recipeFromPhotos,
+  recipeJsonUrl,
+} from "./recipe";
+import { importTikTokFromUrl } from "./tiktok-import";
 import { seedStudio } from "./studio-seed";
+import { resolveSettings, tiktokPostFlags } from "./settings";
 import { readStore, updateStore } from "./store";
-import type { SessionUser, StudioPost } from "./types";
+import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
+import type { RecipeInput } from "./recipe";
 
 export class AgentError extends Error {
   constructor(
@@ -70,6 +85,8 @@ export async function agentCreatePost(
     status?: StudioPost["status"];
     image?: string;
     photo_images?: string[];
+    origin?: StudioPost["origin"];
+    recipe?: RecipeInput;
   },
 ) {
   const caption = input.caption.trim();
@@ -91,7 +108,16 @@ export async function agentCreatePost(
     });
     channelId = created.id;
   }
-  const image = input.image || input.photo_images?.[0] || (await agentMedia(user))[0]?.url || "";
+  const origin = input.origin || "ai";
+  const photos = input.photo_images?.length
+    ? input.photo_images
+    : input.recipe?.slides?.map((slide) => slide.image || "").filter(Boolean).length
+      ? (input.recipe?.slides || []).map((slide) => slide.image || "").filter(Boolean)
+      : [input.image || (await agentMedia(user))[0]?.url || ""];
+  const recipe = input.recipe
+    ? recipeFromPhotos(photos, origin, input.recipe)
+    : recipeFromPhotos(photos, origin);
+  const image = coverOf({ image: photos[0] || "", recipe });
   const now = new Date();
   const post = await updateStore((data) => {
     const created: StudioPost = {
@@ -107,6 +133,12 @@ export async function agentCreatePost(
       likes: 0,
       comments: 0,
       shares: 0,
+      origin,
+      shareId: newShareId(),
+      recipe,
+      visibility: "private",
+      inCalendar: true,
+      createdAt: now.toISOString(),
     };
     data.posts.unshift(created);
     return created;
@@ -124,6 +156,9 @@ export async function agentUpdatePost(
     status: StudioPost["status"];
     channelId: string;
     image: string;
+    photo_images: string[];
+    origin: StudioPost["origin"];
+    recipe: (RecipeInput | Partial<CarouselRecipe>) & { replaceSlides?: boolean };
   }>,
 ) {
   const post = await updateStore((data) => {
@@ -134,11 +169,234 @@ export async function agentUpdatePost(
     if (input.time) found.time = input.time;
     if (input.status) found.status = input.status;
     if (input.channelId) found.channelIds = [input.channelId];
-    if (input.image) found.image = input.image;
+    if (input.origin) found.origin = input.origin;
+    const recipe = ensureRecipe(found);
+    if (input.recipe) {
+      found.recipe = applyRecipePatch(recipe, input.recipe);
+    } else if (input.photo_images?.length) {
+      found.recipe = applyRecipePatch(recipe, {
+        replaceSlides: true,
+        slides: input.photo_images.map((image, index) => ({
+          ...recipe.slides[index],
+          image,
+        })),
+      });
+    } else if (input.image) {
+      found.recipe = applyRecipePatch(recipe, {
+        slides: [{ ...recipe.slides[0], image: input.image }],
+      });
+    } else {
+      found.recipe = recipe;
+    }
+    found.image = coverOf(found);
+    if (!found.shareId) found.shareId = newShareId();
     return found;
   });
   if (!post) throw new AgentError("post_missing", 404);
   return publicPost(post);
+}
+
+export async function agentGetRecipe(user: SessionUser, idOrShare: string) {
+  const data = await readStore();
+  const post = data.posts.find((item) => item.id === idOrShare || item.shareId === idOrShare);
+  if (!post) throw new AgentError("post_missing", 404);
+  if (post.userId !== user.id && post.visibility !== "public") throw new AgentError("post_missing", 404);
+  return publicRecipe(post);
+}
+
+export async function agentUpdateRecipe(
+  user: SessionUser,
+  idOrShare: string,
+  input: (Partial<CarouselRecipe> | RecipeInput) & { caption?: string; replaceSlides?: boolean },
+) {
+  const post = await updateStore((data) => {
+    const found = data.posts.find(
+      (item) =>
+        item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+    );
+    if (!found) return null;
+    found.recipe = applyRecipePatch(ensureRecipe(found), input);
+    found.image = coverOf(found);
+    if (input.caption) found.body = input.caption.slice(0, 2200);
+    if (input.origin) found.origin = input.origin;
+    if (!found.shareId) found.shareId = newShareId();
+    return found;
+  });
+  if (!post) throw new AgentError("post_missing", 404);
+  return publicRecipe(post);
+}
+
+export async function agentEnsureShare(user: SessionUser, id: string) {
+  const post = await updateStore((data) => {
+    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    if (!found) return null;
+    found.recipe = ensureRecipe(found);
+    found.image = coverOf(found);
+    if (!found.shareId) found.shareId = newShareId();
+    found.origin = found.origin || found.recipe.origin;
+    return found;
+  });
+  if (!post) throw new AgentError("post_missing", 404);
+  return {
+    id: post.id,
+    shareId: post.shareId,
+    shareUrl: publicShareUrl(post.shareId!),
+    jsonUrl: recipeJsonUrl(post.shareId!),
+    recipe: publicRecipe(post),
+  };
+}
+
+export async function agentForkPost(user: SessionUser, id: string) {
+  const created = await updateStore((data) => {
+    const found = data.posts.find(
+      (item) => item.id === id && (item.userId === user.id || item.visibility === "public"),
+    );
+    if (!found) return null;
+    if (found.userId !== user.id) found.clones = (found.clones || 0) + 1;
+    const now = new Date();
+    const recipe = cloneRecipe(ensureRecipe(found));
+    recipe.origin = "fork";
+    const copy: StudioPost = {
+      ...found,
+      id: crypto.randomUUID(),
+      userId: user.id,
+      channelIds: data.channels.filter((item) => item.userId === user.id).slice(0, 1).map((item) => item.id),
+      body: found.body,
+      date: now.toISOString().slice(0, 10),
+      time: found.time || "18:00",
+      status: "draft",
+      image: coverOf({ image: found.image, recipe }),
+      views: found.userId === user.id ? 0 : found.views,
+      likes: found.userId === user.id ? 0 : found.likes,
+      comments: found.userId === user.id ? 0 : found.comments,
+      shares: found.userId === user.id ? 0 : found.shares,
+      origin: "fork",
+      shareId: newShareId(),
+      recipe,
+      visibility: "private",
+      inCalendar: false,
+      clones: 0,
+      forkedFrom: found.id,
+      createdAt: now.toISOString(),
+    };
+    data.posts.unshift(copy);
+    return copy;
+  });
+  if (!created) throw new AgentError("post_missing", 404);
+  return publicPost(created);
+}
+
+export async function agentImportTikTok(
+  user: SessionUser,
+  input: { url: string; visibility?: "private" | "public" },
+) {
+  const imported = await importTikTokFromUrl(input.url);
+  const current = await readStore();
+  const existing = current.posts.find(
+    (item) => item.userId === user.id && imported.tiktokId && item.tiktokId === imported.tiktokId,
+  );
+  if (existing) return publicPost(existing);
+  const now = new Date();
+  const recipe = recipeFromPhotos(imported.images, "import", {
+    origin: "import",
+    prompt: `Pixel-perfect import of ${imported.url}. Keep these exact slides and caption.`,
+  });
+  const post = await updateStore((data) => {
+    imported.images.forEach((url, index) => {
+      data.media.unshift({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        url,
+        name: `${imported.authorHandle || "tiktok"}-${imported.tiktokId || "slide"}-${index + 1}`,
+        createdAt: now.toISOString(),
+      });
+    });
+    const channelId = data.channels.find((item) => item.userId === user.id)?.id;
+    const created: StudioPost = {
+      id: crypto.randomUUID(),
+      userId: user.id,
+      channelIds: channelId ? [channelId] : [],
+      body: imported.caption || `TikTok @${imported.authorHandle}`.trim(),
+      date: now.toISOString().slice(0, 10),
+      time: "18:00",
+      status: "draft",
+      image: imported.images[0],
+      views: imported.views,
+      likes: imported.likes,
+      comments: imported.comments,
+      shares: imported.shares,
+      origin: "import",
+      shareId: newShareId(),
+      recipe,
+      visibility: input.visibility || "private",
+      inCalendar: false,
+      kind: imported.kind,
+      tiktokUrl: imported.url,
+      tiktokId: imported.tiktokId,
+      authorHandle: imported.authorHandle,
+      authorName: imported.authorName,
+      authorAvatar: imported.authorAvatar,
+      musicTitle: imported.musicTitle,
+      musicAuthor: imported.musicAuthor,
+      clones: 0,
+      createdAt: now.toISOString(),
+    };
+    data.posts.unshift(created);
+    return created;
+  });
+  return publicPost(post);
+}
+
+export function marketplaceCard(post: StudioPost, userId: string) {
+  const recipe = ensureRecipe(post);
+  return {
+    ...publicPost(post),
+    mine: post.userId === userId,
+    slideCount: recipe.slides.length,
+  };
+}
+
+export async function agentListMarketplace(user: SessionUser, tab: "private" | "public" = "private") {
+  const data = await readStore();
+  if (tab === "public") {
+    return data.posts
+      .filter((item) => item.visibility === "public")
+      .sort((a, b) => b.views - a.views || b.likes - a.likes || (b.clones || 0) - (a.clones || 0))
+      .map((item) => marketplaceCard(item, user.id));
+  }
+  return data.posts
+    .filter((item) => item.userId === user.id)
+    .map((item) => marketplaceCard(item, user.id));
+}
+
+export async function agentSetVisibility(user: SessionUser, id: string, visibility: "private" | "public") {
+  const post = await updateStore((data) => {
+    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    if (!found) return null;
+    found.visibility = visibility;
+    found.recipe = ensureRecipe(found);
+    if (!found.shareId) found.shareId = newShareId();
+    return found;
+  });
+  if (!post) throw new AgentError("post_missing", 404);
+  return publicPost(post);
+}
+
+export async function agentSetCalendar(user: SessionUser, id: string, inCalendar: boolean) {
+  const post = await updateStore((data) => {
+    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    if (!found) return null;
+    found.inCalendar = inCalendar;
+    if (inCalendar && found.status === "draft") found.status = "scheduled";
+    return found;
+  });
+  if (!post) throw new AgentError("post_missing", 404);
+  return publicPost(post);
+}
+
+export async function findPostByShareId(shareId: string) {
+  const data = await readStore();
+  return data.posts.find((item) => item.shareId === shareId) || null;
 }
 
 export async function agentDeletePost(user: SessionUser, id: string) {
@@ -164,6 +422,9 @@ export async function agentPublish(
 ) {
   const channel = await loadTikTokChannel(user.id);
   if (!channel?.accessToken) throw new AgentError("tiktok_not_connected", 401);
+  const store = await readStore();
+  const settings = resolveSettings(store.users.find((item) => item.id === user.id));
+  const flags = tiktokPostFlags(settings);
   const media = await agentMedia(user);
   const photos = (input.photo_images?.length ? input.photo_images : [input.image || media[0]?.url]).filter(
     Boolean,
@@ -174,19 +435,19 @@ export async function agentPublish(
   const privacy =
     input.privacy_level && allowed.includes(input.privacy_level)
       ? input.privacy_level
-      : allowed[0] || input.privacy_level || "SELF_ONLY";
+      : allowed[0] || input.privacy_level || settings.defaultPrivacy;
   const caption = input.caption.trim().slice(0, 2200);
   const result = await initPhotoPost(channel.accessToken, {
     post_info: {
       title: (input.title || caption).slice(0, 90),
       description: caption,
       privacy_level: privacy,
-      disable_comment: Boolean(input.disable_comment ?? true),
-      disable_duet: true,
-      disable_stitch: true,
-      auto_add_music: true,
-      brand_content_toggle: false,
-      brand_organic_toggle: false,
+      disable_comment: input.disable_comment ?? flags.disable_comment,
+      disable_duet: flags.disable_duet,
+      disable_stitch: flags.disable_stitch,
+      auto_add_music: flags.auto_add_music,
+      brand_content_toggle: flags.brand_content_toggle,
+      brand_organic_toggle: flags.brand_organic_toggle,
     },
     source_info: {
       source: "PULL_FROM_URL",
@@ -210,7 +471,7 @@ export async function agentPublish(
 
 export async function agentAnalytics(user: SessionUser) {
   const channel = await loadTikTokChannel(user.id);
-  const posts = await agentListPosts(user);
+  const posts = (await agentListPosts(user)).filter((post) => post.inCalendar !== false);
   const calendar = {
     views: posts.reduce((sum, post) => sum + post.views, 0),
     likes: posts.reduce((sum, post) => sum + post.likes, 0),
@@ -346,17 +607,38 @@ export async function agentReport(user: SessionUser) {
 }
 
 function publicPost(post: StudioPost) {
+  const recipe = ensureRecipe(post);
   return {
     id: post.id,
+    userId: post.userId,
     caption: post.body,
+    body: post.body,
     date: post.date,
     time: post.time,
     status: post.status,
-    image: post.image,
+    image: coverOf(post),
+    photo_images: photosOf(recipe),
     channelIds: post.channelIds,
+    origin: post.origin || recipe.origin,
+    shareId: post.shareId || undefined,
+    shareUrl: post.shareId ? publicShareUrl(post.shareId) : null,
     views: post.views,
     likes: post.likes,
     comments: post.comments,
     shares: post.shares,
+    recipe,
+    visibility: post.visibility || "private",
+    inCalendar: post.inCalendar !== false,
+    kind: post.kind || (recipe.slides.length > 1 ? "photo" : "photo"),
+    tiktokUrl: post.tiktokUrl || null,
+    tiktokId: post.tiktokId || null,
+    authorHandle: post.authorHandle || null,
+    authorName: post.authorName || null,
+    authorAvatar: post.authorAvatar || null,
+    musicTitle: post.musicTitle || null,
+    musicAuthor: post.musicAuthor || null,
+    clones: post.clones || 0,
+    forkedFrom: post.forkedFrom || null,
+    createdAt: post.createdAt || null,
   };
 }

@@ -1,4 +1,19 @@
-export type { Plan } from "./plans";
+export type Plan = import("./plans").Plan;
+
+export type UserSettings = {
+  locale?: "fr" | "en";
+  timezone: string;
+  weekStartsOn: 0 | 1;
+  defaultPostTime: string;
+  defaultPrivacy: string;
+  defaultStatus: "draft" | "scheduled";
+  disableComments: boolean;
+  disableDuet: boolean;
+  disableStitch: boolean;
+  autoAddMusic: boolean;
+  brandContent: boolean;
+  brandOrganic: boolean;
+};
 
 export type User = {
   id: string;
@@ -6,10 +21,11 @@ export type User = {
   name: string;
   passwordHash?: string;
   googleId?: string;
-  plan: import("./plans").Plan;
+  plan: Plan;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   createdAt: string;
+  settings?: Partial<UserSettings>;
 };
 
 export type Account = {
@@ -51,6 +67,42 @@ export type Channel = {
   videoCount?: number;
 };
 
+export type OverlayAlign = "left" | "center" | "right";
+
+export type SlideOverlay = {
+  id: string;
+  text: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number | string;
+  color: string;
+  x: number;
+  y: number;
+  align: OverlayAlign;
+  width?: number;
+  lineHeight?: number;
+};
+
+export type CarouselSlide = {
+  id: string;
+  image: string;
+  html?: string;
+  css?: string;
+  overlays: SlideOverlay[];
+};
+
+export type CarouselOrigin = "ai" | "manual" | "import" | "fork";
+
+export type CarouselRecipe = {
+  version: 1;
+  origin: CarouselOrigin;
+  fontFamily: string;
+  html?: string;
+  css?: string;
+  prompt?: string;
+  slides: CarouselSlide[];
+};
+
 export type StudioPost = {
   id: string;
   userId: string;
@@ -64,6 +116,22 @@ export type StudioPost = {
   likes: number;
   comments: number;
   shares: number;
+  origin?: CarouselOrigin;
+  shareId?: string;
+  recipe?: CarouselRecipe;
+  visibility?: "private" | "public";
+  inCalendar?: boolean;
+  kind?: "photo" | "video";
+  tiktokUrl?: string;
+  tiktokId?: string;
+  authorHandle?: string;
+  authorName?: string;
+  authorAvatar?: string;
+  musicTitle?: string;
+  musicAuthor?: string;
+  clones?: number;
+  forkedFrom?: string;
+  createdAt?: string;
 };
 
 export type MediaItem = {
@@ -98,5 +166,12 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string;
-  plan: import("./plans").Plan;
+  plan: Plan;
+};
+
+export type PublicUser = SessionUser & {
+  createdAt: string;
+  hasPassword: boolean;
+  hasGoogle: boolean;
+  settings: UserSettings;
 };

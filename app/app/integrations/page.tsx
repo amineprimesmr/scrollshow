@@ -1,6 +1,6 @@
-import { IntegrationsView } from "@/components/studio/StudioPages";
+import { ConnectionsView } from "@/components/studio/ConnectionsView";
 import { platformAvailability } from "@/lib/platforms";
 
 export default function Page() {
-  return <IntegrationsView availability={platformAvailability()} />;
+  return <ConnectionsView availability={platformAvailability()} />;
 }

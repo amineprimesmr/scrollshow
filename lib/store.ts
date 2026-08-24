@@ -1,6 +1,7 @@
 import { get, put } from "@vercel/blob";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { resolveSettings } from "./settings";
 import type { Account, Run, StoreData, User } from "./types";
 
 const BLOB_NAME = "scrollshow-store.json";
@@ -154,6 +155,10 @@ export function publicUser(user: User) {
     email: user.email,
     name: user.name,
     plan: user.plan,
+    createdAt: user.createdAt,
+    hasPassword: Boolean(user.passwordHash),
+    hasGoogle: Boolean(user.googleId),
+    settings: resolveSettings(user),
   };
 }
 

@@ -1,9 +1,7 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
-import { familyConfigured, PLATFORMS, platformName, type PlatformAvailability } from "@/lib/platforms";
 import { useEffect, useMemo, useState } from "react";
-import { DeveloperAccess } from "./DeveloperAccess";
 import { useStudio } from "./StudioContext";
 
 export function AnalyticsView() {
@@ -11,7 +9,10 @@ export function AnalyticsView() {
   const [english, setEnglish] = useState(false);
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [videos, setVideos] = useState<any[]>([]);
-  const visible = posts.filter((post) => activeChannel === "all" || post.channelIds.includes(activeChannel));
+  const visible = posts.filter(
+    (post) =>
+      post.inCalendar !== false && (activeChannel === "all" || post.channelIds.includes(activeChannel)),
+  );
   const connected = channels.some((item) => item.connected);
   const totals = useMemo(() => {
     if (videos.length) {
@@ -105,100 +106,6 @@ export function AnalyticsView() {
   );
 }
 
-export function MediaView() {
-  const { media } = useStudio();
-  const [english, setEnglish] = useState(false);
-
-  useEffect(() => {
-    setEnglish(prefersEnglish());
-  }, []);
-
-  if (!media.length) {
-    return (
-      <div className="ss-empty">
-        <h2>{t("Aucun média", "No media", english)}</h2>
-        <p>{t("Tes slides de carrousel apparaîtront ici.", "Your carousel slides will show up here.", english)}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ss-media-grid">
-      {media.map((item) => (
-        <figure key={item.id}>
-          <img src={item.url} alt="" />
-          <figcaption>{item.name}</figcaption>
-        </figure>
-      ))}
-    </div>
-  );
-}
-
-export function IntegrationsView({ availability }: { availability: PlatformAvailability }) {
-  const { channels } = useStudio();
-  const [english, setEnglish] = useState(false);
-
-  useEffect(() => {
-    setEnglish(prefersEnglish());
-  }, []);
-
-  return (
-    <>
-      <div className="ss-network-grid">
-        {PLATFORMS.map((platform) => {
-          const connected = channels.some((item) => item.platform === platform.id && item.connected);
-          const configured = familyConfigured(platform.family, availability);
-          const coming = !configured && platform.id !== "tiktok";
-          const badge = connected
-            ? t("Connecté", "Connected", english)
-            : platform.lifecycle === "pending_review"
-              ? t("Sandbox", "Sandbox", english)
-              : configured
-                ? t("Prêt", "Ready", english)
-                : t("Bientôt", "Soon", english);
-          const badgeClass = connected ? "is-ready" : configured || platform.id === "tiktok" ? "is-review" : "is-wait";
-          return (
-            <article key={platform.id} className="ss-network-card">
-              <header>
-                <img
-                  src={platform.logo}
-                  alt=""
-                  width={36}
-                  height={36}
-                  className={platform.id === "x" ? "ss-platform-logo is-x" : "ss-platform-logo"}
-                />
-                <div>
-                  <h2>{platform.name}</h2>
-                  <span className={`ss-badge ${badgeClass}`}>{badge}</span>
-                </div>
-              </header>
-              <p>
-                {platform.family === "tiktok"
-                  ? t("Connecte le compte, puis publie tes carrousels photo.", "Connect the account, then publish photo carousels.", english)
-                  : coming
-                    ? t("On branche cette plateforme ensuite. TikTok d’abord.", "This platform comes next. TikTok first.", english)
-                    : t("Connecte le compte pour publier depuis le calendrier.", "Connect the account to publish from the calendar.", english)}
-              </p>
-              {coming ? (
-                <button className="ss-btn-ghost" type="button" disabled>
-                  {t("Bientôt", "Soon", english)}
-                </button>
-              ) : (
-                <a className="ss-btn-purple" href={platform.connectPath}>
-                  {connected
-                    ? t(`Reconnecter`, `Reconnect`, english)
-                    : t(`Connecter`, `Connect`, english)}
-                </a>
-              )}
-            </article>
-          );
-        })}
-      </div>
-      <DeveloperAccess />
-    </>
-  );
-}
-
 export function BillingView() {
   const { user } = useStudio();
   const [english, setEnglish] = useState(false);
@@ -231,58 +138,6 @@ export function BillingView() {
         {plan !== "free" ? (
           <button className="ss-btn-ghost" type="button" disabled={busy} onClick={openPortal}>
             {busy ? "…" : t("Gérer l’abonnement", "Manage subscription", english)}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-export function SettingsView() {
-  const { user, channels, reload } = useStudio();
-  const [english, setEnglish] = useState(false);
-  const live = channels.filter((item) => item.connected);
-
-  useEffect(() => {
-    setEnglish(prefersEnglish());
-  }, []);
-
-  return (
-    <div className="ss-panel">
-      <h2>{t("Compte", "Account", english)}</h2>
-      <p>
-        <strong>{user?.name}</strong>
-        <br />
-        {user?.email}
-        <br />
-        {user?.plan && user.plan !== "free" ? `Plan ${user.plan}` : t("Aucun plan", "No plan", english)}
-      </p>
-      <h3>{t("Comptes connectés", "Connected accounts", english)}</h3>
-      {live.length ? (
-        live.map((channel) => (
-          <p key={channel.id}>
-            {platformName(channel.platform)} · @{channel.handle}
-            {channel.followers ? ` · ${channel.followers} ${t("abonnés", "followers", english)}` : ""}
-          </p>
-        ))
-      ) : (
-        <p>{t("Aucun compte connecté.", "No account connected.", english)}</p>
-      )}
-      <div className="ss-form-actions">
-        <a className="ss-btn-purple" href="/app/integrations">
-          {t("Gérer les connexions", "Manage connections", english)}
-        </a>
-        {live.length ? (
-          <button
-            className="ss-btn-ghost"
-            type="button"
-            onClick={async () => {
-              await Promise.all(live.map((channel) => fetch(`/api/studio/channels/${channel.id}`, { method: "DELETE" })));
-              await fetch("/api/tiktok/disconnect", { method: "POST" });
-              reload();
-            }}
-          >
-            {t("Tout déconnecter", "Disconnect all", english)}
           </button>
         ) : null}
       </div>

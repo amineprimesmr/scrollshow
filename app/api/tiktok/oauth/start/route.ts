@@ -21,6 +21,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(buildAuthorizeUrl(state));
   } catch {
     const origin = new URL(request.url).origin;
-    return NextResponse.redirect(`${origin}/app?error=tiktok_not_configured`);
+    return NextResponse.redirect(`${origin}/app/integrations?error=tiktok_not_configured`);
   }
 }

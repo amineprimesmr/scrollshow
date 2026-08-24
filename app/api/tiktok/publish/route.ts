@@ -1,6 +1,8 @@
 import { readSession } from "@/lib/auth";
-import { loadTikTokChannel } from "@/lib/tiktok-account";
+import { resolveSettings, tiktokPostFlags } from "@/lib/settings";
+import { readStore } from "@/lib/store";
 import { absoluteAssetUrl, creatorInfo, initPhotoPost } from "@/lib/tiktok";
+import { loadTikTokChannel } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -23,6 +25,9 @@ export async function POST(request: Request) {
   const channel = await loadTikTokChannel(user.id);
   if (!channel?.accessToken) return NextResponse.json({ error: "not_connected" }, { status: 401 });
 
+  const data = await readStore();
+  const flags = tiktokPostFlags(resolveSettings(data.users.find((item) => item.id === user.id)));
+
   try {
     const info = await creatorInfo(channel.accessToken);
     const allowed = info.privacy_level_options || [];
@@ -35,12 +40,12 @@ export async function POST(request: Request) {
         title: (parsed.data.title || parsed.data.description).slice(0, 90),
         description: parsed.data.description.slice(0, 2200),
         privacy_level: parsed.data.privacy_level,
-        disable_comment: Boolean(parsed.data.disable_comment ?? true),
-        disable_duet: true,
-        disable_stitch: true,
-        auto_add_music: true,
-        brand_content_toggle: Boolean(parsed.data.brand_content_toggle),
-        brand_organic_toggle: Boolean(parsed.data.brand_organic_toggle),
+        disable_comment: parsed.data.disable_comment ?? flags.disable_comment,
+        disable_duet: flags.disable_duet,
+        disable_stitch: flags.disable_stitch,
+        auto_add_music: flags.auto_add_music,
+        brand_content_toggle: parsed.data.brand_content_toggle ?? flags.brand_content_toggle,
+        brand_organic_toggle: parsed.data.brand_organic_toggle ?? flags.brand_organic_toggle,
       },
       source_info: {
         source: "PULL_FROM_URL",

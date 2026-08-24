@@ -294,7 +294,7 @@ export function Landing() {
               { id: "x", name: "X", src: "/assets/platforms/x.png" },
             ].map((brand) => (
               <li key={brand.id}>
-                <span className={`af-ld-networks__brand${brand.id === "x" ? " is-x" : ""}`}>
+                <span className={`af-ld-networks__brand${brand.id === "x" ? " is-x" : ""}${brand.id === "facebook" ? " is-facebook" : ""}`}>
                   <img src={brand.src} alt="" width={36} height={36} />
                   {brand.name}
                 </span>

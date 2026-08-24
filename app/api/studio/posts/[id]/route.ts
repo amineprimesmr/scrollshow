@@ -1,4 +1,5 @@
 import { readSession } from "@/lib/auth";
+import { applyRecipePatch, coverOf, ensureRecipe, newShareId, recipeInputSchema } from "@/lib/recipe";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -10,6 +11,9 @@ const schema = z.object({
   status: z.enum(["draft", "scheduled", "published"]).optional(),
   channelIds: z.array(z.string()).optional(),
   image: z.string().optional(),
+  photo_images: z.array(z.string()).optional(),
+  origin: z.enum(["ai", "manual", "import", "fork"]).optional(),
+  recipe: recipeInputSchema.optional(),
 });
 
 export async function PATCH(
@@ -25,7 +29,29 @@ export async function PATCH(
   const post = await updateStore((data) => {
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
     if (!found) return null;
-    Object.assign(found, parsed.data);
+    const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
+    Object.assign(found, rest);
+    if (origin) found.origin = origin;
+    const recipe = ensureRecipe(found);
+    if (recipePatch) {
+      found.recipe = applyRecipePatch(recipe, recipePatch);
+    } else if (photo_images?.length) {
+      found.recipe = applyRecipePatch(recipe, {
+        replaceSlides: true,
+        slides: photo_images.map((url, index) => ({
+          ...recipe.slides[index],
+          image: url,
+        })),
+      });
+    } else if (image) {
+      found.recipe = applyRecipePatch(recipe, {
+        slides: [{ ...recipe.slides[0], image }],
+      });
+    } else {
+      found.recipe = recipe;
+    }
+    found.image = coverOf(found);
+    if (!found.shareId) found.shareId = newShareId();
     return found;
   });
 

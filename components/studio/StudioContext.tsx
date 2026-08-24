@@ -1,10 +1,12 @@
 "use client";
 
-import type { Channel, MediaItem, SessionUser, StudioPost } from "@/lib/types";
+import { prefersEnglish } from "@/lib/i18n";
+import type { Channel, MediaItem, PublicUser, StudioPost } from "@/lib/types";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type StudioContextValue = {
-  user: SessionUser | null;
+  user: PublicUser | null;
+  english: boolean;
   channels: Channel[];
   posts: StudioPost[];
   media: MediaItem[];
@@ -21,8 +23,14 @@ type StudioContextValue = {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
+function englishFrom(user: PublicUser | null) {
+  if (user?.settings?.locale === "en") return true;
+  if (user?.settings?.locale === "fr") return false;
+  return prefersEnglish();
+}
+
 export function StudioProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const [user, setUser] = useState<PublicUser | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [posts, setPosts] = useState<StudioPost[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -45,9 +53,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     reload();
   }, []);
 
+  const english = englishFrom(user);
+
   const value = useMemo(
     () => ({
       user,
+      english,
       channels,
       posts,
       media,
@@ -61,7 +72,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       setEditing,
       reload,
     }),
-    [user, channels, posts, media, activeChannel, addOpen, postOpen, editing],
+    [user, english, channels, posts, media, activeChannel, addOpen, postOpen, editing],
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;

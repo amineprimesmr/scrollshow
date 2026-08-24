@@ -10,15 +10,15 @@ export async function GET(request: Request) {
   const err = url.searchParams.get("error");
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state") || "";
-  if (err) return NextResponse.redirect(`${site}/app?error=${encodeURIComponent(err)}`);
-  if (!code) return NextResponse.redirect(`${site}/app?error=missing_code`);
+  if (err) return NextResponse.redirect(`${site}/app/integrations?error=${encodeURIComponent(err)}`);
+  if (!code) return NextResponse.redirect(`${site}/app/integrations?error=missing_code`);
 
   const user = await readSession();
   if (!user) return NextResponse.redirect(`${site}/signup?mode=signin&next=/app`);
 
   const expected = (await cookies()).get("ss_oauth_state")?.value || "";
   if (expected && state && expected !== state) {
-    return NextResponse.redirect(`${site}/app?error=state_mismatch`);
+    return NextResponse.redirect(`${site}/app/integrations?error=state_mismatch`);
   }
 
   try {
@@ -55,13 +55,13 @@ export async function GET(request: Request) {
     });
 
     (await cookies()).delete("ss_oauth_state");
-    return NextResponse.redirect(`${site}/app?connected=1`);
+    return NextResponse.redirect(`${site}/app/integrations?connected=tiktok`);
   } catch (error) {
     const raw = error instanceof Error ? error.message : "oauth";
     let code = "oauth";
     if (raw.includes("invalid_client")) code = "invalid_client";
     else if (raw.includes("invalid_grant") || raw.includes("invalid_code")) code = "invalid_grant";
     else if (raw.includes("access_denied")) code = "access_denied";
-    return NextResponse.redirect(`${site}/app?error=${code}`);
+    return NextResponse.redirect(`${site}/app/integrations?error=${code}`);
   }
 }
