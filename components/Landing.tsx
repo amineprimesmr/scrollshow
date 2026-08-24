@@ -158,7 +158,7 @@ export function Landing() {
       nav.style.setProperty("--nav-p", p.toFixed(3));
       const frost = `blur(${(p * 14).toFixed(1)}px) saturate(${(1 + p * 0.2).toFixed(2)})`;
       inner.style.backdropFilter = frost;
-      inner.style.webkitBackdropFilter = frost;
+      inner.style.setProperty("-webkit-backdrop-filter", frost);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
