@@ -25,6 +25,13 @@ const PRIVACY = [
 ];
 
 function rebuildCopy(code: string, english: boolean) {
+  if (code === "ai_gateway_billing") {
+    return t(
+      "Vercel demande une carte pour activer AI Gateway (crédits offerts ensuite). Ajoute-la puis réessaie.",
+      "Vercel needs a card to enable AI Gateway (free credits unlock after). Add it, then try again.",
+      english,
+    );
+  }
   if (code === "ai_gateway_missing") {
     return t(
       "Le modèle du site n’est pas branché. Active AI Gateway sur le projet Vercel, ou ajoute AI_GATEWAY_API_KEY.",
@@ -299,6 +306,16 @@ export function CreatePostModal() {
                 <button className="ss-btn-purple" type="button" onClick={() => void reconstruct()}>
                   {t("Recréer en éditable", "Rebuild as editable", english)}
                 </button>
+              ) : null}
+              {rebuildError.includes("AI Gateway") || rebuildError.includes("carte pour activer") ? (
+                <a
+                  className="ss-btn-ghost"
+                  href="https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("Ajouter une carte Vercel", "Add a Vercel card", english)}
+                </a>
               ) : null}
               {recipe.editable && (slide.sourceImage || slide.image) ? (
                 <button className="ss-btn-ghost" type="button" onClick={() => setShowOriginal((value) => !value)}>

@@ -162,10 +162,16 @@ export function MarketplaceView() {
     setBusy(null);
     if (!res.ok) {
       setMessage(
-        json.error === "ai_gateway_missing"
+        json.error === "ai_gateway_billing"
           ? t(
-              "Le modèle du site n’est pas branché. Ajoute AI_GATEWAY_API_KEY dans .env.local.",
-              "The site model is not connected. Add AI_GATEWAY_API_KEY to .env.local.",
+              "Vercel demande une carte pour activer AI Gateway. Ajoute-la puis réessaie.",
+              "Vercel needs a card to enable AI Gateway. Add it, then try again.",
+              english,
+            )
+          : json.error === "ai_gateway_missing"
+          ? t(
+              "Le modèle du site n’est pas branché. Active AI Gateway sur Vercel.",
+              "The site model is not connected. Enable AI Gateway on Vercel.",
               english,
             )
           : t("Impossible de recréer ce TikTok en éditable.", "Could not rebuild this TikTok as editable.", english),

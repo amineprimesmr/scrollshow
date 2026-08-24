@@ -81,7 +81,13 @@ function namedHex(value: string | undefined, fallback = "#ffffff") {
 
 function gatewayMissing(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /api key|unauthoriz|ai_gateway|oidc|forbidden|401|403|credential|missing.*key|no.*key|loadapikey|authentication/i.test(message);
+  if (/credit card|customer_verification|add-credit-card|unlock your free credits/i.test(message)) {
+    return "ai_gateway_billing";
+  }
+  if (/api key|unauthoriz|ai_gateway|oidc|forbidden|401|403|credential|missing.*key|no.*key|loadapikey|authentication/i.test(message)) {
+    return "ai_gateway_missing";
+  }
+  return null;
 }
 
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>) {
@@ -202,7 +208,8 @@ export async function reconstructRecipe(recipe: CarouselRecipe): Promise<Carouse
   } catch (error) {
     console.error("[reconstruct]", error);
     if (error instanceof ReconstructError) throw error;
-    if (gatewayMissing(error)) throw new ReconstructError("ai_gateway_missing", 503);
+    const gated = gatewayMissing(error);
+    if (gated) throw new ReconstructError(gated, 503);
     throw new ReconstructError("reconstruct_failed", 500);
   }
 }
