@@ -86,6 +86,10 @@ export type SlideOverlay = {
 export type CarouselSlide = {
   id: string;
   image: string;
+  sourceImage?: string;
+  backgroundColor?: string;
+  backgroundColor2?: string;
+  keepPhoto?: boolean;
   html?: string;
   css?: string;
   overlays: SlideOverlay[];
@@ -100,6 +104,7 @@ export type CarouselRecipe = {
   html?: string;
   css?: string;
   prompt?: string;
+  editable?: boolean;
   slides: CarouselSlide[];
 };
 

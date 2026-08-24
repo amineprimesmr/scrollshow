@@ -6,6 +6,7 @@ import {
   defaultOverlay,
   defaultSlide,
   ensureRecipe,
+  needsReconstruct,
   photosOf,
   RECIPE_FONTS,
   recipeFromPhotos,
@@ -23,6 +24,17 @@ const PRIVACY = [
   { id: "SELF_ONLY", fr: "Moi uniquement", en: "Only me" },
 ];
 
+function rebuildCopy(code: string, english: boolean) {
+  if (code === "ai_gateway_missing") {
+    return t(
+      "Le modèle du site n’est pas branché. Ajoute AI_GATEWAY_API_KEY dans .env.local (Vercel → AI Gateway), ou lance reconstruct_post depuis le MCP.",
+      "The site model is not connected. Add AI_GATEWAY_API_KEY to .env.local (Vercel → AI Gateway), or run reconstruct_post from MCP.",
+      english,
+    );
+  }
+  return t("Impossible de recréer les calques éditables.", "Could not rebuild the editable layers.", english);
+}
+
 export function CreatePostModal() {
   const { user, english, postOpen, setPostOpen, channels, media, editing, setEditing, reload, activeChannel } = useStudio();
   const [body, setBody] = useState("");
@@ -39,9 +51,13 @@ export function CreatePostModal() {
   const [message, setMessage] = useState("");
   const [recipe, setRecipe] = useState<CarouselRecipe>(() => recipeFromPhotos([], "manual"));
   const [slideIndex, setSlideIndex] = useState(0);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildError, setRebuildError] = useState("");
+  const [showOriginal, setShowOriginal] = useState(false);
 
   const connected = channels.filter((item) => item.connected);
   const slide = recipe.slides[slideIndex] || recipe.slides[0];
+  const baked = needsReconstruct(recipe);
 
   useEffect(() => {
     if (!postOpen) return;
@@ -54,6 +70,8 @@ export function CreatePostModal() {
       setChannelIds(editing.channelIds);
       setRecipe(next);
       setSlideIndex(0);
+      setMessage("");
+      setShowOriginal(false);
       return;
     }
     const settings = user?.settings;
@@ -74,7 +92,43 @@ export function CreatePostModal() {
     setBranded(Boolean(settings?.brandContent));
     setOrganic(Boolean(settings?.brandOrganic));
     setMessage("");
+    setRebuildError("");
+    setShowOriginal(false);
+    setRebuilding(false);
   }, [postOpen, editing, channels, media, activeChannel, user]);
+
+  useEffect(() => {
+    if (!postOpen || !editing?.id) return;
+    const next = ensureRecipe(editing);
+    if (!needsReconstruct(next)) return;
+    const id = editing.id;
+    let cancelled = false;
+    setRebuilding(true);
+    setRebuildError("");
+    fetch(`/api/studio/posts/${id}/reconstruct`, { method: "POST" })
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setRebuildError(rebuildCopy(String(json.error), english));
+          return;
+        }
+        if (json.post) {
+          setEditing(json.post);
+          setRecipe(ensureRecipe(json.post));
+          reload();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRebuildError(rebuildCopy("reconstruct_failed", english));
+      })
+      .finally(() => {
+        if (!cancelled) setRebuilding(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postOpen, editing?.id, english, reload, setEditing]);
 
   useEffect(() => {
     if (!postOpen || !connected.length) return;
@@ -125,6 +179,24 @@ export function CreatePostModal() {
     setSlideIndex((index) => Math.max(0, Math.min(index, next.length - 1)));
   }
 
+  async function reconstruct() {
+    if (!editing?.id || rebuilding) return;
+    setRebuilding(true);
+    setRebuildError("");
+    const res = await fetch(`/api/studio/posts/${editing.id}/reconstruct`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setRebuilding(false);
+    if (!res.ok) {
+      setRebuildError(rebuildCopy(String(json.error), english));
+      return;
+    }
+    if (json.post) {
+      setEditing(json.post);
+      setRecipe(ensureRecipe(json.post));
+      reload();
+    }
+  }
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setPending(true);
@@ -161,11 +233,26 @@ export function CreatePostModal() {
   async function publishNow() {
     setPending(true);
     setMessage("");
+    let photos = photosOf(recipe);
+    if (recipe.editable) {
+      const raster = await fetch(editing?.id ? `/api/studio/posts/${editing.id}/rasterize` : "/api/studio/rasterize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipe }),
+      });
+      const rasterJson = await raster.json().catch(() => ({}));
+      if (!raster.ok || !Array.isArray(rasterJson.photo_images) || !rasterJson.photo_images.length) {
+        setPending(false);
+        setMessage(t("Impossible de générer les images avec le nouveau texte.", "Could not render images with the new text.", english));
+        return;
+      }
+      photos = rasterJson.photo_images;
+    }
     const res = await fetch("/api/tiktok/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        photo_images: photosOf(recipe),
+        photo_images: photos,
         description: body,
         privacy_level: privacy,
         disable_comment: commentsOff,
@@ -194,8 +281,38 @@ export function CreatePostModal() {
       <div className="ss-dialog ss-dialog--recipe" onClick={(event) => event.stopPropagation()}>
         <h2>{editing ? t("Modifier le TikTok", "Edit TikTok", english) : t("Publier sur TikTok", "Publish to TikTok", english)}</h2>
         <form className="ss-recipe" onSubmit={save}>
+          {baked || rebuilding || rebuildError || recipe.editable ? (
+            <div className={`ss-recipe__banner${rebuildError ? " ss-recipe__banner--err" : ""}`}>
+              <p>
+                {rebuilding
+                  ? t("On recrée le TikTok en calques éditables (fond + textes)…", "Rebuilding the TikTok into editable layers (background + text)…", english)
+                  : rebuildError
+                    ? rebuildError
+                    : recipe.editable
+                      ? t("Les textes et le fond sont éditables. Change une ligne : l’aperçu se met à jour.", "Texts and background are editable. Change a line and the preview updates.", english)
+                      : t("Import brut : le texte est encore dans l’image. Recrée le TikTok pour pouvoir tout modifier.", "Raw import: text is still inside the image. Rebuild it to edit everything.", english)}
+              </p>
+              {editing?.id && (baked || rebuildError) && !rebuilding ? (
+                <button className="ss-btn-purple" type="button" onClick={() => void reconstruct()}>
+                  {t("Recréer en éditable", "Rebuild as editable", english)}
+                </button>
+              ) : null}
+              {recipe.editable && (slide.sourceImage || slide.image) ? (
+                <button className="ss-btn-ghost" type="button" onClick={() => setShowOriginal((value) => !value)}>
+                  {showOriginal ? t("Voir l’édition", "Show edit", english) : t("Voir l’original", "Show original", english)}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="ss-recipe__stage">
-            <SlidePreview slide={slide} recipe={recipe} width={280} />
+            <div className="ss-recipe__preview">
+              <SlidePreview slide={slide} recipe={recipe} width={280} original={showOriginal} />
+              {rebuilding ? (
+                <div className="ss-slide-preview__busy">
+                  {t("Recréation des calques…", "Rebuilding layers…", english)}
+                </div>
+              ) : null}
+            </div>
             <div className="ss-recipe__thumbs">
               {recipe.slides.map((item, index) => (
                 <button
@@ -230,16 +347,36 @@ export function CreatePostModal() {
                 </button>
               ) : null}
             </label>
-            <select value={slide.image} onChange={(event) => patchSlide(slide.id, { image: event.target.value })}>
+            <select value={slide.image} onChange={(event) => patchSlide(slide.id, { image: event.target.value, sourceImage: event.target.value, keepPhoto: true })}>
               {media.map((item) => (
                 <option key={item.id} value={item.url}>
                   {item.name}
                 </option>
               ))}
-              {slide.image && !media.some((item) => item.url === slide.image) ? (
-                <option value={slide.image}>{t("Image actuelle", "Current image", english)}</option>
+              {(slide.image || slide.sourceImage) && !media.some((item) => item.url === slide.image) ? (
+                <option value={slide.image || slide.sourceImage}>{t("Image actuelle", "Current image", english)}</option>
               ) : null}
             </select>
+            {recipe.editable ? (
+              <label className="ss-recipe__label">
+                {t("Fond", "Background", english)}
+                <input
+                  type="color"
+                  value={slide.backgroundColor || "#111111"}
+                  onChange={(event) => patchSlide(slide.id, { backgroundColor: event.target.value, keepPhoto: false })}
+                />
+              </label>
+            ) : null}
+            {baked ? (
+              <p className="ss-lead">
+                {t(
+                  "Tant que le TikTok n’est pas recréé, tu ne peux pas changer les textes — ils sont encore collés dans le JPEG.",
+                  "Until the TikTok is rebuilt, you cannot change the texts — they are still baked into the JPEG.",
+                  english,
+                )}
+              </p>
+            ) : (
+              <>
             {slide.overlays.map((overlay, overlayIndex) => (
               <div key={overlay.id} className="ss-recipe__overlay">
                 <textarea
@@ -269,7 +406,7 @@ export function CreatePostModal() {
                   />
                   <input
                     type="color"
-                    value={overlay.color}
+                    value={/^#[0-9A-Fa-f]{6}$/.test(overlay.color) ? overlay.color : "#ffffff"}
                     onChange={(event) =>
                       patchSlide(slide.id, {
                         overlays: slide.overlays.map((item) =>
@@ -306,6 +443,8 @@ export function CreatePostModal() {
             >
               {t("Ajouter un texte", "Add text", english)}
             </button>
+              </>
+            )}
             {connected.length ? (
               <div className="ss-checks">
                 {connected.map((channel) => (

@@ -37,11 +37,13 @@ export default async function Page({ params }: Params) {
         <span>Marketplace</span>
       </header>
       <section className="ss-share__hero">
-        <p className="ss-share__kicker">{post.origin === "import" ? "Import pixel perfect" : "TikTok source"}</p>
+        <p className="ss-share__kicker">{recipe.editable ? "TikTok éditable" : post.origin === "import" ? "Import brut" : "TikTok source"}</p>
         <h1>{post.body || "Carrousel ScrollShow"}</h1>
         <p>
-          {post.origin === "import"
-            ? "Import pixel-perfect : utilise photo_images et la légende tels quels. Ne pas redessiner, ni changer la police, la taille ou le layout. Le texte est déjà dans les slides."
+          {recipe.editable
+            ? `Ceci est le TikTok recréé en calques éditables — police ${recipe.fontFamily}, textes dans overlays. Modifier les textes puis update_recipe. Ne pas réimporter l’image originale.`
+            : post.origin === "import"
+            ? "Import brut : le texte est encore dans les JPEG. Appelle reconstruct_post pour recréer des calques éditables, puis update_recipe."
             : `Ceci est le code exact du TikTok — même police (${recipe.fontFamily}), mêmes slides, mêmes textes. Ne pas recréer un modèle. Modifier uniquement ce qui est demandé, puis enregistrer avec update_recipe.`}
         </p>
         <p className="ss-share__meta">
@@ -76,8 +78,10 @@ export default async function Page({ params }: Params) {
             Ou MCP ScrollShow : <code>get_recipe</code> avec id <code>{post.id}</code> / shareId <code>{shareId}</code>
           </li>
           <li>
-            {post.origin === "import"
-              ? "Réutilise photo_images et caption à l’identique — pixel perfect, pas de nouveau visuel"
+            {recipe.editable
+              ? "Les textes sont dans overlays — update_recipe pour les changer, puis publish_now avec id pour rasterizer"
+              : post.origin === "import"
+              ? "Appelle reconstruct_post avant de modifier les textes (ils sont encore dans le JPEG)"
               : "Garde fontFamily, positions des overlays, html et css"}
           </li>
           <li>

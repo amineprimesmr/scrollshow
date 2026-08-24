@@ -12,6 +12,7 @@ import {
   cloneRecipe,
   coverOf,
   ensureRecipe,
+  needsRasterize,
   newShareId,
   photosOf,
   publicRecipe,
@@ -20,6 +21,8 @@ import {
   recipeJsonUrl,
 } from "./recipe";
 import { importTikTokFromUrl } from "./tiktok-import";
+import { reconstructRecipe, ReconstructError } from "./reconstruct";
+import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
 import { resolveSettings, tiktokPostFlags } from "./settings";
 import { readStore, updateStore } from "./store";
@@ -226,6 +229,41 @@ export async function agentUpdateRecipe(
   return publicRecipe(post);
 }
 
+export async function agentReconstructPost(user: SessionUser, idOrShare: string) {
+  const data = await readStore();
+  const found = data.posts.find(
+    (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+  );
+  if (!found) throw new AgentError("post_missing", 404);
+  try {
+    const recipe = await reconstructRecipe(ensureRecipe(found));
+    const post = await updateStore((store) => {
+      const item = store.posts.find((entry) => entry.id === found.id && entry.userId === user.id);
+      if (!item) return null;
+      item.recipe = recipe;
+      item.image = coverOf(item);
+      return item;
+    });
+    if (!post) throw new AgentError("post_missing", 404);
+    return publicPost(post);
+  } catch (error) {
+    if (error instanceof ReconstructError) throw new AgentError(error.message, error.status);
+    throw error;
+  }
+}
+
+export async function agentRasterizePost(user: SessionUser, idOrShare: string, recipePatch?: CarouselRecipe) {
+  const data = await readStore();
+  const found = data.posts.find(
+    (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+  );
+  if (!found && !recipePatch) throw new AgentError("post_missing", 404);
+  const recipe = recipePatch || ensureRecipe(found!);
+  const photo_images = await rasterizeRecipe(recipe);
+  if (!photo_images.length) throw new AgentError("photos_required");
+  return { photo_images, recipe };
+}
+
 export async function agentEnsureShare(user: SessionUser, id: string) {
   const post = await updateStore((data) => {
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
@@ -288,7 +326,7 @@ export async function agentForkPost(user: SessionUser, id: string) {
 
 export async function agentImportTikTok(
   user: SessionUser,
-  input: { url: string; visibility?: "private" | "public" },
+  input: { url: string; visibility?: "private" | "public"; reconstruct?: boolean },
 ) {
   const imported = await importTikTokFromUrl(input.url);
   const current = await readStore();
@@ -344,6 +382,7 @@ export async function agentImportTikTok(
     data.posts.unshift(created);
     return created;
   });
+  if (input.reconstruct) return agentReconstructPost(user, post.id);
   return publicPost(post);
 }
 
@@ -414,6 +453,7 @@ export async function agentPublish(
   input: {
     caption: string;
     title?: string;
+    id?: string;
     photo_images?: string[];
     image?: string;
     privacy_level?: string;
@@ -426,9 +466,16 @@ export async function agentPublish(
   const settings = resolveSettings(store.users.find((item) => item.id === user.id));
   const flags = tiktokPostFlags(settings);
   const media = await agentMedia(user);
-  const photos = (input.photo_images?.length ? input.photo_images : [input.image || media[0]?.url]).filter(
+  let photos = (input.photo_images?.length ? input.photo_images : [input.image || media[0]?.url]).filter(
     Boolean,
   ) as string[];
+  if (input.id) {
+    const found = store.posts.find((item) => item.userId === user.id && (item.id === input.id || item.shareId === input.id));
+    if (found) {
+      const recipe = ensureRecipe(found);
+      photos = needsRasterize(recipe) ? await rasterizeRecipe(recipe) : photosOf(recipe);
+    }
+  }
   if (!photos.length) throw new AgentError("photos_required");
   const info = await creatorInfo(channel.accessToken);
   const allowed: string[] = info.privacy_level_options || [];

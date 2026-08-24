@@ -1,7 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import { ensureRecipe } from "@/lib/recipe";
+import { ensureRecipe, needsReconstruct } from "@/lib/recipe";
 import type { StudioPost } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
@@ -13,10 +13,11 @@ type MarketItem = StudioPost & {
   caption?: string;
 };
 
-function originLabel(origin: string | undefined, english: boolean) {
-  if (origin === "ai") return "IA";
-  if (origin === "import") return t("Importé", "Imported", english);
-  if (origin === "fork") return t("Clone", "Clone", english);
+function originLabel(item: MarketItem, english: boolean) {
+  if (item.recipe?.editable) return t("Éditable", "Editable", english);
+  if (item.origin === "ai") return "IA";
+  if (item.origin === "import") return t("Importé", "Imported", english);
+  if (item.origin === "fork") return t("Clone", "Clone", english);
   return t("Manuel", "Manual", english);
 }
 
@@ -153,6 +154,32 @@ export function MarketplaceView() {
     }
   }
 
+  async function reconstruct(item: MarketItem) {
+    setBusy(item.id);
+    setMessage("");
+    const res = await fetch(`/api/studio/posts/${item.id}/reconstruct`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) {
+      setMessage(
+        json.error === "ai_gateway_missing"
+          ? t(
+              "Le modèle du site n’est pas branché. Ajoute AI_GATEWAY_API_KEY dans .env.local.",
+              "The site model is not connected. Add AI_GATEWAY_API_KEY to .env.local.",
+              english,
+            )
+          : t("Impossible de recréer ce TikTok en éditable.", "Could not rebuild this TikTok as editable.", english),
+      );
+      return;
+    }
+    await reload();
+    await loadPublic();
+    if (json.post) {
+      setEditing(json.post);
+      setPostOpen(true);
+    }
+  }
+
   return (
     <div className="ss-market">
       <form className="ss-market-import" onSubmit={(event) => void importUrl(event)}>
@@ -160,8 +187,8 @@ export function MarketplaceView() {
           <strong>{t("Importer un TikTok", "Import a TikTok", english)}</strong>
           <p>
             {t(
-              "Colle le lien : on récupère les slides pixel perfect, la légende, l’auteur et les stats. L’IA pourra recréer exactement le même.",
-              "Paste the link: we pull the slides pixel-perfect, caption, author and stats. Your AI can recreate the exact same post.",
+              "Colle le lien : on copie les slides, puis on les recrée en calques éditables (textes, polices, fond). Tu pourras tout modifier.",
+              "Paste the link: we copy the slides, then rebuild them as editable layers (texts, fonts, background) so you can change everything.",
               english,
             )}
           </p>
@@ -241,7 +268,7 @@ export function MarketplaceView() {
                   <p>{item.body || item.caption}</p>
                   <div className="ss-market-card__meta">
                     <span>{item.visibility === "public" ? t("Public", "Public", english) : t("Privé", "Private", english)}</span>
-                    <span>{originLabel(item.origin, english)}</span>
+                    <span>{originLabel(item, english)}</span>
                     <span>
                       {recipe.slides.length} {t("slides", "slides", english)}
                     </span>
@@ -258,6 +285,11 @@ export function MarketplaceView() {
                         {t("Utiliser ce format", "Use this format", english)}
                       </button>
                     )}
+                    {mine && needsReconstruct(recipe) ? (
+                      <button className="ss-btn-ghost" type="button" disabled={busy === item.id} onClick={() => void reconstruct(item)}>
+                        {busy === item.id ? "…" : t("Recréer en éditable", "Rebuild as editable", english)}
+                      </button>
+                    ) : null}
                     <button className="ss-btn-ghost" type="button" disabled={busy === item.id} onClick={() => void copyLink(item)}>
                       {copied === item.id ? t("Lien copié", "Link copied", english) : t("Lien IA", "AI link", english)}
                     </button>

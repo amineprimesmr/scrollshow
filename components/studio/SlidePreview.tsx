@@ -7,10 +7,12 @@ export function SlidePreview({
   slide,
   recipe,
   width = 270,
+  original = false,
 }: {
   slide: CarouselSlide;
   recipe: CarouselRecipe;
   width?: number;
+  original?: boolean;
 }) {
   const height = Math.round((width * 16) / 9);
   const html = slide.html || recipe.html;
@@ -26,16 +28,28 @@ export function SlidePreview({
       />
     );
   }
+  const photo = original
+    ? slide.sourceImage || slide.image
+    : slide.keepPhoto
+      ? slide.sourceImage || slide.image
+      : slide.backgroundColor
+        ? ""
+        : slide.image;
+  const background = slide.backgroundColor2
+    ? `linear-gradient(180deg, ${slide.backgroundColor}, ${slide.backgroundColor2})`
+    : slide.backgroundColor || "#111";
   return (
-    <div className="ss-slide-preview" style={{ width, height, fontFamily: fontStack(recipe.fontFamily) }}>
-      {slide.image ? <img src={slide.image} alt="" /> : <div className="ss-slide-preview__empty" />}
-      {slide.overlays
-        .filter((overlay) => overlay.text.trim())
-        .map((overlay) => (
-          <div key={overlay.id} style={overlayStyle(overlay, width)}>
-            {overlay.text}
-          </div>
-        ))}
+    <div className="ss-slide-preview" style={{ width, height, fontFamily: fontStack(recipe.fontFamily), background }}>
+      {photo ? <img src={photo} alt="" /> : <div className="ss-slide-preview__empty" style={{ background: "transparent" }} />}
+      {!original
+        ? slide.overlays
+            .filter((overlay) => overlay.text.trim())
+            .map((overlay) => (
+              <div key={overlay.id} style={overlayStyle(overlay, width)}>
+                {overlay.text}
+              </div>
+            ))
+        : null}
     </div>
   );
 }

@@ -757,6 +757,48 @@ html:has(.ss-studio) body.grain {
   background: #111;
 }
 
+.ss-recipe__preview {
+  position: relative;
+}
+
+.ss-slide-preview__busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.58);
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ss-recipe__banner {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f4f0ff;
+  border: 1px solid #ddd6fe;
+  font-size: 13px;
+}
+
+.ss-recipe__banner p {
+  margin: 0;
+  flex: 1 1 220px;
+}
+
+.ss-recipe__banner--err {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
 .ss-dialog--recipe {
   width: min(1080px, 100%);
   max-height: min(92vh, 900px);

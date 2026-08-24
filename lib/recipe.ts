@@ -25,6 +25,10 @@ export const overlayInputSchema = z.object({
 export const slideInputSchema = z.object({
   id: z.string().optional(),
   image: z.string().optional(),
+  sourceImage: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  backgroundColor2: z.string().optional(),
+  keepPhoto: z.boolean().optional(),
   html: z.string().optional(),
   css: z.string().optional(),
   overlays: z.array(overlayInputSchema).optional(),
@@ -37,6 +41,7 @@ export const recipeInputSchema = z.object({
   html: z.string().optional(),
   css: z.string().optional(),
   prompt: z.string().optional(),
+  editable: z.boolean().optional(),
   replaceSlides: z.boolean().optional(),
   slides: z.array(slideInputSchema).optional(),
 });
@@ -93,13 +98,33 @@ export function defaultOverlay(partial?: Partial<SlideOverlay>): SlideOverlay {
   };
 }
 
+export function closestFont(name: string) {
+  const n = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const exact = RECIPE_FONTS.find((font) => font.toLowerCase().replace(/[^a-z0-9]+/g, "") === n);
+  if (exact) return exact;
+  if (n.includes("bebas")) return "Bebas Neue";
+  if (n.includes("playfair")) return "Playfair Display";
+  if (n.includes("dmsans") || n === "dm") return "DM Sans";
+  if (n.includes("impact") || n.includes("haettenschweiler")) return "Anton";
+  if (n.includes("oswald")) return "Oswald";
+  if (n.includes("poppin")) return "Poppins";
+  if (n.includes("outfit")) return "Outfit";
+  if (n.includes("arial") || n.includes("helvetica")) return "Inter";
+  if (n.includes("montserrat")) return "Montserrat";
+  return DEFAULT_FONT;
+}
+
 export function defaultSlide(
   image: string,
   partial?: Partial<Omit<CarouselSlide, "overlays">> & { overlays?: Array<Partial<SlideOverlay>> },
 ): CarouselSlide {
   return {
     id: partial?.id || newId(),
-    image,
+    image: image || partial?.image || "",
+    sourceImage: partial?.sourceImage,
+    backgroundColor: partial?.backgroundColor,
+    backgroundColor2: partial?.backgroundColor2,
+    keepPhoto: partial?.keepPhoto,
     html: partial?.html,
     css: partial?.css,
     overlays: (partial?.overlays || []).map((overlay) => defaultOverlay(overlay)),
@@ -122,6 +147,7 @@ export function recipeFromPhotos(
     html: extra?.html,
     css: extra?.css,
     prompt: extra?.prompt,
+    editable: extra?.editable,
     slides,
   });
 }
@@ -129,11 +155,15 @@ export function recipeFromPhotos(
 export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | undefined, origin: CarouselRecipe["origin"] = "manual"): CarouselRecipe {
   const slides = (input?.slides || [])
     .map((slide) => {
-      if (!slide?.image && !slide?.html) return null;
+      if (!slide?.image && !slide?.html && !slide?.backgroundColor && !slide?.sourceImage) return null;
       return defaultSlide(slide.image || "", {
         id: slide.id,
         html: slide.html,
         css: slide.css,
+        sourceImage: slide.sourceImage,
+        backgroundColor: slide.backgroundColor,
+        backgroundColor2: slide.backgroundColor2,
+        keepPhoto: slide.keepPhoto,
         overlays: slide.overlays,
       });
     })
@@ -145,6 +175,7 @@ export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | u
     html: input?.html,
     css: input?.css,
     prompt: input?.prompt,
+    editable: input?.editable,
     slides: slides.length ? slides : [defaultSlide("/assets/tiktoks/01-glowup-188k.png")],
   };
 }
@@ -184,6 +215,7 @@ export function applyRecipePatch(
     html: patch.html ?? current.html,
     css: patch.css ?? current.css,
     prompt: patch.prompt ?? current.prompt,
+    editable: patch.editable ?? current.editable,
     slides: current.slides,
   });
   if (!patch.slides?.length) return next;
@@ -198,6 +230,10 @@ export function applyRecipePatch(
       id: slide.id,
       html: incoming.html ?? slide.html,
       css: incoming.css ?? slide.css,
+      sourceImage: incoming.sourceImage ?? slide.sourceImage,
+      backgroundColor: incoming.backgroundColor ?? slide.backgroundColor,
+      backgroundColor2: incoming.backgroundColor2 ?? slide.backgroundColor2,
+      keepPhoto: incoming.keepPhoto ?? slide.keepPhoto,
       overlays: mergeOverlays(slide.overlays, incoming.overlays),
     });
   });
@@ -281,8 +317,26 @@ export function publicRecipe(post: StudioPost) {
     image: coverOf(post),
     photo_images: photosOf(recipe),
     recipe,
-    instruction: imported
-      ? "PIXEL-PERFECT import. Use these exact photo_images and this exact caption. Do not redraw, restyle, change font, size, or layout. The slides already contain the original text. Only swap an image if the user asked."
-      : "This is the exact source of an existing ScrollShow TikTok. Do not generate a new template. Keep fontFamily, overlay positions, html and css. Change only the texts or images requested, then call update_recipe with this id.",
+    instruction: recipe.editable
+      ? "EDITABLE reconstruction. Texts live in recipe.slides[].overlays (not baked into the JPEG). Change overlay text/font/color/position or slide.backgroundColor, then call update_recipe. Call reconstruct_post only if overlays are still empty. On publish, rasterize the overlays into photo_images."
+      : imported
+        ? "BAKED import — text is still inside the JPEG. Call reconstruct_post so the user can edit texts and images. Until then, photo_images are a pixel copy of the original TikTok."
+        : "This is the exact source of an existing ScrollShow TikTok. Do not generate a new template. Keep fontFamily, overlay positions, html and css. Change only the texts or images requested, then call update_recipe with this id.",
   };
+}
+
+export function needsReconstruct(recipe: CarouselRecipe) {
+  if (recipe.editable) return false;
+  if (recipe.origin !== "import" && recipe.origin !== "fork") return false;
+  return !recipe.slides.some((slide) => slide.overlays.some((overlay) => overlay.text.trim()));
+}
+
+export function needsRasterize(recipe: CarouselRecipe) {
+  return Boolean(recipe.editable) && recipe.slides.some((slide) => slide.overlays.some((overlay) => overlay.text.trim()));
+}
+
+export function slidePreviewImage(slide: CarouselSlide) {
+  if (slide.keepPhoto) return slide.sourceImage || slide.image;
+  if (slide.backgroundColor) return "";
+  return slide.image;
 }

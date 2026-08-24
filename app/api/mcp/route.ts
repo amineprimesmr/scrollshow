@@ -12,6 +12,7 @@ import {
   agentMedia,
   agentChannels,
   agentPublish,
+  agentReconstructPost,
   agentReport,
   agentSetVisibility,
   agentUpdatePost,
@@ -191,7 +192,7 @@ const handler = createMcpHandler(
       {
         title: "Get exact TikTok recipe",
         description:
-          "Return the exact source of an existing carousel — imported TikToks included. For imports, reuse photo_images and caption pixel-perfect; do not redraw. Works with post id or shareId. Public marketplace items are readable too.",
+          "Return the exact source of an existing carousel — imported TikToks included. If recipe.editable is false and overlays are empty, the text is still baked into the JPEGs: call reconstruct_post first. Works with post id or shareId. Public marketplace items are readable too.",
         inputSchema: z.object({ id: z.string() }),
       },
       async (args, ctx) => {
@@ -246,10 +247,11 @@ const handler = createMcpHandler(
       {
         title: "Publish to TikTok now",
         description:
-          "Direct-post a photo carousel to the connected TikTok account right now. Only use when the user explicitly asked to publish.",
+          "Direct-post a photo carousel to the connected TikTok account right now. Only use when the user explicitly asked to publish. Pass id of an editable post to rasterize overlays into fresh PNGs automatically.",
         inputSchema: z.object({
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
+          id: z.string().optional(),
           photo_images: z.array(z.string()).optional(),
           image: z.string().optional(),
           privacy_level: z.string().optional(),
@@ -289,10 +291,11 @@ const handler = createMcpHandler(
       {
         title: "Import a TikTok by URL",
         description:
-          "Import a public TikTok photo carousel from its URL into the marketplace, pixel-perfect: original slides, caption, author, music and stats. Do not redraw. Use visibility=public to share the format with other ScrollShow users.",
+          "Import a public TikTok photo carousel from its URL into the marketplace. This first copies the original slides. Pass reconstruct=true to immediately decompose them into editable text layers (same look, texts and images can be changed). Use visibility=public to share the format with other ScrollShow users.",
         inputSchema: z.object({
           url: z.string().min(8),
           visibility: z.enum(["private", "public"]).optional(),
+          reconstruct: z.boolean().optional(),
         }),
       },
       async (args, ctx) => {
@@ -317,6 +320,23 @@ const handler = createMcpHandler(
       async (args, ctx) => {
         try {
           return text({ post: await agentSetVisibility(userFrom(ctx), args.id, args.visibility) });
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "reconstruct_post",
+      {
+        title: "Recreate a TikTok as editable layers",
+        description:
+          "Run vision on imported JPEG slides and rebuild them as a recipe: background color/photo + editable text overlays (font, size, color, position). After this, change texts with update_recipe. Required before editing an imported TikTok in the studio.",
+        inputSchema: z.object({ id: z.string() }),
+      },
+      async (args, ctx) => {
+        try {
+          return text({ post: await agentReconstructPost(userFrom(ctx), args.id) });
         } catch (error) {
           return fail(error);
         }
@@ -394,7 +414,7 @@ const handler = createMcpHandler(
   {
     serverInfo: { name: "scrollshow", version: "1.0.0" },
     instructions:
-      "You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami if you do not know whether TikTok is connected. Marketplace: import_tiktok clones a public TikTok pixel-perfect (exact slides + caption). list_marketplace lists private or public formats. get_recipe then update_recipe to edit in place — never regenerate a new template. For imported TikToks, reuse photo_images as-is. Use create_post to draft or schedule. Use publish_now only when the user explicitly asked to post now. Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
+      "You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami if you do not know whether TikTok is connected. Marketplace: import_tiktok copies a public TikTok (slides + caption). The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. Use publish_now with the post id when they asked to publish now (it rasterizes editable overlays). Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
   },
 );
 

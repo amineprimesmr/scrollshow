@@ -44,6 +44,29 @@ export async function savePublicImage(bytes: Buffer, contentType: string, source
   return `/api/i/${name}`;
 }
 
+export async function readSlideBytes(url: string) {
+  const name = url.match(/\/api\/i\/([^/?#]+)/)?.[1];
+  if (name) return readImportedFile(name);
+  if (url.startsWith("/")) {
+    try {
+      const file = path.join(process.cwd(), "public", url.replace(/^\//, ""));
+      const bytes = await readFile(file);
+      const ext = file.split(".").pop() || "jpg";
+      return { bytes, contentType: mimeFrom(ext) };
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    return { bytes, contentType: res.headers.get("content-type") || "image/jpeg" };
+  } catch {
+    return null;
+  }
+}
+
 export async function readImportedFile(name: string) {
   if (name.includes("/") || name.includes("..") || !/^[a-zA-Z0-9._-]+$/.test(name)) return null;
   const ext = name.split(".").pop() || "jpg";
