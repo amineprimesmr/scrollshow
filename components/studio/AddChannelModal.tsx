@@ -22,11 +22,7 @@ export function AddChannelModal() {
       <div className="ss-dialog ss-dialog--narrow" onClick={(event) => event.stopPropagation()}>
         <h2>{t("Ajouter un compte", "Add an account", english)}</h2>
         <p className="ss-lead">
-          {t(
-            "TikTok est en revue. Meta et X sont prêts : on branche les clés, puis tu connectes le compte.",
-            "TikTok is in review. Meta and X are ready: add the keys, then connect the account.",
-            english,
-          )}
+          {t("Connecte TikTok pour publier tes carrousels depuis le calendrier.", "Connect TikTok to publish carousels from the calendar.", english)}
         </p>
         <div className="ss-platforms">
           {PLATFORMS.map((item) => (

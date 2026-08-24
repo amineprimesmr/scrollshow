@@ -1,5 +1,5 @@
-import { AgentView } from "@/components/studio/StudioPages";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <AgentView />;
+  redirect("/app/integrations");
 }

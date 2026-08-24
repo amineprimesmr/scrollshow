@@ -5,23 +5,34 @@ import { prefersEnglish, t } from "@/lib/i18n";
 import { platformById, platformName } from "@/lib/platforms";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { StudioProvider, useStudio } from "./StudioContext";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
+import {
+  IconCalendar,
+  IconCard,
+  IconChart,
+  IconLogout,
+  IconMedia,
+  IconPlus,
+  IconPlug,
+  IconSettings,
+} from "./icons";
+import { StudioProvider, useStudio } from "./StudioContext";
 import { StudioFlash } from "./StudioFlash";
 
-const NAV = [
-  { href: "/app", label: "Calendar", icon: "▦" },
-  { href: "/app/agent", label: "Agent", icon: "⌘" },
-  { href: "/app/analytics", label: "Analytics", icon: "↗" },
-  { href: "/app/media", label: "Media", icon: "▣" },
-  { href: "/app/plugs", label: "Plugs", icon: "⏻" },
-  { href: "/app/integrations", label: "Integrations", icon: "⧉" },
-  { href: "/app/ugc", label: "UGC", icon: "🦞" },
-  { href: "/app/affiliate", label: "Affiliate", icon: "☰" },
-  { href: "/app/billing", label: "Billing", icon: "$" },
-  { href: "/app/settings", label: "Settings", icon: "⚙" },
+const NAV: {
+  href: string;
+  fr: string;
+  en: string;
+  icon: ReactNode;
+}[] = [
+  { href: "/app", fr: "Calendrier", en: "Calendar", icon: <IconCalendar /> },
+  { href: "/app/media", fr: "Médias", en: "Media", icon: <IconMedia /> },
+  { href: "/app/analytics", fr: "Stats", en: "Analytics", icon: <IconChart /> },
+  { href: "/app/integrations", fr: "Connexions", en: "Connect", icon: <IconPlug /> },
+  { href: "/app/billing", fr: "Facturation", en: "Billing", icon: <IconCard /> },
+  { href: "/app/settings", fr: "Réglages", en: "Settings", icon: <IconSettings /> },
 ];
 
 function ShellInner({ children }: { children: React.ReactNode }) {
@@ -29,8 +40,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
   const [english, setEnglish] = useState(false);
-  const title = NAV.find((item) => item.href === pathname)?.label || "Calendar";
-  const live = channels.filter((item) => item.connected);
+  const item = NAV.find((entry) => (entry.href === "/app" ? pathname === "/app" : pathname.startsWith(entry.href)));
+  const title = item ? (english ? item.en : item.fr) : t("Calendrier", "Calendar", english);
+  const live = channels.filter((channel) => channel.connected);
 
   useEffect(() => {
     setEnglish(prefersEnglish());
@@ -39,35 +51,35 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="ss-studio">
       <nav className="ss-rail">
-        <Link href="/">
+        <Link href="/" className="ss-rail__brand" aria-label="ScrollShow">
           <BrandMark size={36} className="ss-rail__logo" />
         </Link>
-        {NAV.map((item) => (
-          <Link key={item.href} href={item.href} className={pathname === item.href ? "is-active" : ""}>
-            <span aria-hidden>{item.icon}</span>
-            {item.label}
-          </Link>
-        ))}
+        {NAV.map((entry) => {
+          const active = entry.href === "/app" ? pathname === "/app" : pathname.startsWith(entry.href);
+          return (
+            <Link key={entry.href} href={entry.href} className={active ? "is-active" : ""}>
+              {entry.icon}
+              <span>{english ? entry.en : entry.fr}</span>
+            </Link>
+          );
+        })}
       </nav>
 
       <aside className="ss-channels">
-        <h2>Channels</h2>
-        <div className="ss-channels__actions">
-          <button className="ss-btn-ghost" onClick={() => setAddOpen(true)}>
-            {t("Ajouter un compte", "Add an account", english)}
-          </button>
-          <button className="ss-btn-ghost" onClick={() => setAddOpen(true)} aria-label="Connect">
-            ↗
-          </button>
-        </div>
+        <h2>{t("Comptes", "Channels", english)}</h2>
         <button
           className="ss-btn-purple ss-btn-wide"
+          type="button"
           onClick={() => {
             setEditing(null);
             setPostOpen(true);
           }}
         >
-          Create Post
+          <IconPlus size={16} />
+          {t("Nouveau post", "New post", english)}
+        </button>
+        <button className="ss-btn-ghost ss-btn-wide" type="button" onClick={() => setAddOpen(true)}>
+          {t("Connecter un compte", "Connect an account", english)}
         </button>
         <button
           className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`}
@@ -76,7 +88,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           <BrandMark size={28} alt="" />
           <span>
             <b>{t("Tous les comptes", "All channels", english)}</b>
-            <span>{t(`${live.length} connecté${live.length > 1 ? "s" : ""}`, `${live.length} connected`, english)}</span>
+            <span>
+              {live.length
+                ? t(`${live.length} connecté${live.length > 1 ? "s" : ""}`, `${live.length} connected`, english)
+                : t("Aucun connecté", "None connected", english)}
+            </span>
           </span>
         </button>
         {channels.map((channel) => (
@@ -101,16 +117,18 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <header className="ss-top">
           <h1>{title}</h1>
           <div className="ss-top__tools">
-            <span>FR / EN</span>
-            <span>{user?.name || "…"}</span>
+            <span className="ss-lang">{english ? "EN" : "FR"}</span>
+            <span className="ss-user">{user?.name || "…"}</span>
             <button
-              className="ss-btn-ghost"
+              className="ss-btn-ghost ss-btn-icon"
+              type="button"
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });
                 router.push("/");
               }}
             >
-              Logout
+              <IconLogout size={16} />
+              {t("Déconnexion", "Log out", english)}
             </button>
           </div>
         </header>

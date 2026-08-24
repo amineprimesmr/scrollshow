@@ -1,5 +1,5 @@
-import { PlugsView } from "@/components/studio/StudioPages";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <PlugsView />;
+  redirect("/app");
 }

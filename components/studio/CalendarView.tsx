@@ -3,7 +3,15 @@
 import { useMemo, useState } from "react";
 import { useStudio } from "./StudioContext";
 
-const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DOW_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DOW_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+function ymd(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function startOfMonth(year: number, month: number) {
   const date = new Date(year, month, 1);
@@ -12,10 +20,21 @@ function startOfMonth(year: number, month: number) {
   return date;
 }
 
+function startOfWeek(date: Date) {
+  const start = new Date(date);
+  const day = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - day);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 export function CalendarView() {
   const { posts, activeChannel, setEditing, setPostOpen } = useStudio();
-  const [cursor, setCursor] = useState(() => new Date(2026, 7, 1));
+  const [cursor, setCursor] = useState(() => new Date());
   const [mode, setMode] = useState<"day" | "week" | "month">("month");
+  const locale = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("fr") ? "fr-FR" : "en-US";
+  const dow = locale.startsWith("fr") ? DOW_FR : DOW_EN;
+  const today = ymd(new Date());
 
   const visible = posts.filter((post) => activeChannel === "all" || post.channelIds.includes(activeChannel));
 
@@ -24,13 +43,12 @@ export function CalendarView() {
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(start);
       date.setDate(start.getDate() + index);
-      const key = date.toISOString().slice(0, 10);
+      const key = ymd(date);
       return { date, key, inMonth: date.getMonth() === cursor.getMonth() };
     });
   }, [cursor]);
 
-  const today = "2026-08-23";
-  const label = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const label = cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
   function open(postId?: string) {
     setEditing(visible.find((item) => item.id === postId) || null);
@@ -38,15 +56,20 @@ export function CalendarView() {
   }
 
   if (mode === "week") {
-    const week = cells.slice(7, 14);
+    const start = startOfWeek(cursor);
+    const week = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return { date, key: ymd(date), inMonth: true };
+    });
     return (
       <>
-        <Toolbar label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+        <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
         <div className="ss-week">
           {week.map((cell) => (
             <div key={cell.key} className="ss-week-col">
               <strong>
-                {cell.date.toLocaleDateString("en-US", { weekday: "short", day: "numeric" })}
+                {cell.date.toLocaleDateString(locale, { weekday: "short", day: "numeric" })}
               </strong>
               {visible
                 .filter((post) => post.date === cell.key)
@@ -68,21 +91,28 @@ export function CalendarView() {
     const key = today;
     return (
       <>
-        <Toolbar label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+        <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
         <div className="ss-dayview">
-          {visible
-            .filter((post) => post.date === key)
-            .map((post) => (
-              <article key={post.id}>
-                <button className="ss-post" onClick={() => open(post.id)}>
-                  <span className="ss-post__bar" />
-                  <img src={post.image} alt="" />
-                  <p>
-                    {post.time} · {post.body}
-                  </p>
-                </button>
-              </article>
-            ))}
+          {visible.filter((post) => post.date === key).length ? (
+            visible
+              .filter((post) => post.date === key)
+              .map((post) => (
+                <article key={post.id}>
+                  <button className="ss-post" onClick={() => open(post.id)}>
+                    <span className="ss-post__bar" />
+                    <img src={post.image} alt="" />
+                    <p>
+                      {post.time} · {post.body}
+                    </p>
+                  </button>
+                </article>
+              ))
+          ) : (
+            <div className="ss-empty">
+              <h2>{locale.startsWith("fr") ? "Rien aujourd’hui" : "Nothing today"}</h2>
+              <p>{locale.startsWith("fr") ? "Crée un post pour le calendrier." : "Create a post for the calendar."}</p>
+            </div>
+          )}
         </div>
       </>
     );
@@ -90,9 +120,9 @@ export function CalendarView() {
 
   return (
     <>
-      <Toolbar label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+      <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
       <div className="ss-grid">
-        {DOW.map((day) => (
+          {dow.map((day) => (
           <div key={day} className="ss-dow">
             {day}
           </div>
@@ -125,16 +155,29 @@ export function CalendarView() {
 }
 
 function Toolbar({
+  french,
   label,
   mode,
   setMode,
   setCursor,
 }: {
+  french: boolean;
   label: string;
   mode: "day" | "week" | "month";
   setMode: (mode: "day" | "week" | "month") => void;
   setCursor: React.Dispatch<React.SetStateAction<Date>>;
 }) {
+  const modes = french
+    ? ([
+        ["day", "Jour"],
+        ["week", "Semaine"],
+        ["month", "Mois"],
+      ] as const)
+    : ([
+        ["day", "Day"],
+        ["week", "Week"],
+        ["month", "Month"],
+      ] as const);
   return (
     <div className="ss-cal-bar">
       <div className="ss-cal-nav">
@@ -145,14 +188,14 @@ function Toolbar({
         <button className="ss-btn-ghost" onClick={() => setCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))}>
           ›
         </button>
-        <button className="ss-btn-ghost" onClick={() => setCursor(new Date(2026, 7, 1))}>
-          Today
+        <button className="ss-btn-ghost" onClick={() => setCursor(new Date())}>
+          {french ? "Aujourd’hui" : "Today"}
         </button>
       </div>
       <div className="ss-seg">
-        {(["day", "week", "month"] as const).map((item) => (
-          <button key={item} className={mode === item ? "is-on" : ""} onClick={() => setMode(item)}>
-            {item[0].toUpperCase() + item.slice(1)}
+        {modes.map(([id, name]) => (
+          <button key={id} className={mode === id ? "is-on" : ""} onClick={() => setMode(id)}>
+            {name}
           </button>
         ))}
       </div>

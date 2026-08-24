@@ -1,5 +1,5 @@
-import { UgcView } from "@/components/studio/StudioPages";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <UgcView />;
+  redirect("/app/media");
 }

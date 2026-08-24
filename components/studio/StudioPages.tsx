@@ -8,6 +8,7 @@ import { useStudio } from "./StudioContext";
 
 export function AnalyticsView() {
   const { posts, channels, activeChannel } = useStudio();
+  const [english, setEnglish] = useState(false);
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [videos, setVideos] = useState<any[]>([]);
   const visible = posts.filter((post) => activeChannel === "all" || post.channelIds.includes(activeChannel));
@@ -33,6 +34,10 @@ export function AnalyticsView() {
   }, [visible, videos]);
 
   useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
+
+  useEffect(() => {
     if (!connected) return;
     fetch("/api/tiktok/me")
       .then((res) => res.json())
@@ -45,33 +50,42 @@ export function AnalyticsView() {
   }, [connected]);
 
   const cards = [
-    { label: "Views", value: totals.views, color: "linear-gradient(135deg,#c4b5fd,#7c3aed)" },
-    { label: "Recent Likes", value: totals.likes, color: "linear-gradient(135deg,#86efac,#16a34a)" },
-    { label: "Recent Comments", value: totals.comments, color: "linear-gradient(135deg,#93c5fd,#2563eb)" },
-    { label: "Recent Shares", value: totals.shares, color: "linear-gradient(135deg,#d8b4fe,#7c3aed)" },
+    { label: t("Vues", "Views", english), value: totals.views },
+    { label: t("Likes", "Likes", english), value: totals.likes },
+    { label: t("Commentaires", "Comments", english), value: totals.comments },
+    { label: t("Partages", "Shares", english), value: totals.shares },
   ];
+
+  if (!connected) {
+    return (
+      <div className="ss-empty">
+        <h2>{t("Pas encore de stats", "No stats yet", english)}</h2>
+        <p>{t("Connecte TikTok pour voir tes vues, likes et posts.", "Connect TikTok to see views, likes and posts.", english)}</p>
+        <a className="ss-btn-purple" href="/app/integrations">
+          {t("Connecter TikTok", "Connect TikTok", english)}
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div>
       {profile ? (
-        <div className="ss-panel">
-          <h2>
-            {profile.display_name || profile.username} · user.info.basic / profile / stats
-          </h2>
+        <div className="ss-panel ss-profile">
+          <h2>{profile.display_name || profile.username}</h2>
           <p>
-            @{profile.username} · {Number(profile.follower_count || 0).toLocaleString()} followers ·{" "}
-            {Number(profile.likes_count || 0).toLocaleString()} likes · {Number(profile.video_count || 0)} videos
+            @{profile.username}
+            {profile.follower_count != null ? ` · ${Number(profile.follower_count).toLocaleString()} ${t("abonnés", "followers", english)}` : ""}
           </p>
         </div>
       ) : null}
       <div className="ss-metrics">
-      {cards.map((card) => (
-        <article key={card.label} className="ss-metric">
-          <span>• {card.label}</span>
-          <div className="ss-swatch" style={{ background: card.color }} />
-          <b>{card.value.toLocaleString("en-US")}</b>
-        </article>
-      ))}
+        {cards.map((card) => (
+          <article key={card.label} className="ss-metric">
+            <span>{card.label}</span>
+            <b>{card.value.toLocaleString(english ? "en-US" : "fr-FR")}</b>
+          </article>
+        ))}
       </div>
       {videos.length ? (
         <div className="ss-media-grid">
@@ -81,7 +95,7 @@ export function AnalyticsView() {
               <figcaption>
                 {video.title || video.video_description || video.id}
                 <br />
-                {Number(video.view_count || 0).toLocaleString()} · video.list
+                {Number(video.view_count || 0).toLocaleString(english ? "en-US" : "fr-FR")} {t("vues", "views", english)}
               </figcaption>
             </figure>
           ))}
@@ -93,6 +107,21 @@ export function AnalyticsView() {
 
 export function MediaView() {
   const { media } = useStudio();
+  const [english, setEnglish] = useState(false);
+
+  useEffect(() => {
+    setEnglish(prefersEnglish());
+  }, []);
+
+  if (!media.length) {
+    return (
+      <div className="ss-empty">
+        <h2>{t("Aucun média", "No media", english)}</h2>
+        <p>{t("Tes slides de carrousel apparaîtront ici.", "Your carousel slides will show up here.", english)}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="ss-media-grid">
       {media.map((item) => (
@@ -101,92 +130,6 @@ export function MediaView() {
           <figcaption>{item.name}</figcaption>
         </figure>
       ))}
-    </div>
-  );
-}
-
-export function AgentView() {
-  const { setPostOpen, setEditing } = useStudio();
-  const [prompt, setPrompt] = useState("");
-  const [out, setOut] = useState("");
-
-  return (
-    <>
-      <DeveloperAccess />
-      <div className="ss-panel">
-      <h2>Caption</h2>
-      <p>Génère une caption, puis envoie-la dans Create Post.</p>
-      <div className="ss-form">
-        <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Écris un carousel glow-up…" />
-        <button
-          className="ss-btn-purple"
-          type="button"
-          onClick={() => {
-            const text = prompt.trim() || "glow up visage";
-            const caption = `POV : tu copies le format qui fait ${text}. Hook en slide 1, preuve en slide 2, CTA App Store en slide 3. #debloat #glowup`;
-            setOut(caption);
-          }}
-        >
-          Generate
-        </button>
-        {out ? (
-          <>
-            <p>{out}</p>
-            <button
-              className="ss-btn-ghost"
-              type="button"
-              onClick={() => {
-                setEditing({
-                  id: "",
-                  userId: "",
-                  channelIds: [],
-                  body: out,
-                  date: new Date().toISOString().slice(0, 10),
-                  time: "18:00",
-                  status: "draft",
-                  image: "/assets/tiktoks/01-glowup-188k.png",
-                  views: 0,
-                  likes: 0,
-                  comments: 0,
-                  shares: 0,
-                });
-                setPostOpen(true);
-              }}
-            >
-              Schedule this
-            </button>
-          </>
-        ) : null}
-      </div>
-    </div>
-    </>
-  );
-}
-
-export function PlugsView() {
-  const plugs = [
-    { name: "Auto-like at 1k views", on: true },
-    { name: "Auto-comment on first hour", on: false },
-    { name: "Repost evergreen every 30 days", on: true },
-  ];
-  const [state, setState] = useState(plugs);
-  return (
-    <div className="ss-panel">
-      <h2>Plugs</h2>
-      <div className="ss-form">
-        {state.map((plug, index) => (
-          <label key={plug.name} className="ss-checks">
-            <input
-              type="checkbox"
-              checked={plug.on}
-              onChange={(event) => {
-                setState((current) => current.map((item, i) => (i === index ? { ...item, on: event.target.checked } : item)));
-              }}
-            />
-            {plug.name}
-          </label>
-        ))}
-      </div>
     </div>
   );
 }
@@ -205,14 +148,15 @@ export function IntegrationsView({ availability }: { availability: PlatformAvail
         {PLATFORMS.map((platform) => {
           const connected = channels.some((item) => item.platform === platform.id && item.connected);
           const configured = familyConfigured(platform.family, availability);
-          const badge =
-            platform.lifecycle === "pending_review"
-              ? t("En revue", "In review", english)
+          const coming = !configured && platform.id !== "tiktok";
+          const badge = connected
+            ? t("Connecté", "Connected", english)
+            : platform.lifecycle === "pending_review"
+              ? t("Sandbox", "Sandbox", english)
               : configured
                 ? t("Prêt", "Ready", english)
-                : t("Clés à brancher", "Keys needed", english);
-          const badgeClass =
-            platform.lifecycle === "pending_review" ? "is-review" : configured ? "is-ready" : "is-wait";
+                : t("Bientôt", "Soon", english);
+          const badgeClass = connected ? "is-ready" : configured || platform.id === "tiktok" ? "is-review" : "is-wait";
           return (
             <article key={platform.id} className="ss-network-card">
               <header>
@@ -230,101 +174,28 @@ export function IntegrationsView({ availability }: { availability: PlatformAvail
               </header>
               <p>
                 {platform.family === "tiktok"
-                  ? t(
-                      "Login Kit + Content Posting. L’app est en revue : le sandbox marche déjà.",
-                      "Login Kit + Content Posting. The app is in review: sandbox already works.",
-                      english,
-                    )
-                  : platform.family === "meta"
-                    ? t(
-                        "Une app Meta pour Instagram et Facebook. Redirect : /api/auth/meta/callback",
-                        "One Meta app for Instagram and Facebook. Redirect: /api/auth/meta/callback",
-                        english,
-                      )
-                    : t(
-                        "OAuth 2.0 PKCE. Redirect : /api/auth/x/callback",
-                        "OAuth 2.0 PKCE. Redirect: /api/auth/x/callback",
-                        english,
-                      )}
+                  ? t("Connecte le compte, puis publie tes carrousels photo.", "Connect the account, then publish photo carousels.", english)
+                  : coming
+                    ? t("On branche cette plateforme ensuite. TikTok d’abord.", "This platform comes next. TikTok first.", english)
+                    : t("Connecte le compte pour publier depuis le calendrier.", "Connect the account to publish from the calendar.", english)}
               </p>
-              <p className="ss-network-card__status">
-                {connected
-                  ? t("Compte connecté", "Account connected", english)
-                  : configured
-                    ? t("Pas encore connecté", "Not connected yet", english)
-                    : platform.family === "tiktok"
-                      ? t("Ajoute TIKTOK_CLIENT_KEY et TIKTOK_CLIENT_SECRET.", "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET.", english)
-                      : platform.family === "meta"
-                        ? t("Ajoute META_APP_ID et META_APP_SECRET.", "Add META_APP_ID and META_APP_SECRET.", english)
-                        : t("Ajoute X_CLIENT_ID et X_CLIENT_SECRET.", "Add X_CLIENT_ID and X_CLIENT_SECRET.", english)}
-              </p>
-              <a className="ss-btn-purple" href={platform.connectPath}>
-                {connected
-                  ? t(`Reconnecter ${platform.name}`, `Reconnect ${platform.name}`, english)
-                  : t(`Connecter ${platform.name}`, `Connect ${platform.name}`, english)}
-              </a>
+              {coming ? (
+                <button className="ss-btn-ghost" type="button" disabled>
+                  {t("Bientôt", "Soon", english)}
+                </button>
+              ) : (
+                <a className="ss-btn-purple" href={platform.connectPath}>
+                  {connected
+                    ? t(`Reconnecter`, `Reconnect`, english)
+                    : t(`Connecter`, `Connect`, english)}
+                </a>
+              )}
             </article>
           );
         })}
       </div>
       <DeveloperAccess />
     </>
-  );
-}
-
-export function UgcView() {
-  const { media, setPostOpen, setEditing } = useStudio();
-  return (
-    <div className="ss-panel">
-      <h2>UGC</h2>
-      <p>Tes formats slideshow prêts à republier.</p>
-      <div className="ss-media-grid">
-        {media.slice(0, 6).map((item) => (
-          <figure key={item.id}>
-            <img src={item.url} alt="" />
-            <figcaption>
-              <button
-                className="ss-btn-ghost"
-                onClick={() => {
-                  setEditing({
-                    id: "",
-                    userId: "",
-                    channelIds: [],
-                    body: item.name,
-                    date: new Date().toISOString().slice(0, 10),
-                    time: "12:00",
-                    status: "draft",
-                    image: item.url,
-                    views: 0,
-                    likes: 0,
-                    comments: 0,
-                    shares: 0,
-                  });
-                  setPostOpen(true);
-                }}
-              >
-                Use in post
-              </button>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function AffiliateView() {
-  return (
-    <div className="ss-panel">
-      <h2>Affiliate</h2>
-      <p>Partage ScrollShow, 30 % à vie sur chaque abonnement Pro.</p>
-      <div className="ss-form">
-        <input readOnly value="https://scrollshow.io/?ref=toi" />
-        <button className="ss-btn-purple" type="button">
-          Copier le lien
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -349,11 +220,9 @@ export function BillingView() {
 
   return (
     <div className="ss-panel">
-      <h2>{t("Facturation", "Billing", english)}</h2>
+      <h2>{t("Abonnement", "Subscription", english)}</h2>
       <p>
         {t("Plan actuel", "Current plan", english)} : <b>{plan === "free" ? "Free" : plan}</b>
-        <br />
-        {t("Essai 3 jours offert sur Starter, Creator et Pro.", "3-day free trial on Starter, Creator, and Pro.", english)}
       </p>
       <div className="ss-form-actions">
         <a className="ss-btn-purple" href="/pricing">
@@ -380,31 +249,28 @@ export function SettingsView() {
 
   return (
     <div className="ss-panel">
-      <h2>{t("Réglages", "Settings", english)}</h2>
+      <h2>{t("Compte", "Account", english)}</h2>
       <p>
         <strong>{user?.name}</strong>
         <br />
         {user?.email}
         <br />
-        Plan {user?.plan && user.plan !== "free" ? user.plan : "—"}
+        {user?.plan && user.plan !== "free" ? `Plan ${user.plan}` : t("Aucun plan", "No plan", english)}
       </p>
       <h3>{t("Comptes connectés", "Connected accounts", english)}</h3>
       {live.length ? (
         live.map((channel) => (
           <p key={channel.id}>
             {platformName(channel.platform)} · @{channel.handle}
-            {channel.followers ? ` · ${channel.followers} followers` : ""}
+            {channel.followers ? ` · ${channel.followers} ${t("abonnés", "followers", english)}` : ""}
           </p>
         ))
       ) : (
         <p>{t("Aucun compte connecté.", "No account connected.", english)}</p>
       )}
       <div className="ss-form-actions">
-        <a className="ss-btn-ghost" href="/app/integrations">
-          {t("Intégrations", "Integrations", english)}
-        </a>
         <a className="ss-btn-purple" href="/app/integrations">
-          {t("Ajouter un compte", "Add an account", english)}
+          {t("Gérer les connexions", "Manage connections", english)}
         </a>
         {live.length ? (
           <button

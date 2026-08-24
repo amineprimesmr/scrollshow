@@ -1,5 +1,5 @@
-import { AffiliateView } from "@/components/studio/StudioPages";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <AffiliateView />;
+  redirect("/app");
 }

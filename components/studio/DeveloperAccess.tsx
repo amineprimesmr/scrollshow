@@ -12,7 +12,7 @@ type ApiKeyRow = {
   lastUsedAt: string | null;
 };
 
-type ClientId = "claude" | "chatgpt" | "cursor" | "claude-code" | "codex";
+type ClientId = "claude" | "cursor" | "claude-code" | "codex";
 type Mode = "mcp" | "cli";
 
 type Step = {
@@ -31,7 +31,6 @@ type Step = {
 
 const CLIENTS: { id: ClientId; label: string; mark: string; tone: string }[] = [
   { id: "claude", label: "Claude", mark: "C", tone: "#d97757" },
-  { id: "chatgpt", label: "ChatGPT", mark: "G", tone: "#10a37f" },
   { id: "cursor", label: "Cursor", mark: "▶", tone: "#e8e8e8" },
   { id: "claude-code", label: "Claude Code", mark: "</>", tone: "#d97757" },
   { id: "codex", label: "Codex", mark: "⌘", tone: "#7c6af7" },
@@ -215,8 +214,8 @@ export function DeveloperAccess() {
     {
       q: tx("Qu’est-ce que MCP ?", "What is MCP?"),
       a: tx(
-        "Le Model Context Protocol relie ton agent (Claude, Cursor, ChatGPT) à ScrollShow. L’agent appelle tes outils : créer, planifier, publier, lire les stats.",
-        "Model Context Protocol connects your agent (Claude, Cursor, ChatGPT) to ScrollShow. The agent calls your tools: create, schedule, publish, read stats.",
+        "Le Model Context Protocol relie ton agent (Claude, Cursor, Claude Code, Codex) à ScrollShow. L’agent appelle tes outils : créer, planifier, publier, lire les stats.",
+        "Model Context Protocol connects your agent (Claude, Cursor, Claude Code, Codex) to ScrollShow. The agent calls your tools: create, schedule, publish, read stats.",
       ),
     },
     {
@@ -245,7 +244,7 @@ export function DeveloperAccess() {
   const showCli = mode === "cli";
 
   function steps(): Step[] {
-    if (showCli && client !== "chatgpt" && client !== "cursor") {
+    if (showCli && client !== "cursor") {
       return [
         {
           n: "1",
@@ -325,36 +324,6 @@ export function DeveloperAccess() {
           n: "3",
           title: tx("Connecte, puis crée", "Connect, then create"),
           body: tx("Recharge Cursor. Demande un carousel, un planning, ou un rapport.", "Reload Cursor. Ask for a carousel, a schedule, or a report."),
-          cta: tx("Commencer à créer", "Start creating"),
-          href: "/app",
-          primary: true,
-        },
-      ];
-    }
-
-    if (client === "chatgpt") {
-      return [
-        {
-          n: "1",
-          title: tx("Copie l’URL du connecteur ScrollShow", "Copy the ScrollShow connector URL"),
-          body: tx("Tu la colleras dans ChatGPT au step suivant.", "You’ll paste this into ChatGPT next."),
-          field: mcpUrl,
-          copyId: "url",
-        },
-        {
-          n: "2",
-          title: tx("ChatGPT → Apps & connecteurs", "ChatGPT → Apps & connectors"),
-          body: tx(
-            "Ajoute un connecteur custom. Nomme-le ScrollShow, colle l’URL, header Bearer.",
-            "Add a custom connector. Name it ScrollShow, paste the URL, Bearer header.",
-          ),
-          cta: tx("Ouvrir ChatGPT", "Open ChatGPT"),
-          href: "https://chatgpt.com/",
-        },
-        {
-          n: "3",
-          title: tx("Connecte, puis crée", "Connect, then create"),
-          body: tx("Connecte-toi, puis demande de générer ou planifier un TikTok.", "Sign in, then ask to generate or schedule a TikTok."),
           cta: tx("Commencer à créer", "Start creating"),
           href: "/app",
           primary: true,
