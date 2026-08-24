@@ -188,34 +188,48 @@ function toSlide(current: CarouselSlide, analyzed: z.infer<typeof analyzedSlideS
   });
 }
 
+async function reconstructWithVision(recipe: CarouselRecipe): Promise<CarouselRecipe> {
+  const slides = await mapPool(recipe.slides, 2, async (slide) => {
+    const source = slide.sourceImage || slide.image;
+    if (!source) return slide;
+    const analyzed = await analyzeSlide(source);
+    return toSlide(slide, analyzed);
+  });
+  const fontFamily = closestFont(slides[0]?.overlays[0]?.fontFamily || recipe.fontFamily);
+  return {
+    ...recipe,
+    origin: recipe.origin || "import",
+    fontFamily,
+    editable: true,
+    prompt: recipe.prompt,
+    slides,
+  };
+}
+
 export async function reconstructRecipe(recipe: CarouselRecipe): Promise<CarouselRecipe> {
   if (!recipe.slides.length) throw new ReconstructError("no_slides", 400);
-  try {
-    const slides = await mapPool(recipe.slides, 2, async (slide) => {
-      const source = slide.sourceImage || slide.image;
-      if (!source) return slide;
-      const analyzed = await analyzeSlide(source);
-      return toSlide(slide, analyzed);
-    });
-    const fontFamily = closestFont(slides[0]?.overlays[0]?.fontFamily || recipe.fontFamily);
-    return {
-      ...recipe,
-      origin: recipe.origin || "import",
-      fontFamily,
-      editable: true,
-      prompt: recipe.prompt,
-      slides,
-    };
-  } catch (error) {
-    console.error("[reconstruct] vision failed, falling back to OCR", error);
+  // Default: OCR only — keep the photos, lift the on-slide texts. Vision waits on AI Gateway
+  // (often a billing 403) and made reconstruct look "stuck" for minutes.
+  if (process.env.SCROLLSHOW_VISION_RECONSTRUCT === "1") {
     try {
-      return await reconstructWithOcr(recipe);
-    } catch (ocrError) {
-      console.error("[reconstruct] OCR fallback failed", ocrError);
-      if (error instanceof ReconstructError) throw error;
+      return await reconstructWithVision(recipe);
+    } catch (error) {
+      console.error("[reconstruct] vision failed, falling back to OCR", error);
       const gated = gatewayMissing(error);
-      if (gated) throw new ReconstructError(gated, 503);
-      throw new ReconstructError("reconstruct_failed", 500);
+      try {
+        return await reconstructWithOcr(recipe);
+      } catch (ocrError) {
+        console.error("[reconstruct] OCR fallback failed", ocrError);
+        if (error instanceof ReconstructError) throw error;
+        if (gated) throw new ReconstructError(gated, 503);
+        throw new ReconstructError("reconstruct_failed", 500);
+      }
     }
+  }
+  try {
+    return await reconstructWithOcr(recipe);
+  } catch (ocrError) {
+    console.error("[reconstruct] OCR failed", ocrError);
+    throw ocrError instanceof ReconstructError ? ocrError : new ReconstructError("reconstruct_failed", 500);
   }
 }

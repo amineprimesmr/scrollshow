@@ -1,9 +1,21 @@
 import path from "path";
 import type { NextConfig } from "next";
 
+const tessFiles = [
+  "./node_modules/tesseract.js/**/*",
+  "./node_modules/tesseract.js-core/**/*",
+  "./node_modules/wasm-feature-detect/**/*",
+  "./node_modules/@tesseract.js-data/eng/**/*",
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["tesseract.js"],
+  serverExternalPackages: ["tesseract.js", "tesseract.js-core", "wasm-feature-detect"],
+  outputFileTracingIncludes: {
+    "/api/studio/posts/[id]/reconstruct": tessFiles,
+    "/api/v1/[...slug]": tessFiles,
+    "/api/mcp": tessFiles,
+  },
   turbopack: {
     root: path.join(__dirname),
   },

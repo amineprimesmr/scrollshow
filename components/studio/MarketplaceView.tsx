@@ -193,8 +193,8 @@ export function MarketplaceView() {
           <strong>{t("Importer un TikTok", "Import a TikTok", english)}</strong>
           <p>
             {t(
-              "Colle le lien : on copie les slides, puis on les recrée en calques éditables (textes, polices, fond). Tu pourras tout modifier.",
-              "Paste the link: we copy the slides, then rebuild them as editable layers (texts, fonts, background) so you can change everything.",
+              "Colle le lien : on copie les photos, puis on extrait les textes pour que tu puisses les modifier.",
+              "Paste the link: we copy the photos, then extract the texts so you can edit them.",
               english,
             )}
           </p>

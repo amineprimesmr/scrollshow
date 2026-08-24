@@ -1,12 +1,17 @@
 import { imageSize } from "image-size";
+import os from "node:os";
 import path from "node:path";
-import { createWorker } from "tesseract.js";
+import { createWorker, PSM, type Worker } from "tesseract.js";
 import { readSlideBytes } from "./media-files";
 import { closestFont, defaultOverlay, defaultSlide } from "./recipe";
 import type { CarouselRecipe, CarouselSlide, OverlayAlign } from "./types";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function pkgDir(name: string) {
+  return path.join(process.cwd(), "node_modules", name);
 }
 
 type Box = { text: string; x0: number; y0: number; x1: number; y1: number; confidence: number };
@@ -31,7 +36,39 @@ function mergeBoxes(lines: Box[], height: number) {
   return groups;
 }
 
-async function ocrSlide(slide: CarouselSlide, worker: Awaited<ReturnType<typeof createWorker>>): Promise<CarouselSlide> {
+let workerPromise: Promise<Worker> | null = null;
+
+async function getWorker() {
+  if (workerPromise) return workerPromise;
+  const tessRoot = pkgDir("tesseract.js");
+  const langPath = path.join(pkgDir("@tesseract.js-data/eng"), "4.0.0_best_int");
+  workerPromise = createWorker("eng", 1, {
+    workerPath: path.join(tessRoot, "src/worker-script/node/index.js"),
+    langPath,
+    cachePath: path.join(os.tmpdir(), "scrollshow-tess"),
+    cacheMethod: "write",
+    gzip: true,
+    logger: (message) => {
+      if (message.status === "recognizing text" && message.progress < 1) return;
+      console.log(`[ocr] ${message.status}${message.progress ? ` ${Math.round(message.progress * 100)}%` : ""}`);
+    },
+    errorHandler: (error) => {
+      console.error("[ocr] worker", error);
+      workerPromise = null;
+    },
+  })
+    .then(async (worker) => {
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+      return worker;
+    })
+    .catch((error) => {
+      workerPromise = null;
+      throw error;
+    });
+  return workerPromise;
+}
+
+async function ocrSlide(slide: CarouselSlide, worker: Worker): Promise<CarouselSlide> {
   const source = slide.sourceImage || slide.image;
   const file = source ? await readSlideBytes(source) : null;
   if (!file) return slide;
@@ -92,22 +129,16 @@ async function ocrSlide(slide: CarouselSlide, worker: Awaited<ReturnType<typeof 
 }
 
 export async function reconstructWithOcr(recipe: CarouselRecipe): Promise<CarouselRecipe> {
-  const worker = await createWorker("eng", 1, {
-    workerPath: path.join(process.cwd(), "node_modules/tesseract.js/src/worker-script/node/index.js"),
-  });
-  try {
-    const slides: CarouselSlide[] = [];
-    for (const slide of recipe.slides) {
-      slides.push(await ocrSlide(slide, worker));
-    }
-    return {
-      ...recipe,
-      origin: recipe.origin || "import",
-      fontFamily: closestFont(slides[0]?.overlays[0]?.fontFamily || recipe.fontFamily),
-      editable: true,
-      slides,
-    };
-  } finally {
-    await worker.terminate();
+  const worker = await getWorker();
+  const slides: CarouselSlide[] = [];
+  for (const slide of recipe.slides) {
+    slides.push(await ocrSlide(slide, worker));
   }
+  return {
+    ...recipe,
+    origin: recipe.origin || "import",
+    fontFamily: closestFont(slides[0]?.overlays[0]?.fontFamily || recipe.fontFamily),
+    editable: true,
+    slides,
+  };
 }

@@ -295,12 +295,12 @@ export function CreatePostModal() {
             <div className={`ss-recipe__banner${rebuildError ? " ss-recipe__banner--err" : ""}`}>
               <p>
                 {rebuilding
-                  ? t("On recrée le TikTok en calques éditables (fond + textes)…", "Rebuilding the TikTok into editable layers (background + text)…", english)
+                  ? t("On extrait les textes des slides (les photos ne bougent pas)…", "Extracting the on-slide texts (photos stay as-is)…", english)
                   : rebuildError
                     ? rebuildError
                     : recipe.editable
                       ? t("Les textes et le fond sont éditables. Change une ligne : l’aperçu se met à jour.", "Texts and background are editable. Change a line and the preview updates.", english)
-                      : t("Import brut : le texte est encore dans l’image. Recrée le TikTok pour pouvoir tout modifier.", "Raw import: text is still inside the image. Rebuild it to edit everything.", english)}
+                      : t("Import brut : le texte est encore dans l’image. Recrée-le pour extraire les textes éditables.", "Raw import: text is still inside the image. Rebuild it to extract editable texts.", english)}
               </p>
               {editing?.id && (baked || rebuildError) && !rebuilding ? (
                 <button className="ss-btn-purple" type="button" onClick={() => void reconstruct()}>
@@ -329,7 +329,7 @@ export function CreatePostModal() {
               <SlidePreview slide={slide} recipe={recipe} width={280} original={showOriginal} />
               {rebuilding ? (
                 <div className="ss-slide-preview__busy">
-                  {t("Recréation des calques…", "Rebuilding layers…", english)}
+                  {t("Extraction des textes…", "Extracting texts…", english)}
                 </div>
               ) : null}
             </div>
@@ -390,8 +390,8 @@ export function CreatePostModal() {
             {baked ? (
               <p className="ss-lead">
                 {t(
-                  "Tant que le TikTok n’est pas recréé, tu ne peux pas changer les textes — ils sont encore collés dans le JPEG.",
-                  "Until the TikTok is rebuilt, you cannot change the texts — they are still baked into the JPEG.",
+                  "Tant que les textes ne sont pas extraits, tu ne peux pas les changer — ils sont encore collés dans le JPEG.",
+                  "Until the texts are extracted, you cannot change them — they are still baked into the JPEG.",
                   english,
                 )}
               </p>
