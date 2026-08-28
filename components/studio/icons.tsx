@@ -237,6 +237,43 @@ export function IconEdit(props: IconProps) {
   );
 }
 
+export function IconInbox(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 13.5 6.5 5h11L20 13.5" {...stroke} />
+      <path d="M4 13.5h4.8l1 2.2h4.4l1-2.2H20V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19v-5.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconBell(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 10.5a6 6 0 0 1 12 0v4l1.8 3H4.2l1.8-3v-4Z" {...stroke} />
+      <path d="M9.7 19.5a2.3 2.3 0 0 0 4.6 0" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconGlobe(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" {...stroke} />
+      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.2-3.6-8.5s1.2-6.2 3.6-8.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconDatabase(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <ellipse cx="12" cy="6" rx="7.5" ry="2.8" {...stroke} />
+      <path d="M4.5 6v12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V6" {...stroke} />
+      <path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" {...stroke} />
+    </Svg>
+  );
+}
+
 const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   home: IconHome,
   automations: IconAutomations,

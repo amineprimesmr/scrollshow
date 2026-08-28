@@ -2,6 +2,7 @@
 
 import { dateInTimeZone } from "@/lib/settings";
 import { useMemo, useState } from "react";
+import { IconAlert, IconCalendar, IconCheck, IconInbox } from "./icons";
 import { useStudio } from "./StudioContext";
 
 const DOW_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -44,6 +45,16 @@ export function CalendarView() {
       post.inCalendar !== false && (activeChannel === "all" || post.channelIds.includes(activeChannel)),
   );
 
+  const stats = useMemo(
+    () => ({
+      published: visible.filter((post) => post.status === "published").length,
+      draft: visible.filter((post) => post.status === "draft").length,
+      scheduled: visible.filter((post) => post.status === "scheduled").length,
+      failed: visible.filter((post) => Boolean(post.publishError) || post.publishState === "FAILED").length,
+    }),
+    [visible],
+  );
+
   const cells = useMemo(() => {
     const start = startOfMonth(cursor.getFullYear(), cursor.getMonth(), weekStartsOn);
     return Array.from({ length: 42 }, (_, index) => {
@@ -75,7 +86,7 @@ export function CalendarView() {
     });
     return (
       <>
-        <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+        <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} stats={stats} />
         <div className="ss-week">
           {week.map((cell) => (
             <div key={cell.key} className="ss-week-col">
@@ -104,7 +115,7 @@ export function CalendarView() {
     const dayLabel = cursor.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
     return (
       <>
-        <Toolbar french={locale.startsWith("fr")} label={dayLabel} mode={mode} setMode={setMode} setCursor={setCursor} />
+        <Toolbar french={locale.startsWith("fr")} label={dayLabel} mode={mode} setMode={setMode} setCursor={setCursor} stats={stats} />
         <div className="ss-dayview">
           {visible.filter((post) => post.date === key).length ? (
             visible
@@ -144,7 +155,7 @@ export function CalendarView() {
 
   return (
     <>
-      <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+      <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} stats={stats} />
       <div className="ss-grid">
           {dow.map((day) => (
           <div key={day} className="ss-dow">
@@ -191,18 +202,22 @@ export function CalendarView() {
   );
 }
 
+type CalendarStats = { published: number; draft: number; scheduled: number; failed: number };
+
 function Toolbar({
   french,
   label,
   mode,
   setMode,
   setCursor,
+  stats,
 }: {
   french: boolean;
   label: string;
   mode: "day" | "week" | "month";
   setMode: (mode: "day" | "week" | "month") => void;
   setCursor: React.Dispatch<React.SetStateAction<Date>>;
+  stats: CalendarStats;
 }) {
   const modes = french
     ? ([
@@ -235,6 +250,24 @@ function Toolbar({
             {name}
           </button>
         ))}
+      </div>
+      <div className="ss-cal-stats">
+        <span className="ss-cal-stat is-good" title={french ? "Publiés" : "Published"}>
+          <IconCheck size={16} />
+          {stats.published}
+        </span>
+        <span className="ss-cal-stat is-warn" title={french ? "Brouillons" : "Drafts"}>
+          <IconInbox size={16} />
+          {stats.draft}
+        </span>
+        <span className="ss-cal-stat is-info" title={french ? "Planifiés" : "Scheduled"}>
+          <IconCalendar size={16} />
+          {stats.scheduled}
+        </span>
+        <span className="ss-cal-stat is-bad" title={french ? "Échecs" : "Failed"}>
+          <IconAlert size={16} />
+          {stats.failed}
+        </span>
       </div>
     </div>
   );
