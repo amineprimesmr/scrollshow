@@ -2,7 +2,7 @@
 
 import { t } from "@/lib/i18n";
 import { AI_CLIENTS } from "@/lib/ai-clients";
-import { formatEuro, isPaidPlan, PLANS } from "@/lib/plans";
+import { formatEuro, isPaidPlan, PLAN } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
 import { formatInTimeZone, PRIVACY_LEVELS, TIMEZONES } from "@/lib/settings";
 import { useRouter } from "next/navigation";
@@ -71,7 +71,7 @@ export function SettingsView() {
     return TIMEZONES;
   }, [timezone]);
   const clockLabel = formatInTimeZone(timezone, english ? "en-GB" : "fr-FR", clock);
-  const planMeta = isPaidPlan(user?.plan) ? PLANS[user.plan] : null;
+  const planMeta = isPaidPlan(user?.plan) ? PLAN : null;
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("tab");
@@ -665,7 +665,7 @@ export function SettingsView() {
             <div className="ss-set-card">
               <h2>{t("Abonnement", "Subscription", english)}</h2>
               <p className="ss-lead">
-                {t("Plan actuel", "Current plan", english)} : <b>{user.plan === "free" ? "Free" : user.plan}</b>
+                {t("Plan actuel", "Current plan", english)} : <b>{planMeta ? "ScrollShow" : "Free"}</b>
                 {planMeta ? ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}` : ""}
               </p>
               <ul className="ss-feat">

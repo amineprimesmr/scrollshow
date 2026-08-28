@@ -34,8 +34,7 @@ export async function POST(request: Request) {
 
   const handle = parsed.data.handle.replace(/^@/, "").toLowerCase();
   const account = await updateStore((data) => {
-    const mine = data.accounts.filter((item) => item.userId === user.id);
-    if (!canAddAccount(user.plan, mine.length)) return { error: "limit" as const };
+    if (!canAddAccount(user.plan)) return { error: "limit" as const };
     const created = {
       id: crypto.randomUUID(),
       userId: user.id,

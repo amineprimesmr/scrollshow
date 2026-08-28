@@ -79,9 +79,6 @@ export async function refreshSessionFromStore(): Promise<SessionUser | null> {
   return user;
 }
 
-export function canAddAccount(plan: Plan, count: number) {
-  if (plan === "starter") return count < 1;
-  if (plan === "creator") return count < 3;
-  if (plan === "pro") return true;
-  return false;
+export function canAddAccount(plan: Plan) {
+  return isPaidPlan(plan);
 }
