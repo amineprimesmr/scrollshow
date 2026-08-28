@@ -25,6 +25,8 @@ type Step = {
   cta?: string;
   href?: string;
   primary?: boolean;
+  secondaryCta?: string;
+  secondaryHref?: string;
 };
 
 const CLIENTS = AI_CLIENTS;
@@ -249,11 +251,13 @@ export function DeveloperAccess() {
         n: "2",
         title: tx("Claude → Customize → Connectors", "Claude → Customize → Connectors"),
         body: tx(
-          "Dans Claude desktop ou claude.ai, va dans Customize → Connectors. Nomme-le ScrollShow et colle l’adresse. Si claude.ai te demande une authentification qu’il ne peut pas compléter, utilise l’onglet Claude Code à la place — il marche avec ta clé directement.",
-          "In Claude desktop or claude.ai, go to Customize → Connectors. Name it ScrollShow and paste the address. If claude.ai asks for an authentication it can't complete, use the Claude Code tab instead — it works with your key directly.",
+          "Ouvre l’app Claude, va dans Customize → Connectors, nomme-le ScrollShow et colle l’adresse. Si Claude te demande une authentification qu’il ne peut pas compléter, utilise l’onglet Claude Code à la place — il marche avec ta clé directement.",
+          "Open the Claude app, go to Customize → Connectors, name it ScrollShow and paste the address. If Claude asks for an authentication it can't complete, use the Claude Code tab instead — it works with your key directly.",
         ),
-        cta: tx("Ouvrir Claude Customize", "Open Claude Customize"),
-        href: "https://claude.ai/settings/connectors",
+        cta: tx("Ouvrir l’app Claude", "Open the Claude app"),
+        href: "claude://claude.ai/new",
+        secondaryCta: tx("Pas l’app ? Utiliser claude.ai", "No app? Use claude.ai"),
+        secondaryHref: "https://claude.ai/settings/connectors",
       },
       start,
     ];
@@ -370,6 +374,11 @@ export function DeveloperAccess() {
                   <a className={step.primary ? "ss-btn-purple" : "ss-btn-ghost"} href={step.href}>
                     {step.cta}
                     {step.primary ? null : <ExternalIcon />}
+                  </a>
+                ) : null}
+                {step.secondaryCta && step.secondaryHref ? (
+                  <a className="ss-mcp-card__secondary" href={step.secondaryHref} target="_blank" rel="noreferrer">
+                    {step.secondaryCta}
                   </a>
                 ) : null}
               </div>

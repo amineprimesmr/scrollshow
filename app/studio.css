@@ -2094,6 +2094,17 @@ a.ss-btn-ghost {
   margin-top: 0;
 }
 
+.ss-mcp-card__secondary {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ss-muted);
+  text-decoration: underline;
+}
+
+.ss-mcp-card__secondary:hover {
+  color: var(--ss-ink);
+}
+
 .ss-mcp-card__n {
   display: grid;
   place-items: center;
