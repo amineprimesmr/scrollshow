@@ -513,6 +513,18 @@ export async function agentPublish(
     date: new Date().toISOString().slice(0, 10),
     time: new Date().toISOString().slice(11, 16),
   });
+  // content/init only queues the carousel; the cron reconciles publish_id into a
+  // real published/failed verdict.
+  const publishId = String(result.publish_id || "");
+  if (publishId) {
+    await updateStore((store) => {
+      const current = store.posts.find((item) => item.id === post.id);
+      if (!current) return;
+      current.publishId = publishId;
+      current.publishState = "PROCESSING";
+      current.publishedAt = new Date().toISOString();
+    });
+  }
   return { ok: true, publish_id: result.publish_id, privacy, post, data: result };
 }
 

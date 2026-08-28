@@ -1,6 +1,7 @@
+import { resolveStoreUserId } from "./local-user";
 import { readStore, updateStore } from "./store";
 import { refreshAccessToken } from "./tiktok";
-import type { Channel } from "./types";
+import type { Channel, SessionUser } from "./types";
 
 export async function loadTikTokChannel(userId: string): Promise<Channel | null> {
   const data = await readStore();
@@ -25,4 +26,12 @@ export async function loadTikTokChannel(userId: string): Promise<Channel | null>
   } catch {
     return channel;
   }
+}
+
+export async function tiktokUserId(session: Pick<SessionUser, "id" | "email">) {
+  return resolveStoreUserId(await readStore(), session);
+}
+
+export async function loadTikTokChannelForSession(session: Pick<SessionUser, "id" | "email">) {
+  return loadTikTokChannel(await tiktokUserId(session));
 }

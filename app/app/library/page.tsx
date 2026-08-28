@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { LibraryInspirationView } from "@/components/studio/views/MoreViews";
 
-export default function Page() {
-  redirect("/app");
+export default function LibraryPage() {
+  return <LibraryInspirationView />;
 }

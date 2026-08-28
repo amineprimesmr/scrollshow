@@ -1,4 +1,6 @@
 import { readSession } from "@/lib/auth";
+import { ensureDemoWorkspace, localAutoSeedEnabled } from "@/lib/demo-workspace";
+import { resolveStoreUser } from "@/lib/local-user";
 import { coverOf, ensureRecipe, newShareId } from "@/lib/recipe";
 import { resolveSettings } from "@/lib/settings";
 import { seedStudio } from "@/lib/studio-seed";
@@ -12,15 +14,32 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
     const payload = await updateStore((data) => {
-      const channels = data.channels.filter((item) => item.userId === user.id);
-      let posts = data.posts.filter((item) => item.userId === user.id);
-      let media = data.media.filter((item) => item.userId === user.id);
+      let stored = resolveStoreUser(data, user);
+
+      if (!stored && localAutoSeedEnabled()) {
+        stored = {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          plan: user.plan,
+          createdAt: new Date().toISOString(),
+        };
+        data.users.push(stored);
+      }
+
+      if (localAutoSeedEnabled() && stored) {
+        ensureDemoWorkspace(data, stored);
+      }
+
+      const userId = stored?.id || user.id;
+      const channels = data.channels.filter((item) => item.userId === userId);
+      let posts = data.posts.filter((item) => item.userId === userId);
+      let media = data.media.filter((item) => item.userId === userId);
       if (!media.length) {
         const seeded = seedStudio(user.id);
         data.media.push(...seeded.media);
         media = seeded.media;
       }
-      const stored = data.users.find((item) => item.id === user.id);
       return {
         channels: channels.map(publicChannel),
         posts: posts.map((post) => {

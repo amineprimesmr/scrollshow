@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { LibraryView } from "@/components/studio/views/LibraryView";
 
-export default function Page() {
-  redirect("/app");
+export default function DiscoverPage() {
+  return <LibraryView />;
 }

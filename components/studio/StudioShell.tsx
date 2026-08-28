@@ -3,44 +3,17 @@
 import { BrandMark } from "@/components/BrandMark";
 import { GOOGLE_FONTS_HREF } from "@/lib/recipe";
 import { t } from "@/lib/i18n";
+import { isPaidPlan } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
+import { navActive, PAGE_TITLES, STUDIO_NAV } from "@/lib/studio-nav";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
-import {
-  IconCalendar,
-  IconCard,
-  IconChart,
-  IconLogout,
-  IconMcp,
-  IconMedia,
-  IconPlus,
-  IconPlug,
-  IconSettings,
-} from "./icons";
+import { IconLock, IconLogout, IconPlus, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { StudioFlash } from "./StudioFlash";
-
-const NAV: {
-  href: string;
-  fr: string;
-  en: string;
-  icon: ReactNode;
-}[] = [
-  { href: "/app", fr: "Calendrier", en: "Calendar", icon: <IconCalendar /> },
-  { href: "/app/marketplace", fr: "Marketplace", en: "Marketplace", icon: <IconMedia /> },
-  { href: "/app/analytics", fr: "Stats", en: "Analytics", icon: <IconChart /> },
-  { href: "/app/integrations", fr: "Connexions", en: "Connect", icon: <IconPlug /> },
-  { href: "/app/mcp", fr: "MCP", en: "MCP", icon: <IconMcp /> },
-];
-
-const PAGE_TITLES: { href: string; fr: string; en: string }[] = [
-  ...NAV,
-  { href: "/app/billing", fr: "Facturation", en: "Billing" },
-  { href: "/app/settings", fr: "Réglages", en: "Settings" },
-];
 
 function initialsOf(name?: string, email?: string) {
   const source = (name || email || "S").trim();
@@ -49,7 +22,20 @@ function initialsOf(name?: string, email?: string) {
   return source.slice(0, 2).toUpperCase();
 }
 
-function RailProfile() {
+function TrialBanner() {
+  const { user, english } = useStudio();
+  if (!user || isPaidPlan(user.plan)) return null;
+  return (
+    <div className="ss-trial">
+      <span>{t("Essai gratuit · 7 jours restants", "Free trial · 7 days left", english)}</span>
+      <Link href="/app/billing" className="ss-trial__btn">
+        {t("Upgrade", "Upgrade", english)}
+      </Link>
+    </div>
+  );
+}
+
+function SidebarProfile() {
   const { user, english } = useStudio();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -60,15 +46,8 @@ function RailProfile() {
     function onDoc(event: MouseEvent) {
       if (!box.current?.contains(event.target as Node)) setOpen(false);
     }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
   async function signOut() {
@@ -77,43 +56,23 @@ function RailProfile() {
   }
 
   return (
-    <div className={`ss-rail-profile${open ? " is-open" : ""}`} ref={box}>
-      <button
-        type="button"
-        className="ss-rail-profile__btn"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={user?.name || t("Profil", "Profile", english)}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="ss-rail-avatar" aria-hidden>
-          {initials || "S"}
+    <div className={`ss-sidebar-profile${open ? " is-open" : ""}`} ref={box}>
+      <button type="button" className="ss-sidebar-profile__btn" onClick={() => setOpen((v) => !v)}>
+        <span className="ss-sidebar-avatar">{initials}</span>
+        <span className="ss-sidebar-profile__meta">
+          <strong>{user?.name || "…"}</strong>
+          <em>{user?.email || ""}</em>
         </span>
       </button>
       {open ? (
-        <div className="ss-rail-menu" role="menu">
-          <div className="ss-rail-menu__head">
-            <span className="ss-rail-avatar" aria-hidden>
-              {initials || "S"}
-            </span>
-            <span>
-              <strong>{user?.name || "…"}</strong>
-              <em>{user?.email || ""}</em>
-            </span>
-          </div>
-          <Link href="/app/settings" role="menuitem" onClick={() => setOpen(false)}>
-            <IconSettings size={16} />
+        <div className="ss-sidebar-menu">
+          <Link href="/app/settings" onClick={() => setOpen(false)}>
             {t("Réglages", "Settings", english)}
           </Link>
-          <Link href="/app/billing" role="menuitem" onClick={() => setOpen(false)}>
-            <IconCard size={16} />
+          <Link href="/app/billing" onClick={() => setOpen(false)}>
             {t("Facturation", "Billing", english)}
           </Link>
-          <Link href="/app/mcp" role="menuitem" onClick={() => setOpen(false)}>
-            <IconMcp size={16} />
-            MCP
-          </Link>
-          <button type="button" role="menuitem" onClick={() => void signOut()}>
+          <button type="button" onClick={() => void signOut()}>
             <IconLogout size={16} />
             {t("Déconnexion", "Log out", english)}
           </button>
@@ -123,96 +82,118 @@ function RailProfile() {
   );
 }
 
+function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; pathname: string; english: boolean }) {
+  const active = navActive(pathname, entry.href);
+  const label = english ? entry.en : entry.fr;
+  return (
+    <Link
+      href={entry.href}
+      className={[
+        "ss-sidebar-link",
+        active ? "is-active" : "",
+        entry.highlight ? "is-highlight" : "",
+        entry.locked ? "is-locked" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <NavIcon name={entry.icon} size={18} />
+      <span>{label}</span>
+      {entry.badge ? <span className="ss-sidebar-dot" /> : null}
+      {entry.locked ? <IconLock size={14} className="ss-sidebar-lock" /> : null}
+    </Link>
+  );
+}
+
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { english, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
-  const item = PAGE_TITLES.find((entry) => (entry.href === "/app" ? pathname === "/app" : pathname.startsWith(entry.href)));
-  const title = item ? (english ? item.en : item.fr) : t("Calendrier", "Calendar", english);
-  const onCalendar = pathname === "/app";
+  const item = PAGE_TITLES.find((entry) => navActive(pathname, entry.href));
+  const title = item ? (english ? item.en : item.fr) : "ScrollShow";
+  const onCalendar = pathname === "/app" || pathname === "/app/calendar";
   const onMcp = pathname.startsWith("/app/mcp");
-  const live = channels.filter((channel) => channel.connected);
+  const onBlitz = pathname.startsWith("/app/blitz");
+  const onWizard = pathname.includes("/automations/") && pathname.endsWith("/edit");
+  const hideHeader = onMcp || onBlitz || onWizard || pathname.startsWith("/app/home");
+
+  const mainNav = STUDIO_NAV.filter((e) => e.section === "main");
+  const bottomNav = STUDIO_NAV.filter((e) => e.section === "bottom");
 
   return (
-    <div className={`ss-studio${onCalendar ? " is-calendar" : ""}`}>
+    <div className={`ss-studio ss-fastlane${onCalendar ? " is-calendar" : ""}${onBlitz ? " is-blitz" : ""}`}>
       <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
-      <nav className="ss-rail">
-        <Link href="/" className="ss-rail__brand" aria-label="ScrollShow">
-          <BrandMark size={36} className="ss-rail__logo" />
-        </Link>
-        <div className="ss-rail__nav">
-          {NAV.map((entry) => {
-            const active = entry.href === "/app" ? pathname === "/app" : pathname.startsWith(entry.href);
-            return (
-              <Link key={entry.href} href={entry.href} className={active ? "is-active" : ""}>
-                {entry.icon}
-                <span>{english ? entry.en : entry.fr}</span>
-              </Link>
-            );
-          })}
+      <aside className="ss-sidebar">
+        <div className="ss-sidebar__head">
+          <Link href="/app/home" className="ss-sidebar__brand">
+            <BrandMark size={28} className="ss-sidebar__logo" />
+            <span>ScrollShow</span>
+          </Link>
         </div>
-        <RailProfile />
-      </nav>
+        <nav className="ss-sidebar__nav">
+          {mainNav.map((entry) => (
+            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
+          ))}
+        </nav>
+        <nav className="ss-sidebar__bottom">
+          {bottomNav.map((entry) => (
+            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
+          ))}
+        </nav>
+        <SidebarProfile />
+      </aside>
 
       {onCalendar ? (
-      <aside className="ss-channels">
-        <h2>{t("Comptes", "Channels", english)}</h2>
-        <button
-          className="ss-btn-purple ss-btn-wide"
-          type="button"
-          onClick={() => {
-            setEditing(null);
-            setPostOpen(true);
-          }}
-        >
-          <IconPlus size={16} />
-          {t("Nouveau post", "New post", english)}
-        </button>
-        <button className="ss-btn-ghost ss-btn-wide" type="button" onClick={() => setAddOpen(true)}>
-          {t("Connecter un compte", "Connect an account", english)}
-        </button>
-        <button
-          className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`}
-          onClick={() => setActiveChannel("all")}
-        >
-          <BrandMark size={28} alt="" />
-          <span>
-            <b>{t("Tous les comptes", "All channels", english)}</b>
-            <span>
-              {live.length
-                ? t(`${live.length} connecté${live.length > 1 ? "s" : ""}`, `${live.length} connected`, english)
-                : t("Aucun connecté", "None connected", english)}
-            </span>
-          </span>
-        </button>
-        {channels.map((channel) => (
+        <aside className="ss-channels">
+          <h2>{t("Comptes", "Channels", english)}</h2>
           <button
-            key={channel.id}
-            className={`ss-channel ${activeChannel === channel.id ? "is-active" : ""}`}
-            onClick={() => setActiveChannel(channel.id)}
+            className="ss-btn-purple ss-btn-wide"
+            type="button"
+            onClick={() => {
+              setEditing(null);
+              setPostOpen(true);
+            }}
           >
-            <img src={channel.avatar || platformById(channel.platform)?.logo || "/logo.png"} alt="" />
+            <IconPlus size={16} />
+            {t("Nouveau post", "New post", english)}
+          </button>
+          <button className="ss-btn-ghost ss-btn-wide" type="button" onClick={() => setAddOpen(true)}>
+            {t("Connecter un compte", "Connect an account", english)}
+          </button>
+          <button className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`} onClick={() => setActiveChannel("all")}>
+            <BrandMark size={28} alt="" />
             <span>
-              <b>{channel.name}</b>
-              <span>
-                {platformName(channel.platform)} · @{channel.handle}
-                {channel.connected ? "" : ` · ${t("à connecter", "not connected", english)}`}
-              </span>
+              <b>{t("Tous les comptes", "All channels", english)}</b>
             </span>
           </button>
-        ))}
-      </aside>
+          {channels.map((channel) => (
+            <button
+              key={channel.id}
+              className={`ss-channel ${activeChannel === channel.id ? "is-active" : ""}`}
+              onClick={() => setActiveChannel(channel.id)}
+            >
+              <img src={channel.avatar || platformById(channel.platform)?.logo || "/logo.png"} alt="" />
+              <span>
+                <b>{channel.name}</b>
+                <span>
+                  {platformName(channel.platform)} · @{channel.handle}
+                </span>
+              </span>
+            </button>
+          ))}
+        </aside>
       ) : null}
 
       <section className="ss-main">
-        {onMcp ? null : (
+        <TrialBanner />
+        {!hideHeader ? (
           <header className="ss-top">
             <h1>{title}</h1>
           </header>
-        )}
+        ) : null}
         <Suspense fallback={null}>
           <StudioFlash />
         </Suspense>
-        {children}
+        <div className="ss-main__body">{children}</div>
       </section>
       <AddChannelModal />
       <CreatePostModal />

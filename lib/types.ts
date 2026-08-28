@@ -50,6 +50,49 @@ export type Run = {
   createdAt: string;
 };
 
+export type AutomationStatus = "draft" | "active" | "paused" | "completed";
+
+export type Automation = {
+  id: string;
+  userId: string;
+  name: string;
+  status: AutomationStatus;
+  step: number;
+  config: {
+    contentMix?: { slideshow: number; wallOfText: number; greenScreen: number; videoHook: number };
+    remixRatio?: number;
+    mentionBusiness?: "never" | "rarely" | "sometimes" | "often" | "always";
+    angles?: { id: string; label: string; weight: number }[];
+    postsTarget?: number;
+    scheduleDays?: number;
+  };
+  postsGenerated: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Influencer = {
+  id: string;
+  userId: string;
+  name: string;
+  avatar: string;
+  traits: string;
+  status: "training" | "ready";
+  imageCount: number;
+  videoCount: number;
+  createdAt: string;
+};
+
+export type BrandProfile = {
+  userId: string;
+  website?: string;
+  productName?: string;
+  audience?: string;
+  tone?: string;
+  angles?: string[];
+  updatedAt?: string;
+};
+
 export type Channel = {
   id: string;
   userId: string;
@@ -138,6 +181,10 @@ export type StudioPost = {
   clones?: number;
   forkedFrom?: string;
   createdAt?: string;
+  publishId?: string;
+  publishState?: string;
+  publishError?: string;
+  publishedAt?: string;
 };
 
 export type MediaItem = {
@@ -166,6 +213,9 @@ export type StoreData = {
   posts: StudioPost[];
   media: MediaItem[];
   apiKeys: ApiKey[];
+  automations?: Automation[];
+  influencers?: Influencer[];
+  brands?: BrandProfile[];
 };
 
 export type SessionUser = {

@@ -2,7 +2,7 @@ import { readSession } from "@/lib/auth";
 import { resolveSettings, tiktokPostFlags } from "@/lib/settings";
 import { readStore } from "@/lib/store";
 import { absoluteAssetUrl, creatorInfo, initPhotoPost } from "@/lib/tiktok";
-import { loadTikTokChannel } from "@/lib/tiktok-account";
+import { loadTikTokChannel, tiktokUserId } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -22,11 +22,12 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
-  const channel = await loadTikTokChannel(user.id);
+  const userId = await tiktokUserId(user);
+  const channel = await loadTikTokChannel(userId);
   if (!channel?.accessToken) return NextResponse.json({ error: "not_connected" }, { status: 401 });
 
   const data = await readStore();
-  const flags = tiktokPostFlags(resolveSettings(data.users.find((item) => item.id === user.id)));
+  const flags = tiktokPostFlags(resolveSettings(data.users.find((item) => item.id === userId)));
 
   try {
     const info = await creatorInfo(channel.accessToken);

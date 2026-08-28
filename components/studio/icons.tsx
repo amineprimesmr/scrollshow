@@ -1,17 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
 
 type IconProps = { size?: number; className?: string };
 
 function Svg({ size = 20, className, children }: IconProps & { children: ReactNode }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      aria-hidden
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       {children}
     </svg>
   );
@@ -141,4 +136,153 @@ export function IconMcp(props: IconProps) {
       <path d="M7 9.5 9.5 12 7 14.5M12 14.5h5" {...stroke} />
     </Svg>
   );
+}
+
+export function IconHome(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19v-8.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconBlitz(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconAutomations(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" {...stroke} />
+      <circle cx="12" cy="12" r="3.5" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconWand(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m15 4 5 5M4 20l4-4M14.5 6.5 8 13l-1 4 4-1 6.5-6.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconFilm(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" {...stroke} />
+      <path d="M7 5v14M17 5v14M3 10h4M17 10h4M3 14h4M17 14h4" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconGift(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="10" width="18" height="10" rx="2" {...stroke} />
+      <path d="M12 10v10M3 14h18M8.5 10C7 10 6 8.8 6 7.5S7 5 8.5 5 11 6.2 11 7.5M12.5 10c1.5 0 2.5-1.2 2.5-2.5S14 5 12.5 5 10 6.2 10 7.5" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconBriefcase(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="8" width="18" height="12" rx="2" {...stroke} />
+      <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8M3 13h18" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconBook(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 4.5h11a2 2 0 0 1 2 2V19.5H7a2 2 0 0 0-2 2V6.5a2 2 0 0 1 2-2Z" {...stroke} />
+      <path d="M7 19.5h11" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconFlame(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-10.5-4C8 6 7 8 7 10c0 4 2 7.5 5 12Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconBulb(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 18h6M10 22h4M8.5 14a6 6 0 1 1 7 0c-.8.8-1.2 1.6-1.5 2.5H10c-.3-.9-.7-1.7-1.5-2.5Z" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconChevron(props: IconProps & { dir?: "left" | "right" | "down" }) {
+  const d =
+    props.dir === "left"
+      ? "M15 6l-6 6 6 6"
+      : props.dir === "down"
+        ? "M6 9l6 6 6-6"
+        : "M9 6l6 6-6 6";
+  return (
+    <Svg {...props}>
+      <path d={d} {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconX(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 6l12 12M18 6 6 18" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconCheck(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 12.5 9.5 17 19 7" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconEdit(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" {...stroke} />
+    </Svg>
+  );
+}
+
+const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
+  home: IconHome,
+  blitz: IconBlitz,
+  library: IconBulb,
+  automations: IconAutomations,
+  studio: IconWand,
+  influencers: IconUser,
+  content: IconFilm,
+  media: IconMedia,
+  calendar: IconCalendar,
+  chart: IconChart,
+  warmed: IconFlame,
+  upgrade: IconCard,
+  gift: IconGift,
+  brand: IconBriefcase,
+  guide: IconBook,
+  plug: IconPlug,
+  mcp: IconMcp,
+  settings: IconSettings,
+};
+
+export function NavIcon({ name, size = 18 }: { name: string; size?: number }) {
+  const Icon = NAV_ICON_MAP[name] || IconHome;
+  return <Icon size={size} />;
 }

@@ -6,7 +6,15 @@ import type { Account, Run, StoreData, User } from "./types";
 
 const BLOB_NAME = "scrollshow-store.json";
 
-const globalStore = globalThis as typeof globalThis & { __scrollshow?: StoreData };
+const globalStore = globalThis as typeof globalThis & {
+  __scrollshow?: StoreData;
+  __scrollshowReadAt?: number;
+};
+
+// A warm Fluid Compute instance can serve many requests over a long life. Without a
+// bound on the cache, an instance never sees what another one wrote to the blob —
+// connecting TikTok on instance A would read back as "not connected" on instance B.
+const BLOB_CACHE_MS = 3000;
 
 function filePath() {
   const root = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), ".data");
@@ -62,7 +70,14 @@ async function writeBlob(data: StoreData) {
 }
 
 function useBlob() {
+  if (process.env.NODE_ENV !== "production" && process.env.SCROLLSHOW_USE_BLOB !== "1") {
+    return false;
+  }
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
+export function localStoreEnabled() {
+  return !useBlob();
 }
 
 function normalize(data: StoreData): StoreData {
@@ -73,21 +88,36 @@ function normalize(data: StoreData): StoreData {
   data.runs ||= [];
   data.users ||= [];
   data.apiKeys ||= [];
+  data.automations ||= [];
+  data.influencers ||= [];
+  data.brands ||= [];
   return data;
 }
 
-export async function readStore(): Promise<StoreData> {
+export async function readStore(fresh = false): Promise<StoreData> {
   const cached = globalStore.__scrollshow;
-  if (cached && (cached.users.length || cached.accounts.length || cached.channels?.length)) {
-    return normalize(cached);
+  const hasContent = Boolean(cached && (cached.users.length || cached.accounts.length || cached.channels?.length));
+  if (cached && hasContent && !fresh) {
+    const age = Date.now() - (globalStore.__scrollshowReadAt || 0);
+    if (!useBlob() || age < BLOB_CACHE_MS) return normalize(cached);
   }
-  const data = normalize(useBlob() ? await readBlob() : await readLocal());
+  let data: StoreData;
+  try {
+    data = normalize(useBlob() ? await readBlob() : await readLocal());
+  } catch (error) {
+    // A failed blob read must never look like an empty workspace: returning one
+    // here would let the caller mutate it and write the emptiness back.
+    if (cached) return normalize(cached);
+    throw error;
+  }
   globalStore.__scrollshow = data;
+  globalStore.__scrollshowReadAt = Date.now();
   return data;
 }
 
 export async function writeStore(data: StoreData) {
   globalStore.__scrollshow = data;
+  globalStore.__scrollshowReadAt = Date.now();
   try {
     if (useBlob()) await writeBlob(data);
     else await writeLocal(data);
@@ -97,7 +127,9 @@ export async function writeStore(data: StoreData) {
 }
 
 export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>) {
-  const data = await readStore();
+  // Always mutate the newest copy: the whole store is one JSON document, so
+  // mutating a stale one silently drops whatever another instance just wrote.
+  const data = await readStore(true);
   const result = await fn(data);
   await writeStore(data);
   return result;

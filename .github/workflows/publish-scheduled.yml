@@ -1,0 +1,22 @@
+# Vercel's Hobby plan caps crons at one run per day, which is too coarse to
+# publish posts at their scheduled slot. This drives the same endpoint every
+# 5 minutes. Set the CRON_SECRET repo secret to the value used on Vercel.
+name: Publish scheduled posts
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger ScrollShow publish queue
+        run: |
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://scrollshow.io/api/cron/publish)
+          cat /tmp/body
+          echo
+          test "$code" = "200"

@@ -5,6 +5,7 @@ const USER_INFO = "https://open.tiktokapis.com/v2/user/info/";
 const VIDEO_LIST = "https://open.tiktokapis.com/v2/video/list/";
 const CREATOR_INFO = "https://open.tiktokapis.com/v2/post/publish/creator_info/query/";
 const CONTENT_INIT = "https://open.tiktokapis.com/v2/post/publish/content/init/";
+const PUBLISH_STATUS = "https://open.tiktokapis.com/v2/post/publish/status/fetch/";
 
 export const CANONICAL_REDIRECT = "https://scrollshow.io/tiktok/callback";
 
@@ -204,6 +205,10 @@ export async function creatorInfo(accessToken: string) {
 
 export async function initPhotoPost(accessToken: string, payload: Record<string, unknown>) {
   return assertOk(await tiktokPost(CONTENT_INIT, accessToken, payload));
+}
+
+export async function fetchPublishStatus(accessToken: string, publishId: string) {
+  return assertOk(await tiktokPost(PUBLISH_STATUS, accessToken, { publish_id: publishId }));
 }
 
 export function publicChannel(channel: {

@@ -1,5 +1,6 @@
 import { readSession } from "@/lib/auth";
 import { exchangeCode, fetchUserInfo } from "@/lib/tiktok";
+import { resolveStoreUserId } from "@/lib/local-user";
 import { updateStore } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -31,12 +32,13 @@ export async function GET(request: Request) {
     }
 
     await updateStore((data) => {
+      const userId = resolveStoreUserId(data, user);
       const existing = data.channels.find(
-        (item) => item.userId === user.id && item.platform === "tiktok" && item.openId === (tokens.open_id || profile.open_id),
+        (item) => item.userId === userId && item.platform === "tiktok" && item.openId === (tokens.open_id || profile.open_id),
       );
       const next = {
         id: existing?.id || crypto.randomUUID(),
-        userId: user.id,
+        userId,
         platform: "tiktok",
         name: profile.display_name || profile.username || "TikTok",
         handle: profile.username || "tiktok",
