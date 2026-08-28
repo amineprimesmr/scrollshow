@@ -155,10 +155,11 @@ export function IconAutomations(props: IconProps) {
   );
 }
 
-export function IconWand(props: IconProps) {
+export function IconEyeOff(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="m15 4 5 5M4 20l4-4M14.5 6.5 8 13l-1 4 4-1 6.5-6.5Z" {...stroke} />
+      <path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c5 0 9 4 10 7-.4 1.2-1.2 2.6-2.4 3.9M6.5 6.6C4.3 8 2.8 10 2 12c1 3 5 7 10 7 1.4 0 2.7-.3 3.9-.8" {...stroke} />
+      <path d="M9.9 10a3 3 0 0 0 4.2 4.2" {...stroke} />
     </Svg>
   );
 }
@@ -239,13 +240,11 @@ export function IconEdit(props: IconProps) {
 const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   home: IconHome,
   automations: IconAutomations,
-  studio: IconWand,
-  influencers: IconUser,
+  unshadowban: IconEyeOff,
   media: IconMedia,
   calendar: IconCalendar,
   chart: IconChart,
   warmed: IconFlame,
-  upgrade: IconCard,
   gift: IconGift,
   brand: IconBriefcase,
   guide: IconBook,

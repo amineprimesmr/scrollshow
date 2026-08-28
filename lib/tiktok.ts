@@ -199,6 +199,41 @@ export async function listVideos(accessToken: string) {
   return assertOk(await tiktokPost(url.toString(), accessToken, { max_count: 10 }));
 }
 
+export type TikTokVideo = {
+  id: string;
+  create_time: number;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  video_description?: string;
+  cover_image_url?: string;
+  share_url?: string;
+};
+
+/**
+ * TikTok's video.list caps a single request at 20 items; a shadowban read on
+ * only the last 10 can't tell a genuine reach collapse from normal variance.
+ * Pages through cursor/has_more up to a hard cap so one bad request can't loop.
+ */
+export async function listRecentVideos(accessToken: string, targetCount = 30) {
+  const url = new URL(VIDEO_LIST);
+  url.searchParams.set("fields", VIDEO_LIST_FIELDS);
+  const videos: TikTokVideo[] = [];
+  let cursor: number | undefined;
+  for (let page = 0; page < 4 && videos.length < targetCount; page += 1) {
+    const body: Record<string, unknown> = { max_count: 20 };
+    if (cursor) body.cursor = cursor;
+    const data = await assertOk(await tiktokPost(url.toString(), accessToken, body));
+    const batch = Array.isArray(data.videos) ? (data.videos as TikTokVideo[]) : [];
+    videos.push(...batch);
+    if (!data.has_more || !batch.length) break;
+    cursor = Number(data.cursor) || undefined;
+    if (!cursor) break;
+  }
+  return videos.slice(0, targetCount);
+}
+
 export async function creatorInfo(accessToken: string) {
   return assertOk(await tiktokPost(CREATOR_INFO, accessToken, {}));
 }

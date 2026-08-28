@@ -5,30 +5,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useStudio } from "../StudioContext";
 
-export function AiStudioView() {
-  const [english, setEnglish] = useState(false);
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  const en = english;
-  return (
-    <div className="ss-empty" style={{ margin: 24 }}>
-      <h2>{t("AI Studio", "AI Studio", en)}</h2>
-      <p>{t("Génération d'images et de vidéos — bientôt disponible.", "Image and video generation — coming soon.", en)}</p>
-    </div>
-  );
-}
-
-export function InfluencersView() {
-  const [english, setEnglish] = useState(false);
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  const en = english;
-  return (
-    <div className="ss-empty" style={{ margin: 24 }}>
-      <h2>{t("Influenceurs", "Influencers", en)}</h2>
-      <p>{t("Personas IA persistants pour du contenu cohérent — bientôt disponible.", "Persistent AI personas for consistent content — coming soon.", en)}</p>
-    </div>
-  );
-}
-
 export function BrandView() {
   const [english, setEnglish] = useState(false);
   const [website, setWebsite] = useState("");
