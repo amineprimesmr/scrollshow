@@ -65,6 +65,24 @@ export async function exchangeXCode(origin: string, code: string, verifier: stri
   };
 }
 
+export async function revokeXToken(accessToken: string) {
+  const config = xConfig();
+  if (!config) return;
+  try {
+    const basic = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+    await fetch("https://api.twitter.com/2/oauth2/revoke", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basic}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ token: accessToken, token_type_hint: "access_token" }),
+    });
+  } catch {
+    // best-effort revoke
+  }
+}
+
 export async function fetchXProfile(accessToken: string) {
   const res = await fetch("https://api.twitter.com/2/users/me?user.fields=name,username,profile_image_url", {
     headers: { Authorization: `Bearer ${accessToken}` },

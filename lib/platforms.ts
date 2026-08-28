@@ -17,7 +17,7 @@ export const PLATFORMS: PlatformDef[] = [
     id: "tiktok",
     name: "TikTok",
     family: "tiktok",
-    lifecycle: "pending_review",
+    lifecycle: "connectable",
     logo: "/assets/platforms/tiktok.png",
     connectPath: "/api/tiktok/oauth/start",
   },

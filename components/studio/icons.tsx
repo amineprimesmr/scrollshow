@@ -146,14 +146,6 @@ export function IconHome(props: IconProps) {
   );
 }
 
-export function IconBlitz(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" {...stroke} />
-    </Svg>
-  );
-}
-
 export function IconAutomations(props: IconProps) {
   return (
     <Svg {...props}>
@@ -167,15 +159,6 @@ export function IconWand(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="m15 4 5 5M4 20l4-4M14.5 6.5 8 13l-1 4 4-1 6.5-6.5Z" {...stroke} />
-    </Svg>
-  );
-}
-
-export function IconFilm(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="5" width="18" height="14" rx="2" {...stroke} />
-      <path d="M7 5v14M17 5v14M3 10h4M17 10h4M3 14h4M17 14h4" {...stroke} />
     </Svg>
   );
 }
@@ -211,14 +194,6 @@ export function IconFlame(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-10.5-4C8 6 7 8 7 10c0 4 2 7.5 5 12Z" {...stroke} />
-    </Svg>
-  );
-}
-
-export function IconBulb(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M9 18h6M10 22h4M8.5 14a6 6 0 1 1 7 0c-.8.8-1.2 1.6-1.5 2.5H10c-.3-.9-.7-1.7-1.5-2.5Z" {...stroke} />
     </Svg>
   );
 }
@@ -263,12 +238,9 @@ export function IconEdit(props: IconProps) {
 
 const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   home: IconHome,
-  blitz: IconBlitz,
-  library: IconBulb,
   automations: IconAutomations,
   studio: IconWand,
   influencers: IconUser,
-  content: IconFilm,
   media: IconMedia,
   calendar: IconCalendar,
   chart: IconChart,

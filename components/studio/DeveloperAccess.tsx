@@ -94,7 +94,7 @@ export function DeveloperAccess() {
   const [creating, setCreating] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [client, setClient] = useState<ClientId>("claude");
+  const [client, setClient] = useState<ClientId>("claude-code");
   const [copied, setCopied] = useState("");
 
   const origin = typeof window === "undefined" ? "https://scrollshow.io" : window.location.origin;
@@ -249,8 +249,8 @@ export function DeveloperAccess() {
         n: "2",
         title: tx("Claude → Customize → Connectors", "Claude → Customize → Connectors"),
         body: tx(
-          "Dans Claude desktop ou claude.ai, va dans Customize → Connectors. Nomme-le ScrollShow et colle l’adresse.",
-          "In Claude desktop or claude.ai, go to Customize → Connectors. Name it ScrollShow and paste the address.",
+          "Dans Claude desktop ou claude.ai, va dans Customize → Connectors. Nomme-le ScrollShow et colle l’adresse. Si claude.ai te demande une authentification qu’il ne peut pas compléter, utilise l’onglet Claude Code à la place — il marche avec ta clé directement.",
+          "In Claude desktop or claude.ai, go to Customize → Connectors. Name it ScrollShow and paste the address. If claude.ai asks for an authentication it can't complete, use the Claude Code tab instead — it works with your key directly.",
         ),
         cta: tx("Ouvrir Claude Customize", "Open Claude Customize"),
         href: "https://claude.ai/settings/connectors",
@@ -287,6 +287,52 @@ export function DeveloperAccess() {
           )}
         </p>
       </header>
+
+      <div className="ss-mcp-keys">
+        <div className="ss-mcp-keys__head">
+          <div>
+            <h3>{tx("Clés actives", "Active keys")}</h3>
+            <p>
+              {revealed
+                ? tx("Copie-la maintenant — elle ne sera plus affichée. Elle marche pour tous tes agents.", "Copy it now — it won’t be shown again. It works for every agent.")
+                : tx("Une clé pour brancher Claude, Claude Code, Cursor et Codex. Crée-la une fois.", "One key to connect Claude, Claude Code, Cursor and Codex. Create it once.")}
+            </p>
+          </div>
+          {revealed ? (
+            <CopyField value={revealed} copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
+          ) : (
+            <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>
+              {creating ? tx("Création…", "Creating…") : tx("Créer une clé", "Create a key")}
+            </button>
+          )}
+        </div>
+        {error ? (
+          <p className="ss-mcp-error">
+            {error === "limit"
+              ? tx("Limite de 10 clés atteinte — révoque-en une pour continuer.", "10-key limit reached — revoke one to continue.")
+              : tx("Impossible de créer la clé. Réessaie.", "Could not create the key. Try again.")}
+          </p>
+        ) : null}
+        {keys.length ? (
+          keys.map((key) => (
+            <div key={key.id} className="ss-mcp-keys__row">
+              <code>
+                {key.prefix}… · {key.name}
+                {key.lastUsedAt ? (
+                  <small style={{ marginLeft: 8, color: "#a1a1aa", fontWeight: 400 }}>
+                    · {tx("utilisée", "used")} {new Date(key.lastUsedAt).toLocaleDateString(english ? "en-US" : "fr-FR")}
+                  </small>
+                ) : null}
+              </code>
+              <button type="button" onClick={() => void revoke(key.id)}>
+                {tx("Révoquer", "Revoke")}
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="ss-mcp-keys__empty">{tx("Aucune clé pour l’instant.", "No keys yet.")}</p>
+        )}
+      </div>
 
       <div className="ss-mcp-panel">
         <div className="ss-mcp-bar">
@@ -335,41 +381,6 @@ export function DeveloperAccess() {
       <p className="ss-mcp-foot">
         {tx("TikTok se branche dans Connexions. Ici, c’est uniquement tes assistants IA.", "TikTok is connected in Connections. This page is only for your AI assistants.")}
       </p>
-
-      <div className="ss-mcp-keys">
-        <div className="ss-mcp-keys__head">
-          <div>
-            <h3>{tx("Clés actives", "Active keys")}</h3>
-            <p>
-              {revealed
-                ? tx("Copie-la maintenant — elle ne sera plus affichée. Elle marche pour tous tes agents.", "Copy it now — it won’t be shown again. It works for every agent.")
-                : tx("Une clé pour brancher Claude, Claude Code, Cursor et Codex. Crée-la une fois.", "One key to connect Claude, Claude Code, Cursor and Codex. Create it once.")}
-            </p>
-          </div>
-          {revealed ? (
-            <CopyField value={revealed} copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
-          ) : (
-            <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>
-              {creating ? tx("Création…", "Creating…") : tx("Créer une clé", "Create a key")}
-            </button>
-          )}
-        </div>
-        {error ? <p className="ss-mcp-error">{error}</p> : null}
-        {keys.length ? (
-          keys.map((key) => (
-            <div key={key.id} className="ss-mcp-keys__row">
-              <code>
-                {key.prefix}… · {key.name}
-              </code>
-              <button type="button" onClick={() => void revoke(key.id)}>
-                {tx("Révoquer", "Revoke")}
-              </button>
-            </div>
-          ))
-        ) : (
-          <p className="ss-mcp-keys__empty">{tx("Aucune clé pour l’instant.", "No keys yet.")}</p>
-        )}
-      </div>
     </section>
   );
 }

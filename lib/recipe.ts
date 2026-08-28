@@ -349,12 +349,14 @@ function overlayLooksBroken(text: string) {
 }
 
 export function needsRasterize(recipe: CarouselRecipe) {
-  return (
-    Boolean(recipe.editable) &&
-    recipe.slides.some(
-      (slide) => !slide.keepPhoto && slide.overlays.some((overlay) => overlay.text.trim()),
-    )
-  );
+  // A slide only ever publishes as a raw upload of slide.image when it needs
+  // neither: a flat/gradient background (no real photo — image would be empty,
+  // photosOf() would silently drop the slide) nor overlay text (would be lost,
+  // since only rasterizeSlide bakes it onto the photo). Gating this on
+  // recipe.editable — set only by the OCR reconstruct pipeline — meant every
+  // manually composed post with typed-on text skipped rasterizing entirely and
+  // published the bare photo.
+  return recipe.slides.some((slide) => Boolean(slide.backgroundColor) || slide.overlays.some((overlay) => overlay.text.trim()));
 }
 
 export function slidePreviewImage(slide: CarouselSlide) {

@@ -24,22 +24,16 @@ export async function POST() {
   const now = new Date().toISOString();
   const automation = await updateStore((data) => {
     const userId = resolveStoreUserId(data, user);
+    const channel = data.channels.find((c) => c.userId === userId && c.platform === "tiktok");
     const item: Automation = {
       id: crypto.randomUUID(),
       userId,
       name: defaultName(),
       status: "draft",
-      step: 1,
-      config: {
-        contentMix: { slideshow: 25, wallOfText: 25, greenScreen: 25, videoHook: 25 },
-        remixRatio: 50,
-        mentionBusiness: "sometimes",
-        angles: [
-          { id: "1", label: "Carousel Format Research", weight: 34 },
-          { id: "2", label: "Content Reference Chaos", weight: 33 },
-          { id: "3", label: "Faster TikTok Publishing", weight: 33 },
-        ],
-      },
+      channelId: channel?.id,
+      postsTarget: 5,
+      scheduleDays: 1,
+      postTime: "18:00",
       postsGenerated: 0,
       createdAt: now,
       updatedAt: now,

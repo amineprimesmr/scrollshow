@@ -28,6 +28,7 @@ function compact(value: number, english: boolean) {
 export function MarketplaceView() {
   const { posts, english, user, setEditing, setPostOpen, reload } = useStudio();
   const [tab, setTab] = useState<"private" | "public">("private");
+  const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "scheduled" | "published">("all");
   const [publicItems, setPublicItems] = useState<MarketItem[]>([]);
   const [url, setUrl] = useState("");
   const [sharePublic, setSharePublic] = useState(false);
@@ -46,7 +47,9 @@ export function MarketplaceView() {
   }, []);
 
   const privateItems = useMemo(() => posts as MarketItem[], [posts]);
-  const items = tab === "public" ? publicItems : privateItems;
+  const items = (tab === "public" ? publicItems : privateItems).filter(
+    (item) => tab === "public" || statusFilter === "all" || item.status === statusFilter,
+  );
 
   function createNew() {
     setEditing(null);
@@ -239,12 +242,24 @@ export function MarketplaceView() {
         </button>
       </div>
 
+      {tab === "private" ? (
+        <div className="ss-segment" style={{ marginBottom: 16 }}>
+          {(["all", "draft", "scheduled", "published"] as const).map((f) => (
+            <button key={f} type="button" className={statusFilter === f ? "is-active" : ""} onClick={() => setStatusFilter(f)}>
+              {f === "all" ? t("Tout", "All", english) : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {!items.length ? (
         <div className="ss-empty ss-empty--market">
           <h2>
             {tab === "public"
               ? t("Rien en public pour l’instant", "Nothing public yet", english)
-              : t("Aucun TikTok", "No TikToks yet", english)}
+              : statusFilter !== "all" && privateItems.length
+                ? t(`Aucun post "${statusFilter}"`, `No "${statusFilter}" posts`, english)
+                : t("Aucun TikTok", "No TikToks yet", english)}
           </h2>
           <p>
             {tab === "public"
@@ -253,11 +268,13 @@ export function MarketplaceView() {
                   "Public formats from other creators will show up here, sorted by views. You can clone a winning format.",
                   english,
                 )
-              : t(
-                  "Importe un lien TikTok, crée un carrousel, ou publie un format en public pour le partager.",
-                  "Import a TikTok link, create a carousel, or publish a format so others can clone it.",
-                  english,
-                )}
+              : statusFilter !== "all" && privateItems.length
+                ? t("Change de filtre pour voir tes autres posts.", "Switch the filter to see your other posts.", english)
+                : t(
+                    "Importe un lien TikTok, crée un carrousel, ou publie un format en public pour le partager.",
+                    "Import a TikTok link, create a carousel, or publish a format so others can clone it.",
+                    english,
+                  )}
           </p>
         </div>
       ) : (
@@ -267,7 +284,7 @@ export function MarketplaceView() {
             const mine = item.mine ?? item.userId === user?.id;
             return (
               <article key={item.id} className="ss-market-card">
-                <button type="button" className="ss-market-card__cover" onClick={() => (mine ? edit(item) : void fork(item.id))}>
+                <button type="button" className="ss-market-card__cover" disabled={!mine} onClick={() => mine && edit(item)}>
                   <SlidePreview slide={recipe.slides[0]} recipe={recipe} width={220} original={Boolean(recipe.slides[0]?.keepPhoto)} />
                 </button>
                 <div className="ss-market-card__body">

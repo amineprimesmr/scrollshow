@@ -89,7 +89,6 @@ function normalize(data: StoreData): StoreData {
   data.users ||= [];
   data.apiKeys ||= [];
   data.automations ||= [];
-  data.influencers ||= [];
   data.brands ||= [];
   return data;
 }

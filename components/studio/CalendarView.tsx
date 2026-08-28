@@ -30,7 +30,7 @@ function startOfWeek(date: Date, weekStartsOn: 0 | 1) {
 }
 
 export function CalendarView() {
-  const { posts, activeChannel, setEditing, setPostOpen, user, english } = useStudio();
+  const { posts, activeChannel, setEditing, setPostOpen, setComposeDate, user, english } = useStudio();
   const [cursor, setCursor] = useState(() => new Date());
   const [mode, setMode] = useState<"day" | "week" | "month">("month");
   const locale = english ? "en-US" : "fr-FR";
@@ -56,8 +56,13 @@ export function CalendarView() {
 
   const label = cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
 
-  function open(postId?: string) {
-    setEditing(visible.find((item) => item.id === postId) || null);
+  function open(postId?: string, date?: string) {
+    if (postId) {
+      setEditing(visible.find((item) => item.id === postId) || null);
+    } else {
+      setEditing(null);
+      setComposeDate(date || null);
+    }
     setPostOpen(true);
   }
 
@@ -94,10 +99,12 @@ export function CalendarView() {
   }
 
   if (mode === "day") {
-    const key = today;
+    const key = ymd(cursor);
+    const isToday = key === today;
+    const dayLabel = cursor.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
     return (
       <>
-        <Toolbar french={locale.startsWith("fr")} label={label} mode={mode} setMode={setMode} setCursor={setCursor} />
+        <Toolbar french={locale.startsWith("fr")} label={dayLabel} mode={mode} setMode={setMode} setCursor={setCursor} />
         <div className="ss-dayview">
           {visible.filter((post) => post.date === key).length ? (
             visible
@@ -115,8 +122,19 @@ export function CalendarView() {
               ))
           ) : (
             <div className="ss-empty">
-              <h2>{locale.startsWith("fr") ? "Rien aujourd’hui" : "Nothing today"}</h2>
+              <h2>
+                {isToday
+                  ? locale.startsWith("fr")
+                    ? "Rien aujourd’hui"
+                    : "Nothing today"
+                  : locale.startsWith("fr")
+                    ? "Rien ce jour-là"
+                    : "Nothing this day"}
+              </h2>
               <p>{locale.startsWith("fr") ? "Crée un post pour le calendrier." : "Create a post for the calendar."}</p>
+              <button className="ss-btn-purple" type="button" onClick={() => open(undefined, key)}>
+                {locale.startsWith("fr") ? "Nouveau post" : "New post"}
+              </button>
             </div>
           )}
         </div>
@@ -133,17 +151,17 @@ export function CalendarView() {
             {day}
           </div>
         ))}
-        {cells.map((cell) => (
-          <div
-            key={cell.key}
-            className={`ss-day ${cell.inMonth ? "" : "is-out"} ${cell.key === today ? "is-today" : ""}`}
-            onDoubleClick={() => open()}
-          >
-            <div className="ss-day__n">{cell.date.getDate()}</div>
-            {visible
-              .filter((post) => post.date === cell.key)
-              .slice(0, 3)
-              .map((post) => (
+        {cells.map((cell) => {
+          const dayPosts = visible.filter((post) => post.date === cell.key);
+          const extra = dayPosts.length - 3;
+          return (
+            <div
+              key={cell.key}
+              className={`ss-day ${cell.inMonth ? "" : "is-out"} ${cell.key === today ? "is-today" : ""}`}
+              onDoubleClick={() => open(undefined, cell.key)}
+            >
+              <div className="ss-day__n">{cell.date.getDate()}</div>
+              {dayPosts.slice(0, 3).map((post) => (
                 <button key={post.id} className="ss-post" onClick={() => open(post.id)}>
                   <span className="ss-post__bar" />
                   <img src={post.image} alt="" />
@@ -153,8 +171,21 @@ export function CalendarView() {
                   </p>
                 </button>
               ))}
-          </div>
-        ))}
+              {extra > 0 ? (
+                <button
+                  type="button"
+                  className="ss-day__more"
+                  onClick={() => {
+                    setCursor(cell.date);
+                    setMode("day");
+                  }}
+                >
+                  +{extra} {english ? "more" : "de plus"}
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </>
   );

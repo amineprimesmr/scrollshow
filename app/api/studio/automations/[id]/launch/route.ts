@@ -1,61 +1,52 @@
 import { readSession } from "@/lib/auth";
 import { resolveStoreUserId } from "@/lib/local-user";
-import { defaultSlide, normalizeRecipe } from "@/lib/recipe";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
-const ASSETS = [
-  "/assets/tiktoks/01-glowup-188k.png",
-  "/assets/tiktoks/02-foods-107k.png",
-  "/assets/tiktoks/03-guide-178k.png",
-];
-
 export async function POST(_req: Request, { params }: Params) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
+
   const result = await updateStore((data) => {
     const userId = resolveStoreUserId(data, user);
     const automation = data.automations?.find((a) => a.id === id && a.userId === userId);
-    if (!automation) return null;
-    const channel = data.channels.find((c) => c.userId === userId && c.platform === "tiktok");
-    const channelIds = channel ? [channel.id] : [];
+    if (!automation) return "not_found" as const;
+
+    const channel = automation.channelId
+      ? data.channels.find((c) => c.id === automation.channelId && c.userId === userId)
+      : data.channels.find((c) => c.userId === userId && c.platform === "tiktok");
+    if (!channel) return "no_channel" as const;
+
+    // Only schedule the user's own real drafts — never fabricate content. Oldest
+    // first so a queue drains fairly instead of always resurfacing the newest.
+    const queue = data.posts
+      .filter((post) => post.userId === userId && post.status === "draft")
+      .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+    if (!queue.length) return "no_content" as const;
+
+    const target = queue.slice(0, automation.postsTarget);
     const now = new Date();
-    let created = 0;
-    for (let i = 0; i < 4; i += 1) {
+    target.forEach((post, index) => {
       const date = new Date(now);
-      date.setDate(date.getDate() + i + 1);
-      const post = {
-        id: crypto.randomUUID(),
-        userId,
-        channelIds,
-        body: `${automation.name} — post ${i + 1}`,
-        date: date.toISOString().slice(0, 10),
-        time: "18:00",
-        status: "scheduled" as const,
-        image: ASSETS[i % ASSETS.length],
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        origin: "ai" as const,
-        shareId: crypto.randomUUID().replace(/-/g, "").slice(0, 16),
-        visibility: "private" as const,
-        inCalendar: true,
-        kind: "photo" as const,
-        createdAt: new Date().toISOString(),
-        recipe: normalizeRecipe({ origin: "ai", slides: [defaultSlide(ASSETS[i % ASSETS.length])] }),
-      };
-      data.posts.unshift(post);
-      created += 1;
-    }
+      date.setDate(date.getDate() + (index + 1) * automation.scheduleDays);
+      post.status = "scheduled";
+      post.inCalendar = true;
+      post.channelIds = [channel.id];
+      post.date = date.toISOString().slice(0, 10);
+      post.time = automation.postTime;
+    });
+
     automation.status = "active";
-    automation.postsGenerated += created;
+    automation.postsGenerated += target.length;
     automation.updatedAt = new Date().toISOString();
-    return { automation, created };
+    return { automation, scheduled: target.length, requested: automation.postsTarget };
   });
-  if (!result) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  if (result === "not_found") return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (result === "no_channel") return NextResponse.json({ error: "no_channel" }, { status: 400 });
+  if (result === "no_content") return NextResponse.json({ error: "no_content" }, { status: 400 });
   return NextResponse.json(result);
 }

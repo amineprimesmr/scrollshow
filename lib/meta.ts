@@ -65,6 +65,16 @@ export type MetaPage = {
   instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
 };
 
+export async function revokeMetaToken(accessToken: string) {
+  try {
+    const url = new URL("https://graph.facebook.com/v21.0/me/permissions");
+    url.searchParams.set("access_token", accessToken);
+    await fetch(url, { method: "DELETE" });
+  } catch {
+    // best-effort revoke
+  }
+}
+
 export async function fetchMetaPages(accessToken: string) {
   const url = new URL("https://graph.facebook.com/v21.0/me/accounts");
   url.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username,profile_picture_url}");

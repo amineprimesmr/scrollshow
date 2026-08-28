@@ -20,11 +20,15 @@ export function AutomationsView() {
 
   useEffect(() => setEnglish(prefersEnglish()), []);
 
-  useEffect(() => {
-    fetch("/api/studio/automations")
+  function load() {
+    return fetch("/api/studio/automations")
       .then((r) => r.json())
       .then((json) => setItems(json.automations || []))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    void load();
   }, []);
 
   async function createNew() {
@@ -39,21 +43,23 @@ export function AutomationsView() {
     }
   }
 
+  async function remove(id: string, name: string) {
+    if (!window.confirm(t(`Supprimer "${name}" ?`, `Delete "${name}"?`, en))) return;
+    await fetch(`/api/studio/automations/${id}`, { method: "DELETE" });
+    void load();
+  }
+
   const en = english;
-  const used = items.filter((i) => i.status !== "draft").length;
 
   return (
     <div style={{ padding: "0 24px 48px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
         <div>
-          <p style={{ margin: 0, fontSize: 13, color: "#71717a", fontWeight: 600 }}>
-            ⚡ {used} / 1 {t("utilisée", "used", en)}
-          </p>
           <h2 style={{ margin: "8px 0 4px", fontSize: 28, fontWeight: 800 }}>{t("Automations", "Automations", en)}</h2>
           <p style={{ margin: 0, color: "#52525b", fontSize: 14 }}>
             {t(
-              "Génère du contenu en batch et planifie-le direct dans ton calendrier.",
-              "Batch-generate content and schedule it straight into your calendar.",
+              "Planifie automatiquement tes brouillons sur TikTok, à un rythme régulier.",
+              "Automatically schedule your drafts to TikTok, on a regular cadence.",
               en,
             )}
           </p>
@@ -69,18 +75,16 @@ export function AutomationsView() {
       ) : items.length ? (
         <div className="ss-panel">
           {items.map((item) => (
-            <Link
-              key={item.id}
-              href={`/app/automations/${item.id}/edit`}
-              style={{ display: "flex", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid #ececec", textDecoration: "none", color: "inherit" }}
-            >
-              <span>
+            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: "1px solid #ececec" }}>
+              <Link href={`/app/automations/${item.id}/edit`} style={{ textDecoration: "none", color: "inherit", flex: 1 }}>
                 <strong>{item.name}</strong>
                 <br />
                 <small style={{ color: "#71717a" }}>{item.status} · {item.postsGenerated} posts</small>
-              </span>
-              <span>→</span>
-            </Link>
+              </Link>
+              <button type="button" className="ss-btn-ghost" onClick={() => void remove(item.id, item.name)}>
+                {t("Supprimer", "Delete", en)}
+              </button>
+            </div>
           ))}
         </div>
       ) : (
@@ -93,8 +97,8 @@ export function AutomationsView() {
           </h3>
           <p style={{ margin: "0 0 24px", color: "#52525b", maxWidth: 420, marginInline: "auto", lineHeight: 1.5 }}>
             {t(
-              "Décris une campagne une fois — on génère une série de posts pour tes comptes TikTok et Instagram. Review, tweak, puis lance.",
-              "Describe a campaign once and we'll generate a paced run of posts across your TikTok and Instagram accounts. Review, tweak, then launch.",
+              "Choisis un rythme une fois — on planifie tes brouillons existants sur TikTok à intervalle régulier.",
+              "Set a cadence once — we'll schedule your existing drafts to TikTok at a regular interval.",
               en,
             )}
           </p>

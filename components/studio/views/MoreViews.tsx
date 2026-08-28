@@ -5,168 +5,99 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useStudio } from "../StudioContext";
 
-export function ContentView() {
-  const { posts, english: ctxEnglish, setEditing, setPostOpen } = useStudio();
-  const [english, setEnglish] = useState(false);
-  const [filter, setFilter] = useState<"all" | "draft" | "scheduled" | "published">("all");
-
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  const en = ctxEnglish || english;
-
-  const filtered = posts.filter((p) => filter === "all" || p.status === filter);
-
-  return (
-    <div style={{ padding: "0 24px 48px" }}>
-      <div className="ss-segment" style={{ marginBottom: 20 }}>
-        {(["all", "draft", "scheduled", "published"] as const).map((f) => (
-          <button key={f} type="button" className={filter === f ? "is-active" : ""} onClick={() => setFilter(f)}>
-            {f === "all" ? t("Tout", "All", en) : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
-      <div className="ss-media-grid">
-        {filtered.map((post) => (
-          <figure key={post.id}>
-            <button
-              type="button"
-              style={{ border: 0, padding: 0, background: "none", cursor: "pointer", width: "100%" }}
-              onClick={() => {
-                setEditing(post);
-                setPostOpen(true);
-              }}
-            >
-              <img src={post.image} alt="" />
-            </button>
-            <figcaption>
-              {post.body.slice(0, 60) || t("Sans titre", "Untitled", en)}
-              <br />
-              <small>{post.status} · {post.views.toLocaleString()} {t("vues", "views", en)}</small>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-      {!filtered.length ? (
-        <div className="ss-empty">
-          <p>{t("Aucun contenu.", "No content yet.", en)}</p>
-          <Link href="/app/blitz" className="ss-btn-purple">{t("Ouvrir Blitz", "Open Blitz", en)}</Link>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function LibraryInspirationView() {
+export function AiStudioView() {
   const [english, setEnglish] = useState(false);
   useEffect(() => setEnglish(prefersEnglish()), []);
   const en = english;
   return (
     <div className="ss-empty" style={{ margin: 24 }}>
-      <h2>{t("Bibliothèque inspiration", "Inspiration Library", en)}</h2>
-      <p>{t("Accès Pro — formats trending curés par niche, mis à jour chaque semaine.", "Pro access — trending formats curated by niche, updated weekly.", en)}</p>
-      <Link href="/app/billing" className="ss-btn-purple">{t("Upgrade", "Upgrade", en)}</Link>
+      <h2>{t("AI Studio", "AI Studio", en)}</h2>
+      <p>{t("Génération d'images et de vidéos — bientôt disponible.", "Image and video generation — coming soon.", en)}</p>
     </div>
-  );
-}
-
-export function AiStudioView() {
-  const [english, setEnglish] = useState(false);
-  const [showOnboard, setShowOnboard] = useState(true);
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  const en = english;
-
-  return (
-    <>
-      {showOnboard ? (
-        <div className="ss-onboard" role="dialog">
-          <div className="ss-onboard-card">
-            <h2>{t("C'est quoi AI Studio ?", "What is AI Studio?", en)}</h2>
-            <p style={{ color: "#52525b", margin: "0 0 16px" }}>
-              {t("AI Studio génère des assets uniques pour ton contenu.", "AI Studio is where you can generate unique assets to use in your content.", en)}
-            </p>
-            <div className="ss-onboard-grid">
-              <div className="ss-onboard-box">
-                <strong>{t("Images", "Images", en)}</strong>
-                {t("Fonds pour slideshows — ex. parcours golf pour une app golf.", "Background images for slideshows — e.g. golf course for a golf app.", en)}
-              </div>
-              <div className="ss-onboard-box">
-                <strong>{t("Vidéo", "Video", en)}</strong>
-                {t("Vidéos one-off — ex. personne qui marche sur un parcours.", "One-off videos — e.g. person walking on a course.", en)}
-              </div>
-            </div>
-            <p style={{ fontSize: 13, color: "#71717a" }}>
-              {t("Pour un influenceur AI cohérent → page", "For a consistent AI influencer →", en)}{" "}
-              <Link href="/app/influencers">{t("Influenceurs", "Influencers", en)}</Link>.
-            </p>
-            <button type="button" className="ss-btn-purple" style={{ float: "right" }} onClick={() => setShowOnboard(false)}>
-              {t("Compris", "Got it", en)}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <div style={{ padding: 24 }}>
-        <div className="ss-panel">
-          <h3>{t("Générer une image", "Generate an image", en)}</h3>
-          <textarea className="ss-input" rows={3} placeholder={t("Décris l'image…", "Describe the image…", en)} style={{ width: "100%", marginBottom: 12 }} />
-          <button type="button" className="ss-btn-purple">{t("Générer", "Generate", en)}</button>
-        </div>
-      </div>
-    </>
   );
 }
 
 export function InfluencersView() {
   const [english, setEnglish] = useState(false);
-  const [showOnboard, setShowOnboard] = useState(true);
   useEffect(() => setEnglish(prefersEnglish()), []);
   const en = english;
-
   return (
-    <>
-      {showOnboard ? (
-        <div className="ss-onboard">
-          <div className="ss-onboard-card">
-            <h2>{t("Bienvenue dans Influenceurs", "Welcome to Influencers", en)}</h2>
-            <div className="ss-onboard-grid" style={{ gridTemplateColumns: "1fr" }}>
-              <div className="ss-onboard-box">
-                <strong>{t("Crée un influenceur", "Create an influencer", en)}</strong>
-                {t("Persona IA persistant — choisis les traits, on entraîne le personnage.", "AI persona you can generate content with. Pick traits and we'll train a persistent character.", en)}
-              </div>
-              <div className="ss-onboard-box">
-                <strong>{t("Génère images et vidéos", "Generate images and videos", en)}</strong>
-                {t("Prompt n'importe quelle image. Vidéos à partir d'une image existante.", "Prompt for any image. Videos from an existing image as base.", en)}
-              </div>
-            </div>
-            <button type="button" className="ss-btn-purple" style={{ float: "right" }} onClick={() => setShowOnboard(false)}>
-              {t("Compris", "Got it", en)}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <div className="ss-empty" style={{ margin: 24 }}>
-        <h2>{t("Aucun influenceur", "No influencers yet", en)}</h2>
-        <p>{t("Crée ton premier persona IA pour du contenu cohérent.", "Create your first AI persona for consistent content.", en)}</p>
-        <button type="button" className="ss-btn-purple">{t("+ Nouvel influenceur", "+ New influencer", en)}</button>
-      </div>
-    </>
+    <div className="ss-empty" style={{ margin: 24 }}>
+      <h2>{t("Influenceurs", "Influencers", en)}</h2>
+      <p>{t("Personas IA persistants pour du contenu cohérent — bientôt disponible.", "Persistent AI personas for consistent content — coming soon.", en)}</p>
+    </div>
   );
 }
 
 export function BrandView() {
   const [english, setEnglish] = useState(false);
   const [website, setWebsite] = useState("");
+  const [productName, setProductName] = useState("");
+  const [audience, setAudience] = useState("");
+  const [tone, setTone] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   useEffect(() => setEnglish(prefersEnglish()), []);
   const en = english;
+
+  useEffect(() => {
+    fetch("/api/studio/brand")
+      .then((res) => res.json())
+      .then((json) => {
+        const brand = json.brand;
+        if (brand) {
+          setWebsite(brand.website || "");
+          setProductName(brand.productName || "");
+          setAudience(brand.audience || "");
+          setTone(brand.tone || "");
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    const res = await fetch("/api/studio/brand", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ website, productName, audience, tone }),
+    });
+    setSaving(false);
+    if (res.ok) setSaved(true);
+  }
 
   return (
     <div style={{ padding: 24, maxWidth: 560 }}>
       <div className="ss-panel">
         <h3>{t("Contexte marque", "Brand context", en)}</h3>
-        <p className="ss-lead">{t("Utilisé par Automations et Blitz pour personnaliser le contenu.", "Used by Automations and Blitz to personalize content.", en)}</p>
-        <label style={{ display: "block", marginTop: 16 }}>
-          {t("Site web", "Website", en)}
-          <input className="ss-input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" style={{ width: "100%", marginTop: 6 }} />
-        </label>
-        <button type="button" className="ss-btn-purple" style={{ marginTop: 16 }}>{t("Enregistrer", "Save", en)}</button>
+        <p className="ss-lead">{t("Contexte marque — utile pour te rappeler ton positionnement.", "Brand context — a place to keep your positioning on hand.", en)}</p>
+        {loading ? (
+          <p className="ss-lead">{t("Chargement…", "Loading…", en)}</p>
+        ) : (
+          <>
+            <label style={{ display: "block", marginTop: 16 }}>
+              {t("Site web", "Website", en)}
+              <input className="ss-input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" style={{ width: "100%", marginTop: 6 }} />
+            </label>
+            <label style={{ display: "block", marginTop: 16 }}>
+              {t("Produit", "Product", en)}
+              <input className="ss-input" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder={t("Nom du produit", "Product name", en)} style={{ width: "100%", marginTop: 6 }} />
+            </label>
+            <label style={{ display: "block", marginTop: 16 }}>
+              {t("Audience", "Audience", en)}
+              <textarea className="ss-input" rows={2} value={audience} onChange={(e) => setAudience(e.target.value)} placeholder={t("Qui achète ton produit ?", "Who buys your product?", en)} style={{ width: "100%", marginTop: 6 }} />
+            </label>
+            <label style={{ display: "block", marginTop: 16 }}>
+              {t("Ton", "Tone", en)}
+              <input className="ss-input" value={tone} onChange={(e) => setTone(e.target.value)} placeholder={t("Ex. direct, fun, premium", "e.g. direct, fun, premium", en)} style={{ width: "100%", marginTop: 6 }} />
+            </label>
+            <button type="button" className="ss-btn-purple" style={{ marginTop: 16 }} disabled={saving} onClick={() => void save()}>
+              {saving ? t("Enregistrement…", "Saving…", en) : saved ? t("Enregistré ✓", "Saved ✓", en) : t("Enregistrer", "Save", en)}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -206,7 +137,7 @@ export function AffiliateView() {
   return (
     <div className="ss-empty" style={{ margin: 24 }}>
       <h2>{t("Parrainer & gagner", "Refer & Earn", en)}</h2>
-      <p>{t("20% de commission récurrente sur chaque filleul.", "20% recurring commission on every referral.", en)}</p>
+      <p>{t("Programme de parrainage — bientôt disponible.", "Referral program — coming soon.", en)}</p>
     </div>
   );
 }

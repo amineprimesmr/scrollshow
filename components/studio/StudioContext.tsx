@@ -1,6 +1,7 @@
 "use client";
 
 import { prefersEnglish } from "@/lib/i18n";
+import type { PlatformAvailability } from "@/lib/platforms";
 import type { Channel, MediaItem, PublicUser, StudioPost } from "@/lib/types";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -10,6 +11,7 @@ type StudioContextValue = {
   channels: Channel[];
   posts: StudioPost[];
   media: MediaItem[];
+  availability: PlatformAvailability | null;
   activeChannel: string | "all";
   setActiveChannel: (id: string | "all") => void;
   addOpen: boolean;
@@ -18,6 +20,8 @@ type StudioContextValue = {
   setPostOpen: (open: boolean) => void;
   editing: StudioPost | null;
   setEditing: (post: StudioPost | null) => void;
+  composeDate: string | null;
+  setComposeDate: (date: string | null) => void;
   reload: () => Promise<void>;
 };
 
@@ -34,10 +38,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [posts, setPosts] = useState<StudioPost[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [availability, setAvailability] = useState<PlatformAvailability | null>(null);
   const [activeChannel, setActiveChannel] = useState<string | "all">("all");
   const [addOpen, setAddOpen] = useState(false);
   const [postOpen, setPostOpen] = useState(false);
   const [editing, setEditing] = useState<StudioPost | null>(null);
+  const [composeDate, setComposeDate] = useState<string | null>(null);
 
   async function reload() {
     const res = await fetch("/api/studio");
@@ -47,6 +53,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setChannels(json.channels || []);
     setPosts(json.posts || []);
     setMedia(json.media || []);
+    if (json.availability) setAvailability(json.availability);
   }
 
   useEffect(() => {
@@ -62,6 +69,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       channels,
       posts,
       media,
+      availability,
       activeChannel,
       setActiveChannel,
       addOpen,
@@ -70,9 +78,11 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       setPostOpen,
       editing,
       setEditing,
+      composeDate,
+      setComposeDate,
       reload,
     }),
-    [user, english, channels, posts, media, activeChannel, addOpen, postOpen, editing],
+    [user, english, channels, posts, media, availability, activeChannel, addOpen, postOpen, editing, composeDate],
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;

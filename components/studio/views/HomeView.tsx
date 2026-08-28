@@ -6,24 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { IconChevron } from "../icons";
 import { useStudio } from "../StudioContext";
 
-const TRENDING = [
-  { image: "/assets/tiktoks/01-glowup-188k.png", views: "188K", likes: "12.4K" },
-  { image: "/assets/tiktoks/02-foods-107k.png", views: "107K", likes: "8.2K" },
-  { image: "/assets/tiktoks/03-guide-178k.png", views: "178K", likes: "9.8K" },
-  { image: "/assets/tiktoks/07-pov-98k.png", views: "98K", likes: "7.2K" },
-  { image: "/assets/tiktoks/05-beach-39k.png", views: "39K", likes: "2.1K" },
-  { image: "/assets/tiktoks/04-marlon-65k.png", views: "65K", likes: "4.4K" },
-  { image: "/assets/tiktoks/01-glowup-188k.png", views: "771K", likes: "253K" },
-  { image: "/assets/tiktoks/02-foods-107k.png", views: "500K", likes: "17K" },
-];
-
 const FAQ: { section: string; items: { q: string; a: string }[] }[] = [
   {
     section: "WARMING UP YOUR ACCOUNT",
     items: [
       { q: "How do I warm up my account?", a: "Post 1–2 carousels per day for the first week. Mix formats and avoid hard CTAs early." },
-      { q: "How do I navigate zero view jail?", a: "Use proven hooks from the Inspiration Library, post at consistent times, and remix trending formats." },
-      { q: "What should I do in the first few weeks?", a: "Connect TikTok, run Blitz daily, schedule 3–5 posts per week, track what hooks win in Analytics." },
+      { q: "How do I navigate zero view jail?", a: "Browse the Marketplace for proven formats, post at consistent times, and remix what's working." },
+      { q: "What should I do in the first few weeks?", a: "Connect TikTok, schedule 3–5 posts per week, track what hooks win in Analytics." },
       { q: "Why are my first posts getting low views?", a: "New accounts need trust. Warm up with native formats before pushing product CTAs." },
     ],
   },
@@ -62,18 +51,16 @@ export function HomeView() {
   const en = ctxEnglish || english;
   const connected = channels.some((c) => c.connected);
   const hasPost = posts.some((p) => p.status === "published" || p.status === "scheduled");
-  const blitzDone = posts.length > 2;
 
   const steps = useMemo(
     () =>
       [
-        { id: "blitz", label: t("Swipe du contenu dans Blitz", "Swipe content in Blitz", en), href: "/app/blitz", done: blitzDone },
         {
           id: "connect",
           label: t("Connecte ton compte", "Connect your account", en),
           href: "/app/integrations",
           done: connected,
-          extra: "TikTok · IG · YT",
+          extra: "TikTok · Instagram · Facebook · X",
         },
         { id: "demo", label: t("Importe une démo", "Upload a demo video", en), href: "/app/marketplace", done: posts.some((p) => p.origin === "import") },
         {
@@ -91,7 +78,7 @@ export function HomeView() {
         extra?: string;
         action?: () => void;
       }>,
-    [en, blitzDone, connected, hasPost, posts, setPostOpen],
+    [en, connected, hasPost, posts, setPostOpen],
   );
 
   const doneCount = steps.filter((s) => s.done).length;
@@ -109,7 +96,7 @@ export function HomeView() {
         <div className="ss-quickstart__head">
           <h2>{t("Démarrage rapide", "Quickstart", en)}</h2>
           <span>
-            {doneCount}/4
+            {doneCount}/{steps.length}
           </span>
         </div>
         <p>{t("Complète ces étapes pour tirer le max de ScrollShow.", "Complete these to get the most out of ScrollShow.", en)}</p>
@@ -134,7 +121,7 @@ export function HomeView() {
             </li>
           ))}
         </ul>
-        <Link href={steps.find((s) => !s.done)?.href || "/app/blitz"} className="ss-btn-purple ss-btn-wide">
+        <Link href={steps.find((s) => !s.done)?.href || "/app"} className="ss-btn-purple ss-btn-wide">
           {t("Continuer la config →", "Continue setup →", en)}
         </Link>
       </div>
@@ -144,27 +131,6 @@ export function HomeView() {
           {t("Changelog →", "Changelog →", en)}
         </Link>
       </div>
-
-      <section className="ss-trending">
-        <div className="ss-trending__head">
-          <span>📈</span>
-          {t("Contenu trending", "Trending Content", en)}
-          <Link href="/app/library" style={{ marginLeft: "auto", fontSize: 13, color: "#52525b" }}>
-            →
-          </Link>
-        </div>
-        <div className="ss-trend-grid">
-          {TRENDING.map((item, index) => (
-            <Link key={index} href="/app/blitz" className="ss-trend-card">
-              <img src={item.image} alt="" />
-              <div className="ss-trend-card__stats">
-                <span>♥ {item.likes}</span>
-                <span>👁 {item.views}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
 
       <section className="ss-faq">
         <h2>❓ {t("Questions fréquentes", "Frequently Asked Questions", en)}</h2>

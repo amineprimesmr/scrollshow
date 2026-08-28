@@ -1,6 +1,7 @@
 import { readSession } from "@/lib/auth";
 import { ensureDemoWorkspace, localAutoSeedEnabled } from "@/lib/demo-workspace";
 import { resolveStoreUser } from "@/lib/local-user";
+import { platformAvailability } from "@/lib/platforms";
 import { coverOf, ensureRecipe, newShareId } from "@/lib/recipe";
 import { resolveSettings } from "@/lib/settings";
 import { seedStudio } from "@/lib/studio-seed";
@@ -65,7 +66,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(payload);
+    return NextResponse.json({ ...payload, availability: platformAvailability() });
   } catch (error) {
     const message = error instanceof Error ? error.message : "studio_failed";
     return NextResponse.json({ error: message }, { status: 500 });

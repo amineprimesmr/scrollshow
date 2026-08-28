@@ -57,30 +57,13 @@ export type Automation = {
   userId: string;
   name: string;
   status: AutomationStatus;
-  step: number;
-  config: {
-    contentMix?: { slideshow: number; wallOfText: number; greenScreen: number; videoHook: number };
-    remixRatio?: number;
-    mentionBusiness?: "never" | "rarely" | "sometimes" | "often" | "always";
-    angles?: { id: string; label: string; weight: number }[];
-    postsTarget?: number;
-    scheduleDays?: number;
-  };
+  channelId?: string;
+  postsTarget: number;
+  scheduleDays: number;
+  postTime: string;
   postsGenerated: number;
   createdAt: string;
   updatedAt: string;
-};
-
-export type Influencer = {
-  id: string;
-  userId: string;
-  name: string;
-  avatar: string;
-  traits: string;
-  status: "training" | "ready";
-  imageCount: number;
-  videoCount: number;
-  createdAt: string;
 };
 
 export type BrandProfile = {
@@ -89,7 +72,6 @@ export type BrandProfile = {
   productName?: string;
   audience?: string;
   tone?: string;
-  angles?: string[];
   updatedAt?: string;
 };
 
@@ -214,7 +196,6 @@ export type StoreData = {
   media: MediaItem[];
   apiKeys: ApiKey[];
   automations?: Automation[];
-  influencers?: Influencer[];
   brands?: BrandProfile[];
 };
 

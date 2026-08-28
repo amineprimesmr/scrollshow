@@ -12,8 +12,11 @@ export function ConnectionsView({ availability }: { availability: PlatformAvaila
 
   async function disconnect(id: string, platform: string) {
     setBusy(id);
-    await fetch(`/api/studio/channels/${id}`, { method: "DELETE" });
+    // /api/tiktok/disconnect both revokes the token and removes the channel —
+    // calling the generic DELETE first would remove the channel before it can
+    // be looked up there, and the revoke would silently never fire.
     if (platform === "tiktok") await fetch("/api/tiktok/disconnect", { method: "POST" });
+    else await fetch(`/api/studio/channels/${id}`, { method: "DELETE" });
     setBusy("");
     await reload();
   }

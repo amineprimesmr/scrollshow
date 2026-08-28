@@ -6,6 +6,7 @@ import {
   defaultOverlay,
   defaultSlide,
   ensureRecipe,
+  needsRasterize,
   needsReconstruct,
   photosOf,
   RECIPE_FONTS,
@@ -46,7 +47,7 @@ function rebuildCopy(code: string, english: boolean) {
 }
 
 export function CreatePostModal() {
-  const { user, english, postOpen, setPostOpen, channels, media, editing, setEditing, reload, activeChannel } = useStudio();
+  const { user, english, postOpen, setPostOpen, channels, media, editing, setEditing, composeDate, setComposeDate, reload, activeChannel } = useStudio();
   const [body, setBody] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("18:00");
@@ -87,7 +88,8 @@ export function CreatePostModal() {
     const settings = user?.settings;
     const first = media[0]?.url || "/assets/tiktoks/01-glowup-188k.png";
     setBody("");
-    setDate(dateInTimeZone(settings?.timezone || "Europe/Paris"));
+    setDate(composeDate || dateInTimeZone(settings?.timezone || "Europe/Paris"));
+    setComposeDate(null);
     setTime(settings?.defaultPostTime || "18:00");
     setStatus(settings?.defaultStatus || "scheduled");
     setRecipe(recipeFromPhotos([first], "manual"));
@@ -209,7 +211,9 @@ export function CreatePostModal() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (rebuilding) return;
     setPending(true);
+    setMessage("");
     const payload = {
       body,
       date,
@@ -221,30 +225,57 @@ export function CreatePostModal() {
       origin: editing?.origin || recipe.origin || "manual",
       recipe: { ...recipe, replaceSlides: true },
     };
-    if (editing?.id) {
-      await fetch(`/api/studio/posts/${editing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await fetch("/api/studio/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    try {
+      const res = editing?.id
+        ? await fetch(`/api/studio/posts/${editing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/studio/posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(json.error || t("Impossible d'enregistrer.", "Could not save.", english));
+        return;
+      }
+      setPostOpen(false);
+      setEditing(null);
+      reload();
+    } catch {
+      setMessage(t("Connexion impossible. Réessaie.", "Could not reach the server. Try again.", english));
+    } finally {
+      setPending(false);
     }
-    setPending(false);
-    setPostOpen(false);
-    setEditing(null);
-    reload();
+  }
+
+  async function remove() {
+    if (!editing?.id) return;
+    if (!window.confirm(t("Supprimer ce post ? C'est définitif.", "Delete this post? This can't be undone.", english))) return;
+    setPending(true);
+    try {
+      const res = await fetch(`/api/studio/posts/${editing.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setMessage(t("Impossible de supprimer.", "Could not delete.", english));
+        return;
+      }
+      setPostOpen(false);
+      setEditing(null);
+      reload();
+    } finally {
+      setPending(false);
+    }
   }
 
   async function publishNow() {
+    if (rebuilding) return;
     setPending(true);
     setMessage("");
     let photos = photosOf(recipe);
-    if (recipe.editable) {
+    if (needsRasterize(recipe)) {
       const raster = await fetch(editing?.id ? `/api/studio/posts/${editing.id}/rasterize` : "/api/studio/rasterize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -515,10 +546,15 @@ export function CreatePostModal() {
             </select>
             {message ? <p className="ss-lead">{message}</p> : null}
             <div className="ss-form-actions">
-              <button className="ss-btn-ghost" type="submit" disabled={pending}>
+              {editing?.id ? (
+                <button className="ss-btn-danger" type="button" disabled={pending || rebuilding} onClick={() => void remove()}>
+                  {t("Supprimer", "Delete", english)}
+                </button>
+              ) : null}
+              <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding}>
                 {pending ? "…" : editing ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
               </button>
-              <button className="ss-btn-purple" type="button" disabled={pending || !connected.length || !body.trim()} onClick={publishNow}>
+              <button className="ss-btn-purple" type="button" disabled={pending || rebuilding || !connected.length || !body.trim()} onClick={publishNow}>
                 {pending ? "…" : t("Publier maintenant", "Publish now", english)}
               </button>
             </div>

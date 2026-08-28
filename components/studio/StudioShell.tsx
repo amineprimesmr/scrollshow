@@ -112,15 +112,14 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const title = item ? (english ? item.en : item.fr) : "ScrollShow";
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
   const onMcp = pathname.startsWith("/app/mcp");
-  const onBlitz = pathname.startsWith("/app/blitz");
   const onWizard = pathname.includes("/automations/") && pathname.endsWith("/edit");
-  const hideHeader = onMcp || onBlitz || onWizard || pathname.startsWith("/app/home");
+  const hideHeader = onMcp || onWizard || pathname.startsWith("/app/home");
 
   const mainNav = STUDIO_NAV.filter((e) => e.section === "main");
   const bottomNav = STUDIO_NAV.filter((e) => e.section === "bottom");
 
   return (
-    <div className={`ss-studio ss-fastlane${onCalendar ? " is-calendar" : ""}${onBlitz ? " is-blitz" : ""}`}>
+    <div className={`ss-studio ss-fastlane${onCalendar ? " is-calendar" : ""}`}>
       <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
       <aside className="ss-sidebar">
         <div className="ss-sidebar__head">
