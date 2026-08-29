@@ -92,7 +92,9 @@ button.ss-btn-ghost:active {
   .ss-flash-in,
   .ss-loading-skel,
   .ss-loading-skel__bar,
-  .ss-loading-skel__card {
+  .ss-loading-skel__card,
+  .ss-modal,
+  .ss-dialog {
     animation: none !important;
   }
   .ss-sidebar-link,
@@ -1072,6 +1074,7 @@ html:has(.ss-studio) body.grain {
   place-items: center;
   background: rgb(17 17 24 / 0.28);
   padding: 20px;
+  animation: ss-modal-backdrop-in 0.16s ease both;
 }
 
 .ss-dialog {
@@ -1082,6 +1085,27 @@ html:has(.ss-studio) body.grain {
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 24px 80px rgb(17 17 24 / 0.2);
+  animation: ss-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ss-modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ss-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .ss-dialog h2 {

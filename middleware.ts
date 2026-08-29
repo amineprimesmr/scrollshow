@@ -3,7 +3,7 @@ import { hasStudioAccess } from "@/lib/plans";
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/tiktok", "/api/keys"];
+const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/tiktok", "/api/keys", "/api/push"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

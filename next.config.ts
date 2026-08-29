@@ -11,6 +11,14 @@ const tessFiles = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Keep client-side navigations within the studio instant: once a route's
+  // RSC payload is fetched, reuse it instead of re-requesting on every click.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
   serverExternalPackages: ["tesseract.js", "tesseract.js-core", "wasm-feature-detect", "sharp"],
   outputFileTracingIncludes: {
     "/api/studio/posts/[id]/reconstruct": tessFiles,

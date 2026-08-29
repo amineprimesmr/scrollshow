@@ -1,6 +1,7 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
+import { sound } from "@/lib/sound";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,6 +14,11 @@ export function StudioFlash() {
   useEffect(() => {
     setEnglish(prefersEnglish());
   }, []);
+
+  useEffect(() => {
+    if (connected) sound.success();
+    else if (error) sound.error();
+  }, [connected, error]);
 
   if (!connected && !error) return null;
 
@@ -49,7 +55,7 @@ export function StudioFlash() {
         : t("TikTok connecté. Profil, stats et posts sont disponibles.", "TikTok connected. Profile, stats, and posts are available.", english);
 
   return (
-    <p className={`ss-flash ${error ? "is-error" : ""}`}>
+    <p className={`ss-flash ss-flash-in ${error ? "is-error" : ""}`}>
       {connected
         ? connectedCopy
         : errorCopy}

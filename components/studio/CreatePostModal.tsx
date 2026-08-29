@@ -13,6 +13,7 @@ import {
   recipeFromPhotos,
 } from "@/lib/recipe";
 import { dateInTimeZone } from "@/lib/settings";
+import { sound } from "@/lib/sound";
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
@@ -239,13 +240,16 @@ export function CreatePostModal() {
           });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        sound.error();
         setMessage(json.error || t("Impossible d'enregistrer.", "Could not save.", english));
         return;
       }
+      sound.success();
       setPostOpen(false);
       setEditing(null);
       reload();
     } catch {
+      sound.error();
       setMessage(t("Connexion impossible. Réessaie.", "Could not reach the server. Try again.", english));
     } finally {
       setPending(false);
@@ -259,9 +263,11 @@ export function CreatePostModal() {
     try {
       const res = await fetch(`/api/studio/posts/${editing.id}`, { method: "DELETE" });
       if (!res.ok) {
+        sound.error();
         setMessage(t("Impossible de supprimer.", "Could not delete.", english));
         return;
       }
+      sound.notify();
       setPostOpen(false);
       setEditing(null);
       reload();
@@ -304,9 +310,11 @@ export function CreatePostModal() {
     const json = await res.json().catch(() => ({}));
     setPending(false);
     if (!res.ok) {
+      sound.error();
       setMessage(json.error || t("Publication impossible", "Could not publish", english));
       return;
     }
+    sound.success();
     setMessage(t("Envoyé sur TikTok (video.publish)", "Posted to TikTok (video.publish)", english));
     reload();
   }
