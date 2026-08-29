@@ -3585,6 +3585,18 @@ a.ss-btn-ghost {
   font-weight: 500;
 }
 
+.ss-an-growth {
+  font-weight: 700;
+}
+
+.ss-an-growth.is-up {
+  color: #16a34a;
+}
+
+.ss-an-growth.is-down {
+  color: #dc2626;
+}
+
 .ss-stat-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

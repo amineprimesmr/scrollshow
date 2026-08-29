@@ -29,6 +29,8 @@ const emptyStore = (): StoreData => ({
   posts: [],
   media: [],
   apiKeys: [],
+  videoStats: [],
+  channelStats: [],
 });
 
 function memory(): StoreData {
@@ -89,6 +91,8 @@ function normalize(data: StoreData): StoreData {
   data.users ||= [];
   data.apiKeys ||= [];
   data.pushSubscriptions ||= [];
+  data.videoStats ||= [];
+  data.channelStats ||= [];
   return data;
 }
 

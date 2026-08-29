@@ -12,11 +12,36 @@ type AnalyticsPayload = {
   handle?: string;
   calendar: { views: number; likes: number; comments: number; shares: number; drafts: number; scheduled: number; published: number };
   totals: { views: number; likes: number; comments: number; shares: number };
-  videos: Array<{ id: string; title?: string; video_description?: string; view_count?: number; like_count?: number; comment_count?: number; share_count?: number; cover_image_url?: string; share_url?: string; create_time?: number }>;
+  lifetimeTotals?: { views: number; likes: number; comments: number; shares: number };
+  videos: Array<{
+    id: string;
+    title?: string;
+    video_description?: string;
+    view_count?: number;
+    period_views?: number;
+    like_count?: number;
+    period_likes?: number;
+    comment_count?: number;
+    period_comments?: number;
+    share_count?: number;
+    period_shares?: number;
+    cover_image_url?: string;
+    share_url?: string;
+    create_time?: number;
+  }>;
+  channelStats?: Array<{
+    id: string;
+    handle: string;
+    followers: number;
+    likes: number;
+    videoCount: number;
+    growth: { followers: number; likes: number; videoCount: number } | null;
+  }>;
   errors?: string[];
   rangeDays?: number | null;
   videoCount?: number;
   totalVideoCount?: number;
+  historyDays?: number;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -149,7 +174,9 @@ export function AnalyticsView() {
     {
       key: "views",
       label: t("Vues", "Views", english),
-      hint: t("vidéos publiées sur la période", "videos published in this period", english),
+      hint: rangeDays
+        ? t("croissance mesurée sur la période", "growth measured over the period", english)
+        : t("cumulées à vie", "lifetime cumulative", english),
       value: totals.views,
       color: "#3b82f6",
       series: daily.map((d) => d.views),
@@ -235,17 +262,39 @@ export function AnalyticsView() {
 
       {analytics?.connected ? (
         <p className="ss-an-range__caption">
-          {rangeDays
-            ? t(
-                `${analytics.videoCount ?? 0} vidéo(s) publiée(s) sur les ${rangeDays} derniers jours (sur ${analytics.totalVideoCount ?? 0} vidéos regardées au total). Compteurs TikTok cumulés à date, pas de vues "du jour".`,
-                `${analytics.videoCount ?? 0} video(s) published in the last ${rangeDays} days (out of ${analytics.totalVideoCount ?? 0} videos scanned). TikTok counters are cumulative-to-date, not daily deltas.`,
+          {rangeDays ? (
+            <>
+              {t(
+                `Croissance mesurée sur les ${rangeDays} derniers jours, à partir de relevés quotidiens que ScrollShow prend lui-même (TikTok ne fournit que des compteurs cumulés à vie, pas de vues "du jour").`,
+                `Growth measured over the last ${rangeDays} days, from daily snapshots ScrollShow takes itself (TikTok only exposes lifetime cumulative counters, no "today's views").`,
                 english,
-              )
-            : t(
-                `${analytics.videoCount ?? 0} vidéo(s) au total (sur les ${analytics.totalVideoCount ?? 0} les plus récentes scannées). Compteurs TikTok cumulés à date.`,
-                `${analytics.videoCount ?? 0} video(s) total (out of the ${analytics.totalVideoCount ?? 0} most recent scanned). TikTok counters are cumulative-to-date.`,
-                english,
-              )}
+              )}{" "}
+              {(analytics.historyDays ?? 0) < rangeDays ? (
+                <strong>
+                  {t(
+                    `Historique encore court (${analytics.historyDays ?? 0} jour(s) de relevés) — la précision augmente chaque jour.`,
+                    `History still short (${analytics.historyDays ?? 0} day(s) of snapshots) — accuracy improves daily.`,
+                    english,
+                  )}
+                </strong>
+              ) : null}{" "}
+              {analytics.lifetimeTotals ? (
+                <>
+                  {t(
+                    `Pour comparaison, vues à vie sur ${analytics.totalVideoCount ?? 0} vidéo(s) scannée(s) : ${fmt(analytics.lifetimeTotals.views, english)}.`,
+                    `For reference, lifetime views across ${analytics.totalVideoCount ?? 0} video(s) scanned: ${fmt(analytics.lifetimeTotals.views, english)}.`,
+                    english,
+                  )}
+                </>
+              ) : null}
+            </>
+          ) : (
+            t(
+              `Vues à vie cumulées sur ${analytics.totalVideoCount ?? 0} vidéo(s) scannée(s). Ce sont les mêmes compteurs que TikTok Studio affiche par vidéo.`,
+              `Lifetime views across ${analytics.totalVideoCount ?? 0} video(s) scanned. Same per-video counters TikTok Studio shows.`,
+              english,
+            )
+          )}
         </p>
       ) : null}
 
@@ -298,7 +347,26 @@ export function AnalyticsView() {
           <div className="ss-an-card__head">
             <h2>{t("Par compte", "By account", english)}</h2>
           </div>
-          {channels.filter((c) => c.platform === "tiktok").length ? (
+          {analytics?.channelStats?.length ? (
+            <div className="ss-an-list">
+              {analytics.channelStats.map((ch) => (
+                <div key={ch.id} className="ss-an-list__row">
+                  <span>@{ch.handle}</span>
+                  <b>
+                    {ch.followers.toLocaleString(english ? "en-US" : "fr-FR")}
+                    {ch.growth ? (
+                      <small className={`ss-an-growth ${ch.growth.followers >= 0 ? "is-up" : "is-down"}`}>
+                        {" "}
+                        {ch.growth.followers >= 0 ? "+" : ""}
+                        {ch.growth.followers.toLocaleString(english ? "en-US" : "fr-FR")}
+                      </small>
+                    ) : null}
+                  </b>
+                  <small>{t("abonnés", "followers", english)}</small>
+                </div>
+              ))}
+            </div>
+          ) : channels.filter((c) => c.platform === "tiktok").length ? (
             <div className="ss-an-list">
               {channels
                 .filter((c) => c.platform === "tiktok")
@@ -320,25 +388,44 @@ export function AnalyticsView() {
             <h2>
               {t("Top vidéos", "Top videos", english)}{" "}
               <small className="ss-an-card__sub">
-                {rangeDays ? t(`(${rangeDays}j)`, `(${rangeDays}d)`, english) : t("(tout)", "(all time)", english)}
+                {rangeDays
+                  ? t(`(croissance sur ${rangeDays}j)`, `(growth over ${rangeDays}d)`, english)
+                  : t("(à vie)", "(lifetime)", english)}
               </small>
             </h2>
           </div>
           {analytics?.videos?.length ? (
             <div className="ss-an-list">
-              {[...analytics.videos]
-                .sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
-                .slice(0, 5)
-                .map((v) => (
-                  <a key={v.id} className="ss-an-list__row ss-an-list__row--link" href={v.share_url || undefined} target="_blank" rel="noreferrer">
-                    <span className="ss-an-list__title">
-                      {(v.title || v.video_description || t("Sans titre", "Untitled", english)).slice(0, 48)}
-                      {v.create_time ? <small className="ss-an-list__date"> · {fmtDate(v.create_time, english)}</small> : null}
-                    </span>
-                    <b>{fmt(v.view_count || 0, english)}</b>
-                    <small>{t("vues", "views", english)}</small>
-                  </a>
-                ))}
+              {(() => {
+                const topMetric = metric === "posts" ? "views" : metric;
+                const lifetimeKey = { views: "view_count", likes: "like_count", comments: "comment_count", shares: "share_count" }[topMetric] as
+                  | "view_count"
+                  | "like_count"
+                  | "comment_count"
+                  | "share_count";
+                const periodKey = { views: "period_views", likes: "period_likes", comments: "period_comments", shares: "period_shares" }[
+                  topMetric
+                ] as "period_views" | "period_likes" | "period_comments" | "period_shares";
+                const metricLabel = {
+                  views: t("vues", "views", english),
+                  likes: t("likes", "likes", english),
+                  comments: t("commentaires", "comments", english),
+                  shares: t("partages", "shares", english),
+                }[topMetric];
+                return [...analytics.videos]
+                  .sort((a, b) => (rangeDays ? (b[periodKey] || 0) - (a[periodKey] || 0) : (b[lifetimeKey] || 0) - (a[lifetimeKey] || 0)))
+                  .slice(0, 5)
+                  .map((v) => (
+                    <a key={v.id} className="ss-an-list__row ss-an-list__row--link" href={v.share_url || undefined} target="_blank" rel="noreferrer">
+                      <span className="ss-an-list__title">
+                        {(v.title || v.video_description || t("Sans titre", "Untitled", english)).slice(0, 48)}
+                        {v.create_time ? <small className="ss-an-list__date"> · {fmtDate(v.create_time, english)}</small> : null}
+                      </span>
+                      <b>{fmt(rangeDays ? v[periodKey] || 0 : v[lifetimeKey] || 0, english)}</b>
+                      <small>{rangeDays ? `${metricLabel} (${rangeDays}j)` : `${metricLabel} · ${t("à vie", "lifetime", english)}`}</small>
+                    </a>
+                  ));
+              })()}
             </div>
           ) : (
             <p className="ss-lead">

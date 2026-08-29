@@ -114,7 +114,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const title = item ? (english ? item.en : item.fr) : "ScrollShow";
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
   const onMcp = pathname.startsWith("/app/mcp");
-  const hideHeader = onMcp || pathname.startsWith("/app/home");
+  const hideHeader =
+    onMcp ||
+    pathname.startsWith("/app/home") ||
+    pathname.startsWith("/app/analytics") ||
+    pathname.startsWith("/app/unshadowban");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const mainNav = STUDIO_NAV.filter((e) => e.section === "main");

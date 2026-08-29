@@ -528,6 +528,154 @@ export async function agentPublish(
   return { ok: true, publish_id: result.publish_id, privacy, post, data: result };
 }
 
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function daysAgoKey(days: number) {
+  return dayKey(new Date(Date.now() - days * 86400_000));
+}
+
+// TikTok's public video.list only ever returns each video's lifetime
+// cumulative counters — there is no "views gained this week" field, and no
+// profile-views/reach metric at all for regular accounts (TikTok only exposes
+// those through the separate Business API, which requires the creator to
+// convert to a Business account and re-authorize through a different OAuth
+// flow entirely — it cannot be turned on for a normal account from our side).
+// The only way to get a real windowed number for ANY account is to snapshot
+// the lifetime counters ourselves once a day and diff two snapshots. Accuracy
+// grows with how long we've been collecting; it's not retroactive.
+async function snapshotVideoStats(channelId: string, videos: any[]) {
+  if (!videos.length) return;
+  const day = dayKey(new Date());
+  const capturedAt = new Date().toISOString();
+  try {
+    await updateStore((store) => {
+      store.videoStats ||= [];
+      for (const video of videos) {
+        const videoId = String(video.id);
+        const existing = store.videoStats!.find((s) => s.channelId === channelId && s.videoId === videoId && s.day === day);
+        const snap = {
+          channelId,
+          videoId,
+          day,
+          viewCount: Number(video.view_count || 0),
+          likeCount: Number(video.like_count || 0),
+          commentCount: Number(video.comment_count || 0),
+          shareCount: Number(video.share_count || 0),
+          capturedAt,
+        };
+        if (existing) Object.assign(existing, snap);
+        else store.videoStats!.push(snap);
+      }
+    });
+  } catch {
+    // Snapshotting is best-effort — never let it break the analytics response.
+  }
+}
+
+async function snapshotChannelStats(channelId: string, profile: Record<string, unknown> | null) {
+  if (!profile) return;
+  const day = dayKey(new Date());
+  const capturedAt = new Date().toISOString();
+  try {
+    await updateStore((store) => {
+      store.channelStats ||= [];
+      const existing = store.channelStats!.find((s) => s.channelId === channelId && s.day === day);
+      const snap = {
+        channelId,
+        day,
+        followers: Number(profile.follower_count || 0),
+        likes: Number(profile.likes_count || 0),
+        videoCount: Number(profile.video_count || 0),
+        capturedAt,
+      };
+      if (existing) Object.assign(existing, snap);
+      else store.channelStats!.push(snap);
+    });
+  } catch {
+    // Best-effort, same as video snapshots.
+  }
+}
+
+type MetricTotals = { views: number; likes: number; comments: number; shares: number };
+
+function sumVideoMetrics(videos: any[]): MetricTotals {
+  return videos.reduce(
+    (sum, v) => ({
+      views: sum.views + Number(v.view_count || 0),
+      likes: sum.likes + Number(v.like_count || 0),
+      comments: sum.comments + Number(v.comment_count || 0),
+      shares: sum.shares + Number(v.share_count || 0),
+    }),
+    { views: 0, likes: 0, comments: 0, shares: 0 },
+  );
+}
+
+function videoGrowth(
+  snapshots: { videoId: string; day: string; viewCount: number; likeCount: number; commentCount: number; shareCount: number }[],
+  videoId: string,
+  rangeDays: number,
+): MetricTotals | null {
+  const snaps = snapshots.filter((s) => s.videoId === videoId).sort((a, b) => a.day.localeCompare(b.day));
+  if (snaps.length < 2) return null;
+  const cutoff = daysAgoKey(rangeDays);
+  const baseline = [...snaps].reverse().find((s) => s.day < cutoff) || snaps[0];
+  const latest = snaps[snaps.length - 1];
+  return {
+    views: Math.max(0, latest.viewCount - baseline.viewCount),
+    likes: Math.max(0, latest.likeCount - baseline.likeCount),
+    comments: Math.max(0, latest.commentCount - baseline.commentCount),
+    shares: Math.max(0, latest.shareCount - baseline.shareCount),
+  };
+}
+
+function periodDeltaTotals(
+  snapshots: { channelId: string; videoId: string; day: string; viewCount: number; likeCount: number; commentCount: number; shareCount: number }[],
+  videoIds: Set<string>,
+  rangeDays: number,
+) {
+  const byVideo = new Map<string, typeof snapshots>();
+  for (const snap of snapshots) {
+    if (!videoIds.has(snap.videoId)) continue;
+    if (!byVideo.has(snap.videoId)) byVideo.set(snap.videoId, []);
+    byVideo.get(snap.videoId)!.push(snap);
+  }
+  let totals: MetricTotals = { views: 0, likes: 0, comments: 0, shares: 0 };
+  let oldestDay: string | null = null;
+  for (const [videoId, snaps] of byVideo) {
+    snaps.sort((a, b) => a.day.localeCompare(b.day));
+    if (!oldestDay || snaps[0].day < oldestDay) oldestDay = snaps[0].day;
+    const growth = videoGrowth(snaps, videoId, rangeDays);
+    if (!growth) continue;
+    totals = {
+      views: totals.views + growth.views,
+      likes: totals.likes + growth.likes,
+      comments: totals.comments + growth.comments,
+      shares: totals.shares + growth.shares,
+    };
+  }
+  const historyDays = oldestDay ? Math.floor((Date.now() - new Date(oldestDay).getTime()) / 86400_000) : 0;
+  return { totals, historyDays };
+}
+
+function channelGrowth(
+  snapshots: { channelId: string; day: string; followers: number; likes: number; videoCount: number }[],
+  channelId: string,
+  rangeDays: number,
+) {
+  const snaps = snapshots.filter((s) => s.channelId === channelId).sort((a, b) => a.day.localeCompare(b.day));
+  if (snaps.length < 2) return null;
+  const cutoff = daysAgoKey(rangeDays);
+  const baseline = [...snaps].reverse().find((s) => s.day < cutoff) || snaps[0];
+  const latest = snaps[snaps.length - 1];
+  return {
+    followers: latest.followers - baseline.followers,
+    likes: latest.likes - baseline.likes,
+    videoCount: latest.videoCount - baseline.videoCount,
+  };
+}
+
 export async function agentAnalytics(user: SessionUser, options: { days?: number } = {}) {
   const rangeDays = options.days && options.days > 0 ? options.days : null; // null = all-time
   const channels = await loadTikTokChannels(user.id);
@@ -542,58 +690,91 @@ export async function agentAnalytics(user: SessionUser, options: { days?: number
     published: posts.filter((post) => post.status === "published").length,
   };
   if (!channels.length) {
-    return { connected: false, calendar, profile: null, videos: [], totals: calendar, errors: [], rangeDays, videoCount: 0 };
+    return { connected: false, calendar, profile: null, videos: [], totals: calendar, errors: [], rangeDays, videoCount: 0, historyDays: 0 };
   }
 
   let profile: Record<string, unknown> | null = null;
   let allVideos: any[] = [];
   const errors: string[] = [];
-  // TikTok's video.list only returns cumulative lifetime counters per video
-  // (no daily deltas), so a "range" here means "videos published in this
-  // window" — fetch enough history that a wide range isn't silently capped.
-  const fetchCount = rangeDays && rangeDays <= 30 ? 50 : 200;
+  const channelProfiles: Array<{ channel: (typeof channels)[number]; profile: Record<string, unknown> | null }> = [];
+  // "Tout" needs deep history for lifetime totals; a specific range only needs
+  // enough recent videos to snapshot — the real windowed number comes from
+  // our own daily diffs (periodDeltaTotals), not from how far back we fetch.
+  const fetchCount = rangeDays ? 50 : 200;
 
   for (const channel of channels) {
     if (!channel.accessToken) continue;
+    let channelProfile: Record<string, unknown> | null = null;
     try {
-      const channelProfile = await fetchUserInfo(channel.accessToken);
+      channelProfile = await fetchUserInfo(channel.accessToken);
       profile = profile || channelProfile;
+      await snapshotChannelStats(channel.id, channelProfile);
     } catch (err) {
       errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "profile fetch failed"}`);
     }
+    channelProfiles.push({ channel, profile: channelProfile });
     try {
       const channelVideos = await listRecentVideos(channel.accessToken, fetchCount);
       allVideos.push(...channelVideos.map((video) => ({ ...video, channelHandle: channel.handle })));
+      await snapshotVideoStats(channel.id, channelVideos);
     } catch (err) {
       errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "video list failed"}`);
     }
   }
 
-  const cutoff = rangeDays ? Math.floor(Date.now() / 1000) - rangeDays * 86400 : null;
-  const videos = cutoff ? allVideos.filter((video) => Number(video.create_time || 0) >= cutoff) : allVideos;
+  const videoIds = new Set(allVideos.map((v) => String(v.id)));
+  const store = await readStore();
+  const videoSnapshots = store.videoStats || [];
+  const channelSnapshots = store.channelStats || [];
+  const lifetimeTotals = sumVideoMetrics(allVideos);
 
-  const totals = videos.length
-    ? videos.reduce(
-        (sum, video) => ({
-          views: sum.views + Number(video.view_count || 0),
-          likes: sum.likes + Number(video.like_count || 0),
-          comments: sum.comments + Number(video.comment_count || 0),
-          shares: sum.shares + Number(video.share_count || 0),
-        }),
-        { views: 0, likes: 0, comments: 0, shares: 0 },
-      )
-    : { views: 0, likes: 0, comments: 0, shares: 0 };
+  let totals: MetricTotals;
+  let historyDays = 0;
+  let rankedVideos = allVideos;
+
+  if (rangeDays) {
+    const delta = periodDeltaTotals(videoSnapshots, videoIds, rangeDays);
+    totals = delta.totals;
+    historyDays = delta.historyDays;
+    rankedVideos = [...allVideos]
+      .map((video) => {
+        const growth = videoGrowth(videoSnapshots, String(video.id), rangeDays);
+        return {
+          ...video,
+          period_views: growth?.views ?? 0,
+          period_likes: growth?.likes ?? 0,
+          period_comments: growth?.comments ?? 0,
+          period_shares: growth?.shares ?? 0,
+        };
+      })
+      .sort((a, b) => b.period_views - a.period_views);
+  } else {
+    totals = lifetimeTotals;
+    rankedVideos = [...allVideos].sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0));
+  }
+
+  const channelStats = channelProfiles.map(({ channel, profile: p }) => ({
+    id: channel.id,
+    handle: channel.handle,
+    followers: Number(p?.follower_count ?? channel.followers ?? 0),
+    likes: Number(p?.likes_count ?? channel.likes ?? 0),
+    videoCount: Number(p?.video_count ?? channel.videoCount ?? 0),
+    growth: rangeDays ? channelGrowth(channelSnapshots, channel.id, rangeDays) : null,
+  }));
 
   return {
     connected: true,
     handle: channels[0].handle,
     calendar,
     profile,
-    videos: videos.sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0)).slice(0, 20),
+    videos: rankedVideos.slice(0, 20),
     totals,
+    lifetimeTotals,
+    channelStats,
     errors,
     rangeDays,
-    videoCount: videos.length,
+    historyDays,
+    videoCount: allVideos.length,
     totalVideoCount: allVideos.length,
   };
 }

@@ -174,6 +174,26 @@ export type PushSubscriptionRecord = {
   createdAt: string;
 };
 
+export type VideoStatSnapshot = {
+  channelId: string;
+  videoId: string;
+  day: string; // YYYY-MM-DD, one snapshot per video per day
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  capturedAt: string;
+};
+
+export type ChannelStatSnapshot = {
+  channelId: string;
+  day: string; // YYYY-MM-DD, one snapshot per channel per day
+  followers: number;
+  likes: number;
+  videoCount: number;
+  capturedAt: string;
+};
+
 export type StoreData = {
   users: User[];
   accounts: Account[];
@@ -183,6 +203,8 @@ export type StoreData = {
   media: MediaItem[];
   apiKeys: ApiKey[];
   pushSubscriptions?: PushSubscriptionRecord[];
+  videoStats?: VideoStatSnapshot[];
+  channelStats?: ChannelStatSnapshot[];
 };
 
 export type SessionUser = {
