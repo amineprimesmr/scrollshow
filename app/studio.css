@@ -2220,7 +2220,7 @@ a.ss-btn-ghost {
 .ss-network-list {
   display: grid;
   gap: 14px;
-  margin: 0 22px 36px;
+  margin: 20px 22px 36px;
 }
 
 .ss-network-card {

@@ -27,7 +27,6 @@ const HINTS: Record<PlatformId, { fr: string; en: string }> = {
 export function ConnectionsView({ availability }: { availability: PlatformAvailability }) {
   const { english, channels, reload } = useStudio();
   const [busy, setBusy] = useState("");
-  const live = channels.filter((item) => item.connected);
 
   async function disconnect(id: string, platform: string) {
     setBusy(id);
@@ -42,30 +41,6 @@ export function ConnectionsView({ availability }: { availability: PlatformAvaila
 
   return (
     <div className="ss-connect">
-      <div className="ss-page-intro">
-        <div>
-          <p>
-            {t(
-              "Branche TikTok, Instagram, Facebook et X. La publication live est TikTok pour l’instant.",
-              "Connect TikTok, Instagram, Facebook and X. Live publishing is TikTok for now.",
-              english,
-            )}
-          </p>
-          <p className="ss-muted">
-            {live.length
-              ? t(
-                  `${live.length} compte${live.length > 1 ? "s" : ""} connecté${live.length > 1 ? "s" : ""}.`,
-                  `${live.length} account${live.length > 1 ? "s" : ""} connected.`,
-                  english,
-                )
-              : t("Aucun compte connecté pour l’instant.", "No account connected yet.", english)}
-          </p>
-        </div>
-        <a className="ss-btn-ghost" href="/app/mcp">
-          {t("MCP · agents IA", "MCP · AI agents", english)}
-        </a>
-      </div>
-
       <div className="ss-network-list">
         {PLATFORMS.map((platform) => {
           const accounts = channels.filter((item) => item.platform === platform.id && item.connected);
