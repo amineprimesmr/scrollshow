@@ -1,7 +1,6 @@
 "use client";
 
 import { prefersEnglish, t } from "@/lib/i18n";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useStudio } from "../StudioContext";
 
@@ -101,7 +100,9 @@ export function WarmedAccountsView() {
     <div className="ss-empty" style={{ margin: 24 }}>
       <h2>{t("Comptes warmés", "Warmed Accounts", en)}</h2>
       <p>{t("Comptes TikTok/IG US/EU warmés sur vrais téléphones — à partir de 80€/mois.", "Real US/EU TikTok/IG accounts warmed on real phones — from $80/month.", en)}</p>
-      <Link href="/app/billing" className="ss-btn-purple">{t("Upgrade", "Upgrade", en)}</Link>
+      <a href="mailto:support@scrollshow.io?subject=Comptes%20warm%C3%A9s" className="ss-btn-purple">
+        {t("Nous contacter", "Contact us", en)}
+      </a>
     </div>
   );
 }

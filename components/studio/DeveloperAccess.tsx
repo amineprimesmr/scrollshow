@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { t as tr } from "@/lib/i18n";
 import { useStudio } from "./StudioContext";
-
-type ApiKeyRow = {
-  id: string;
-  name: string;
-  prefix: string;
-  createdAt: string;
-  lastUsedAt: string | null;
-};
 
 type ClientId = AiClientId;
 
@@ -95,7 +87,6 @@ function CopyField({
 
 export function DeveloperAccess() {
   const { english } = useStudio();
-  const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -106,22 +97,12 @@ export function DeveloperAccess() {
   const mcpUrl = `${origin}/api/mcp`;
   const token = revealed || "ss_live_YOUR_KEY";
 
-  useEffect(() => {
-    void refresh();
-  }, []);
-
   function tx(fr: string, en: string) {
     return tr(fr, en, english);
   }
 
   function pick(id: ClientId) {
     setClient(id);
-  }
-
-  async function refresh() {
-    const res = await fetch("/api/keys");
-    const data = await res.json();
-    setKeys(data.keys || []);
   }
 
   async function createKey() {
@@ -138,18 +119,11 @@ export function DeveloperAccess() {
       const next = liveToken(data);
       if (!next) throw new Error("create_failed");
       setRevealed(next);
-      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "create_failed");
     } finally {
       setCreating(false);
     }
-  }
-
-  async function revoke(id: string) {
-    await fetch(`/api/keys/${id}`, { method: "DELETE" });
-    if (revealed) setRevealed(null);
-    await refresh();
   }
 
   async function copy(id: string, text: string) {
@@ -159,6 +133,7 @@ export function DeveloperAccess() {
   }
 
   const claudeCli = `claude mcp add --transport http scrollshow ${mcpUrl} --header "Authorization: Bearer ${token}"`;
+  const claudeCodePrompt = `Set up ScrollShow for me so I can create and schedule TikTok carousels from here.\n\n1. Add the MCP server: run \`${claudeCli}\`.\n\nOnce that's done, let me know when it's ready.`;
   const codexExport = `export SCROLLSHOW_API_KEY='${token}'`;
   const codexCli = `codex mcp add scrollshow --url ${mcpUrl} --bearer-token-env-var SCROLLSHOW_API_KEY`;
   const cursorDeeplink = useMemo(() => {
@@ -207,18 +182,18 @@ export function DeveloperAccess() {
       return [
         {
           n: "1",
-          title: tx("Copie cette commande", "Copy this command"),
-          body: tx("Tu la colleras dans le terminal au step suivant.", "You’ll paste it in the terminal next."),
-          field: claudeCli,
-          copyId: "cli",
+          title: tx("Copie ce message", "Copy this message"),
+          body: tx("Tu le colleras directement dans Claude Code au step suivant.", "You’ll paste it straight into Claude Code next."),
+          field: claudeCodePrompt,
+          copyId: "cc-prompt",
           sensitive: true,
         },
         {
           n: "2",
-          title: tx("Colle-la dans le terminal", "Paste it in your terminal"),
+          title: tx("Envoie-le à Claude Code", "Send it to Claude Code"),
           body: tx(
-            "Dans le terminal où tourne Claude Code (pas une nouvelle fenêtre), colle la commande et valide, puis relance la session.",
-            "In the terminal where Claude Code is running (not a new window), paste the command and press enter, then reload the session.",
+            "Colle-le dans la conversation, pas dans le terminal. Claude Code ajoute le connecteur lui-même, puis tu peux lui demander de créer ton premier post.",
+            "Paste it into the chat, not the terminal. Claude Code adds the connector itself — then ask it to create your first post.",
           ),
         },
         start,
@@ -256,15 +231,13 @@ export function DeveloperAccess() {
       },
       {
         n: "2",
-        title: tx("Claude → Customize → Connectors", "Claude → Customize → Connectors"),
+        title: tx("Ouvre le connecteur Claude", "Open the Claude connector"),
         body: tx(
-          "Ouvre l’app Claude, va dans Customize → Connectors, nomme-le ScrollShow et colle l’adresse. Si Claude te demande une authentification qu’il ne peut pas compléter, utilise l’onglet Claude Code à la place — il marche avec ta clé directement.",
-          "Open the Claude app, go to Customize → Connectors, name it ScrollShow and paste the address. If Claude asks for an authentication it can't complete, use the Claude Code tab instead — it works with your key directly.",
+          "Ça ouvre claude.ai avec la fenêtre « Ajouter un connecteur » déjà affichée. Colle l’adresse copiée à l’étape 1, nomme-le ScrollShow, et connecte-toi avec la clé ci-dessous.",
+          "This opens claude.ai with the “Add connector” dialog already showing. Paste the address you copied in step 1, name it ScrollShow, and sign in with the key below.",
         ),
-        cta: tx("Ouvrir l’app Claude", "Open the Claude app"),
-        href: "claude://claude.ai/new",
-        secondaryCta: tx("Pas l’app ? Utiliser claude.ai", "No app? Use claude.ai"),
-        secondaryHref: "https://claude.ai/settings/connectors",
+        cta: tx("Ouvrir claude.ai", "Open claude.ai"),
+        href: "https://claude.ai/customize/connectors?modal=add-custom-connector",
       },
       start,
     ];
@@ -337,7 +310,16 @@ export function DeveloperAccess() {
                   />
                 ) : null}
                 {step.sensitive && !revealed ? (
-                  <p className="ss-mcp-card__warn">{tx("Crée une clé ci-dessous d'abord.", "Create a key below first.")}</p>
+                  <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>
+                    {creating ? tx("Génération…", "Generating…") : tx("Générer ma clé ScrollShow", "Generate my ScrollShow key")}
+                  </button>
+                ) : null}
+                {step.sensitive && error ? (
+                  <p className="ss-mcp-error">
+                    {error === "limit"
+                      ? tx("Limite de clés atteinte — gère-les dans Réglages → Clés API.", "Key limit reached — manage them in Settings → API keys.")
+                      : tx("Impossible de générer la clé. Réessaie.", "Could not generate the key. Try again.")}
+                  </p>
                 ) : null}
                 {step.cta && step.href ? (
                   step.sensitive && !revealed ? (
@@ -345,7 +327,12 @@ export function DeveloperAccess() {
                       {step.cta}
                     </span>
                   ) : (
-                    <a className={step.primary ? "ss-btn-purple" : "ss-btn-ghost"} href={step.href}>
+                    <a
+                      className={step.primary ? "ss-btn-purple" : "ss-btn-ghost"}
+                      href={step.href}
+                      target={step.href.startsWith("http") ? "_blank" : undefined}
+                      rel={step.href.startsWith("http") ? "noreferrer" : undefined}
+                    >
                       {step.cta}
                       {step.primary ? null : <ExternalIcon />}
                     </a>
@@ -362,54 +349,23 @@ export function DeveloperAccess() {
         </div>
       </div>
 
-      <div className="ss-mcp-keys">
-        <div className="ss-mcp-keys__head">
-          <div>
-            <h3>{tx("Clés actives", "Active keys")}</h3>
-            <p>
-              {revealed
-                ? tx("Copie-la maintenant — elle ne sera plus affichée. Elle marche pour tous tes agents.", "Copy it now — it won’t be shown again. It works for every agent.")
-                : tx("Une clé pour brancher Claude, Claude Code, Cursor et Codex. Crée-la une fois.", "One key to connect Claude, Claude Code, Cursor and Codex. Create it once.")}
-            </p>
-          </div>
-          {revealed ? (
-            <CopyField value={revealed} copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
-          ) : (
-            <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>
-              {creating ? tx("Création…", "Creating…") : tx("Créer une clé", "Create a key")}
-            </button>
-          )}
-        </div>
-        {error ? (
-          <p className="ss-mcp-error">
-            {error === "limit"
-              ? tx("Limite de 10 clés atteinte — révoque-en une pour continuer.", "10-key limit reached — revoke one to continue.")
-              : tx("Impossible de créer la clé. Réessaie.", "Could not create the key. Try again.")}
-          </p>
-        ) : null}
-        {keys.length ? (
-          keys.map((key) => (
-            <div key={key.id} className="ss-mcp-keys__row">
-              <code>
-                {key.prefix}… · {key.name}
-                {key.lastUsedAt ? (
-                  <small style={{ marginLeft: 8, color: "#a1a1aa", fontWeight: 400 }}>
-                    · {tx("utilisée", "used")} {new Date(key.lastUsedAt).toLocaleDateString(english ? "en-US" : "fr-FR")}
-                  </small>
-                ) : null}
-              </code>
-              <button type="button" onClick={() => void revoke(key.id)}>
-                {tx("Révoquer", "Revoke")}
-              </button>
+      {revealed ? (
+        <div className="ss-mcp-keys">
+          <div className="ss-mcp-keys__head">
+            <div>
+              <h3>{tx("Ta clé ScrollShow", "Your ScrollShow key")}</h3>
+              <p>{tx("Copie-la maintenant — elle ne sera plus affichée ici.", "Copy it now — it won’t be shown here again.")}</p>
             </div>
-          ))
-        ) : (
-          <p className="ss-mcp-keys__empty">{tx("Aucune clé pour l’instant.", "No keys yet.")}</p>
-        )}
-      </div>
+            <CopyField value={revealed} copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
+          </div>
+        </div>
+      ) : null}
 
       <p className="ss-mcp-foot">
-        {tx("TikTok se branche dans Connexions. Ici, c’est uniquement tes assistants IA.", "TikTok is connected in Connections. This page is only for your AI assistants.")}
+        {tx(
+          "TikTok se branche dans Connexions. Tes clés se gèrent dans Réglages → Clés API.",
+          "TikTok is connected in Connections. Your keys are managed in Settings → API keys.",
+        )}
       </p>
     </section>
   );

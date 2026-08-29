@@ -18,7 +18,7 @@ export const STUDIO_NAV: NavItem[] = [
   { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },
   { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
   { href: "/app/analytics", fr: "Analytics", en: "Analytics", icon: "chart", section: "main" },
-  { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", locked: true, section: "main" },
+  { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main" },
   { href: "/app/affiliate", fr: "Parrainer", en: "Refer & Earn", icon: "gift", locked: true, section: "bottom" },
   { href: "/app/brand", fr: "Marque", en: "Brand", icon: "brand", badge: true, section: "bottom" },
   { href: "/app/guide", fr: "Guide", en: "Guide", icon: "guide", section: "bottom" },
