@@ -2401,6 +2401,11 @@ a.ss-btn-ghost {
   font-size: 12px;
 }
 
+.ss-network-add {
+  margin-top: 12px;
+  width: 100%;
+}
+
 .ss-mcp {
   margin: 12px 22px 36px;
 }
