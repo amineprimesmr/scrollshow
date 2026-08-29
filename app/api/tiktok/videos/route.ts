@@ -3,7 +3,7 @@ import { resolveStoreUserId } from "@/lib/local-user";
 import { isLocalDemoToken, localDemoEnabled, localDemoVideos } from "@/lib/local-demo";
 import { readStore } from "@/lib/store";
 import { loadTikTokChannel } from "@/lib/tiktok-account";
-import { listVideos } from "@/lib/tiktok";
+import { listRecentVideos } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -17,8 +17,8 @@ export async function GET() {
     return NextResponse.json({ videos: await localDemoVideos(userId), scopes: ["video.list"], demo: true });
   }
   try {
-    const result = await listVideos(channel.accessToken);
-    return NextResponse.json({ videos: result.videos || result.list || [], scopes: ["video.list"] });
+    const videos = await listRecentVideos(channel.accessToken);
+    return NextResponse.json({ videos, scopes: ["video.list"] });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "videos" }, { status: 400 });
   }

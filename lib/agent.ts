@@ -1,10 +1,10 @@
-import { loadTikTokChannel } from "./tiktok-account";
+import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import {
   absoluteAssetUrl,
   creatorInfo,
   fetchUserInfo,
   initPhotoPost,
-  listVideos,
+  listRecentVideos,
   publicChannel,
 } from "./tiktok";
 import {
@@ -529,7 +529,7 @@ export async function agentPublish(
 }
 
 export async function agentAnalytics(user: SessionUser) {
-  const channel = await loadTikTokChannel(user.id);
+  const channels = await loadTikTokChannels(user.id);
   const posts = (await agentListPosts(user)).filter((post) => post.inCalendar !== false);
   const calendar = {
     views: posts.reduce((sum, post) => sum + post.views, 0),
@@ -540,22 +540,30 @@ export async function agentAnalytics(user: SessionUser) {
     scheduled: posts.filter((post) => post.status === "scheduled").length,
     published: posts.filter((post) => post.status === "published").length,
   };
-  if (!channel?.accessToken) {
-    return { connected: false, calendar, profile: null, videos: [], totals: calendar };
+  if (!channels.length) {
+    return { connected: false, calendar, profile: null, videos: [], totals: calendar, errors: [] };
   }
+
   let profile: Record<string, unknown> | null = null;
   let videos: any[] = [];
-  try {
-    profile = await fetchUserInfo(channel.accessToken);
-  } catch {
-    profile = null;
+  const errors: string[] = [];
+
+  for (const channel of channels) {
+    if (!channel.accessToken) continue;
+    try {
+      const channelProfile = await fetchUserInfo(channel.accessToken);
+      profile = profile || channelProfile;
+    } catch (err) {
+      errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "profile fetch failed"}`);
+    }
+    try {
+      const channelVideos = await listRecentVideos(channel.accessToken);
+      videos.push(...channelVideos.map((video) => ({ ...video, channelHandle: channel.handle })));
+    } catch (err) {
+      errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "video list failed"}`);
+    }
   }
-  try {
-    const result = await listVideos(channel.accessToken);
-    videos = result.videos || result.list || [];
-  } catch {
-    videos = [];
-  }
+
   const totals = videos.length
     ? videos.reduce(
         (sum, video) => ({
@@ -567,13 +575,15 @@ export async function agentAnalytics(user: SessionUser) {
         { views: 0, likes: 0, comments: 0, shares: 0 },
       )
     : calendar;
+
   return {
     connected: true,
-    handle: channel.handle,
+    handle: channels[0].handle,
     calendar,
     profile,
-    videos: videos.slice(0, 20),
+    videos: videos.sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0)).slice(0, 20),
     totals,
+    errors,
   };
 }
 

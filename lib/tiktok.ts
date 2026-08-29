@@ -193,12 +193,6 @@ export async function fetchUserInfo(accessToken: string) {
   return data.data?.user || data.data || {};
 }
 
-export async function listVideos(accessToken: string) {
-  const url = new URL(VIDEO_LIST);
-  url.searchParams.set("fields", VIDEO_LIST_FIELDS);
-  return assertOk(await tiktokPost(url.toString(), accessToken, { max_count: 10 }));
-}
-
 export type TikTokVideo = {
   id: string;
   create_time: number;

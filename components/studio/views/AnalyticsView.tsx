@@ -13,6 +13,7 @@ type AnalyticsPayload = {
   calendar: { views: number; likes: number; comments: number; shares: number; drafts: number; scheduled: number; published: number };
   totals: { views: number; likes: number; comments: number; shares: number };
   videos: Array<{ id: string; title?: string; video_description?: string; view_count?: number; like_count?: number; comment_count?: number; share_count?: number; cover_image_url?: string; share_url?: string }>;
+  errors?: string[];
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,6 +83,7 @@ export function AnalyticsView() {
   const [english, setEnglish] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [metric, setMetric] = useState<MetricKey>("views");
 
   const connectedChannels = channels.filter((c) => c.connected);
@@ -90,9 +92,15 @@ export function AnalyticsView() {
 
   useEffect(() => {
     fetch("/api/studio/analytics")
-      .then((res) => res.json())
-      .then((json) => setAnalytics(json))
-      .catch(() => setAnalytics(null))
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+        setAnalytics(json);
+      })
+      .catch((err) => {
+        setAnalytics(null);
+        setFetchError(err instanceof Error ? err.message : "unknown error");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -195,6 +203,14 @@ export function AnalyticsView() {
           </p>
         </div>
       </div>
+
+      {(fetchError || analytics?.errors?.length) ? (
+        <div className="ss-an-card ss-an-card--pad" style={{ borderColor: "#f59e0b", color: "#b45309" }}>
+          {fetchError
+            ? t(`Erreur de chargement: ${fetchError}`, `Failed to load: ${fetchError}`, english)
+            : analytics!.errors!.join(" · ")}
+        </div>
+      ) : null}
 
       <div className="ss-an-card">
         <div className="ss-an-metrics">
