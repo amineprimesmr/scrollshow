@@ -42,33 +42,44 @@ const FAQ: { section: string; items: { q: string; a: string }[] }[] = [
 ];
 
 export function HomeView() {
-  const { posts, channels, english: ctxEnglish, setPostOpen } = useStudio();
+  const { posts, channels, english: ctxEnglish } = useStudio();
   const [english, setEnglish] = useState(false);
   const [openFaq, setOpenFaq] = useState<string | null>(null);
+  const [hasKey, setHasKey] = useState(false);
 
   useEffect(() => setEnglish(prefersEnglish()), []);
 
+  useEffect(() => {
+    fetch("/api/keys")
+      .then((res) => res.json())
+      .then((data) => setHasKey((data.keys || []).length > 0))
+      .catch(() => {});
+  }, []);
+
   const en = ctxEnglish || english;
   const connected = channels.some((c) => c.connected);
-  const hasPost = posts.some((p) => p.status === "published" || p.status === "scheduled");
+  const hasAiPost = posts.some((p) => p.origin === "ai");
 
   const steps = useMemo(
     () =>
       [
         {
           id: "connect",
-          label: t("Connecte ton compte", "Connect your account", en),
+          label: t("Connecte tes comptes TikTok", "Connect your TikTok accounts", en),
           href: "/app/integrations",
           done: connected,
-          extra: "TikTok · Instagram · Facebook · X",
         },
-        { id: "demo", label: t("Importe une démo", "Upload a demo video", en), href: "/app/marketplace", done: posts.some((p) => p.origin === "import") },
+        {
+          id: "mcp",
+          label: t("Connecte le MCP à ton IA", "Connect MCP to your AI", en),
+          href: "/app/mcp",
+          done: hasKey,
+        },
         {
           id: "post",
-          label: t("Publie ton premier post", "Make your first post", en),
-          href: "/app",
-          done: hasPost,
-          action: () => setPostOpen(true),
+          label: t("Crée et publie depuis ton IA", "Create and publish from your AI", en),
+          href: "/app/mcp",
+          done: hasAiPost,
         },
       ] as Array<{
         id: string;
@@ -78,7 +89,7 @@ export function HomeView() {
         extra?: string;
         action?: () => void;
       }>,
-    [en, connected, hasPost, posts, setPostOpen],
+    [en, connected, hasKey, hasAiPost],
   );
 
   const doneCount = steps.filter((s) => s.done).length;
