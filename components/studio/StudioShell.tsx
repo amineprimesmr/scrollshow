@@ -12,7 +12,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
-import { IconLock, IconLogout, IconPlus, NavIcon } from "./icons";
+import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { StudioFlash } from "./StudioFlash";
 
@@ -115,19 +115,43 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
   const onMcp = pathname.startsWith("/app/mcp");
   const hideHeader = onMcp || pathname.startsWith("/app/home");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const mainNav = STUDIO_NAV.filter((e) => e.section === "main");
   const bottomNav = STUDIO_NAV.filter((e) => e.section === "bottom");
 
+  useEffect(() => setMobileNavOpen(false), [pathname]);
+
   return (
     <div className={`ss-studio ss-fastlane${onCalendar ? " is-calendar" : ""}`}>
       <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
-      <aside className="ss-sidebar">
+      <button
+        type="button"
+        className="ss-mobile-topbar__menu"
+        aria-label={t("Ouvrir le menu", "Open menu", english)}
+        onClick={() => setMobileNavOpen(true)}
+      >
+        <IconMenu size={20} />
+      </button>
+      <div className="ss-mobile-topbar__brand">
+        <BrandMark size={22} />
+        <span>ScrollShow</span>
+      </div>
+      {mobileNavOpen ? <div className="ss-mobile-backdrop" onClick={() => setMobileNavOpen(false)} /> : null}
+      <aside className={`ss-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}>
         <div className="ss-sidebar__head">
           <Link href="/app/home" className="ss-sidebar__brand">
             <BrandMark size={28} className="ss-sidebar__logo" />
             <span>ScrollShow</span>
           </Link>
+          <button
+            type="button"
+            className="ss-sidebar__close"
+            aria-label={t("Fermer le menu", "Close menu", english)}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <IconX size={18} />
+          </button>
         </div>
         <nav className="ss-sidebar__nav">
           {mainNav.map((entry) => (

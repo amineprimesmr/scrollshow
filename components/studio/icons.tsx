@@ -177,6 +177,14 @@ export function IconChevron(props: IconProps & { dir?: "left" | "right" | "down"
   );
 }
 
+export function IconMenu(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16M4 12h16M4 17h16" {...stroke} />
+    </Svg>
+  );
+}
+
 export function IconX(props: IconProps) {
   return (
     <Svg {...props}>

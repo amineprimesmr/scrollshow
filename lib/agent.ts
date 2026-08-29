@@ -528,7 +528,8 @@ export async function agentPublish(
   return { ok: true, publish_id: result.publish_id, privacy, post, data: result };
 }
 
-export async function agentAnalytics(user: SessionUser) {
+export async function agentAnalytics(user: SessionUser, options: { days?: number } = {}) {
+  const rangeDays = options.days && options.days > 0 ? options.days : null; // null = all-time
   const channels = await loadTikTokChannels(user.id);
   const posts = (await agentListPosts(user)).filter((post) => post.inCalendar !== false);
   const calendar = {
@@ -541,12 +542,16 @@ export async function agentAnalytics(user: SessionUser) {
     published: posts.filter((post) => post.status === "published").length,
   };
   if (!channels.length) {
-    return { connected: false, calendar, profile: null, videos: [], totals: calendar, errors: [] };
+    return { connected: false, calendar, profile: null, videos: [], totals: calendar, errors: [], rangeDays, videoCount: 0 };
   }
 
   let profile: Record<string, unknown> | null = null;
-  let videos: any[] = [];
+  let allVideos: any[] = [];
   const errors: string[] = [];
+  // TikTok's video.list only returns cumulative lifetime counters per video
+  // (no daily deltas), so a "range" here means "videos published in this
+  // window" — fetch enough history that a wide range isn't silently capped.
+  const fetchCount = rangeDays && rangeDays <= 30 ? 50 : 200;
 
   for (const channel of channels) {
     if (!channel.accessToken) continue;
@@ -557,12 +562,15 @@ export async function agentAnalytics(user: SessionUser) {
       errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "profile fetch failed"}`);
     }
     try {
-      const channelVideos = await listRecentVideos(channel.accessToken);
-      videos.push(...channelVideos.map((video) => ({ ...video, channelHandle: channel.handle })));
+      const channelVideos = await listRecentVideos(channel.accessToken, fetchCount);
+      allVideos.push(...channelVideos.map((video) => ({ ...video, channelHandle: channel.handle })));
     } catch (err) {
       errors.push(`@${channel.handle}: ${err instanceof Error ? err.message : "video list failed"}`);
     }
   }
+
+  const cutoff = rangeDays ? Math.floor(Date.now() / 1000) - rangeDays * 86400 : null;
+  const videos = cutoff ? allVideos.filter((video) => Number(video.create_time || 0) >= cutoff) : allVideos;
 
   const totals = videos.length
     ? videos.reduce(
@@ -574,7 +582,7 @@ export async function agentAnalytics(user: SessionUser) {
         }),
         { views: 0, likes: 0, comments: 0, shares: 0 },
       )
-    : calendar;
+    : { views: 0, likes: 0, comments: 0, shares: 0 };
 
   return {
     connected: true,
@@ -584,6 +592,9 @@ export async function agentAnalytics(user: SessionUser) {
     videos: videos.sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0)).slice(0, 20),
     totals,
     errors,
+    rangeDays,
+    videoCount: videos.length,
+    totalVideoCount: allVideos.length,
   };
 }
 

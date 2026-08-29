@@ -215,7 +215,8 @@ export async function listRecentVideos(accessToken: string, targetCount = 30) {
   url.searchParams.set("fields", VIDEO_LIST_FIELDS);
   const videos: TikTokVideo[] = [];
   let cursor: number | undefined;
-  for (let page = 0; page < 4 && videos.length < targetCount; page += 1) {
+  const maxPages = Math.min(10, Math.ceil(targetCount / 20));
+  for (let page = 0; page < maxPages && videos.length < targetCount; page += 1) {
     const body: Record<string, unknown> = { max_count: 20 };
     if (cursor) body.cursor = cursor;
     const data = await assertOk(await tiktokPost(url.toString(), accessToken, body));

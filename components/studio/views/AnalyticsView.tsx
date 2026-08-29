@@ -12,24 +12,38 @@ type AnalyticsPayload = {
   handle?: string;
   calendar: { views: number; likes: number; comments: number; shares: number; drafts: number; scheduled: number; published: number };
   totals: { views: number; likes: number; comments: number; shares: number };
-  videos: Array<{ id: string; title?: string; video_description?: string; view_count?: number; like_count?: number; comment_count?: number; share_count?: number; cover_image_url?: string; share_url?: string }>;
+  videos: Array<{ id: string; title?: string; video_description?: string; view_count?: number; like_count?: number; comment_count?: number; share_count?: number; cover_image_url?: string; share_url?: string; create_time?: number }>;
   errors?: string[];
+  rangeDays?: number | null;
+  videoCount?: number;
+  totalVideoCount?: number;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const RANGE_OPTIONS = [
+  { days: 7, fr: "7 jours", en: "7 days" },
+  { days: 30, fr: "30 jours", en: "30 days" },
+  { days: 90, fr: "90 jours", en: "90 days" },
+  { days: 0, fr: "Tout", en: "All time" },
+];
 
 function fmt(n: number, en: boolean) {
   return Math.round(n).toLocaleString(en ? "en-US" : "fr-FR");
 }
 
-function last30Days() {
+function lastNDays(n: number) {
   const days: string[] = [];
   const now = new Date();
-  for (let i = 29; i >= 0; i -= 1) {
+  for (let i = n - 1; i >= 0; i -= 1) {
     const d = new Date(now.getTime() - i * DAY_MS);
     days.push(d.toISOString().slice(0, 10));
   }
   return days;
+}
+
+function fmtDate(ts: number, en: boolean) {
+  return new Date(ts * 1000).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
@@ -85,26 +99,29 @@ export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [metric, setMetric] = useState<MetricKey>("views");
+  const [rangeDays, setRangeDays] = useState<number>(30);
 
   const connectedChannels = channels.filter((c) => c.connected);
 
   useEffect(() => setEnglish(prefersEnglish()), []);
 
   useEffect(() => {
-    fetch("/api/studio/analytics")
+    setLoading(true);
+    fetch(`/api/studio/analytics?days=${rangeDays}`)
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
         setAnalytics(json);
+        setFetchError(null);
       })
       .catch((err) => {
         setAnalytics(null);
         setFetchError(err instanceof Error ? err.message : "unknown error");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [rangeDays]);
 
-  const days = useMemo(() => last30Days(), []);
+  const days = useMemo(() => lastNDays(Math.min(rangeDays || 90, 90)), [rangeDays]);
 
   // Per-day breakdown is bucketed by each post's own publish date — the only
   // granularity ScrollShow actually stores. TikTok's API returns a live total
@@ -132,7 +149,7 @@ export function AnalyticsView() {
     {
       key: "views",
       label: t("Vues", "Views", english),
-      hint: t("sur toutes tes vidéos", "across all your videos", english),
+      hint: t("vidéos publiées sur la période", "videos published in this period", english),
       value: totals.views,
       color: "#3b82f6",
       series: daily.map((d) => d.views),
@@ -202,7 +219,35 @@ export function AnalyticsView() {
               : t("Basé sur tes posts ScrollShow — connecte TikTok pour des chiffres en direct.", "Based on your ScrollShow posts — connect TikTok for live numbers.", english)}
           </p>
         </div>
+        <div className="ss-range-tabs">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.days}
+              type="button"
+              className={rangeDays === opt.days ? "is-active" : ""}
+              onClick={() => setRangeDays(opt.days)}
+            >
+              {t(opt.fr, opt.en, english)}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {analytics?.connected ? (
+        <p className="ss-an-range__caption">
+          {rangeDays
+            ? t(
+                `${analytics.videoCount ?? 0} vidéo(s) publiée(s) sur les ${rangeDays} derniers jours (sur ${analytics.totalVideoCount ?? 0} vidéos regardées au total). Compteurs TikTok cumulés à date, pas de vues "du jour".`,
+                `${analytics.videoCount ?? 0} video(s) published in the last ${rangeDays} days (out of ${analytics.totalVideoCount ?? 0} videos scanned). TikTok counters are cumulative-to-date, not daily deltas.`,
+                english,
+              )
+            : t(
+                `${analytics.videoCount ?? 0} vidéo(s) au total (sur les ${analytics.totalVideoCount ?? 0} les plus récentes scannées). Compteurs TikTok cumulés à date.`,
+                `${analytics.videoCount ?? 0} video(s) total (out of the ${analytics.totalVideoCount ?? 0} most recent scanned). TikTok counters are cumulative-to-date.`,
+                english,
+              )}
+        </p>
+      ) : null}
 
       {(fetchError || analytics?.errors?.length) ? (
         <div className="ss-an-card ss-an-card--pad" style={{ borderColor: "#f59e0b", color: "#b45309" }}>
@@ -239,6 +284,13 @@ export function AnalyticsView() {
           <span>{axisStart}</span>
           <span>{axisEnd}</span>
         </div>
+        <p className="ss-an-chart-note">
+          {t(
+            "Tendance par jour de publication ScrollShow (pas les compteurs TikTok en direct affichés ci-dessus).",
+            "Trend by ScrollShow publish date (not the live TikTok counters shown above).",
+            english,
+          )}
+        </p>
       </div>
 
       <div className="ss-an-grid">
@@ -265,7 +317,12 @@ export function AnalyticsView() {
 
         <div className="ss-an-card ss-an-card--pad">
           <div className="ss-an-card__head">
-            <h2>{t("Top vidéos", "Top videos", english)}</h2>
+            <h2>
+              {t("Top vidéos", "Top videos", english)}{" "}
+              <small className="ss-an-card__sub">
+                {rangeDays ? t(`(${rangeDays}j)`, `(${rangeDays}d)`, english) : t("(tout)", "(all time)", english)}
+              </small>
+            </h2>
           </div>
           {analytics?.videos?.length ? (
             <div className="ss-an-list">
@@ -274,7 +331,10 @@ export function AnalyticsView() {
                 .slice(0, 5)
                 .map((v) => (
                   <a key={v.id} className="ss-an-list__row ss-an-list__row--link" href={v.share_url || undefined} target="_blank" rel="noreferrer">
-                    <span className="ss-an-list__title">{(v.title || v.video_description || t("Sans titre", "Untitled", english)).slice(0, 48)}</span>
+                    <span className="ss-an-list__title">
+                      {(v.title || v.video_description || t("Sans titre", "Untitled", english)).slice(0, 48)}
+                      {v.create_time ? <small className="ss-an-list__date"> · {fmtDate(v.create_time, english)}</small> : null}
+                    </span>
                     <b>{fmt(v.view_count || 0, english)}</b>
                     <small>{t("vues", "views", english)}</small>
                   </a>
