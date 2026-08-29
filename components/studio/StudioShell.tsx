@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n";
 import { isPaidPlan } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
 import { navActive, PAGE_TITLES, STUDIO_NAV } from "@/lib/studio-nav";
+import { sound } from "@/lib/sound";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
@@ -88,6 +89,7 @@ function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; 
   return (
     <Link
       href={entry.href}
+      onClick={() => !active && sound.nav()}
       className={[
         "ss-sidebar-link",
         active ? "is-active" : "",
@@ -112,8 +114,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const title = item ? (english ? item.en : item.fr) : "ScrollShow";
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
   const onMcp = pathname.startsWith("/app/mcp");
-  const onWizard = pathname.includes("/automations/") && pathname.endsWith("/edit");
-  const hideHeader = onMcp || onWizard || pathname.startsWith("/app/home");
+  const hideHeader = onMcp || pathname.startsWith("/app/home");
 
   const mainNav = STUDIO_NAV.filter((e) => e.section === "main");
   const bottomNav = STUDIO_NAV.filter((e) => e.section === "bottom");
@@ -192,7 +193,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <Suspense fallback={null}>
           <StudioFlash />
         </Suspense>
-        <div className="ss-main__body">{children}</div>
+        <div className="ss-main__body ss-page-enter" key={pathname}>
+          {children}
+        </div>
       </section>
       <AddChannelModal />
       <CreatePostModal />

@@ -146,15 +146,6 @@ export function IconHome(props: IconProps) {
   );
 }
 
-export function IconAutomations(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" {...stroke} />
-      <circle cx="12" cy="12" r="3.5" {...stroke} />
-    </Svg>
-  );
-}
-
 export function IconEyeOff(props: IconProps) {
   return (
     <Svg {...props}>
@@ -276,7 +267,6 @@ export function IconDatabase(props: IconProps) {
 
 const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   home: IconHome,
-  automations: IconAutomations,
   unshadowban: IconEyeOff,
   media: IconMedia,
   calendar: IconCalendar,

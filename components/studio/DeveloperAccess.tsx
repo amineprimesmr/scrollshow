@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { t as tr } from "@/lib/i18n";
@@ -112,7 +112,7 @@ export function DeveloperAccess() {
       const res = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: CLIENTS.find((item) => item.id === client)?.label || "Agent" }),
+        body: JSON.stringify({ name: "MCP" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "create_failed");
@@ -125,6 +125,11 @@ export function DeveloperAccess() {
       setCreating(false);
     }
   }
+
+  useEffect(() => {
+    void createKey();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function copy(id: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -309,10 +314,8 @@ export function DeveloperAccess() {
                     disabled={step.sensitive && !revealed}
                   />
                 ) : null}
-                {step.sensitive && !revealed ? (
-                  <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>
-                    {creating ? tx("Génération…", "Generating…") : tx("Générer ma clé ScrollShow", "Generate my ScrollShow key")}
-                  </button>
+                {step.sensitive && !revealed && creating ? (
+                  <p className="ss-mcp-card__warn">{tx("Génération de ta clé…", "Generating your key…")}</p>
                 ) : null}
                 {step.sensitive && error ? (
                   <p className="ss-mcp-error">

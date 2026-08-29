@@ -14,7 +14,6 @@ export type NavItem = {
 export const STUDIO_NAV: NavItem[] = [
   { href: "/app/home", fr: "Accueil", en: "Home", icon: "home", section: "main" },
   { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
-  { href: "/app/automations", fr: "Automations", en: "Automations", icon: "automations", section: "main" },
   { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },
   { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
   { href: "/app/analytics", fr: "Analytics", en: "Analytics", icon: "chart", section: "main" },

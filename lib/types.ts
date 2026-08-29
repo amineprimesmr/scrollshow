@@ -52,22 +52,6 @@ export type Run = {
   createdAt: string;
 };
 
-export type AutomationStatus = "draft" | "active" | "paused" | "completed";
-
-export type Automation = {
-  id: string;
-  userId: string;
-  name: string;
-  status: AutomationStatus;
-  channelId?: string;
-  postsTarget: number;
-  scheduleDays: number;
-  postTime: string;
-  postsGenerated: number;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type BrandProfile = {
   userId: string;
   website?: string;
@@ -207,7 +191,6 @@ export type StoreData = {
   posts: StudioPost[];
   media: MediaItem[];
   apiKeys: ApiKey[];
-  automations?: Automation[];
   brands?: BrandProfile[];
   pushSubscriptions?: PushSubscriptionRecord[];
 };
