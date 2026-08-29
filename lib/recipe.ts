@@ -335,9 +335,9 @@ export function publicRecipe(post: StudioPost) {
 export function needsReconstruct(recipe: CarouselRecipe) {
   if (recipe.origin !== "import" && recipe.origin !== "fork") return false;
   const overlays = recipe.slides.flatMap((slide) => slide.overlays);
-  const hasText = overlays.some((overlay) => overlay.text.trim());
+  const hasText = overlays.some((overlay) => (overlay.text || "").trim());
   if (!recipe.editable || !hasText) return !hasText;
-  return overlays.some((overlay) => overlayLooksBroken(overlay.text));
+  return overlays.some((overlay) => overlayLooksBroken(overlay.text || ""));
 }
 
 function overlayLooksBroken(text: string) {
@@ -356,7 +356,7 @@ export function needsRasterize(recipe: CarouselRecipe) {
   // recipe.editable — set only by the OCR reconstruct pipeline — meant every
   // manually composed post with typed-on text skipped rasterizing entirely and
   // published the bare photo.
-  return recipe.slides.some((slide) => Boolean(slide.backgroundColor) || slide.overlays.some((overlay) => overlay.text.trim()));
+  return recipe.slides.some((slide) => Boolean(slide.backgroundColor) || slide.overlays.some((overlay) => (overlay.text || "").trim()));
 }
 
 export function slidePreviewImage(slide: CarouselSlide) {

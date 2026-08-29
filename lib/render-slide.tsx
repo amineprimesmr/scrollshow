@@ -98,7 +98,7 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
           <img src={photo} width={1080} height={1920} style={{ position: "absolute", inset: 0, objectFit: "cover" }} />
         ) : null}
         {slide.overlays
-          .filter((overlay) => overlay.text.trim())
+          .filter((overlay) => (overlay.text || "").trim())
           .map((overlay) => (
             <div
               key={overlay.id}
@@ -143,7 +143,7 @@ export async function rasterizeRecipe(recipe: CarouselRecipe) {
   }
   const urls: string[] = [];
   for (const slide of recipe.slides) {
-    if (slide.overlays.some((overlay) => overlay.text.trim()) || slide.backgroundColor) {
+    if (slide.overlays.some((overlay) => (overlay.text || "").trim()) || slide.backgroundColor) {
       urls.push(await rasterizeSlide(slide, recipe));
     } else if (slide.image) {
       urls.push(slide.image);
