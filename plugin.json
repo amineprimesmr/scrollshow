@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "scrollshow",
+  "description": "Create, schedule, and publish TikTok photo carousels with ScrollShow — read analytics, search your research library, and reuse exact carousel recipes.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ScrollShow",
+    "url": "https://scrollshow.io"
+  }
+}
