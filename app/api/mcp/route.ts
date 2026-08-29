@@ -38,8 +38,7 @@ function text(data: unknown) {
 
 function fail(error: unknown) {
   const message = error instanceof Error ? error.message : "error";
-  const stack = error instanceof Error ? error.stack : undefined;
-  return { content: [{ type: "text" as const, text: JSON.stringify({ error: message, stack }) }], isError: true as const };
+  return { content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }], isError: true as const };
 }
 
 function userFrom(ctx: { http?: { authInfo?: AuthInfo } }): SessionUser {

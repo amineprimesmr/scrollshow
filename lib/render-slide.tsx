@@ -82,18 +82,23 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
   const photo = keepPhoto ? await dataUrl(slide.sourceImage || slide.image) : "";
   const background = slide.backgroundColor || "#111111";
   const fonts = await fontsFor(recipe, slide);
+  const gradient = slide.backgroundColor2 && !keepPhoto;
+  const outerStyle: Record<string, unknown> = {
+    width: 1080,
+    height: 1920,
+    display: "flex",
+    position: "relative",
+    backgroundColor: background,
+  };
+  // Satori/css-to-react-native crashes with "Cannot read properties of
+  // undefined (reading 'trim')" if a style key is present with an
+  // `undefined` value (e.g. backgroundImage) — omit the key entirely instead.
+  if (gradient) {
+    outerStyle.backgroundImage = `linear-gradient(180deg, ${background}, ${slide.backgroundColor2})`;
+  }
   const png = new ImageResponse(
     (
-      <div
-        style={{
-          width: 1080,
-          height: 1920,
-          display: "flex",
-          position: "relative",
-          backgroundColor: background,
-          backgroundImage: slide.backgroundColor2 && !keepPhoto ? `linear-gradient(180deg, ${background}, ${slide.backgroundColor2})` : undefined,
-        }}
-      >
+      <div style={outerStyle}>
         {photo ? (
           <img src={photo} width={1080} height={1920} style={{ position: "absolute", inset: 0, objectFit: "cover" }} />
         ) : null}
@@ -111,10 +116,10 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
                 display: "flex",
                 justifyContent:
                   overlay.align === "left" ? "flex-start" : overlay.align === "right" ? "flex-end" : "center",
-                color: overlay.color,
-                fontFamily: overlay.fontFamily,
-                fontSize: overlay.fontSize,
-                fontWeight: overlay.fontWeight,
+                color: overlay.color || "#ffffff",
+                fontFamily: overlay.fontFamily || recipe.fontFamily,
+                fontSize: overlay.fontSize ?? 64,
+                fontWeight: overlay.fontWeight ?? 800,
                 lineHeight: overlay.lineHeight ?? 1.05,
                 textAlign: overlay.align,
                 whiteSpace: "pre-wrap",
