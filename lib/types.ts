@@ -52,15 +52,6 @@ export type Run = {
   createdAt: string;
 };
 
-export type BrandProfile = {
-  userId: string;
-  website?: string;
-  productName?: string;
-  audience?: string;
-  tone?: string;
-  updatedAt?: string;
-};
-
 export type Channel = {
   id: string;
   userId: string;
@@ -191,7 +182,6 @@ export type StoreData = {
   posts: StudioPost[];
   media: MediaItem[];
   apiKeys: ApiKey[];
-  brands?: BrandProfile[];
   pushSubscriptions?: PushSubscriptionRecord[];
 };
 

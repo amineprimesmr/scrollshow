@@ -155,33 +155,6 @@ export function IconEyeOff(props: IconProps) {
   );
 }
 
-export function IconGift(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="10" width="18" height="10" rx="2" {...stroke} />
-      <path d="M12 10v10M3 14h18M8.5 10C7 10 6 8.8 6 7.5S7 5 8.5 5 11 6.2 11 7.5M12.5 10c1.5 0 2.5-1.2 2.5-2.5S14 5 12.5 5 10 6.2 10 7.5" {...stroke} />
-    </Svg>
-  );
-}
-
-export function IconBriefcase(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="8" width="18" height="12" rx="2" {...stroke} />
-      <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8M3 13h18" {...stroke} />
-    </Svg>
-  );
-}
-
-export function IconBook(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M5 4.5h11a2 2 0 0 1 2 2V19.5H7a2 2 0 0 0-2 2V6.5a2 2 0 0 1 2-2Z" {...stroke} />
-      <path d="M7 19.5h11" {...stroke} />
-    </Svg>
-  );
-}
-
 export function IconFlame(props: IconProps) {
   return (
     <Svg {...props}>
@@ -272,15 +245,15 @@ const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   calendar: IconCalendar,
   chart: IconChart,
   warmed: IconFlame,
-  gift: IconGift,
-  brand: IconBriefcase,
-  guide: IconBook,
   plug: IconPlug,
   mcp: IconMcp,
   settings: IconSettings,
 };
 
 export function NavIcon({ name, size = 18 }: { name: string; size?: number }) {
+  if (name === "tiktok") {
+    return <img src="/assets/platforms/tiktok.png" alt="" width={size} height={size} className="ss-sidebar-tiktok" />;
+  }
   const Icon = NAV_ICON_MAP[name] || IconHome;
   return <Icon size={size} />;
 }

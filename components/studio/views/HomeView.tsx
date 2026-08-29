@@ -137,12 +137,6 @@ export function HomeView() {
         </Link>
       </div>
 
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <Link href="/app/guide" className="ss-btn-ghost">
-          {t("Changelog →", "Changelog →", en)}
-        </Link>
-      </div>
-
       <section className="ss-faq">
         <h2>❓ {t("Questions fréquentes", "Frequently Asked Questions", en)}</h2>
         <div className="ss-faq-grid">
