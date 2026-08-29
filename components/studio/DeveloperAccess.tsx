@@ -27,6 +27,7 @@ type Step = {
   primary?: boolean;
   secondaryCta?: string;
   secondaryHref?: string;
+  sensitive?: boolean;
 };
 
 const CLIENTS = AI_CLIENTS;
@@ -68,11 +69,13 @@ function CopyField({
   copied,
   onCopy,
   multiline,
+  disabled,
 }: {
   value: string;
   copied: boolean;
   onCopy: () => void;
   multiline?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className={`ss-mcp-copy ${multiline ? "is-multi" : ""}`}>
@@ -82,7 +85,7 @@ function CopyField({
         ) : (
           <input readOnly value={value} onFocus={(event) => event.currentTarget.select()} />
         )}
-        <button type="button" onClick={onCopy} aria-label="Copy">
+        <button type="button" onClick={onCopy} aria-label="Copy" disabled={disabled}>
           {copied ? <CheckIcon /> : <CopyIcon />}
         </button>
       </div>
@@ -187,6 +190,7 @@ export function DeveloperAccess() {
           body: tx("Colle-la dans le terminal de Codex.", "Paste it in the Codex terminal."),
           field: codexExport,
           copyId: "codex-env",
+          sensitive: true,
         },
         {
           n: "2",
@@ -207,13 +211,15 @@ export function DeveloperAccess() {
           body: tx("Tu la colleras dans le terminal au step suivant.", "You’ll paste it in the terminal next."),
           field: claudeCli,
           copyId: "cli",
+          sensitive: true,
         },
         {
           n: "2",
-          title: tx("Colle-la dans Claude Code", "Paste it in Claude Code"),
-          body: tx("Ouvre ton projet, colle la commande, puis relance la session.", "Open your project, paste the command, then reload the session."),
-          cta: tx("Ouvrir Claude Code", "Open Claude Code"),
-          href: "https://docs.anthropic.com/en/docs/claude-code",
+          title: tx("Colle-la dans le terminal", "Paste it in your terminal"),
+          body: tx(
+            "Dans le terminal où tourne Claude Code (pas une nouvelle fenêtre), colle la commande et valide, puis relance la session.",
+            "In the terminal where Claude Code is running (not a new window), paste the command and press enter, then reload the session.",
+          ),
         },
         start,
       ];
@@ -234,6 +240,7 @@ export function DeveloperAccess() {
           body: tx("Un clic. Cursor te demande de confirmer. C’est tout.", "One click. Cursor will ask you to confirm. That’s it."),
           cta: tx("Ouvrir Cursor", "Open Cursor"),
           href: cursorDeeplink,
+          sensitive: true,
         },
         start,
       ];
@@ -292,6 +299,69 @@ export function DeveloperAccess() {
         </p>
       </header>
 
+      <div className="ss-mcp-panel">
+        <div className="ss-mcp-bar">
+          <div className="ss-mcp-tabs" role="tablist">
+            {CLIENTS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={client === item.id}
+                className={client === item.id ? "is-on" : ""}
+                onClick={() => pick(item.id)}
+              >
+                <img src={item.logo} alt="" className="ss-mcp-tabs__mark" style={{ background: item.bg }} />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ss-mcp-board">
+          {stepList.map((step) => (
+            <article key={`${client}-${step.n}`} className="ss-mcp-card">
+              <span className="ss-mcp-card__n">{step.n}</span>
+              <h3>
+                {step.n === "1" ? <BrandMark size={18} /> : null}
+                {step.title}
+              </h3>
+              <p>{step.body}</p>
+              <div className="ss-mcp-card__action">
+                {step.field ? (
+                  <CopyField
+                    value={step.field}
+                    copied={copied === step.copyId}
+                    onCopy={() => void copy(step.copyId || "field", step.field || "")}
+                    disabled={step.sensitive && !revealed}
+                  />
+                ) : null}
+                {step.sensitive && !revealed ? (
+                  <p className="ss-mcp-card__warn">{tx("Crée une clé ci-dessous d'abord.", "Create a key below first.")}</p>
+                ) : null}
+                {step.cta && step.href ? (
+                  step.sensitive && !revealed ? (
+                    <span className="ss-btn-ghost is-disabled" aria-disabled="true">
+                      {step.cta}
+                    </span>
+                  ) : (
+                    <a className={step.primary ? "ss-btn-purple" : "ss-btn-ghost"} href={step.href}>
+                      {step.cta}
+                      {step.primary ? null : <ExternalIcon />}
+                    </a>
+                  )
+                ) : null}
+                {step.secondaryCta && step.secondaryHref ? (
+                  <a className="ss-mcp-card__secondary" href={step.secondaryHref} target="_blank" rel="noreferrer">
+                    {step.secondaryCta}
+                  </a>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
       <div className="ss-mcp-keys">
         <div className="ss-mcp-keys__head">
           <div>
@@ -336,55 +406,6 @@ export function DeveloperAccess() {
         ) : (
           <p className="ss-mcp-keys__empty">{tx("Aucune clé pour l’instant.", "No keys yet.")}</p>
         )}
-      </div>
-
-      <div className="ss-mcp-panel">
-        <div className="ss-mcp-bar">
-          <div className="ss-mcp-tabs" role="tablist">
-            {CLIENTS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={client === item.id}
-                className={client === item.id ? "is-on" : ""}
-                onClick={() => pick(item.id)}
-              >
-                <img src={item.logo} alt="" className="ss-mcp-tabs__mark" style={{ background: item.bg }} />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="ss-mcp-board">
-          {stepList.map((step) => (
-            <article key={`${client}-${step.n}`} className="ss-mcp-card">
-              <span className="ss-mcp-card__n">{step.n}</span>
-              <h3>
-                {step.n === "1" ? <BrandMark size={18} /> : null}
-                {step.title}
-              </h3>
-              <p>{step.body}</p>
-              <div className="ss-mcp-card__action">
-                {step.field ? (
-                  <CopyField value={step.field} copied={copied === step.copyId} onCopy={() => void copy(step.copyId || "field", step.field || "")} />
-                ) : null}
-                {step.cta && step.href ? (
-                  <a className={step.primary ? "ss-btn-purple" : "ss-btn-ghost"} href={step.href}>
-                    {step.cta}
-                    {step.primary ? null : <ExternalIcon />}
-                  </a>
-                ) : null}
-                {step.secondaryCta && step.secondaryHref ? (
-                  <a className="ss-mcp-card__secondary" href={step.secondaryHref} target="_blank" rel="noreferrer">
-                    {step.secondaryCta}
-                  </a>
-                ) : null}
-              </div>
-            </article>
-          ))}
-        </div>
       </div>
 
       <p className="ss-mcp-foot">

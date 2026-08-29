@@ -2408,6 +2408,24 @@ a.ss-btn-ghost {
   color: var(--ss-ink);
 }
 
+.ss-mcp-card__warn {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: #b45309;
+}
+
+.ss-btn-ghost.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ss-mcp-copy__row button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .ss-mcp-card__n {
   display: grid;
   place-items: center;
