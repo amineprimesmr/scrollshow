@@ -34,6 +34,8 @@ const preferencesSchema = z.object({
   autoAddMusic: z.boolean(),
   brandContent: z.boolean(),
   brandOrganic: z.boolean(),
+  notifyPublishSuccess: z.boolean(),
+  notifyPublishFailure: z.boolean(),
 });
 
 const schema = z.discriminatedUnion("action", [profileSchema, passwordSchema, unlinkSchema, preferencesSchema]);
@@ -116,6 +118,8 @@ export async function PATCH(request: Request) {
       autoAddMusic: body.autoAddMusic,
       brandContent: body.brandContent,
       brandOrganic: body.brandOrganic,
+      notifyPublishSuccess: body.notifyPublishSuccess,
+      notifyPublishFailure: body.notifyPublishFailure,
     };
     return user;
   });

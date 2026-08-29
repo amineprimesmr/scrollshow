@@ -13,6 +13,8 @@ export type UserSettings = {
   autoAddMusic: boolean;
   brandContent: boolean;
   brandOrganic: boolean;
+  notifyPublishSuccess: boolean;
+  notifyPublishFailure: boolean;
 };
 
 export type User = {
@@ -187,6 +189,16 @@ export type ApiKey = {
   lastUsedAt?: string;
 };
 
+export type PushSubscriptionRecord = {
+  id: string;
+  userId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  label: string;
+  createdAt: string;
+};
+
 export type StoreData = {
   users: User[];
   accounts: Account[];
@@ -197,6 +209,7 @@ export type StoreData = {
   apiKeys: ApiKey[];
   automations?: Automation[];
   brands?: BrandProfile[];
+  pushSubscriptions?: PushSubscriptionRecord[];
 };
 
 export type SessionUser = {

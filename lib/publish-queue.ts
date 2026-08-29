@@ -1,3 +1,4 @@
+import { sendPushToUser } from "./push";
 import { ensureRecipe, needsRasterize, photosOf } from "./recipe";
 import { rasterizeRecipe } from "./render-slide";
 import { resolveSettings, tiktokPostFlags } from "./settings";
@@ -128,6 +129,7 @@ export async function reconcilePendingPublishes() {
     try {
       const status = await fetchPublishStatus(channel.accessToken, post.publishId as string);
       const state = String(status.status || "");
+      let failReason = "";
       await updateStore((store) => {
         const current = store.posts.find((item) => item.id === post.id);
         if (!current) return;
@@ -138,10 +140,30 @@ export async function reconcilePendingPublishes() {
           const postId = (status.publicaly_available_post_id || status.publicly_available_post_id || [])[0];
           if (postId) current.tiktokId = String(postId);
         } else if (state === "FAILED") {
+          failReason = String(status.fail_reason || "failed").slice(0, 300);
           current.status = "draft";
-          current.publishError = String(status.fail_reason || "failed").slice(0, 300);
+          current.publishError = failReason;
         }
       });
+      // Fire-and-forget: a cron tick reconciles many posts, and a slow/failed
+      // push service must never hold up the next post's reconciliation.
+      const settings = resolveSettings(user);
+      const caption = (post.body || "").slice(0, 60);
+      if (state === "PUBLISH_COMPLETE" && settings.notifyPublishSuccess) {
+        void sendPushToUser(user.id, {
+          title: "Post publié sur TikTok",
+          body: caption || "Ton carrousel programmé vient d'être publié.",
+          url: "/app",
+          tag: `publish-${post.id}`,
+        });
+      } else if (state === "FAILED" && settings.notifyPublishFailure) {
+        void sendPushToUser(user.id, {
+          title: "Échec de publication",
+          body: caption ? `${caption} — ${failReason}` : failReason || "La publication a échoué.",
+          url: "/app",
+          tag: `publish-${post.id}`,
+        });
+      }
       results.push({ id: post.id, status: state });
     } catch (error) {
       results.push({ id: post.id, status: error instanceof Error ? error.message : "status_error" });

@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoAddMusic: true,
   brandContent: false,
   brandOrganic: false,
+  notifyPublishSuccess: true,
+  notifyPublishFailure: true,
 };
 
 export const TIMEZONES = [
@@ -60,6 +62,8 @@ export function resolveSettings(user?: Pick<User, "settings"> | null): UserSetti
     autoAddMusic: user?.settings?.autoAddMusic !== false,
     brandContent: Boolean(user?.settings?.brandContent),
     brandOrganic: Boolean(user?.settings?.brandOrganic),
+    notifyPublishSuccess: user?.settings?.notifyPublishSuccess !== false,
+    notifyPublishFailure: user?.settings?.notifyPublishFailure !== false,
   };
 }
 
