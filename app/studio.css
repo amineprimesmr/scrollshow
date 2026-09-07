@@ -4394,3 +4394,141 @@ a.ss-btn-ghost {
   color: #991b1b;
   font-weight: 650;
 }
+
+/* Shadowban — distribution-round model */
+.ss-rounds {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ss-rounds__score {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: center;
+  border-radius: var(--ss-radius);
+  padding: 20px 24px;
+}
+
+.ss-rounds__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.ss-rounds__value {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.ss-rounds__of {
+  font-size: 16px;
+  font-weight: 700;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.ss-rounds__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.08);
+  margin: 10px 0 6px;
+  overflow: hidden;
+}
+
+.ss-rounds__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.ss-rounds__score small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ss-rounds__diag h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.ss-rounds__diag p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ss-rounds__trend {
+  margin-top: 8px !important;
+  font-size: 13px;
+}
+
+.ss-rounds__hist {
+  display: grid;
+  gap: 10px;
+}
+
+.ss-rounds__row {
+  display: grid;
+  grid-template-columns: 80px 1fr 220px;
+  gap: 12px;
+  align-items: center;
+}
+
+.ss-rounds__round b {
+  display: block;
+  font-size: 14px;
+}
+
+.ss-rounds__round span,
+.ss-rounds__count span {
+  font-size: 11px;
+  color: var(--ss-muted);
+}
+
+.ss-rounds__track {
+  height: 18px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.ss-rounds__track i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.ss-rounds__count b {
+  display: block;
+  font-size: 16px;
+}
+
+.ss-rounds__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.ss-rounds__grid .ss-panel h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+@media (max-width: 760px) {
+  .ss-rounds__score,
+  .ss-rounds__grid {
+    grid-template-columns: 1fr;
+  }
+  .ss-rounds__row {
+    grid-template-columns: 60px 1fr 140px;
+  }
+}

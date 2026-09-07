@@ -1,3 +1,4 @@
+import { analyzeRounds, type RoundsReport } from "./shadowban-rounds";
 import type { TikTokVideo } from "./tiktok";
 
 export type ShadowbanVerdict = "insufficient_data" | "none" | "mild" | "likely";
@@ -23,6 +24,8 @@ export type ShadowbanReport = {
   estimatedOnset: string | null;
   windowMode: "date" | "count" | "none";
   points: VideoPoint[];
+  /** Distribution-round model: histogram, 0-100 probability, signals, fixes. */
+  rounds: RoundsReport;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -85,6 +88,7 @@ export function analyzeShadowban(videos: TikTokVideo[]): ShadowbanReport {
       consecutiveLowCount: 0,
       estimatedOnset: null,
       windowMode: "none",
+      rounds: analyzeRounds(sorted),
       points: sorted.map((v) => ({
         id: v.id,
         createdAt: new Date(v.create_time * 1000).toISOString(),
@@ -139,6 +143,7 @@ export function analyzeShadowban(videos: TikTokVideo[]): ShadowbanReport {
     consecutiveLowCount: verdict === "none" || verdict === "insufficient_data" ? 0 : consecutiveLowCount,
     estimatedOnset: verdict === "likely" || verdict === "mild" ? (onsetVideo ? new Date(onsetVideo.create_time * 1000).toISOString() : null) : null,
     windowMode: mode,
+    rounds: analyzeRounds(sorted),
     points: sorted.map((v) => ({
       id: v.id,
       createdAt: new Date(v.create_time * 1000).toISOString(),

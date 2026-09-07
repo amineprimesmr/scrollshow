@@ -5,6 +5,7 @@ import type { ShadowbanReport, VideoPoint } from "@/lib/shadowban";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "../StudioContext";
+import { ShadowbanRounds } from "./ShadowbanRounds";
 
 const VERDICT_STYLE: Record<ShadowbanReport["verdict"], { bg: string; fg: string; barLow: string }> = {
   insufficient_data: { bg: "#f4f4f5", fg: "#52525b", barLow: "#a1a1aa" },
@@ -192,6 +193,8 @@ export function ShadowbanView() {
               </p>
             ) : null}
           </div>
+
+          {report.rounds ? <ShadowbanRounds rounds={report.rounds} en={en} /> : null}
 
           {report.verdict !== "insufficient_data" ? (
             <>

@@ -1,5 +1,6 @@
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import { fetchUserInfo, listRecentVideos, publicChannel } from "./tiktok";
+import { analyzeShadowban } from "./shadowban";
 import {
   applyRecipePatch,
   cloneRecipe,
@@ -819,6 +820,52 @@ export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
   );
   if (!account) throw new AgentError("account_missing", 404);
   return account;
+}
+
+/**
+ * Shadowban / throttling check on the connected TikTok account(s): a 0-100
+ * probability per account, the distribution-round histogram behind it, the
+ * spam/automation signals found, the throttled-vs-content split, and a fix
+ * list. Reads the creator's own last <=30 posts through video.list.
+ */
+export async function agentShadowbanCheck(user: SessionUser) {
+  const channels = await loadTikTokChannels(user.id);
+  if (!channels.length) throw new AgentError("tiktok_not_connected", 401);
+  const accounts: Array<Record<string, unknown>> = [];
+  for (const channel of channels) {
+    try {
+      const videos = await listRecentVideos(channel.accessToken as string, 30);
+      const report = analyzeShadowban(videos);
+      const r = report.rounds;
+      accounts.push({
+        handle: channel.handle,
+        name: channel.name,
+        probability: r.probability,
+        diagnosis: r.diagnosis,
+        verdict: report.verdict,
+        postCount: r.postCount,
+        histogram: r.histogram,
+        medianViews: r.medianViews,
+        medianEngagement: r.medianEngagement,
+        r0Share: r.r0Share,
+        trend: r.trend,
+        signals: r.signals,
+        scoreBreakdown: r.scoreBreakdown,
+        recentAvgViews: report.recentAvgViews,
+        baselineAvgViews: report.baselineAvgViews,
+        dropPct: report.dropPct,
+        estimatedOnset: report.estimatedOnset,
+        fixes: r.fixes,
+      });
+    } catch (error) {
+      accounts.push({ handle: channel.handle, name: channel.name, error: error instanceof Error ? error.message : "shadowban_failed" });
+    }
+  }
+  return {
+    accounts,
+    model:
+      "TikTok distributes in rounds (R0 <200 views: never left the seed batch; R1 200-500: seeded, no expansion; R2 500-2k; R3 2k-20k FYP traction; R4 >20k viral). Probability = R0 share (<=40) + median<300 (20) + zero-view posts (<=20) + burst posting (10) + duplicate captions (10). At a low median, engagement >=1% = throttled (change how you post), <1% = content fails the seed test (fix slide 1 / first 1.5s). This is an estimate; TikTok publishes no shadowban status.",
+  };
 }
 
 export async function agentReport(user: SessionUser) {

@@ -14,6 +14,7 @@ import {
   agentPublish,
   agentReconstructPost,
   agentReport,
+  agentShadowbanCheck,
   agentSetVisibility,
   agentUpdatePost,
   agentUpdateRecipe,
@@ -401,6 +402,23 @@ const handler = createMcpHandler(
       async (_args, ctx) => {
         try {
           return text(await agentReport(userFrom(ctx)));
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "shadowban_check",
+      {
+        title: "TikTok shadowban / throttling check",
+        description:
+          "Tell whether the connected TikTok account(s) are shadowbanned or throttled: a 0-100 probability per account, the distribution-round histogram (R0-R4) behind it, the spam/automation signals found (burst posting, duplicate captions, repeated hashtags, zero-view posts), whether the account is throttled (engagement >=1%) or the content fails the seed test (<1%), the last-10 vs previous-10 trend, and a fix list. Use when the user asks 'am I shadowbanned', 'why did my reach drop', 'why 200 views', or is about to abandon/recreate an account. Present it as a diagnosis with a table, not raw JSON.",
+        inputSchema: z.object({}),
+      },
+      async (_args, ctx) => {
+        try {
+          return text(await agentShadowbanCheck(userFrom(ctx)));
         } catch (error) {
           return fail(error);
         }
