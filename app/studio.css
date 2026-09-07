@@ -5009,12 +5009,11 @@ a.ss-btn-ghost {
 /* ================================================================== */
 .ss-fan {
   --fan-green: #22c55e;
-  --fan-green-soft: #4ade80;
   position: relative;
   margin: 0 0 24px;
   border-radius: 26px;
   background:
-    radial-gradient(70% 55% at 22% -10%, rgb(34 197 94 / 0.22), transparent 62%),
+    radial-gradient(70% 55% at 22% -10%, rgb(34 197 94 / 0.2), transparent 62%),
     radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1.2px) 0 0 / 14px 14px,
     #050505;
   border: 1px solid rgb(255 255 255 / 0.08);
@@ -5109,9 +5108,9 @@ a.ss-btn-ghost {
 
 .ss-fan__stage {
   position: relative;
-  height: 470px;
-  perspective: 1500px;
-  perspective-origin: 50% 40%;
+  height: 480px;
+  perspective: 1400px;
+  perspective-origin: 45% 38%;
   transform-style: preserve-3d;
   cursor: grab;
   outline: none;
@@ -5168,101 +5167,146 @@ a.ss-btn-ghost {
   will-change: transform;
 }
 
-/* Folder */
+/* ---------- Folder: back panel, tab, sheets peeking out, opaque front pocket ---------- */
 .ss-folder {
   position: absolute;
   left: 0;
   top: 0;
-  width: 168px;
-  height: 208px;
+  width: 184px;
+  height: 226px;
   transform-style: preserve-3d;
   will-change: transform, opacity;
   backface-visibility: hidden;
   cursor: pointer;
 }
 
-.ss-folder__tab {
-  position: absolute;
-  top: -11px;
-  left: 0;
-  width: 60px;
-  height: 20px;
-  border-radius: 11px 11px 0 0;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.86), rgb(255 255 255 / 0.62));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
-}
-
-.ss-folder__body {
+.ss-folder__back {
   position: absolute;
   inset: 0;
-  border-radius: 14px;
-  background:
-    linear-gradient(160deg, rgb(255 255 255 / 0.84) 0%, rgb(255 255 255 / 0.56) 46%, rgb(235 235 240 / 0.42) 100%);
+  border-radius: 16px;
+  background: linear-gradient(172deg, rgb(255 255 255 / 0.66) 0%, rgb(228 228 236 / 0.5) 100%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.95),
-    inset 0 0 0 1px rgb(255 255 255 / 0.42),
-    inset 0 -18px 30px rgb(255 255 255 / 0.18),
-    0 24px 48px rgb(0 0 0 / 0.48);
-  overflow: hidden;
-  transition: box-shadow 0.25s ease, background 0.25s ease;
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    inset 0 0 0 1px rgb(255 255 255 / 0.32),
+    0 26px 50px rgb(0 0 0 / 0.52);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
-.ss-folder__body::after {
+.ss-folder__tab {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  width: 66px;
+  height: 22px;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.84), rgb(236 236 242 / 0.66));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95);
+  transition: background 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ss-folder__docs {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 12px;
+  height: 130px;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ss-folder__doc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 118px;
+  padding: 13px 12px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.14), inset 0 0 0 1px rgb(0 0 0 / 0.03);
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ss-folder__doc i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: #cdd0d8;
+}
+
+/* three sheets, slightly fanned; the first one is in front */
+.ss-folder__doc:nth-child(1) {
+  z-index: 3;
+  transform: translate3d(0, 10px, 0) rotate(-1.2deg);
+}
+
+.ss-folder__doc:nth-child(2) {
+  z-index: 2;
+  transform: translate3d(6px, 2px, 0) rotate(0.6deg);
+}
+
+.ss-folder__doc:nth-child(3) {
+  z-index: 1;
+  transform: translate3d(12px, -6px, 0) rotate(2deg);
+}
+
+.ss-folder__front {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58%;
+  border-radius: 12px 12px 16px 16px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.96) 0%, rgb(238 238 244 / 0.92) 100%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 0 0 1px rgb(255 255 255 / 0.5),
+    0 -10px 24px rgb(0 0 0 / 0.1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ss-folder__front::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.22) 45%, transparent 60%);
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.5) 48%, transparent 62%);
   pointer-events: none;
-}
-
-.ss-folder__lines {
-  position: absolute;
-  top: 20px;
-  left: 16px;
-  right: 16px;
-  display: grid;
-  gap: 7px;
-}
-
-.ss-folder__lines i {
-  display: block;
-  height: 6px;
-  border-radius: 3px;
-  background: rgb(255 255 255 / 0.92);
-  box-shadow: 0 1px 0 rgb(0 0 0 / 0.04);
 }
 
 .ss-folder__avatar {
   position: absolute;
-  top: 16px;
-  right: 14px;
+  top: 12px;
+  right: 12px;
   width: 30px;
   height: 30px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgb(255 255 255 / 0.9);
-  box-shadow: 0 4px 10px rgb(0 0 0 / 0.2);
+  border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.18);
 }
 
 .ss-folder__count {
   position: absolute;
   left: 14px;
-  bottom: 44px;
+  bottom: 46px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 12px;
   font-weight: 700;
-  color: #111;
+  color: #18181b;
 }
 
 .ss-folder__label {
   position: absolute;
   left: 14px;
   right: 10px;
-  bottom: 12px;
+  bottom: 14px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: -0.02em;
   color: #0a0a0a;
   white-space: nowrap;
@@ -5273,8 +5317,8 @@ a.ss-btn-ghost {
 .ss-folder.is-live .ss-folder__tab::after {
   content: "";
   position: absolute;
-  right: 8px;
-  top: 6px;
+  right: 9px;
+  top: 7px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -5282,24 +5326,36 @@ a.ss-btn-ghost {
   box-shadow: 0 0 8px var(--fan-green);
 }
 
-.ss-folder.is-selected .ss-folder__tab {
-  background: linear-gradient(180deg, #86efac, #22c55e);
-}
-
-.ss-folder.is-selected .ss-folder__body {
+/* Selected: the folder opens — green, tab lifts, sheets slide up */
+.ss-folder.is-selected .ss-folder__back {
   background:
     radial-gradient(90% 60% at 30% 0%, rgb(255 255 255 / 0.35), transparent 60%),
-    linear-gradient(160deg, #4ade80 0%, #22c55e 45%, #15803d 100%);
+    linear-gradient(172deg, #4ade80 0%, #22c55e 55%, #16a34a 100%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.8),
     inset 0 0 0 1px rgb(187 247 208 / 0.6),
     0 0 0 1px rgb(34 197 94 / 0.5),
-    0 0 46px rgb(34 197 94 / 0.55),
-    0 28px 60px rgb(0 0 0 / 0.55);
+    0 0 52px rgb(34 197 94 / 0.55),
+    0 30px 60px rgb(0 0 0 / 0.55);
 }
 
-.ss-folder.is-selected .ss-folder__lines i {
-  background: rgb(255 255 255 / 0.85);
+.ss-folder.is-selected .ss-folder__tab {
+  background: linear-gradient(180deg, #86efac, #22c55e);
+  transform: translateY(-4px);
+}
+
+.ss-folder.is-selected .ss-folder__docs {
+  transform: translateY(-14px);
+}
+
+.ss-folder.is-selected .ss-folder__front {
+  background:
+    linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.28) 48%, transparent 62%),
+    linear-gradient(180deg, rgb(74 222 128 / 0.96), rgb(22 163 74 / 0.96));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    inset 0 0 0 1px rgb(187 247 208 / 0.5),
+    0 -10px 24px rgb(0 0 0 / 0.14);
 }
 
 .ss-folder.is-selected .ss-folder__count,
@@ -5307,124 +5363,8 @@ a.ss-btn-ghost {
   color: #fff;
 }
 
-/* Floating glass card */
-.ss-fan__card {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 236px;
-  padding: 14px 16px 16px;
-  border-radius: 18px;
-  background: linear-gradient(160deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.36));
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid rgb(255 255 255 / 0.55);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 30px 60px rgb(0 0 0 / 0.45);
-  color: #0a0a0a;
-  z-index: 2000;
-  will-change: transform;
-  pointer-events: none;
-}
-
-.ss-fan__card-inner {
-  animation: ss-fan-card-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.ss-fan__card button {
-  pointer-events: auto;
-}
-
-@keyframes ss-fan-card-in {
-  from {
-    opacity: 0;
-    scale: 0.94;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
-}
-
-.ss-fan__card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.ss-fan__card-head b {
-  display: block;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  max-width: 160px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ss-fan__card-head span {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: rgb(10 10 10 / 0.55);
-}
-
-.ss-fan__card-arrow {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 0;
-  background: rgb(10 10 10 / 0.06);
-  color: #0a0a0a;
-  font: inherit;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background-color 0.16s ease, transform 0.16s ease;
-}
-
-.ss-fan__card-arrow:hover {
-  background: #0a0a0a;
-  color: #fff;
-  transform: translateX(2px);
-}
-
-.ss-fan__card-big {
-  margin-top: 12px;
-  font-size: 34px;
-  font-weight: 300;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.ss-fan__card-big small {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: rgb(10 10 10 / 0.55);
-}
-
-.ss-fan__card-dot {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--fan-green-soft);
-  box-shadow: 0 0 0 5px rgb(74 222 128 / 0.3), 0 0 22px rgb(34 197 94 / 0.7);
-  display: grid;
-  place-items: center;
-}
-
-.ss-fan__card-dot i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #0a0a0a;
+.ss-folder.is-selected .ss-folder__avatar {
+  border-color: #dcfce7;
 }
 
 /* Empty state */
@@ -5548,18 +5488,30 @@ a.ss-btn-ghost {
     perspective: 1100px;
   }
   .ss-folder {
-    width: 116px;
-    height: 148px;
+    width: 128px;
+    height: 158px;
+  }
+  .ss-folder__docs {
+    height: 92px;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+  }
+  .ss-folder__doc {
+    height: 84px;
+    padding: 10px;
   }
   .ss-folder__label {
     font-size: 13px;
+    bottom: 10px;
   }
-  .ss-fan__card {
-    width: 196px;
-    padding: 12px 14px 14px;
+  .ss-folder__count {
+    bottom: 36px;
+    font-size: 11px;
   }
-  .ss-fan__card-big {
-    font-size: 28px;
+  .ss-folder__avatar {
+    width: 24px;
+    height: 24px;
   }
   .ss-fan__detail {
     grid-template-columns: 1fr;
@@ -5573,8 +5525,11 @@ a.ss-btn-ghost {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ss-fan__card-inner,
-  .ss-fan__detail {
+  .ss-fan__detail,
+  .ss-folder__docs,
+  .ss-folder__doc,
+  .ss-folder__tab {
     animation: none !important;
+    transition: none !important;
   }
 }

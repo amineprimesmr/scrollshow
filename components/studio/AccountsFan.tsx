@@ -24,7 +24,6 @@ export type FanItem = {
   avgViews: number;
   connected: boolean;
   verdict?: Account["verdict"];
-  since?: string;
 };
 
 type SortKey = "followers" | "likes" | "posts";
@@ -59,7 +58,6 @@ function fromAccount(a: Account): FanItem {
     avgViews: a.avgViews || 0,
     connected: false,
     verdict: a.verdict,
-    since: a.createdAt,
   };
 }
 
@@ -74,21 +72,32 @@ export function compact(n: number) {
 /* Geometry                                                            */
 /* ------------------------------------------------------------------ */
 
-type Geo = { step: number; gap: number; lift: number; w: number; h: number; tilt: number };
+type Geo = { w: number; h: number; step: number; baseRot: number; focusRot: number };
 
-const DESKTOP: Geo = { step: 46, gap: 128, lift: 0, w: 168, h: 208, tilt: -56 };
-const MOBILE: Geo = { step: 32, gap: 84, lift: 0, w: 116, h: 148, tilt: -54 };
+const DESKTOP: Geo = { w: 184, h: 226, step: 58, baseRot: -58, focusRot: -30 };
+const MOBILE: Geo = { w: 128, h: 158, step: 38, baseRot: -56, focusRot: -30 };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const smooth = (v: number) => {
   const x = clamp(v, 0, 1);
   return x * x * (3 - 2 * x);
 };
+const rad = (deg: number) => (deg * Math.PI) / 180;
 
-/** Horizontal offset of an item sitting `d` slots away from the focus. */
-function offsetX(d: number, g: Geo) {
-  // Items before the focus pack tightly; the focus opens a gap after itself.
-  return d * g.step + g.gap * smooth(d);
+/**
+ * Where an item sits when it is `d` slots away from the (per-item) focus.
+ * The focused folder turns towards the viewer, so its projected width grows:
+ * everything after it shifts by exactly that extra footprint. No artificial gap.
+ */
+function layout(d: number, g: Geo) {
+  const near = Math.exp(-(d * d) / 1.3); // 1 at the focus, fades over ~1.5 slots
+  const opened = g.w * (Math.cos(rad(g.focusRot)) - Math.cos(rad(g.baseRot)));
+  const x = d * g.step + opened * smooth(d);
+  const y = 14 * (1 - Math.exp(-(d * d) / 10)) - 16 * near; // far ones sink, focus rises: a wave
+  const rot = g.baseRot + (g.focusRot - g.baseRot) * near;
+  const z = 64 * near;
+  const scale = 1 + 0.05 * near;
+  return { x, y, rot, z, scale, near };
 }
 
 /* ------------------------------------------------------------------ */
@@ -101,7 +110,6 @@ export function AccountsFan() {
   const [clippers, setClippers] = useState<Account[]>([]);
   const [sort, setSort] = useState<SortKey>("followers");
   const [selected, setSelected] = useState(0);
-  const [hovered, setHovered] = useState<number | null>(null);
   const [narrow, setNarrow] = useState(false);
 
   useEffect(() => {
@@ -131,105 +139,104 @@ export function AccountsFan() {
     return unique.sort((a, b) => b[sort] - a[sort]);
   }, [channels, clippers, sort]);
 
-  const geo = narrow ? MOBILE : DESKTOP;
   const count = items.length;
   const totalFollowers = useMemo(() => items.reduce((n, i) => n + i.followers, 0), [items]);
 
-  /* ---------------- spring-driven focus (no React re-render per frame) ---------------- */
+  /* ---------------- animation state lives in refs: no React work per frame ---------------- */
   const stageRef = useRef<HTMLDivElement>(null);
   const nodes = useRef<(HTMLDivElement | null)[]>([]);
-  const cardRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
-  const focus = useRef(0); // animated value
-  const target = useRef(0); // where the spring goes
-  const velocity = useRef(0);
+  const target = useRef(0); // where the fan is heading (fractional while dragging)
+  const cur = useRef<number[]>([]); // each folder's own lagging focus → wave
+  const vel = useRef<number[]>([]); // slots per second, used to lean the folders
+  const hov = useRef<number[]>([]); // smoothed hover amount per folder
+  const hovered = useRef<number | null>(null);
   const raf = useRef<number | null>(null);
   const lastT = useRef(0);
   const reduced = useRef(false);
-  const drag = useRef<{ x: number; start: number; moved: boolean; lastX: number; lastT: number; v: number } | null>(null);
-  const hoveredRef = useRef<number | null>(null);
-  hoveredRef.current = hovered;
+  const narrowRef = useRef(false);
+  narrowRef.current = narrow;
+  const countRef = useRef(0);
+  countRef.current = count;
 
   useEffect(() => {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }, []);
 
   const paint = useCallback(() => {
-    const f = focus.current;
     const stage = stageRef.current;
     if (!stage) return;
-    const cx = stage.clientWidth * (narrow ? 0.4 : 0.4);
-    const cy = stage.clientHeight * (narrow ? 0.62 : 0.56);
-    const g = narrow ? MOBILE : DESKTOP;
-    let selX = cx;
+    const g = narrowRef.current ? MOBILE : DESKTOP;
+    const cx = stage.clientWidth * (narrowRef.current ? 0.42 : 0.4);
+    const cy = stage.clientHeight * (narrowRef.current ? 0.6 : 0.55);
     for (let i = 0; i < nodes.current.length; i += 1) {
       const el = nodes.current[i];
       if (!el) continue;
-      const d = i - f;
+      const d = i - (cur.current[i] ?? target.current);
+      const l = layout(d, g);
+      const h = hov.current[i] ?? 0;
+      const lean = clamp(-(vel.current[i] ?? 0) * 0.9, -7, 7); // lean into the motion
+      const x = cx + l.x - g.w / 2;
+      const y = cy + l.y - g.h / 2 - 22 * h - Math.abs(lean) * 0.6;
+      const z = l.z + 48 * h;
+      const rot = l.rot + 10 * h;
+      el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rot}deg) rotateZ(${lean}deg) scale(${l.scale + 0.02 * h})`;
       const ad = Math.abs(d);
-      const near = 1 - smooth(ad); // 1 at focus, 0 one slot away
-      const isHover = hoveredRef.current === i;
-      const x = cx + offsetX(d, g);
-      const z = near * 70 + (isHover ? 34 : 0);
-      const y = cy - near * 10 - (isHover ? 16 : 0);
-      const rot = g.tilt + near * 9 + (isHover ? 5 : 0);
-      const scale = 1 + near * 0.06;
-      el.style.transform = `translate3d(${x - g.w / 2}px, ${y - g.h / 2}px, ${z}px) rotateY(${rot}deg) scale(${scale})`;
-      el.style.zIndex = String(1000 - Math.round(ad * 10));
-      el.style.opacity = String(clamp(1 - Math.max(0, ad - 4) * 0.06, 0.35, 1));
-      el.style.filter = ad > 0.5 ? `brightness(${clamp(1 - ad * 0.03, 0.62, 1)})` : "none";
-      if (i === Math.round(f)) selX = x;
-    }
-    const card = cardRef.current;
-    if (card) {
-      // Desktop: above-left of the focused folder, its green dot touching the
-      // tab. Narrow screens: centred above the folder and kept inside the stage.
-      const cw = card.offsetWidth || (narrow ? 196 : 236);
-      const cardX = narrow
-        ? clamp(selX - cw / 2, 12, Math.max(12, stage.clientWidth - cw - 12))
-        : selX - g.w / 2 - 150;
-      const cardY = narrow ? cy - g.h / 2 - 96 : cy - g.h / 2 - 58;
-      card.style.transform = `translate3d(${cardX}px, ${cardY}px, 140px)`;
+      el.style.zIndex = String(1000 - Math.round(ad * 10) + (h > 0.5 ? 5 : 0));
+      el.style.opacity = String(clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1));
+      el.style.filter = ad > 0.6 ? `brightness(${clamp(1 - (ad - 0.6) * 0.045, 0.66, 1)})` : "none";
     }
     const handle = handleRef.current;
-    if (handle && count > 1) {
-      const p = clamp(f / (count - 1), 0, 1);
+    const n = countRef.current;
+    if (handle && n > 1) {
+      const f = cur.current[Math.round(clamp(target.current, 0, n - 1))] ?? target.current;
+      const p = clamp(f / (n - 1), 0, 1);
       const w = stage.clientWidth;
       const hx = w * 0.18 + p * w * 0.64;
       const hy = 46 - Math.sin(p * Math.PI) * 26;
       handle.style.transform = `translate3d(${hx - 18}px, ${hy - 18}px, 0)`;
     }
-  }, [narrow, count]);
+  }, []);
 
   const settle = useCallback(() => {
-    const idx = clamp(Math.round(target.current), 0, Math.max(0, count - 1));
+    const idx = clamp(Math.round(target.current), 0, Math.max(0, countRef.current - 1));
     setSelected((prev) => (prev === idx ? prev : idx));
-  }, [count]);
+  }, []);
 
   const tick = useCallback(
     (now: number) => {
       const gap = now - (lastT.current || now);
-      const dt = Math.min(0.05, gap / 1000 || 0.016);
+      const dt = clamp(gap / 1000 || 0.016, 0.001, 0.05);
       lastT.current = now;
-      if (reduced.current || gap > 250 || document.visibilityState === "hidden") {
-        // Reduced motion, or the tab was throttled/hidden: land immediately
-        // instead of replaying a stale spring when frames resume.
-        focus.current = target.current;
-        velocity.current = 0;
-      } else {
-        // Critically damped spring: snappy, no overshoot.
-        const k = 190;
-        const c = 2 * Math.sqrt(k);
-        const dx = target.current - focus.current;
-        const a = k * dx - c * velocity.current;
-        velocity.current += a * dt;
-        focus.current += velocity.current * dt;
+      const snap = reduced.current || gap > 250 || document.visibilityState === "hidden";
+      const n = countRef.current;
+      const tgt = target.current;
+      const pivot = Math.round(clamp(tgt, 0, Math.max(0, n - 1)));
+      let active = false;
+      for (let i = 0; i < n; i += 1) {
+        const prev = cur.current[i] ?? tgt;
+        if (snap) {
+          cur.current[i] = tgt;
+          vel.current[i] = 0;
+        } else {
+          // Folders further from the pivot follow later: the move ripples
+          // through the stack like a wave instead of sliding as one block.
+          const dist = Math.min(Math.abs(i - pivot), 7);
+          const rate = 15 - dist * 1.35;
+          const a = 1 - Math.exp(-rate * dt);
+          const next = prev + (tgt - prev) * a;
+          vel.current[i] = (next - prev) / dt;
+          cur.current[i] = Math.abs(tgt - next) < 0.0008 ? tgt : next;
+        }
+        const ht = hovered.current === i ? 1 : 0;
+        const hp = hov.current[i] ?? 0;
+        const hn = snap ? ht : hp + (ht - hp) * (1 - Math.exp(-16 * dt));
+        hov.current[i] = Math.abs(ht - hn) < 0.002 ? ht : hn;
+        if (cur.current[i] !== tgt || hov.current[i] !== ht) active = true;
       }
       paint();
-      const resting = Math.abs(target.current - focus.current) < 0.0015 && Math.abs(velocity.current) < 0.003;
-      if (resting) {
-        focus.current = target.current;
-        velocity.current = 0;
+      if (!active) {
+        for (let i = 0; i < n; i += 1) vel.current[i] = 0;
         paint();
         raf.current = null;
         lastT.current = 0;
@@ -246,23 +253,34 @@ export function AccountsFan() {
 
   const goTo = useCallback(
     (idx: number) => {
-      target.current = clamp(idx, 0, Math.max(0, count - 1));
+      target.current = clamp(idx, 0, Math.max(0, countRef.current - 1));
       settle();
       kick();
     },
-    [count, settle, kick],
+    [settle, kick],
   );
+  const goToRef = useRef(goTo);
+  goToRef.current = goTo;
 
   useEffect(() => {
-    // Sorting or data changes: keep the focus valid and repaint.
+    // Data or sort changed: keep the focus valid, reseed lagging values, repaint.
     target.current = clamp(target.current, 0, Math.max(0, count - 1));
-    focus.current = clamp(focus.current, 0, Math.max(0, count - 1));
+    for (let i = 0; i < count; i += 1) {
+      if (cur.current[i] == null) cur.current[i] = target.current;
+      if (hov.current[i] == null) hov.current[i] = 0;
+    }
+    cur.current.length = count;
+    vel.current.length = count;
+    hov.current.length = count;
     settle();
+    kick();
+  }, [count, sort, settle, kick]);
+
+  useLayoutEffect(() => {
     paint();
-  }, [count, sort, paint, settle]);
+  }, [selected, narrow, paint]);
 
   useEffect(() => {
-    paint();
     const stage = stageRef.current;
     if (!stage) return;
     const ro = new ResizeObserver(() => paint());
@@ -274,42 +292,53 @@ export function AccountsFan() {
     if (raf.current != null) cancelAnimationFrame(raf.current);
   }, []);
 
-  useLayoutEffect(() => {
-    paint();
-  }, [hovered, selected, paint]);
+  /* ---------------- pointer: press a folder to select, drag to scrub ---------------- */
+  const drag = useRef<{ x: number; start: number; moved: boolean; lastX: number; lastT: number; v: number; index: number | null } | null>(null);
 
-  /* ---------------- pointer: drag to scrub, click to select ---------------- */
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
-    drag.current = { x: e.clientX, start: target.current, moved: false, lastX: e.clientX, lastT: performance.now(), v: 0 };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }
-  function onPointerMove(e: React.PointerEvent) {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    if (Math.abs(dx) > 4) d.moved = true;
-    if (!d.moved) return;
-    const now = performance.now();
-    const dtms = Math.max(1, now - d.lastT);
-    d.v = (e.clientX - d.lastX) / dtms; // px per ms
-    d.lastX = e.clientX;
-    d.lastT = now;
-    target.current = clamp(d.start - dx / geo.step, -0.4, count - 0.6);
-    kick();
-  }
-  function onPointerUp() {
-    const d = drag.current;
-    if (!d) return;
-    drag.current = null;
-    if (!d.moved) return;
-    // Project the fling, then snap to the nearest account.
-    const fling = -d.v * 90;
-    goTo(Math.round(target.current + fling / geo.step));
+    const folder = (e.target as HTMLElement).closest<HTMLElement>(".ss-folder");
+    const index = folder ? Number(folder.dataset.index) : null;
+    drag.current = { x: e.clientX, start: target.current, moved: false, lastX: e.clientX, lastT: performance.now(), v: 0, index };
+    const g = narrowRef.current ? MOBILE : DESKTOP;
+    const move = (ev: PointerEvent) => {
+      const d = drag.current;
+      if (!d) return;
+      const dx = ev.clientX - d.x;
+      if (!d.moved && Math.abs(dx) > 5) d.moved = true;
+      if (!d.moved) return;
+      const now = performance.now();
+      d.v = (ev.clientX - d.lastX) / Math.max(1, now - d.lastT);
+      d.lastX = ev.clientX;
+      d.lastT = now;
+      target.current = clamp(d.start - dx / g.step, -0.35, countRef.current - 0.65);
+      kick();
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      const d = drag.current;
+      drag.current = null;
+      if (!d) return;
+      if (!d.moved) {
+        if (d.index != null) goToRef.current(d.index);
+        return;
+      }
+      // Project the fling, then settle on the nearest folder.
+      goToRef.current(Math.round(target.current - (d.v * 90) / g.step));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   }
 
-  const goToRef = useRef(goTo);
-  goToRef.current = goTo;
+  function setHover(i: number | null) {
+    if (hovered.current === i) return;
+    hovered.current = i;
+    kick();
+  }
+
   useEffect(() => {
     // Horizontal trackpad swipes scrub the fan; vertical wheel keeps scrolling
     // the page. Registered natively so preventDefault is honoured (React's
@@ -347,10 +376,10 @@ export function AccountsFan() {
     }
   }
 
-  /* ---------------- arc handle: drag along the arc to scrub ---------------- */
   function onArcPointer(e: React.PointerEvent) {
     const stage = stageRef.current;
     if (!stage || count < 2) return;
+    e.stopPropagation();
     const rect = stage.getBoundingClientRect();
     const p = clamp((e.clientX - rect.left - rect.width * 0.18) / (rect.width * 0.64), 0, 1);
     target.current = p * (count - 1);
@@ -405,9 +434,7 @@ export function AccountsFan() {
         role="listbox"
         aria-activedescendant={current ? `fan-${current.id}` : undefined}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onMouseLeave={() => setHover(null)}
         onKeyDown={onKeyDown}
       >
         {count > 1 ? (
@@ -429,30 +456,38 @@ export function AccountsFan() {
             <div
               key={item.id}
               id={`fan-${item.id}`}
+              data-index={i}
               ref={(el) => {
                 nodes.current[i] = el;
               }}
               role="option"
               aria-selected={isSel}
               className={`ss-folder ${isSel ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered((h) => (h === i ? null : h))}
-              onClick={() => {
-                if (drag.current?.moved) return;
-                goTo(i);
-              }}
+              onMouseEnter={() => setHover(i)}
             >
+              <div className="ss-folder__back" />
               <div className="ss-folder__tab" />
-              <div className="ss-folder__body">
-                <div className="ss-folder__lines">
-                  <i style={{ width: "72%" }} />
-                  <i style={{ width: "54%" }} />
-                  <i style={{ width: "64%" }} />
-                  <i style={{ width: "38%" }} />
+              <div className="ss-folder__docs" aria-hidden>
+                <div className="ss-folder__doc">
+                  <i style={{ width: "62%" }} />
+                  <i style={{ width: "84%" }} />
+                  <i style={{ width: "48%" }} />
                 </div>
+                <div className="ss-folder__doc">
+                  <i style={{ width: "70%" }} />
+                  <i style={{ width: "54%" }} />
+                  <i style={{ width: "78%" }} />
+                </div>
+                <div className="ss-folder__doc">
+                  <i style={{ width: "58%" }} />
+                  <i style={{ width: "80%" }} />
+                  <i style={{ width: "44%" }} />
+                </div>
+              </div>
+              <div className="ss-folder__front">
                 {item.avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" loading="lazy" /> : null}
                 <div className="ss-folder__count">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden>
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
                     <circle cx="9" cy="8" r="3.4" />
                     <circle cx="16.5" cy="9.5" r="2.6" />
                     <path d="M3 18.5c0-3 2.7-5 6-5s6 2 6 5v.5H3z" />
@@ -465,38 +500,6 @@ export function AccountsFan() {
             </div>
           );
         })}
-
-        {current ? (
-          <div ref={cardRef} className="ss-fan__card">
-            <div className="ss-fan__card-inner" key={current.id}>
-            <div className="ss-fan__card-head">
-              <div>
-                <b>{current.name}</b>
-                <span>
-                  {current.kind === "channel"
-                    ? current.connected
-                      ? t("Connecté", "Connected", en)
-                      : t("Compte lié", "Linked", en)
-                    : t("Clipper", "Clipper", en)}
-                  {" · "}
-                  {current.platform === "tiktok" ? "TikTok" : current.platform === "instagram" ? "Instagram" : current.platform}
-                  {current.since ? ` · ${new Date(current.since).toLocaleDateString(en ? "en-US" : "fr-FR", { month: "short", year: "numeric" })}` : ""}
-                </span>
-              </div>
-              <button type="button" className="ss-fan__card-arrow" onClick={() => openInCalendar(current)} aria-label={t("Ouvrir", "Open", en)}>
-                →
-              </button>
-            </div>
-            <div className="ss-fan__card-big">
-              {compact(current.followers)}
-              <small>{t("abonnés", "followers", en)}</small>
-            </div>
-            <div className="ss-fan__card-dot" aria-hidden>
-              <i />
-            </div>
-            </div>
-          </div>
-        ) : null}
 
         {!count ? (
           <div className="ss-fan__empty">
@@ -516,7 +519,7 @@ export function AccountsFan() {
             <div>
               <b>{current.name}</b>
               <span>
-                @{current.handle} · {current.platform === "tiktok" ? "TikTok" : current.platform}
+                @{current.handle} · {current.platform === "tiktok" ? "TikTok" : current.platform === "instagram" ? "Instagram" : current.platform}
                 {current.verdict ? ` · ${current.verdict}` : ""}
               </span>
             </div>
