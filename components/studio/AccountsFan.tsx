@@ -348,22 +348,23 @@ export function AccountsFan() {
     // wheel listeners are passive).
     const stage = stageRef.current;
     if (!stage) return;
-    let acc = 0;
-    let cooldown = 0;
+    let idle: number | null = null;
     const onWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
       e.preventDefault();
-      const now = performance.now();
-      if (now < cooldown) return;
-      acc += e.deltaX;
-      if (Math.abs(acc) < 40) return;
-      goToRef.current(Math.round(target.current) + (acc > 0 ? 1 : -1));
-      acc = 0;
-      cooldown = now + 140;
+      const g = narrowRef.current ? MOBILE : DESKTOP;
+      // Scrub continuously with the gesture, then settle on the nearest folder.
+      target.current = clamp(target.current + e.deltaX / (g.step * 1.4), -0.35, countRef.current - 0.65);
+      kick();
+      if (idle != null) window.clearTimeout(idle);
+      idle = window.setTimeout(() => goToRef.current(Math.round(target.current)), 110);
     };
     stage.addEventListener("wheel", onWheel, { passive: false });
-    return () => stage.removeEventListener("wheel", onWheel);
-  }, []);
+    return () => {
+      stage.removeEventListener("wheel", onWheel);
+      if (idle != null) window.clearTimeout(idle);
+    };
+  }, [kick]);
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowRight") {
@@ -468,7 +469,9 @@ export function AccountsFan() {
               className={`ss-folder ${isSel ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
               onMouseEnter={() => setHover(i)}
             >
+              <div className="ss-folder__glow" aria-hidden />
               <div className="ss-folder__back" />
+              <div className="ss-folder__back-green" aria-hidden />
               <div className="ss-folder__tab" />
               <div className="ss-folder__docs" aria-hidden>
                 <div className="ss-folder__doc">
@@ -488,6 +491,7 @@ export function AccountsFan() {
                 </div>
               </div>
               <div className="ss-folder__front">
+                <div className="ss-folder__front-green" aria-hidden />
                 {item.avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" loading="lazy" /> : null}
                 <div className="ss-folder__count">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>

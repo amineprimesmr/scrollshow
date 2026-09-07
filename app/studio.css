@@ -5204,7 +5204,51 @@ a.ss-btn-ghost {
     inset 0 1px 0 rgb(255 255 255 / 0.9),
     inset 0 0 0 1px rgb(255 255 255 / 0.32),
     0 26px 50px rgb(0 0 0 / 0.52);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Selection is painted by green layers fading in: opacity only, GPU-composited. */
+.ss-folder__back-green,
+.ss-folder__front-green,
+.ss-folder__glow {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+  transition: opacity 0.26s ease;
+}
+
+.ss-folder__back-green {
+  inset: 0;
+  border-radius: 16px;
+  background:
+    radial-gradient(90% 60% at 30% 0%, rgb(255 255 255 / 0.35), transparent 60%),
+    linear-gradient(172deg, #4ade80 0%, #22c55e 55%, #16a34a 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    inset 0 0 0 1px rgb(187 247 208 / 0.6);
+}
+
+.ss-folder__front-green {
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.28) 48%, transparent 62%),
+    linear-gradient(180deg, rgb(74 222 128 / 0.98), rgb(22 163 74 / 0.98));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    inset 0 0 0 1px rgb(187 247 208 / 0.5);
+}
+
+.ss-folder__glow {
+  inset: -6px;
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px rgb(34 197 94 / 0.5), 0 0 56px rgb(34 197 94 / 0.6);
+}
+
+.ss-folder.is-selected .ss-folder__back-green,
+.ss-folder.is-selected .ss-folder__front-green,
+.ss-folder.is-selected .ss-folder__glow {
+  opacity: 1;
 }
 
 .ss-folder__tab {
@@ -5214,9 +5258,10 @@ a.ss-btn-ghost {
   width: 66px;
   height: 22px;
   border-radius: 12px 12px 0 0;
-  background: linear-gradient(180deg, #f8f8fb, #e6e6ee);
+  background-color: #eeeef3;
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.55), transparent);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95);
-  transition: background 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.26s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ss-folder__docs {
@@ -5279,7 +5324,6 @@ a.ss-btn-ghost {
     inset 0 1px 0 #fff,
     inset 0 0 0 1px rgb(255 255 255 / 0.5),
     0 -10px 24px rgb(0 0 0 / 0.1);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .ss-folder__front::after {
@@ -5289,6 +5333,16 @@ a.ss-btn-ghost {
   border-radius: inherit;
   background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.5) 48%, transparent 62%);
   pointer-events: none;
+  z-index: 1;
+}
+
+.ss-folder__front > * {
+  position: absolute;
+  z-index: 2;
+}
+
+.ss-folder__front-green {
+  z-index: 0;
 }
 
 .ss-folder__avatar {
@@ -5341,36 +5395,14 @@ a.ss-btn-ghost {
   box-shadow: 0 0 8px var(--fan-green);
 }
 
-/* Selected: the folder opens — green, tab lifts, sheets slide up */
-.ss-folder.is-selected .ss-folder__back {
-  background:
-    radial-gradient(90% 60% at 30% 0%, rgb(255 255 255 / 0.35), transparent 60%),
-    linear-gradient(172deg, #4ade80 0%, #22c55e 55%, #16a34a 100%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.8),
-    inset 0 0 0 1px rgb(187 247 208 / 0.6),
-    0 0 0 1px rgb(34 197 94 / 0.5),
-    0 0 52px rgb(34 197 94 / 0.55),
-    0 30px 60px rgb(0 0 0 / 0.55);
-}
-
+/* Selected: the folder opens — tab turns green and lifts, sheets slide up */
 .ss-folder.is-selected .ss-folder__tab {
-  background: linear-gradient(180deg, #86efac, #22c55e);
+  background-color: #34d399;
   transform: translateY(-4px);
 }
 
 .ss-folder.is-selected .ss-folder__docs {
   transform: translateY(-14px);
-}
-
-.ss-folder.is-selected .ss-folder__front {
-  background:
-    linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.28) 48%, transparent 62%),
-    linear-gradient(180deg, rgb(74 222 128 / 0.96), rgb(22 163 74 / 0.96));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.7),
-    inset 0 0 0 1px rgb(187 247 208 / 0.5),
-    0 -10px 24px rgb(0 0 0 / 0.14);
 }
 
 .ss-folder.is-selected .ss-folder__count,
@@ -5380,6 +5412,12 @@ a.ss-btn-ghost {
 
 .ss-folder.is-selected .ss-folder__avatar {
   border-color: #dcfce7;
+}
+
+.ss-folder__count,
+.ss-folder__label,
+.ss-folder__avatar {
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
 /* Empty state */
