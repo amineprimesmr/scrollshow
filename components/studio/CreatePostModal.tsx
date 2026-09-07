@@ -16,7 +16,7 @@ import { dateInTimeZone } from "@/lib/settings";
 import { sound } from "@/lib/sound";
 import { coerceOptions, EMPTY_OPTIONS, type TikTokPostOptions, validatePostOptions } from "@/lib/tiktok-compliance";
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
 import { useStudio } from "./StudioContext";
 import { blockedCopy, optionsErrorCopy, PublishStatus, type PublishProgress, TikTokPublishPanel, useTikTokCreator } from "./TikTokPublishPanel";
@@ -77,8 +77,18 @@ export function CreatePostModal() {
     !rebuilding &&
     !(progress && progress.status !== "FAILED");
 
+  // Initialise the form once per opening (or when switching to another post).
+  // `reload()` after a publish refreshes channels/media/user; that must not
+  // wipe the creator's choices or the publish status they are watching.
+  const initKey = postOpen ? editing?.id || "new" : "";
+  const lastInit = useRef("");
   useEffect(() => {
-    if (!postOpen) return;
+    if (!postOpen) {
+      lastInit.current = "";
+      return;
+    }
+    if (lastInit.current === initKey) return;
+    lastInit.current = initKey;
     if (editing) {
       const next = ensureRecipe(editing);
       setBody(editing.body);
@@ -118,7 +128,8 @@ export function CreatePostModal() {
     setRebuildError("");
     setShowOriginal(false);
     setRebuilding(false);
-  }, [postOpen, editing, channels, media, activeChannel, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postOpen, initKey]);
 
   useEffect(() => {
     if (!postOpen || !editing?.id) return;
