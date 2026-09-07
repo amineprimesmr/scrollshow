@@ -35,7 +35,7 @@ export function LibraryView() {
       </div>
       <div className="ss-panel">
         {filtered.map((account) => (
-          <article key={account.id} style={{ padding: "16px 0", borderBottom: "1px solid #ececec" }}>
+          <article key={account.id} style={{ padding: "16px 0", borderBottom: "1px solid var(--ss-line)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong>@{account.handle}</strong>
               <span
@@ -44,18 +44,18 @@ export function LibraryView() {
                   fontWeight: 800,
                   padding: "4px 10px",
                   borderRadius: 999,
-                  background: account.verdict === "keep" ? "#ecfdf5" : account.verdict === "skip" ? "#fef2f2" : "#f4f4f5",
-                  color: account.verdict === "keep" ? "#059669" : account.verdict === "skip" ? "#dc2626" : "#52525b",
+                  background: account.verdict === "keep" ? "var(--ss-ok-bg)" : account.verdict === "skip" ? "var(--ss-err-bg)" : "var(--ss-soft)",
+                  color: account.verdict === "keep" ? "var(--ss-ok-fg)" : account.verdict === "skip" ? "var(--ss-err-fg)" : "var(--ss-muted)",
                 }}
               >
                 {account.verdict.toUpperCase()}
               </span>
             </div>
-            <p style={{ margin: "6px 0", fontSize: 13, color: "#71717a" }}>{account.niche}</p>
+            <p style={{ margin: "6px 0", fontSize: 13, color: "var(--ss-muted)" }}>{account.niche}</p>
             <p style={{ margin: 0, fontSize: 13 }}>
               {account.followers.toLocaleString()} {t("abonnés", "followers", en)} · {account.avgViews.toLocaleString()} {t("vues moy.", "avg views", en)}
             </p>
-            {account.notes ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "#52525b" }}>{account.notes}</p> : null}
+            {account.notes ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ss-muted)" }}>{account.notes}</p> : null}
           </article>
         ))}
         {!filtered.length ? <p className="ss-lead">{t("Aucun compte.", "No accounts yet.", en)}</p> : null}

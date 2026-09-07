@@ -21,8 +21,8 @@ body {
 }
 
 html:has(.af-ld) body {
-  background: #f3f3f4;
-  color: #0a0a0a;
+  background: var(--ss-bg);
+  color: var(--ss-ink);
 }
 
 html:has(.af-ld) body.grain {

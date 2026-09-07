@@ -255,6 +255,7 @@ const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
   warmed: IconFlame,
   globe: IconGlobe,
   user: IconUser,
+  support: IconInbox,
   plug: IconPlug,
   mcp: IconMcp,
   settings: IconSettings,

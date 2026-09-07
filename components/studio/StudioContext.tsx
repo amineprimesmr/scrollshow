@@ -25,6 +25,8 @@ type StudioContextValue = {
   reload: () => Promise<void>;
 };
 
+const SNAPSHOT_KEY = "ss-studio-snapshot";
+
 const StudioContext = createContext<StudioContextValue | null>(null);
 
 function englishFrom(user: PublicUser | null) {
@@ -45,10 +47,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [editing, setEditing] = useState<StudioPost | null>(null);
   const [composeDate, setComposeDate] = useState<string | null>(null);
 
-  async function reload() {
-    const res = await fetch("/api/studio");
-    if (!res.ok) return;
-    const json = await res.json();
+  function applySnapshot(json: any) {
     setUser(json.user);
     setChannels(json.channels || []);
     setPosts(json.posts || []);
@@ -56,8 +55,28 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     if (json.availability) setAvailability(json.availability);
   }
 
+  async function reload() {
+    const res = await fetch("/api/studio");
+    if (!res.ok) return;
+    const json = await res.json();
+    applySnapshot(json);
+    try {
+      sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(json));
+    } catch {
+      /* quota or private mode: the live fetch still rendered */
+    }
+  }
+
   useEffect(() => {
+    // Paint the last known workspace instantly, then refresh from the API.
+    try {
+      const cached = sessionStorage.getItem(SNAPSHOT_KEY);
+      if (cached) applySnapshot(JSON.parse(cached));
+    } catch {
+      /* ignore a corrupt snapshot */
+    }
     reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Resolved after mount: prefersEnglish() reads navigator, which the server

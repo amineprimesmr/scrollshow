@@ -55,9 +55,9 @@ function fmt(n: number, en: boolean) {
 }
 
 function scoreColor(p: number) {
-  if (p >= 60) return { bg: "#fef2f2", fg: "#991b1b", bar: "#dc2626" };
-  if (p >= 30) return { bg: "#fffbeb", fg: "#92400e", bar: "#f59e0b" };
-  return { bg: "#ecfdf5", fg: "#065f46", bar: "#10b981" };
+  if (p >= 60) return { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)", bar: "var(--ss-err-fg)" };
+  if (p >= 30) return { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)", bar: "var(--ss-warn-fg)" };
+  return { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)", bar: "var(--ss-ok-fg)" };
 }
 
 function diagnosisCopy(r: RoundsReport, en: boolean) {
@@ -164,7 +164,7 @@ export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: bool
                   <span>{copy.range}</span>
                 </div>
                 <div className="ss-rounds__track">
-                  <i style={{ width: `${(count / maxCount) * 100}%`, background: r.id === "R0" ? "#dc2626" : r.id === "R1" ? "#f59e0b" : "#0a0a0a" }} />
+                  <i style={{ width: `${(count / maxCount) * 100}%`, background: r.id === "R0" ? "var(--ss-err-fg)" : r.id === "R1" ? "var(--ss-warn-fg)" : "var(--ss-ink)" }} />
                 </div>
                 <div className="ss-rounds__count">
                   <b>{count}</b>

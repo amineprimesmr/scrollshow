@@ -1,6 +1,7 @@
 import type { User, UserSettings } from "./types";
 
 export const DEFAULT_SETTINGS: UserSettings = {
+  theme: "dark",
   timezone: "Europe/Paris",
   weekStartsOn: 1,
   defaultPostTime: "18:00",

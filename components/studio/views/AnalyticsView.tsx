@@ -117,7 +117,7 @@ function BigChart({ values, days, color }: { values: number[]; days: string[]; c
   );
 }
 
-export function AnalyticsView() {
+export function AnalyticsView({ embedded = false }: { embedded?: boolean } = {}) {
   const { posts, channels } = useStudio();
   const [english, setEnglish] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
@@ -237,9 +237,9 @@ export function AnalyticsView() {
 
   return (
     <div className="ss-an">
-      <div className="ss-analytics-head">
+      <div className={`ss-analytics-head${embedded ? " is-embedded" : ""}`}>
         <div>
-          <h1>{t("Analytics", "Analytics", english)}</h1>
+          {embedded ? <h2>{t("Analytics", "Analytics", english)}</h2> : <h1>{t("Analytics", "Analytics", english)}</h1>}
           <p>
             {analytics?.connected
               ? t(`Données en direct de @${analytics.handle}.`, `Live data from @${analytics.handle}.`, english)
@@ -299,7 +299,7 @@ export function AnalyticsView() {
       ) : null}
 
       {(fetchError || analytics?.errors?.length) ? (
-        <div className="ss-an-card ss-an-card--pad" style={{ borderColor: "#f59e0b", color: "#b45309" }}>
+        <div className="ss-an-card ss-an-card--pad" style={{ borderColor: "var(--ss-warn-line)", color: "var(--ss-warn-fg)", background: "var(--ss-warn-bg)" }}>
           {fetchError
             ? t(`Erreur de chargement: ${fetchError}`, `Failed to load: ${fetchError}`, english)
             : analytics!.errors!.join(" · ")}

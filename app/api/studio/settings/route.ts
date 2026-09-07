@@ -23,6 +23,7 @@ const unlinkSchema = z.object({
 const preferencesSchema = z.object({
   action: z.literal("preferences"),
   locale: z.enum(["fr", "en"]),
+  theme: z.enum(["light", "dark", "system"]).default("dark"),
   timezone: z.string().min(1).max(80),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   defaultPostTime: z.string().regex(/^\d{2}:\d{2}$/),
@@ -101,6 +102,7 @@ export async function PATCH(request: Request) {
     user.settings = {
       ...resolveSettings(user),
       locale: body.locale,
+      theme: body.theme,
       timezone: body.timezone,
       weekStartsOn: body.weekStartsOn,
       defaultPostTime: body.defaultPostTime,

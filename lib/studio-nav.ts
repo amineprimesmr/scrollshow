@@ -12,7 +12,7 @@ export type NavItem = {
 };
 
 export const STUDIO_NAV: NavItem[] = [
-  { href: "/app/home", fr: "Accueil", en: "Home", icon: "home", section: "main" },
+  { href: "/app/home", fr: "Overview", en: "Overview", icon: "home", section: "main" },
   { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
   { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },
   { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
@@ -22,6 +22,7 @@ export const STUDIO_NAV: NavItem[] = [
   { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main" },
   { href: "/app/integrations", fr: "Comptes", en: "Accounts", icon: "tiktok", section: "bottom" },
   { href: "/app/mcp", fr: "MCP", en: "MCP", icon: "mcp", section: "bottom" },
+  { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "bottom" },
   { href: "/app/settings", fr: "Réglages", en: "Settings", icon: "settings", section: "bottom" },
 ];
 

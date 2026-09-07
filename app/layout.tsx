@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
+import "./theme.css";
 
 const sans = Inter({
   subsets: ["latin"],
@@ -54,8 +55,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${sans.variable} ${serif.variable}`}>
-      <body className="antialiased grain">{children}</body>
+    <html lang="fr" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
+      <body className="antialiased grain">
+        {/* Applies the saved theme before first paint so dark mode never flashes light. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('ss-theme');var d=document.documentElement;if(t==='light'||t==='dark'){d.setAttribute('data-theme',t)}else if(t!=='system'){d.setAttribute('data-theme','dark')}}catch(e){document.documentElement.setAttribute('data-theme','dark')}",
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

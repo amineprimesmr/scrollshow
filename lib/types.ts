@@ -1,7 +1,10 @@
 export type Plan = import("./plans").Plan;
 
+export type ThemePreference = "light" | "dark" | "system";
+
 export type UserSettings = {
   locale?: "fr" | "en";
+  theme?: ThemePreference;
   timezone: string;
   weekStartsOn: 0 | 1;
   defaultPostTime: string;

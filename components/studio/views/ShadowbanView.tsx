@@ -8,10 +8,10 @@ import { useStudio } from "../StudioContext";
 import { ShadowbanRounds } from "./ShadowbanRounds";
 
 const VERDICT_STYLE: Record<ShadowbanReport["verdict"], { bg: string; fg: string; barLow: string }> = {
-  insufficient_data: { bg: "#f4f4f5", fg: "#52525b", barLow: "#a1a1aa" },
-  none: { bg: "#ecfdf5", fg: "#065f46", barLow: "#a1a1aa" },
-  mild: { bg: "#fffbeb", fg: "#92400e", barLow: "#f59e0b" },
-  likely: { bg: "#fef2f2", fg: "#991b1b", barLow: "#dc2626" },
+  insufficient_data: { bg: "var(--ss-soft)", fg: "var(--ss-muted)", barLow: "var(--ss-muted-2)" },
+  none: { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)", barLow: "var(--ss-muted-2)" },
+  mild: { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)", barLow: "var(--ss-warn-fg)" },
+  likely: { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)", barLow: "var(--ss-err-fg)" },
 };
 
 function pct(n: number) {
@@ -46,13 +46,13 @@ function Chart({ points, baselineAvgViews, en }: { points: VideoPoint[]; baselin
     <div style={{ overflowX: "auto" }}>
       <svg width={width} height={height + 24} viewBox={`0 0 ${width} ${height + 24}`} role="img" aria-label={t("Vues par vidéo dans le temps", "Views per video over time", en)}>
         {baselineY != null ? (
-          <line x1={0} y1={baselineY} x2={width} y2={baselineY} stroke="#d4d4d8" strokeWidth={1.5} strokeDasharray="4 4" />
+          <line x1={0} y1={baselineY} x2={width} y2={baselineY} stroke="var(--ss-line)" strokeWidth={1.5} strokeDasharray="4 4" />
         ) : null}
         {chrono.map((p, i) => {
           const barHeight = Math.max(2, (p.views / max) * height);
           const x = i * (barWidth + gap);
           const y = height - barHeight;
-          const color = p.isLow ? VERDICT_STYLE.likely.barLow : "#0a0a0a";
+          const color = p.isLow ? VERDICT_STYLE.likely.barLow : "var(--ss-ink)";
           return (
             <g key={p.id}>
               <rect x={x} y={y} width={barWidth} height={barHeight} rx={4} fill={color} opacity={p.bucket === "excluded" ? 0.35 : 1}>
@@ -67,7 +67,7 @@ function Chart({ points, baselineAvgViews, en }: { points: VideoPoint[]; baselin
       </svg>
       <div className="ss-shadow-legend">
         <span>
-          <i style={{ background: "#0a0a0a" }} /> {t("Normal", "Normal", en)}
+          <i style={{ background: "var(--ss-ink)" }} /> {t("Normal", "Normal", en)}
         </span>
         <span>
           <i style={{ background: VERDICT_STYLE.likely.barLow }} /> {t("En chute (< 30% de ta moyenne)", "Collapsed (< 30% of your average)", en)}

@@ -7,6 +7,7 @@ import { isPaidPlan } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
 import { navActive, PAGE_TITLES, STUDIO_NAV } from "@/lib/studio-nav";
 import { sound } from "@/lib/sound";
+import { setStoredTheme } from "@/lib/theme";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
@@ -109,7 +110,7 @@ function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; 
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { english, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
+  const { user, english, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
   const item = PAGE_TITLES.find((entry) => navActive(pathname, entry.href));
   const title = item ? (english ? item.en : item.fr) : "ScrollShow";
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
@@ -120,6 +121,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/app/analytics") ||
     pathname.startsWith("/app/unshadowban");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // The saved preference wins over whatever this browser last stored.
+  useEffect(() => {
+    if (user?.settings?.theme) setStoredTheme(user.settings.theme);
+  }, [user?.settings?.theme]);
 
   const mainNav = STUDIO_NAV.filter((e) => e.section === "main");
   const bottomNav = STUDIO_NAV.filter((e) => e.section === "bottom");

@@ -1,7 +1,7 @@
 html:has(.ss-pricing),
 html:has(.ss-pricing) body {
-  background: #f4f4f5 !important;
-  color: #111 !important;
+  background: var(--ss-soft) !important;
+  color: var(--ss-ink) !important;
 }
 
 html:has(.ss-pricing) body.grain {
@@ -10,8 +10,8 @@ html:has(.ss-pricing) body.grain {
 
 .ss-pricing {
   min-height: 100dvh;
-  background: #f4f4f5;
-  color: #111;
+  background: var(--ss-soft);
+  color: var(--ss-ink);
   font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -41,7 +41,7 @@ html:has(.ss-pricing) body.grain {
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #6b7280;
+  color: var(--ss-muted);
   font-size: 14px;
 }
 
@@ -66,7 +66,7 @@ html:has(.ss-pricing) body.grain {
 
 .ss-pricing__hero p {
   margin: 10px 0 0;
-  color: #6b7280;
+  color: var(--ss-muted);
   font-size: 17px;
 }
 
@@ -75,14 +75,14 @@ html:has(.ss-pricing) body.grain {
   margin: 28px auto 0;
   padding: 4px;
   border-radius: 999px;
-  background: #ececee;
+  background: var(--ss-line);
   gap: 2px;
 }
 
 .ss-pricing__toggle button {
   border: 0;
   background: transparent;
-  color: #6b7280;
+  color: var(--ss-muted);
   border-radius: 999px;
   padding: 10px 18px;
   font-weight: 700;
@@ -92,14 +92,14 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-pricing__toggle button.is-on {
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.08);
 }
 
 .ss-pricing__save {
   margin-left: 8px;
-  color: #7c3aed;
+  color: var(--ss-info-fg);
   font-size: 11px;
 }
 
@@ -119,8 +119,8 @@ html:has(.ss-pricing) body.grain {
 
 .ss-price-card {
   position: relative;
-  background: #fff;
-  border: 1px solid #e7e7ea;
+  background: var(--ss-card);
+  border: 1px solid var(--ss-line);
   border-radius: 22px;
   padding: 28px 24px 24px;
   min-height: 520px;
@@ -129,9 +129,9 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card.is-popular {
-  background: #111;
-  color: #fff;
-  border-color: #111;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+  border-color: var(--ss-ink);
   transform: translateY(-10px);
 }
 
@@ -140,8 +140,8 @@ html:has(.ss-pricing) body.grain {
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: #111;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -152,18 +152,18 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card.is-popular .ss-price-card__badge {
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
 }
 
 .ss-price-card__name {
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-size: 14px;
   font-weight: 600;
 }
 
 .ss-price-card.is-popular .ss-price-card__name {
-  color: #b8bcc6;
+  color: var(--ss-muted-2);
 }
 
 .ss-price-card__amount {
@@ -180,14 +180,14 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card__old {
-  color: #9aa0aa;
+  color: var(--ss-muted-2);
   text-decoration: line-through;
   font-size: 18px;
 }
 
 .ss-price-card__off {
-  background: #ececee;
-  color: #111;
+  background: var(--ss-line);
+  color: var(--ss-ink);
   font-size: 12px;
   font-weight: 800;
   padding: 2px 6px;
@@ -195,13 +195,13 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card.is-popular .ss-price-card__off {
-  background: #2a2a2a;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
 }
 
 .ss-price-card__cadence {
   margin-top: 8px;
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-size: 14px;
 }
 
@@ -217,20 +217,20 @@ html:has(.ss-pricing) body.grain {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  color: #3f4550;
+  color: var(--ss-muted);
   font-size: 15px;
 }
 
 .ss-price-card.is-popular .ss-price-card__list li {
-  color: #ececec;
+  color: var(--ss-line);
 }
 
 .ss-price-card__list i {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #111;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -241,16 +241,16 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card.is-popular .ss-price-card__list i {
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
 }
 
 .ss-price-card__cta {
   margin-top: auto;
   width: 100%;
-  border: 1px solid #111;
-  background: #fff;
-  color: #111;
+  border: 1px solid var(--ss-ink);
+  background: var(--ss-card);
+  color: var(--ss-ink);
   border-radius: 14px;
   min-height: 48px;
   font-weight: 700;
@@ -258,9 +258,9 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card.is-popular .ss-price-card__cta {
-  background: #fff;
-  color: #111;
-  border-color: #fff;
+  background: var(--ss-card);
+  color: var(--ss-ink);
+  border-color: var(--ss-card);
 }
 
 .ss-price-card__cta:disabled {
@@ -272,11 +272,11 @@ html:has(.ss-pricing) body.grain {
   width: min(1080px, calc(100% - 32px));
   margin: 42px auto 64px;
   text-align: center;
-  color: #6b7280;
+  color: var(--ss-muted);
 }
 
 .ss-pricing__foot a {
-  color: #7c3aed;
+  color: var(--ss-info-fg);
 }
 
 .ss-upsell {
@@ -286,7 +286,7 @@ html:has(.ss-pricing) body.grain {
   display: grid;
   place-items: center;
   padding: 24px 16px;
-  background: rgb(17 17 17 / 0.32);
+  background: rgb(0 0 0 / 0.45);
   backdrop-filter: blur(12px);
   overflow: auto;
 }
@@ -294,8 +294,8 @@ html:has(.ss-pricing) body.grain {
 .ss-upsell__card {
   position: relative;
   width: min(560px, 100%);
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
   border-radius: 28px;
   box-shadow: 0 24px 80px rgb(17 17 17 / 0.18);
   padding: 36px 32px 28px;
@@ -322,7 +322,7 @@ html:has(.ss-pricing) body.grain {
   height: 36px;
   border: 0;
   background: transparent;
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
@@ -335,8 +335,8 @@ html:has(.ss-pricing) body.grain {
   min-height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  background: #f8d5e4;
-  color: #c43b73;
+  background: var(--ss-pink-line);
+  color: var(--ss-pink-fg);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -354,12 +354,12 @@ html:has(.ss-pricing) body.grain {
 
 .ss-upsell__lead {
   margin: 10px 0 0;
-  color: #5b616c;
+  color: var(--ss-muted);
   font-size: 16px;
 }
 
 .ss-upsell__lead b {
-  color: #111;
+  color: var(--ss-ink);
 }
 
 .ss-upsell__list {
@@ -375,7 +375,7 @@ html:has(.ss-pricing) body.grain {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  color: #2d323b;
+  color: var(--ss-ink);
   font-size: 15px;
   line-height: 1.45;
 }
@@ -386,7 +386,7 @@ html:has(.ss-pricing) body.grain {
   flex: none;
   margin-top: 1px;
   border-radius: 50%;
-  border: 1.5px solid #111;
+  border: 1.5px solid var(--ss-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -403,20 +403,20 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-upsell__compare > div {
-  background: #f4f4f5;
+  background: var(--ss-soft);
   border-radius: 16px;
   padding: 14px 12px 12px;
   text-align: left;
 }
 
 .ss-upsell__compare > div.is-win {
-  background: #fff1f6;
-  outline: 1px solid #f3c4d6;
+  background: var(--ss-pink-bg);
+  outline: 1px solid var(--ss-pink-line);
 }
 
 .ss-upsell__compare small {
   display: block;
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -433,21 +433,21 @@ html:has(.ss-pricing) body.grain {
 
 .ss-upsell__compare span {
   margin-left: 4px;
-  color: #6b7280;
+  color: var(--ss-muted);
   font-size: 13px;
 }
 
 .ss-upsell__compare em {
   display: block;
   margin-top: 6px;
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-style: normal;
   font-size: 12px;
 }
 
 .ss-upsell__compare > i {
   align-self: center;
-  color: #c43b73;
+  color: var(--ss-pink-fg);
   font-style: normal;
   font-size: 20px;
 }
@@ -456,7 +456,7 @@ html:has(.ss-pricing) body.grain {
   margin: 24px 0 0;
   padding: 18px 18px 14px;
   border-radius: 18px;
-  background: #f4f4f5;
+  background: var(--ss-soft);
   text-align: left;
 }
 
@@ -469,7 +469,7 @@ html:has(.ss-pricing) body.grain {
 
 .ss-upsell__deal small {
   display: block;
-  color: #8b8f98;
+  color: var(--ss-muted-2);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -485,7 +485,7 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-upsell__prices s {
-  color: #9aa0aa;
+  color: var(--ss-muted-2);
   font-size: 20px;
 }
 
@@ -495,28 +495,28 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-upsell__prices em {
-  color: #6b7280;
+  color: var(--ss-muted);
   font-style: normal;
   font-size: 15px;
 }
 
 .ss-upsell__save {
-  color: #c43b73;
+  color: var(--ss-pink-fg);
   font-size: 18px;
   white-space: nowrap;
-  background: #fde7f0;
+  background: var(--ss-pink-bg);
   padding: 4px 10px;
   border-radius: 8px;
 }
 
 .ss-upsell__deal p {
   margin: 10px 0 0;
-  color: #6b7280;
+  color: var(--ss-muted);
   font-size: 13px;
 }
 
 .ss-upsell__deal p b {
-  color: #111;
+  color: var(--ss-ink);
 }
 
 .ss-upsell__primary,
@@ -532,15 +532,15 @@ html:has(.ss-pricing) body.grain {
 .ss-upsell__primary {
   margin-top: 20px;
   border: 0;
-  background: #111;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
 }
 
 .ss-upsell__secondary {
   margin-top: 10px;
-  border: 1px solid #e7e7ea;
-  background: #fff;
-  color: #111;
+  border: 1px solid var(--ss-line);
+  background: var(--ss-card);
+  color: var(--ss-ink);
 }
 
 .ss-upsell__primary:disabled,
@@ -551,7 +551,7 @@ html:has(.ss-pricing) body.grain {
 
 .ss-upsell__note {
   margin: 14px 0 0;
-  color: #9aa0aa;
+  color: var(--ss-muted-2);
   font-size: 13px;
 }
 

@@ -1,7 +1,7 @@
 html:has(.ss-signup),
 html:has(.ss-signup) body {
-  background: #fff !important;
-  color: #111 !important;
+  background: var(--ss-card) !important;
+  color: var(--ss-ink) !important;
 }
 
 html:has(.ss-signup) body.grain {
@@ -12,8 +12,8 @@ html:has(.ss-signup) body.grain {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
   font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -36,7 +36,7 @@ html:has(.ss-signup) body.grain {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #111;
+  color: var(--ss-ink);
   text-decoration: none;
   font-size: 18px;
   font-weight: 700;
@@ -53,7 +53,7 @@ html:has(.ss-signup) body.grain {
 
 .ss-signup__sub {
   margin: 10px 0 0;
-  color: #737373;
+  color: var(--ss-muted);
   font-size: 15px;
   line-height: 1.45;
 }
@@ -66,10 +66,10 @@ html:has(.ss-signup) body.grain {
   width: 100%;
   min-height: 46px;
   margin-top: 28px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--ss-line);
   border-radius: 10px;
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
   font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
@@ -77,7 +77,7 @@ html:has(.ss-signup) body.grain {
 }
 
 .ss-signup__google:hover {
-  background: #fafafa;
+  background: var(--ss-soft);
 }
 
 .ss-signup__google svg {
@@ -92,7 +92,7 @@ html:has(.ss-signup) body.grain {
   align-items: center;
   gap: 12px;
   margin: 22px 0 18px;
-  color: #a3a3a3;
+  color: var(--ss-muted-2);
   font-size: 13px;
 }
 
@@ -100,13 +100,13 @@ html:has(.ss-signup) body.grain {
 .ss-signup__or::after {
   content: "";
   height: 1px;
-  background: #ececec;
+  background: var(--ss-line);
 }
 
 .ss-signup label {
   display: block;
   margin-bottom: 8px;
-  color: #111;
+  color: var(--ss-ink);
   font-size: 14px;
   font-weight: 600;
 }
@@ -115,25 +115,25 @@ html:has(.ss-signup) body.grain {
   width: 100%;
   min-height: 46px;
   padding: 0 14px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--ss-line);
   border-radius: 10px;
-  background: #fff;
-  color: #111;
+  background: var(--ss-card);
+  color: var(--ss-ink);
   font-size: 14.5px;
 }
 
 .ss-signup input::placeholder {
-  color: #a3a3a3;
+  color: var(--ss-muted-2);
 }
 
 .ss-signup input:focus {
-  border-color: #111;
+  border-color: var(--ss-ink);
   box-shadow: 0 0 0 3px rgb(0 0 0 / 0.06);
 }
 
 .ss-signup__error {
   margin: 10px 0 0;
-  color: #dc2626;
+  color: var(--ss-err-fg);
   font-size: 13px;
 }
 
@@ -143,15 +143,15 @@ html:has(.ss-signup) body.grain {
   margin-top: 14px;
   border: 0;
   border-radius: 10px;
-  background: #111;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
   font-size: 14.5px;
   font-weight: 650;
   cursor: pointer;
 }
 
 .ss-signup__submit:hover {
-  background: #000;
+  background: var(--ss-ink);
 }
 
 .ss-signup__submit:disabled {
@@ -162,12 +162,12 @@ html:has(.ss-signup) body.grain {
 .ss-signup__foot {
   margin: 22px 0 0;
   text-align: center;
-  color: #737373;
+  color: var(--ss-muted);
   font-size: 14px;
 }
 
 .ss-signup__foot a {
-  color: #111;
+  color: var(--ss-ink);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -184,7 +184,7 @@ html:has(.ss-signup) body.grain {
   gap: 18px;
   padding: 36px 36px 28px;
   border-radius: 28px;
-  background: #f3f3f4;
+  background: var(--ss-soft);
   overflow: hidden;
 }
 
@@ -212,23 +212,23 @@ html:has(.ss-signup) body.grain {
   min-height: 0;
   padding: 18px 20px 16px;
   border-radius: 18px;
-  background: #e5e7eb;
+  background: var(--ss-line);
 }
 
 .ss-quote__metric {
-  color: #737373;
+  color: var(--ss-muted);
   font-size: 13px;
   font-weight: 500;
 }
 
 .ss-quote__metric b {
-  color: #111;
+  color: var(--ss-ink);
   font-weight: 700;
 }
 
 .ss-quote blockquote {
   margin: 0;
-  color: #171717;
+  color: var(--ss-ink);
   font-size: 15px;
   line-height: 1.45;
   font-weight: 500;
@@ -247,7 +247,7 @@ html:has(.ss-signup) body.grain {
   height: 36px;
   border-radius: 999px;
   object-fit: cover;
-  background: #d4d4d4;
+  background: var(--ss-line);
 }
 
 .ss-quote__who strong {
@@ -259,7 +259,7 @@ html:has(.ss-signup) body.grain {
 
 .ss-quote__who span {
   display: block;
-  color: #737373;
+  color: var(--ss-muted);
   font-size: 12.5px;
 }
 
@@ -270,8 +270,8 @@ html:has(.ss-signup) body.grain {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: #111;
-  color: #fff;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: -0.04em;

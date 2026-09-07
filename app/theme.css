@@ -1,0 +1,109 @@
+/* ScrollShow UI tokens — light by default, dark via html[data-theme="dark"]
+   or the system preference when no explicit theme is set. */
+:root {
+  --ss-bg: #f3f3f4;
+  --ss-card: #fff;
+  --ss-soft: #f4f4f5;
+  --ss-ink: #0a0a0a;
+  --ss-on-ink: #fff;
+  --ss-muted: #52525b;
+  --ss-muted-2: #a1a1aa;
+  --ss-line: #ececec;
+  --ss-purple: #0a0a0a;
+  --ss-purple-soft: #f4f4f5;
+  --ss-ok-bg: #ecfdf5;
+  --ss-ok-line: #bbf7d0;
+  --ss-ok-fg: #15803d;
+  --ss-err-bg: #fef2f2;
+  --ss-err-line: #fecaca;
+  --ss-err-fg: #b91c1c;
+  --ss-warn-bg: #fffbeb;
+  --ss-warn-line: #fde68a;
+  --ss-warn-fg: #b45309;
+  --ss-info-bg: #f4f0ff;
+  --ss-info-line: #ddd6fe;
+  --ss-info-fg: #5b21b6;
+  --ss-pink-bg: #fff1f6;
+  --ss-pink-line: #f3c4d6;
+  --ss-pink-fg: #c43b73;
+  --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  --ss-glass-rgb: 255 255 255;
+  --ss-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --ss-bg: #000;
+  --ss-card: #0b0b0d;
+  --ss-soft: #141416;
+  --ss-ink: #fafafa;
+  --ss-on-ink: #000;
+  --ss-muted: #a1a1aa;
+  --ss-muted-2: #6b6b73;
+  --ss-line: #1f1f23;
+  --ss-purple: #fafafa;
+  --ss-purple-soft: #141416;
+  --ss-ok-bg: #08200f;
+  --ss-ok-line: #14532d;
+  --ss-ok-fg: #4ade80;
+  --ss-err-bg: #250b0d;
+  --ss-err-line: #7f1d1d;
+  --ss-err-fg: #f87171;
+  --ss-warn-bg: #241a04;
+  --ss-warn-line: #78350f;
+  --ss-warn-fg: #fbbf24;
+  --ss-info-bg: #16112e;
+  --ss-info-line: #4c1d95;
+  --ss-info-fg: #a78bfa;
+  --ss-pink-bg: #240d19;
+  --ss-pink-line: #831843;
+  --ss-pink-fg: #f472b6;
+  --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+  --ss-glass-rgb: 11 11 13;
+  --ss-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --ss-bg: #000;
+    --ss-card: #0b0b0d;
+    --ss-soft: #141416;
+    --ss-ink: #fafafa;
+    --ss-on-ink: #000;
+    --ss-muted: #a1a1aa;
+    --ss-muted-2: #6b6b73;
+    --ss-line: #1f1f23;
+    --ss-purple: #fafafa;
+    --ss-purple-soft: #141416;
+    --ss-ok-bg: #08200f;
+    --ss-ok-line: #14532d;
+    --ss-ok-fg: #4ade80;
+    --ss-err-bg: #250b0d;
+    --ss-err-line: #7f1d1d;
+    --ss-err-fg: #f87171;
+    --ss-warn-bg: #241a04;
+    --ss-warn-line: #78350f;
+    --ss-warn-fg: #fbbf24;
+    --ss-info-bg: #16112e;
+    --ss-info-line: #4c1d95;
+    --ss-info-fg: #a78bfa;
+    --ss-pink-bg: #240d19;
+    --ss-pink-line: #831843;
+    --ss-pink-fg: #f472b6;
+    --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+    --ss-scheme: dark;
+  }
+}
+
+.ss-studio,
+.ss-signup,
+.ss-pricing,
+.ss-legal,
+.af-ld {
+  color-scheme: var(--ss-scheme);
+}
+
+/* Native controls and images inside the app follow the scheme. */
+html[data-theme="dark"] .ss-studio img.ss-invert-dark,
+html[data-theme="dark"] .ss-signup img.ss-invert-dark {
+  filter: invert(1) hue-rotate(180deg);
+}

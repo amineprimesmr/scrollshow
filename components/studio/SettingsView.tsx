@@ -1,6 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
+import { setStoredTheme } from "@/lib/theme";
 import { AI_CLIENTS } from "@/lib/ai-clients";
 import { formatEuro, isPaidPlan, PLAN } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
@@ -104,6 +105,7 @@ export function SettingsView() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [locale, setLocale] = useState<"fr" | "en">("fr");
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("dark");
   const [timezone, setTimezone] = useState("Europe/Paris");
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1);
   const [defaultPostTime, setDefaultPostTime] = useState("18:00");
@@ -149,6 +151,7 @@ export function SettingsView() {
     setName(user.name);
     setEmail(user.email);
     setLocale(user.settings?.locale || (english ? "en" : "fr"));
+    setTheme(user.settings?.theme || "dark");
     setTimezone(user.settings?.timezone || "Europe/Paris");
     setWeekStartsOn(user.settings?.weekStartsOn === 0 ? 0 : 1);
     setDefaultPostTime(user.settings?.defaultPostTime || "18:00");
@@ -216,10 +219,16 @@ export function SettingsView() {
     return true;
   }
 
+  function applyTheme(next: "light" | "dark" | "system") {
+    setTheme(next);
+    setStoredTheme(next);
+  }
+
   function preferencesPayload() {
     return {
       action: "preferences" as const,
       locale,
+      theme,
       timezone,
       weekStartsOn,
       defaultPostTime,
@@ -509,6 +518,23 @@ export function SettingsView() {
                   </button>
                   <button type="button" className={locale === "en" ? "is-on" : ""} onClick={() => setLocale("en")}>
                     English
+                  </button>
+                </div>
+              </div>
+              <div className="ss-set-row">
+                <div>
+                  <b>{t("Apparence", "Appearance", english)}</b>
+                  <p>{t("Clair, sombre, ou comme ton système.", "Light, dark, or follow your system.", english)}</p>
+                </div>
+                <div className="ss-seg" role="group">
+                  <button type="button" className={theme === "light" ? "is-on" : ""} onClick={() => applyTheme("light")}>
+                    {t("Clair", "Light", english)}
+                  </button>
+                  <button type="button" className={theme === "dark" ? "is-on" : ""} onClick={() => applyTheme("dark")}>
+                    {t("Sombre", "Dark", english)}
+                  </button>
+                  <button type="button" className={theme === "system" ? "is-on" : ""} onClick={() => applyTheme("system")}>
+                    {t("Système", "System", english)}
                   </button>
                 </div>
               </div>
