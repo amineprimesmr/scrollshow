@@ -1,7 +1,10 @@
 "use client";
 
-import { prefersEnglish, t } from "@/lib/i18n";
-import { useEffect, useState } from "react";
+import { t } from "@/lib/i18n";
+import { US_AGENT_PROMPT, US_CHECKLIST, US_LINKS } from "@/lib/us-guide";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useStudio } from "../StudioContext";
 
 type Row = { fr: string; en: string };
 
@@ -91,10 +94,113 @@ function List({ rows, en, ordered }: { rows: Row[]; en: boolean; ordered?: boole
   return ordered ? <ol className="ss-shadow-steps">{items}</ol> : <ul className="ss-feat">{items}</ul>;
 }
 
+function AgentPrompt({ en }: { en: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const text = en ? US_AGENT_PROMPT.en : US_AGENT_PROMPT.fr;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable: the textarea below stays selectable */
+    }
+  }
+  return (
+    <div className="ss-postus-prompt">
+      <div className="ss-postus-prompt__head">
+        <h3>{t("Prompt agent : serveur Hetzner Ashburn + Outline", "Agent prompt: Hetzner Ashburn + Outline server", en)}</h3>
+        <button type="button" className="ss-btn-purple" onClick={copy}>
+          {copied ? t("Copié ✓", "Copied ✓", en) : t("Copier le prompt", "Copy prompt", en)}
+        </button>
+      </div>
+      <p className="ss-lead">
+        {t(
+          "Colle-le tel quel dans Cursor ou Claude Code sur ton Mac. L'agent crée le VPS, installe Outline et te rend le JSON à coller dans Outline Manager. Il ne touche pas au téléphone.",
+          "Paste it as is into Cursor or Claude Code on your Mac. The agent creates the VPS, installs Outline and hands you the JSON to paste into Outline Manager. It never touches the phone.",
+          en,
+        )}
+      </p>
+      <textarea className="ss-input ss-postus-prompt__text" readOnly value={text} rows={12} onFocus={(e) => e.currentTarget.select()} />
+    </div>
+  );
+}
+
+function Checklist({ en, done, toggle, saving }: { en: boolean; done: Set<string>; toggle: (id: string) => void; saving: boolean }) {
+  const total = US_CHECKLIST.reduce((n, g) => n + g.items.length, 0);
+  return (
+    <div className="ss-postus-check">
+      <div className="ss-postus-check__head">
+        <h3>{t("Ma checklist", "My checklist", en)}</h3>
+        <span>
+          {done.size}/{total} {saving ? "·" : ""} {saving ? t("enregistrement…", "saving…", en) : ""}
+        </span>
+      </div>
+      <div className="ss-postus-check__bar">
+        <i style={{ width: `${total ? Math.round((done.size / total) * 100) : 0}%` }} />
+      </div>
+      {US_CHECKLIST.map((group) => (
+        <section key={group.id}>
+          <h4>{t(group.fr, group.en, en)}</h4>
+          <ul>
+            {group.items.map((item) => {
+              const checked = done.has(item.id);
+              return (
+                <li key={item.id} className={checked ? "is-done" : ""}>
+                  <label>
+                    <input type="checkbox" checked={checked} onChange={() => toggle(item.id)} />
+                    <span>{t(item.fr, item.en, en)}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function PostUSView() {
-  const [english, setEnglish] = useState(false);
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  const en = english;
+  const { english: en } = useStudio();
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/studio/us-guide")
+      .then((res) => res.json())
+      .then((json) => setDone(new Set<string>(json.done || [])))
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const doneList = useMemo(() => Array.from(done), [done]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    setSaving(true);
+    const handle = setTimeout(() => {
+      fetch("/api/studio/us-guide", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: doneList }),
+      })
+        .catch(() => {})
+        .finally(() => setSaving(false));
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneList]);
+
+  function toggle(id: string) {
+    setDone((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="ss-postus">
@@ -176,6 +282,7 @@ export function PostUSView() {
         <List rows={B_BEFORE} en={en} ordered />
         <h3>{t("Serveur VPN (fait par ton agent Cursor / Claude Code)", "VPN server (done by your Cursor / Claude Code agent)", en)}</h3>
         <List rows={B_SERVER} en={en} />
+        <AgentPrompt en={en} />
         <h3>{t("Après", "After", en)}</h3>
         <List rows={B_AFTER} en={en} ordered />
         <p className="ss-lead">
@@ -192,8 +299,20 @@ export function PostUSView() {
             "Don't want to manage the phone and the server? We provide US accounts already warmed on real phones.",
             en,
           )}{" "}
-          <a href="/app/warmed-accounts">{t("Voir les comptes warmés", "See warmed accounts", en)}</a>
+          <Link href="/app/warmed-accounts">{t("Voir les comptes warmés", "See warmed accounts", en)}</Link>
         </p>
+        <p className="ss-lead">
+          {t("Liens utiles :", "Useful links:", en)}{" "}
+          <a href={US_LINKS.hetznerConsole} target="_blank" rel="noreferrer">Hetzner Console</a> ·{" "}
+          <a href={US_LINKS.outlineGetStarted} target="_blank" rel="noreferrer">Outline Manager</a> ·{" "}
+          <a href={US_LINKS.outlineIos} target="_blank" rel="noreferrer">Outline iOS</a> ·{" "}
+          <a href={US_LINKS.ipCheck} target="_blank" rel="noreferrer">{t("Vérifier mon IP", "Check my IP", en)}</a> ·{" "}
+          <a href={US_LINKS.textnow} target="_blank" rel="noreferrer">TextNow</a>
+        </p>
+      </div>
+
+      <div className="ss-panel">
+        <Checklist en={en} done={done} toggle={toggle} saving={saving} />
       </div>
     </div>
   );

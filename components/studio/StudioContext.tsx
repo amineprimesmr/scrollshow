@@ -60,7 +60,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     reload();
   }, []);
 
-  const english = englishFrom(user);
+  // Resolved after mount: prefersEnglish() reads navigator, which the server
+  // cannot see, so computing it during render caused hydration mismatches.
+  const [english, setEnglish] = useState(false);
+  useEffect(() => {
+    setEnglish(englishFrom(user));
+  }, [user]);
 
   const value = useMemo(
     () => ({

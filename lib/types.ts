@@ -28,6 +28,22 @@ export type User = {
   stripeSubscriptionId?: string;
   createdAt: string;
   settings?: Partial<UserSettings>;
+  /** Ids of completed "Post to the US" checklist items. */
+  usChecklist?: string[];
+};
+
+export type WarmedOrderStatus = "requested" | "contacted" | "delivered" | "cancelled";
+
+export type WarmedOrder = {
+  id: string;
+  userId: string;
+  listingId: string;
+  quantity: number;
+  niche: string;
+  note: string;
+  status: WarmedOrderStatus;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type Account = {
@@ -207,6 +223,7 @@ export type StoreData = {
   pushSubscriptions?: PushSubscriptionRecord[];
   videoStats?: VideoStatSnapshot[];
   channelStats?: ChannelStatSnapshot[];
+  warmedOrders?: WarmedOrder[];
 };
 
 export type SessionUser = {

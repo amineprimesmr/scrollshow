@@ -93,6 +93,7 @@ function normalize(data: StoreData): StoreData {
   data.pushSubscriptions ||= [];
   data.videoStats ||= [];
   data.channelStats ||= [];
+  data.warmedOrders ||= [];
   return data;
 }
 
