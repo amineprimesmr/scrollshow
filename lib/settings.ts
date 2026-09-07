@@ -44,12 +44,7 @@ export const TIMEZONES = [
   "UTC",
 ];
 
-export const PRIVACY_LEVELS = [
-  { id: "PUBLIC_TO_EVERYONE", fr: "Tout le monde", en: "Everyone" },
-  { id: "MUTUAL_FOLLOW_FRIENDS", fr: "Amis", en: "Friends" },
-  { id: "FOLLOWER_OF_CREATOR", fr: "Abonnés", en: "Followers" },
-  { id: "SELF_ONLY", fr: "Moi uniquement", en: "Only me" },
-] as const;
+export { PRIVACY_LEVELS } from "./tiktok-compliance";
 
 export function resolveSettings(user?: Pick<User, "settings"> | null): UserSettings {
   return {
@@ -110,13 +105,12 @@ export function formatInTimeZone(
   }
 }
 
+// Privacy, comments and commercial disclosure are deliberately NOT global
+// defaults any more: TikTok requires the creator to pick them on every post
+// (Content Sharing Guidelines, Required UX Implementation 2-3). The legacy
+// fields stay in UserSettings so old stores still parse, but nothing reads them.
 export function tiktokPostFlags(settings: UserSettings) {
   return {
-    disable_comment: settings.disableComments,
-    disable_duet: settings.disableDuet,
-    disable_stitch: settings.disableStitch,
     auto_add_music: settings.autoAddMusic,
-    brand_content_toggle: settings.brandContent,
-    brand_organic_toggle: settings.brandOrganic,
   };
 }

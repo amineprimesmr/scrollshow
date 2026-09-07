@@ -1,3 +1,5 @@
+import { creatorBlockedReason, normalizeCreator } from "./tiktok-compliance";
+
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 const REVOKE_URL = "https://open.tiktokapis.com/v2/oauth/revoke/";
@@ -231,6 +233,21 @@ export async function listRecentVideos(accessToken: string, targetCount = 30) {
 
 export async function creatorInfo(accessToken: string) {
   return assertOk(await tiktokPost(CREATOR_INFO, accessToken, {}));
+}
+
+/**
+ * creator_info doubles as TikTok's "may this creator post right now?" check:
+ * spam-risk and user-cap answers come back as error codes with an empty data
+ * block. Callers must stop the publish attempt on those instead of treating
+ * them as a transport failure (guideline 1b).
+ */
+export async function queryCreatorInfo(accessToken: string) {
+  const data = await tiktokPost(CREATOR_INFO, accessToken, {});
+  const code = String(data?.error?.code || "ok");
+  const blocked = creatorBlockedReason(code);
+  if (blocked) return { creator: null, blocked };
+  if (code !== "ok") throw new Error(String(data?.error?.message || code));
+  return { creator: normalizeCreator(data?.data || {}), blocked: null };
 }
 
 export async function initPhotoPost(accessToken: string, payload: Record<string, unknown>) {

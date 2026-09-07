@@ -103,8 +103,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
           title: body.title,
           photo_images: body.photo_images,
           image: body.image,
-          privacy_level: body.privacy_level,
-          disable_comment: body.disable_comment,
+          privacy_level: String(body.privacy_level || ""),
+          allow_comment: body.allow_comment === true || body.disable_comment === false,
+          commercial_content: Boolean(body.commercial_content),
+          brand_organic: Boolean(body.brand_organic),
+          brand_content: Boolean(body.brand_content),
         }),
       );
     }

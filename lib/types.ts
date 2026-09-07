@@ -140,6 +140,8 @@ export type StudioPost = {
   clones?: number;
   forkedFrom?: string;
   createdAt?: string;
+  /** Creator's explicit Direct Post choices, captured on the Post to TikTok page. */
+  tiktok?: import("./tiktok-compliance").TikTokPostOptions;
   publishId?: string;
   publishState?: string;
   publishError?: string;

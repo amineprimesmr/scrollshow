@@ -14,17 +14,12 @@ import {
 } from "@/lib/recipe";
 import { dateInTimeZone } from "@/lib/settings";
 import { sound } from "@/lib/sound";
+import { coerceOptions, EMPTY_OPTIONS, type TikTokPostOptions, validatePostOptions } from "@/lib/tiktok-compliance";
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
 import { useStudio } from "./StudioContext";
-
-const PRIVACY = [
-  { id: "PUBLIC_TO_EVERYONE", fr: "Tout le monde", en: "Everyone" },
-  { id: "MUTUAL_FOLLOW_FRIENDS", fr: "Amis", en: "Friends" },
-  { id: "FOLLOWER_OF_CREATOR", fr: "Abonnés", en: "Followers" },
-  { id: "SELF_ONLY", fr: "Moi uniquement", en: "Only me" },
-];
+import { optionsErrorCopy, PublishStatus, type PublishProgress, TikTokPublishPanel, useTikTokCreator } from "./TikTokPublishPanel";
 
 function rebuildCopy(code: string, english: boolean) {
   if (code === "ai_gateway_billing") {
@@ -54,11 +49,10 @@ export function CreatePostModal() {
   const [time, setTime] = useState("18:00");
   const [status, setStatus] = useState<"draft" | "scheduled">("scheduled");
   const [channelIds, setChannelIds] = useState<string[]>([]);
-  const [privacy, setPrivacy] = useState("SELF_ONLY");
-  const [allowed, setAllowed] = useState<string[]>(PRIVACY.map((item) => item.id));
-  const [commentsOff, setCommentsOff] = useState(true);
-  const [branded, setBranded] = useState(false);
-  const [organic, setOrganic] = useState(false);
+  // Every Direct Post choice starts empty/off: TikTok forbids defaults for
+  // privacy, comments and commercial disclosure.
+  const [options, setOptions] = useState<TikTokPostOptions>(EMPTY_OPTIONS);
+  const [progress, setProgress] = useState<PublishProgress | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [recipe, setRecipe] = useState<CarouselRecipe>(() => recipeFromPhotos([], "manual"));
@@ -70,6 +64,18 @@ export function CreatePostModal() {
   const connected = channels.filter((item) => item.connected);
   const slide = recipe.slides[slideIndex] || recipe.slides[0];
   const baked = needsReconstruct(recipe);
+  const creatorState = useTikTokCreator(postOpen && connected.length > 0);
+  const optionsError = validatePostOptions(options, creatorState.creator);
+  const canPublish =
+    connected.length > 0 &&
+    !creatorState.loading &&
+    !creatorState.blocked &&
+    Boolean(creatorState.creator) &&
+    !optionsError &&
+    Boolean(body.trim()) &&
+    !pending &&
+    !rebuilding &&
+    !(progress && progress.status !== "FAILED");
 
   useEffect(() => {
     if (!postOpen) return;
@@ -84,6 +90,12 @@ export function CreatePostModal() {
       setSlideIndex(0);
       setMessage("");
       setShowOriginal(Boolean(next.slides.some((item) => item.keepPhoto)));
+      setOptions(editing.tiktok ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS });
+      setProgress(
+        editing.publishId && editing.publishState && editing.publishState !== "FAILED"
+          ? { publishId: editing.publishId, status: editing.publishState, tiktokId: editing.tiktokId }
+          : null,
+      );
       return;
     }
     const settings = user?.settings;
@@ -100,10 +112,8 @@ export function CreatePostModal() {
         ? channels.filter((item) => item.connected).slice(0, 1).map((item) => item.id)
         : [activeChannel],
     );
-    setPrivacy(settings?.defaultPrivacy || "PUBLIC_TO_EVERYONE");
-    setCommentsOff(Boolean(settings?.disableComments));
-    setBranded(Boolean(settings?.brandContent));
-    setOrganic(Boolean(settings?.brandOrganic));
+    setOptions({ ...EMPTY_OPTIONS });
+    setProgress(null);
     setMessage("");
     setRebuildError("");
     setShowOriginal(false);
@@ -143,19 +153,40 @@ export function CreatePostModal() {
     };
   }, [postOpen, editing?.id, english, reload, setEditing]);
 
+  // Guideline 5e: after content/init, poll publish/status/fetch so the creator
+  // sees PROCESSING → PUBLISH_COMPLETE / FAILED without leaving the page.
   useEffect(() => {
-    if (!postOpen || !connected.length) return;
-    fetch("/api/tiktok/creator")
-      .then((res) => res.json())
-      .then((json) => {
-        const options = json.creator?.privacy_level_options;
-        if (Array.isArray(options) && options.length) {
-          setAllowed(options);
-          setPrivacy((current) => (options.includes(current) ? current : options[0]));
+    if (!postOpen || !progress || progress.status === "PUBLISH_COMPLETE" || progress.status === "FAILED") return;
+    let cancelled = false;
+    let attempts = 0;
+    const timer = setInterval(async () => {
+      attempts += 1;
+      if (attempts > 60) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/tiktok/publish/status?publish_id=${encodeURIComponent(progress.publishId)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok) return;
+        const status = String(json.status || "");
+        if (!status) return;
+        setProgress({ publishId: progress.publishId, status, tiktokId: json.tiktokId, failReason: json.failReason });
+        if (status === "PUBLISH_COMPLETE" || status === "FAILED") {
+          clearInterval(timer);
+          if (status === "PUBLISH_COMPLETE") sound.success();
+          else sound.error();
+          reload();
         }
-      })
-      .catch(() => undefined);
-  }, [postOpen, connected.length]);
+      } catch {
+        // transient; next tick retries
+      }
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [postOpen, progress, reload]);
 
   if (!postOpen || !slide) return null;
 
@@ -213,6 +244,13 @@ export function CreatePostModal() {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (rebuilding) return;
+    // A scheduled post goes out unattended, so the creator's choices must be
+    // complete now — the scheduler never fills them in.
+    if (status === "scheduled" && channelIds.some((id) => connected.some((channel) => channel.id === id)) && optionsError) {
+      sound.error();
+      setMessage(optionsErrorCopy(optionsError, english));
+      return;
+    }
     setPending(true);
     setMessage("");
     const payload = {
@@ -220,6 +258,7 @@ export function CreatePostModal() {
       date,
       time,
       status,
+      tiktok: options,
       image: recipe.slides[0]?.image,
       photo_images: photosOf(recipe),
       channelIds,
@@ -277,7 +316,10 @@ export function CreatePostModal() {
   }
 
   async function publishNow() {
-    if (rebuilding) return;
+    if (!canPublish) {
+      if (optionsError) setMessage(optionsErrorCopy(optionsError, english));
+      return;
+    }
     setPending(true);
     setMessage("");
     let photos = photosOf(recipe);
@@ -295,27 +337,32 @@ export function CreatePostModal() {
       }
       photos = rasterJson.photo_images;
     }
+    // Guideline 5c: nothing is sent to TikTok before this explicit click.
     const res = await fetch("/api/tiktok/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         photo_images: photos,
         description: body,
-        privacy_level: privacy,
-        disable_comment: commentsOff,
-        brand_content_toggle: branded,
-        brand_organic_toggle: organic,
+        options,
+        post_id: editing?.id,
       }),
     });
     const json = await res.json().catch(() => ({}));
     setPending(false);
     if (!res.ok) {
       sound.error();
-      setMessage(json.error || t("Publication impossible", "Could not publish", english));
+      const code = String(json.error || "");
+      if (code.startsWith("creator_")) {
+        creatorState.refresh();
+        setMessage(t("TikTok n'autorise pas la publication pour le moment. Réessaie plus tard.", "TikTok is not allowing posting right now. Please try again later.", english));
+      } else {
+        setMessage(optionsErrorCopy(code, english) || code || t("Publication impossible", "Could not publish", english));
+      }
       return;
     }
-    sound.success();
-    setMessage(t("Envoyé sur TikTok (video.publish)", "Posted to TikTok (video.publish)", english));
+    sound.notify();
+    setProgress({ publishId: String(json.publish_id || ""), status: "PROCESSING" });
     reload();
   }
 
@@ -521,38 +568,16 @@ export function CreatePostModal() {
                   </label>
                 ))}
               </div>
-            ) : (
-              <p className="ss-lead">
-                {t("Connecte TikTok pour publier en Direct Post.", "Connect TikTok to publish with Direct Post.", english)}{" "}
-                <a href="/api/tiktok/oauth/start">{t("Continuer avec TikTok", "Continue with TikTok", english)}</a>
-              </p>
-            )}
-            <select value={privacy} onChange={(event) => setPrivacy(event.target.value)}>
-              {PRIVACY.filter((item) => allowed.includes(item.id)).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {english ? item.en : item.fr}
-                </option>
-              ))}
-            </select>
-            <label className="ss-checks">
-              <input type="checkbox" checked={commentsOff} onChange={(event) => setCommentsOff(event.target.checked)} />
-              {t("Désactiver les commentaires", "Disable comments", english)}
-            </label>
-            <label className="ss-checks">
-              <input type="checkbox" checked={organic} onChange={(event) => setOrganic(event.target.checked)} />
-              {t("Votre marque (brand_organic_toggle)", "Your brand (brand_organic_toggle)", english)}
-            </label>
-            <label className="ss-checks">
-              <input type="checkbox" checked={branded} onChange={(event) => setBranded(event.target.checked)} />
-              {t("Contenu de marque (brand_content_toggle)", "Branded content (brand_content_toggle)", english)}
-            </label>
+            ) : null}
             <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
             <input type="time" value={time} onChange={(event) => setTime(event.target.value)} required />
             <select value={status} onChange={(event) => setStatus(event.target.value as "draft" | "scheduled")}>
               <option value="draft">{t("Brouillon", "Draft", english)}</option>
               <option value="scheduled">{t("Planifié", "Scheduled", english)}</option>
             </select>
-            {message ? <p className="ss-lead">{message}</p> : null}
+            <TikTokPublishPanel english={english} creatorState={creatorState} options={options} setOptions={setOptions} onRefresh={creatorState.refresh} />
+            {progress ? <PublishStatus progress={progress} english={english} handle={creatorState.creator?.username || creatorState.handle} /> : null}
+            {message ? <p className="ss-lead ss-lead--err">{message}</p> : null}
             <div className="ss-form-actions">
               {editing?.id ? (
                 <button className="ss-btn-danger" type="button" disabled={pending || rebuilding} onClick={() => void remove()}>
@@ -562,9 +587,20 @@ export function CreatePostModal() {
               <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding}>
                 {pending ? "…" : editing ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
               </button>
-              <button className="ss-btn-purple" type="button" disabled={pending || rebuilding || !connected.length || !body.trim()} onClick={publishNow}>
-                {pending ? "…" : t("Publier maintenant", "Publish now", english)}
-              </button>
+              <span
+                className="ss-ttp__publish"
+                title={
+                  optionsError === "commercial_choice_required"
+                    ? optionsErrorCopy(optionsError, english)
+                    : optionsError
+                      ? optionsErrorCopy(optionsError, english)
+                      : undefined
+                }
+              >
+                <button className="ss-btn-purple" type="button" disabled={!canPublish} onClick={publishNow}>
+                  {pending ? "…" : t("Publier sur TikTok", "Post to TikTok", english)}
+                </button>
+              </span>
             </div>
           </div>
         </form>

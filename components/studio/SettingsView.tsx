@@ -4,7 +4,7 @@ import { t } from "@/lib/i18n";
 import { AI_CLIENTS } from "@/lib/ai-clients";
 import { formatEuro, isPaidPlan, PLAN } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
-import { formatInTimeZone, PRIVACY_LEVELS, TIMEZONES } from "@/lib/settings";
+import { formatInTimeZone, TIMEZONES } from "@/lib/settings";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -107,14 +107,8 @@ export function SettingsView() {
   const [timezone, setTimezone] = useState("Europe/Paris");
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1);
   const [defaultPostTime, setDefaultPostTime] = useState("18:00");
-  const [defaultPrivacy, setDefaultPrivacy] = useState("PUBLIC_TO_EVERYONE");
   const [defaultStatus, setDefaultStatus] = useState<"draft" | "scheduled">("scheduled");
-  const [disableComments, setDisableComments] = useState(false);
-  const [disableDuet, setDisableDuet] = useState(true);
-  const [disableStitch, setDisableStitch] = useState(true);
   const [autoAddMusic, setAutoAddMusic] = useState(true);
-  const [brandContent, setBrandContent] = useState(false);
-  const [brandOrganic, setBrandOrganic] = useState(false);
   const [notifyPublishSuccess, setNotifyPublishSuccess] = useState(true);
   const [notifyPublishFailure, setNotifyPublishFailure] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -158,14 +152,8 @@ export function SettingsView() {
     setTimezone(user.settings?.timezone || "Europe/Paris");
     setWeekStartsOn(user.settings?.weekStartsOn === 0 ? 0 : 1);
     setDefaultPostTime(user.settings?.defaultPostTime || "18:00");
-    setDefaultPrivacy(user.settings?.defaultPrivacy || "PUBLIC_TO_EVERYONE");
     setDefaultStatus(user.settings?.defaultStatus || "scheduled");
-    setDisableComments(Boolean(user.settings?.disableComments));
-    setDisableDuet(user.settings?.disableDuet !== false);
-    setDisableStitch(user.settings?.disableStitch !== false);
     setAutoAddMusic(user.settings?.autoAddMusic !== false);
-    setBrandContent(Boolean(user.settings?.brandContent));
-    setBrandOrganic(Boolean(user.settings?.brandOrganic));
     setNotifyPublishSuccess(user.settings?.notifyPublishSuccess !== false);
     setNotifyPublishFailure(user.settings?.notifyPublishFailure !== false);
   }, [user, english]);
@@ -235,14 +223,8 @@ export function SettingsView() {
       timezone,
       weekStartsOn,
       defaultPostTime,
-      defaultPrivacy,
       defaultStatus,
-      disableComments,
-      disableDuet,
-      disableStitch,
       autoAddMusic,
-      brandContent,
-      brandOrganic,
       notifyPublishSuccess,
       notifyPublishFailure,
     };
@@ -573,22 +555,16 @@ export function SettingsView() {
             <div className="ss-set-card">
               <h2>{t("Publication TikTok", "TikTok publishing", english)}</h2>
               <p className="ss-lead">
-                {t("Valeurs par défaut du nouveau post et de Direct Post (MCP inclus).", "Defaults for new posts and Direct Post (including MCP).", english)}
+                {t(
+                  "Heure et statut du nouveau post. La confidentialité, les commentaires et la mention commerciale se choisissent sur chaque publication, jamais par défaut (exigence TikTok).",
+                  "Time and status of a new post. Privacy, comments and commercial disclosure are chosen on every post, never by default (TikTok requirement).",
+                  english,
+                )}
               </p>
               <div className="ss-set-grid">
                 <label>
                   {t("Heure par défaut", "Default time", english)}
                   <input type="time" value={defaultPostTime} onChange={(event) => setDefaultPostTime(event.target.value)} required />
-                </label>
-                <label>
-                  {t("Confidentialité", "Privacy", english)}
-                  <select value={defaultPrivacy} onChange={(event) => setDefaultPrivacy(event.target.value)}>
-                    {PRIVACY_LEVELS.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {english ? item.en : item.fr}
-                      </option>
-                    ))}
-                  </select>
                 </label>
               </div>
               <div className="ss-set-row">
@@ -606,40 +582,10 @@ export function SettingsView() {
                 </div>
               </div>
               <Switch
-                on={disableComments}
-                set={setDisableComments}
-                title={t("Désactiver les commentaires", "Disable comments", english)}
-                hint={t("Par défaut sur chaque publication.", "Default on every publish.", english)}
-              />
-              <Switch
-                on={disableDuet}
-                set={setDisableDuet}
-                title={t("Désactiver les Duets", "Disable Duets", english)}
-                hint={t("Envoyé à TikTok à la publication.", "Sent to TikTok on publish.", english)}
-              />
-              <Switch
-                on={disableStitch}
-                set={setDisableStitch}
-                title={t("Désactiver les Stitch", "Disable Stitch", english)}
-                hint={t("Envoyé à TikTok à la publication.", "Sent to TikTok on publish.", english)}
-              />
-              <Switch
                 on={autoAddMusic}
                 set={setAutoAddMusic}
                 title={t("Ajouter la musique auto", "Auto-add music", english)}
                 hint={t("TikTok auto_add_music sur les carrousels photo.", "TikTok auto_add_music on photo carousels.", english)}
-              />
-              <Switch
-                on={brandOrganic}
-                set={setBrandOrganic}
-                title={t("Votre marque", "Your brand", english)}
-                hint={t("Disclosure brand_organic_toggle.", "brand_organic_toggle disclosure.", english)}
-              />
-              <Switch
-                on={brandContent}
-                set={setBrandContent}
-                title={t("Contenu de marque / paid partnership", "Branded content / paid partnership", english)}
-                hint={t("Disclosure brand_content_toggle.", "brand_content_toggle disclosure.", english)}
               />
             </div>
 

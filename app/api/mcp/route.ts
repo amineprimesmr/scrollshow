@@ -132,6 +132,19 @@ const handler = createMcpHandler(
           photo_images: z.array(z.string()).optional(),
           origin: z.enum(["ai", "manual"]).optional(),
           recipe: recipeInputSchema.optional(),
+          tiktok: z
+            .object({
+              title: z.string().max(90).optional(),
+              privacy: z.enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"]).optional(),
+              allowComment: z.boolean().optional(),
+              commercial: z.boolean().optional(),
+              brandOrganic: z.boolean().optional(),
+              brandContent: z.boolean().optional(),
+            })
+            .optional()
+            .describe(
+              "Direct Post choices the user made: privacy (required before a scheduled post can go out), allowComment (off unless the user asked), commercial + brandOrganic/brandContent disclosure.",
+            ),
         }),
       },
       async (args, ctx) => {
@@ -159,6 +172,19 @@ const handler = createMcpHandler(
           image: z.string().optional(),
           photo_images: z.array(z.string()).optional(),
           recipe: recipeInputSchema.optional(),
+          tiktok: z
+            .object({
+              title: z.string().max(90).optional(),
+              privacy: z.enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"]).optional(),
+              allowComment: z.boolean().optional(),
+              commercial: z.boolean().optional(),
+              brandOrganic: z.boolean().optional(),
+              brandContent: z.boolean().optional(),
+            })
+            .optional()
+            .describe(
+              "Direct Post choices the user made: privacy (required before a scheduled post can go out), allowComment (off unless the user asked), commercial + brandOrganic/brandContent disclosure.",
+            ),
         }),
       },
       async (args, ctx) => {
@@ -247,15 +273,20 @@ const handler = createMcpHandler(
       {
         title: "Publish to TikTok now",
         description:
-          "Direct-post a photo carousel to the connected TikTok account right now. Only use when the user explicitly asked to publish. Pass id of an editable post to rasterize overlays into fresh PNGs automatically.",
+          "Direct-post a photo carousel to the connected TikTok account right now. Only use when the user explicitly asked to publish AND told you the privacy level — never pick one for them. Pass id of an editable post to rasterize overlays into fresh PNGs automatically. Comments stay off and no commercial disclosure is set unless the user asked. TikTok processes the post asynchronously: it may take a few minutes to appear on the profile.",
         inputSchema: z.object({
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
           id: z.string().optional(),
           photo_images: z.array(z.string()).optional(),
           image: z.string().optional(),
-          privacy_level: z.string().optional(),
-          disable_comment: z.boolean().optional(),
+          privacy_level: z
+            .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"])
+            .describe("The privacy the user chose. Required."),
+          allow_comment: z.boolean().optional().describe("Allow comments. Default false."),
+          commercial_content: z.boolean().optional().describe("User disclosed commercial content."),
+          brand_organic: z.boolean().optional().describe("Promotes the user's own brand ('Promotional content' label)."),
+          brand_content: z.boolean().optional().describe("Promotes a third party ('Paid partnership' label). Not allowed with SELF_ONLY."),
         }),
       },
       async (args, ctx) => {

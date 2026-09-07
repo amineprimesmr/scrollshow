@@ -15,6 +15,16 @@ const schema = z.object({
   photo_images: z.array(z.string()).optional(),
   origin: z.enum(["ai", "manual", "import", "fork"]).optional(),
   recipe: recipeInputSchema.optional(),
+  tiktok: z
+    .object({
+      title: z.string().max(90),
+      privacy: z.string(),
+      allowComment: z.boolean(),
+      commercial: z.boolean(),
+      brandOrganic: z.boolean(),
+      brandContent: z.boolean(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -53,6 +63,7 @@ export async function POST(request: Request) {
       visibility: "private",
       inCalendar: true,
       createdAt: new Date().toISOString(),
+      tiktok: parsed.data.tiktok,
     };
     data.posts.unshift(created);
     return created;

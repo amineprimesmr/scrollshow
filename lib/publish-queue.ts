@@ -1,10 +1,12 @@
 import { sendPushToUser } from "./push";
 import { ensureRecipe, needsRasterize, photosOf } from "./recipe";
 import { rasterizeRecipe } from "./render-slide";
-import { resolveSettings, tiktokPostFlags } from "./settings";
+import { resolveSettings } from "./settings";
 import { readStore, updateStore } from "./store";
-import { absoluteAssetUrl, creatorInfo, fetchPublishStatus, initPhotoPost } from "./tiktok";
+import { fetchPublishStatus } from "./tiktok";
 import { loadTikTokChannel } from "./tiktok-account";
+import { coerceOptions } from "./tiktok-compliance";
+import { directPostPhotos } from "./tiktok-publish";
 import type { StudioPost, User } from "./types";
 
 // TikTok processes a DIRECT_POST asynchronously: content/init only hands back a
@@ -37,42 +39,21 @@ export function isDue(post: StudioPost, timeZone: string, now = Date.now()) {
 }
 
 async function publishPost(user: User, post: StudioPost) {
-  const channel = await loadTikTokChannel(user.id);
-  if (!channel?.accessToken) throw new Error("tiktok_not_connected");
-
   const recipe = ensureRecipe(post);
   const photos = needsRasterize(recipe) ? await rasterizeRecipe(recipe) : photosOf(recipe);
   if (!photos.length) throw new Error("photos_required");
 
-  const settings = resolveSettings(user);
-  const flags = tiktokPostFlags(settings);
-  const info = await creatorInfo(channel.accessToken);
-  const allowed: string[] = info.privacy_level_options || [];
-  const privacy = allowed.includes(settings.defaultPrivacy) ? settings.defaultPrivacy : allowed[0];
-  if (!privacy) throw new Error("no_privacy_level");
-
-  const caption = (post.body || "").slice(0, 2200);
-  const result = await initPhotoPost(channel.accessToken, {
-    post_info: {
-      title: caption.slice(0, 90),
-      description: caption,
-      privacy_level: privacy,
-      disable_comment: flags.disable_comment,
-      disable_duet: flags.disable_duet,
-      disable_stitch: flags.disable_stitch,
-      auto_add_music: flags.auto_add_music,
-      brand_content_toggle: flags.brand_content_toggle,
-      brand_organic_toggle: flags.brand_organic_toggle,
-    },
-    source_info: {
-      source: "PULL_FROM_URL",
-      photo_cover_index: 0,
-      photo_images: photos.map(absoluteAssetUrl),
-    },
-    post_mode: "DIRECT_POST",
-    media_type: "PHOTO",
+  // A scheduled post carries the choices the creator made on the Post to
+  // TikTok page. Without them we must not guess (no default privacy, no
+  // default disclosure) — the post stays scheduled with a clear error.
+  if (!post.tiktok?.privacy) throw new Error("tiktok_options_required");
+  const options = coerceOptions(post.tiktok, post.body || "");
+  const { publishId } = await directPostPhotos(user.id, {
+    photos,
+    description: (post.body || "").slice(0, 2200),
+    options,
   });
-  return String(result.publish_id || "");
+  return publishId;
 }
 
 /** Publishes every scheduled post whose slot has passed. */
@@ -113,6 +94,67 @@ export async function runScheduledPublishes(now = Date.now()) {
   return results;
 }
 
+type Reconciled = { id: string; publishId: string; status: string; failReason?: string; tiktokId?: string };
+
+async function settlePost(user: User, post: StudioPost, accessToken: string): Promise<Reconciled> {
+  const status = await fetchPublishStatus(accessToken, post.publishId as string);
+  const state = String(status.status || "");
+  let failReason = "";
+  let tiktokId = "";
+  await updateStore((store) => {
+    const current = store.posts.find((item) => item.id === post.id);
+    if (!current) return;
+    current.publishState = state;
+    if (state === "PUBLISH_COMPLETE") {
+      current.status = "published";
+      current.publishError = undefined;
+      const postId = (status.publicaly_available_post_id || status.publicly_available_post_id || [])[0];
+      if (postId) {
+        tiktokId = String(postId);
+        current.tiktokId = tiktokId;
+      }
+    } else if (state === "FAILED") {
+      failReason = String(status.fail_reason || "failed").slice(0, 300);
+      current.status = "draft";
+      current.publishError = failReason;
+    }
+  });
+  // Fire-and-forget: a cron tick reconciles many posts, and a slow/failed
+  // push service must never hold up the next post's reconciliation.
+  const settings = resolveSettings(user);
+  const caption = (post.body || "").slice(0, 60);
+  if (state === "PUBLISH_COMPLETE" && settings.notifyPublishSuccess) {
+    void sendPushToUser(user.id, {
+      title: "Post publié sur TikTok",
+      body: caption || "Ton carrousel programmé vient d'être publié.",
+      url: "/app",
+      tag: `publish-${post.id}`,
+    });
+  } else if (state === "FAILED" && settings.notifyPublishFailure) {
+    void sendPushToUser(user.id, {
+      title: "Échec de publication",
+      body: caption ? `${caption} — ${failReason}` : failReason || "La publication a échoué.",
+      url: "/app",
+      tag: `publish-${post.id}`,
+    });
+  }
+  return { id: post.id, publishId: post.publishId as string, status: state, failReason: failReason || undefined, tiktokId: tiktokId || undefined };
+}
+
+/** Settles one publish_id on demand (the modal polls this right after posting). */
+export async function reconcilePublishId(userId: string, publishId: string): Promise<Reconciled | null> {
+  const data = await readStore();
+  const post = data.posts.find((item) => item.userId === userId && item.publishId === publishId);
+  const user = data.users.find((item) => item.id === userId);
+  if (!post || !user) return null;
+  if (TERMINAL.has(post.publishState || "")) {
+    return { id: post.id, publishId, status: post.publishState as string, failReason: post.publishError, tiktokId: post.tiktokId };
+  }
+  const channel = await loadTikTokChannel(userId);
+  if (!channel?.accessToken) throw new Error("tiktok_not_connected");
+  return settlePost(user, post, channel.accessToken);
+}
+
 /** Turns publish_ids into a real published/failed verdict. */
 export async function reconcilePendingPublishes() {
   const data = await readStore();
@@ -127,44 +169,8 @@ export async function reconcilePendingPublishes() {
     const channel = await loadTikTokChannel(user.id);
     if (!channel?.accessToken) continue;
     try {
-      const status = await fetchPublishStatus(channel.accessToken, post.publishId as string);
-      const state = String(status.status || "");
-      let failReason = "";
-      await updateStore((store) => {
-        const current = store.posts.find((item) => item.id === post.id);
-        if (!current) return;
-        current.publishState = state;
-        if (state === "PUBLISH_COMPLETE") {
-          current.status = "published";
-          current.publishError = undefined;
-          const postId = (status.publicaly_available_post_id || status.publicly_available_post_id || [])[0];
-          if (postId) current.tiktokId = String(postId);
-        } else if (state === "FAILED") {
-          failReason = String(status.fail_reason || "failed").slice(0, 300);
-          current.status = "draft";
-          current.publishError = failReason;
-        }
-      });
-      // Fire-and-forget: a cron tick reconciles many posts, and a slow/failed
-      // push service must never hold up the next post's reconciliation.
-      const settings = resolveSettings(user);
-      const caption = (post.body || "").slice(0, 60);
-      if (state === "PUBLISH_COMPLETE" && settings.notifyPublishSuccess) {
-        void sendPushToUser(user.id, {
-          title: "Post publié sur TikTok",
-          body: caption || "Ton carrousel programmé vient d'être publié.",
-          url: "/app",
-          tag: `publish-${post.id}`,
-        });
-      } else if (state === "FAILED" && settings.notifyPublishFailure) {
-        void sendPushToUser(user.id, {
-          title: "Échec de publication",
-          body: caption ? `${caption} — ${failReason}` : failReason || "La publication a échoué.",
-          url: "/app",
-          tag: `publish-${post.id}`,
-        });
-      }
-      results.push({ id: post.id, status: state });
+      const settled = await settlePost(user, post, channel.accessToken);
+      results.push({ id: post.id, status: settled.status });
     } catch (error) {
       results.push({ id: post.id, status: error instanceof Error ? error.message : "status_error" });
     }
