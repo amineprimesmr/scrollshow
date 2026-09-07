@@ -4,6 +4,7 @@ import { prefersEnglish, t } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsView } from "./AnalyticsView";
+import { AccountsFan } from "../AccountsFan";
 import { useStudio } from "../StudioContext";
 
 export function HomeView() {
@@ -82,6 +83,8 @@ export function HomeView() {
         <h1>{t("Overview", "Overview", en)}</h1>
         <p className="ss-home-hero__sub">{t("Ton état des lieux : configuration, portée et posts.", "Your at-a-glance state: setup, reach and posts.", en)}</p>
       </div>
+
+      <AccountsFan />
 
       <div className="ss-quickstart">
         <div className="ss-quickstart__head">
