@@ -5119,6 +5119,12 @@ a.ss-btn-ghost {
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ss-fan__stage img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .ss-fan__stage:active {

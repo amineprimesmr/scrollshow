@@ -151,6 +151,8 @@ export function AccountsFan() {
   const vel = useRef<number[]>([]); // slots per second, used to lean the folders
   const hov = useRef<number[]>([]); // smoothed hover amount per folder
   const hovered = useRef<number | null>(null);
+  const dragging = useRef(false);
+  const lastMouse = useRef({ x: -1, y: -1 });
   const raf = useRef<number | null>(null);
   const lastT = useRef(0);
   const reduced = useRef(false);
@@ -303,6 +305,8 @@ export function AccountsFan() {
     const folder = (e.target as HTMLElement).closest<HTMLElement>(".ss-folder");
     const index = folder ? Number(folder.dataset.index) : null;
     drag.current = { x: e.clientX, start: target.current, moved: false, lastX: e.clientX, lastT: performance.now(), v: 0, index };
+    dragging.current = true;
+    setHover(null);
     const g = narrowRef.current ? MOBILE : DESKTOP;
     const move = (ev: PointerEvent) => {
       const d = drag.current;
@@ -315,12 +319,14 @@ export function AccountsFan() {
       d.lastX = ev.clientX;
       d.lastT = now;
       target.current = clamp(d.start - dx / g.step, -0.35, countRef.current - 0.65);
+      settle(); // the green highlight follows the scrub live
       kick();
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
+      dragging.current = false;
       const d = drag.current;
       drag.current = null;
       if (!d) return;
@@ -342,6 +348,17 @@ export function AccountsFan() {
     kick();
   }
 
+  // Chrome re-dispatches mouse events when elements move under a still cursor
+  // (after a drag, a wheel scrub or the wave itself). Only a pointer that
+  // really moved may hover, and never while the pointer is pressed.
+  function onMouseMove(e: React.MouseEvent) {
+    if (dragging.current) return;
+    if (e.clientX === lastMouse.current.x && e.clientY === lastMouse.current.y) return;
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+    const folder = (e.target as HTMLElement).closest<HTMLElement>(".ss-folder");
+    setHover(folder ? Number(folder.dataset.index) : null);
+  }
+
   useEffect(() => {
     // Horizontal trackpad swipes scrub the fan; vertical wheel keeps scrolling
     // the page. Registered natively so preventDefault is honoured (React's
@@ -355,6 +372,7 @@ export function AccountsFan() {
       const g = narrowRef.current ? MOBILE : DESKTOP;
       // Scrub continuously with the gesture, then settle on the nearest folder.
       target.current = clamp(target.current + e.deltaX / (g.step * 1.4), -0.35, countRef.current - 0.65);
+      settle();
       kick();
       if (idle != null) window.clearTimeout(idle);
       idle = window.setTimeout(() => goToRef.current(Math.round(target.current)), 110);
@@ -364,7 +382,7 @@ export function AccountsFan() {
       stage.removeEventListener("wheel", onWheel);
       if (idle != null) window.clearTimeout(idle);
     };
-  }, [kick]);
+  }, [kick, settle]);
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowRight") {
@@ -438,6 +456,7 @@ export function AccountsFan() {
         role="listbox"
         aria-activedescendant={current ? `fan-${current.id}` : undefined}
         onPointerDown={onPointerDown}
+        onMouseMove={onMouseMove}
         onMouseLeave={() => setHover(null)}
         onKeyDown={onKeyDown}
       >
@@ -467,7 +486,6 @@ export function AccountsFan() {
               role="option"
               aria-selected={isSel}
               className={`ss-folder ${isSel ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
-              onMouseEnter={() => setHover(i)}
             >
               <div className="ss-folder__glow" aria-hidden />
               <div className="ss-folder__back" />
@@ -492,7 +510,7 @@ export function AccountsFan() {
               </div>
               <div className="ss-folder__front">
                 <div className="ss-folder__front-green" aria-hidden />
-                {item.avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" loading="lazy" /> : null}
+                {item.avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" loading="lazy" draggable={false} /> : null}
                 <div className="ss-folder__count">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
                     <circle cx="9" cy="8" r="3.4" />
