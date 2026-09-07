@@ -14,6 +14,10 @@ export function WarmedAccountsView() {
       <a href="mailto:support@scrollshow.io?subject=Comptes%20warm%C3%A9s" className="ss-btn-purple">
         {t("Nous contacter", "Contact us", en)}
       </a>
+      <p>
+        {t("Tu préfères le faire toi-même ?", "Prefer doing it yourself?", en)}{" "}
+        <a href="/app/post-us">{t("Guide : poster aux US à 100 %", "Guide: post to the US, 100%", en)}</a>
+      </p>
     </div>
   );
 }

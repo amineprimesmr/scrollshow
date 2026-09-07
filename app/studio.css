@@ -4532,3 +4532,34 @@ a.ss-btn-ghost {
     grid-template-columns: 60px 1fr 140px;
   }
 }
+
+/* Poster aux US */
+.ss-postus .ss-panel h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.ss-postus .ss-panel h3 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ss-postus .ss-shadow-table {
+  margin: 0 0 8px;
+}
+
+.ss-postus .ss-shadow-table th,
+.ss-postus .ss-shadow-table td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+.ss-postus .ss-shadow-table tbody th {
+  white-space: nowrap;
+  color: var(--ss-muted);
+  font-weight: 600;
+}
