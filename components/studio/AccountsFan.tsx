@@ -211,7 +211,7 @@ export function AccountsFan() {
       const gap = now - (lastT.current || now);
       const dt = Math.min(0.05, gap / 1000 || 0.016);
       lastT.current = now;
-      if (reduced.current || gap > 250) {
+      if (reduced.current || gap > 250 || document.visibilityState === "hidden") {
         // Reduced motion, or the tab was throttled/hidden: land immediately
         // instead of replaying a stale spring when frames resume.
         focus.current = target.current;
