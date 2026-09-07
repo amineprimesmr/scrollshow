@@ -71,3 +71,7 @@ Replace `<N>` with a realistic daily-creator estimate (the creator cap will be s
 - `tsc --noEmit` clean.
 - Manual run on localhost: panel renders, privacy has no default, comments off, disclosure toggle off; branded → paid-partnership label, declaration change, "Only me" disabled; "Only me" → branded disabled; toggle-without-choice → disabled button with tooltip; creator API error → "Could not read the TikTok account"; blocked codes → try-again-later banner.
 - Not exercised locally: a real Direct Post (the local seed token is fake). Test once on production with the real account before recording.
+
+## 5. Demo video produced on 7 Sep 2026
+
+`~/Downloads/scrollshow-tiktok-direct-post-demo.mp4` (1512×802, 99 s, 2.2 MB, 33 steps at 3 s each), recorded from the live scrollshow.io tab with the real @mannyprcs account (set to private). It shows: calendar → Accounts (TikTok connected via Login Kit) → Analytics → New post → title, privacy chosen manually, Allow comment, commercial disclosure + "Your brand" with the Promotional-content prompt, declaration → Post to TikTok → processing status → "Posted to TikTok" → TikTok profile → the post open on TikTok with the Promotional content label. Three private test posts were created on @mannyprcs during the takes; delete them from TikTok once the audit is submitted.
