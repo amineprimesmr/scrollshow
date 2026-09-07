@@ -75,3 +75,7 @@ Replace `<N>` with a realistic daily-creator estimate (the creator cap will be s
 ## 5. Demo video produced on 7 Sep 2026
 
 `~/Downloads/scrollshow-tiktok-direct-post-demo.mp4` (1512×802, 99 s, 2.2 MB, 33 steps at 3 s each), recorded from the live scrollshow.io tab with the real @mannyprcs account (set to private). It shows: calendar → Accounts (TikTok connected via Login Kit) → Analytics → New post → title, privacy chosen manually, Allow comment, commercial disclosure + "Your brand" with the Promotional-content prompt, declaration → Post to TikTok → processing status → "Posted to TikTok" → TikTok profile → the post open on TikTok with the Promotional content label. Three private test posts were created on @mannyprcs during the takes; delete them from TikTok once the audit is submitted.
+
+## 6. Resubmitted on 7 Sep 2026
+
+Direct Post audit application submitted from the developer portal (Content Posting API application form, app id 7673250598694963220) with the demo video `docs/scrollshow-tiktok-direct-post-demo.mp4`, the UX explanation from section 3, "Less than 100" daily publishing users, and the list of stored API fields. TikTok answers in 2–4 weeks; the status shows on Manage apps → ScrollShow → Content Posting API → Direct Post.
