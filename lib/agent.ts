@@ -1,6 +1,7 @@
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import { fetchUserInfo, listRecentVideos, publicChannel } from "./tiktok";
 import { analyzeShadowban } from "./shadowban";
+import { FIX_TEXT } from "./shadowban-rounds";
 import {
   applyRecipePatch,
   cloneRecipe,
@@ -855,7 +856,7 @@ export async function agentShadowbanCheck(user: SessionUser) {
         baselineAvgViews: report.baselineAvgViews,
         dropPct: report.dropPct,
         estimatedOnset: report.estimatedOnset,
-        fixes: r.fixes,
+        fixes: r.fixes.map((id) => FIX_TEXT[id]),
       });
     } catch (error) {
       accounts.push({ handle: channel.handle, name: channel.name, error: error instanceof Error ? error.message : "shadowban_failed" });

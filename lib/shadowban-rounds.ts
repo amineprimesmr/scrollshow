@@ -38,6 +38,29 @@ export type Signal = {
 
 export type Diagnosis = "healthy" | "throttled" | "content_fails_seed" | "mixed" | "insufficient_data";
 
+export type FixId =
+  | "post_more"
+  | "change_how_you_post"
+  | "dont_recreate"
+  | "fix_hook"
+  | "clone_format"
+  | "unique_captions"
+  | "spread_posting"
+  | "check_account_status"
+  | "keep_going";
+
+export const FIX_TEXT: Record<FixId, string> = {
+  post_more: "Post at least 5 times so the round histogram means something.",
+  change_how_you_post: "Change how you post, not what: pause 48–72h, then one post per day from the phone with a library sound, at least 6h apart.",
+  dont_recreate: "Do not recreate the account unless Account status shows strikes — restrictions expire on their own.",
+  fix_hook: "Fix slide 1 / the first 1.5 s: a specific number + a concrete object + a mistake-or-rule.",
+  clone_format: "Clone a format that already prints in your niche (accounts with a stable 100k+/30d median, not one viral fluke).",
+  unique_captions: "Write a unique caption per post and rotate hashtags — near-identical content de-recommends the whole account.",
+  spread_posting: "Spread posting times: never several posts within an hour, max 3 per day, never mirror one post across accounts.",
+  check_account_status: "Zero-view posts were never seeded: check Account status in TikTok for a strike, and that the account/post is not private.",
+  keep_going: "Nothing to fix: keep the cadence, keep captions unique, and keep testing hooks on slide 1.",
+};
+
 export type RoundsReport = {
   postCount: number;
   histogram: Record<Round, number>;
@@ -52,7 +75,7 @@ export type RoundsReport = {
   diagnosis: Diagnosis;
   trend: { last10Median: number; previous10Median: number; changePct: number | null };
   perPost: Array<{ id: string; round: Round; views: number; engagementRate: number; createdAt: string }>;
-  fixes: string[];
+  fixes: FixId[];
 };
 
 const HOUR = 3600;
@@ -146,33 +169,15 @@ function detectSignals(sorted: TikTokVideo[]): Signal[] {
   return signals;
 }
 
-function fixesFor(diagnosis: Diagnosis, signals: Signal[]): string[] {
-  const fixes: string[] = [];
+function fixesFor(diagnosis: Diagnosis, signals: Signal[]): FixId[] {
+  const fixes: FixId[] = [];
   const ids = new Set(signals.map((s) => s.id));
-  if (diagnosis === "throttled" || diagnosis === "mixed") {
-    fixes.push(
-      "Change how you post, not what: pause 48–72h, then one post per day from the phone with a library sound, at least 6h apart.",
-      "Do not recreate the account unless Account status shows strikes — restrictions expire on their own.",
-    );
-  }
-  if (diagnosis === "content_fails_seed" || diagnosis === "mixed") {
-    fixes.push(
-      "Fix slide 1 / the first 1.5 s: a specific number + a concrete object + a mistake-or-rule.",
-      "Clone a format that already prints in your niche (accounts with a stable 100k+/30d median, not one viral fluke).",
-    );
-  }
-  if (ids.has("duplicate_captions") || ids.has("repeated_hashtags")) {
-    fixes.push("Write a unique caption per post and rotate hashtags — near-identical content de-recommends the whole account.");
-  }
-  if (ids.has("burst_posting") || ids.has("high_daily_rate")) {
-    fixes.push("Spread posting times: never several posts within an hour, max 3 per day, never mirror one post across accounts.");
-  }
-  if (ids.has("zero_view_posts")) {
-    fixes.push("Zero-view posts were never seeded: check Account status in TikTok for a strike, and that the account/post is not private.");
-  }
-  if (diagnosis === "healthy" && !fixes.length) {
-    fixes.push("Nothing to fix: keep the cadence, keep captions unique, and keep testing hooks on slide 1.");
-  }
+  if (diagnosis === "throttled" || diagnosis === "mixed") fixes.push("change_how_you_post", "dont_recreate");
+  if (diagnosis === "content_fails_seed" || diagnosis === "mixed") fixes.push("fix_hook", "clone_format");
+  if (ids.has("duplicate_captions") || ids.has("repeated_hashtags")) fixes.push("unique_captions");
+  if (ids.has("burst_posting") || ids.has("high_daily_rate")) fixes.push("spread_posting");
+  if (ids.has("zero_view_posts")) fixes.push("check_account_status");
+  if (diagnosis === "healthy" && !fixes.length) fixes.push("keep_going");
   return fixes;
 }
 
@@ -238,6 +243,6 @@ export function analyzeRounds(videos: TikTokVideo[]): RoundsReport {
     diagnosis,
     trend: { last10Median, previous10Median, changePct },
     perPost,
-    fixes: n < 5 ? ["Post at least 5 times so the round histogram means something."] : fixesFor(diagnosis, signals),
+    fixes: n < 5 ? ["post_more"] : fixesFor(diagnosis, signals),
   };
 }

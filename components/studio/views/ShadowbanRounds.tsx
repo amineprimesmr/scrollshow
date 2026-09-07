@@ -1,7 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import { ROUNDS, type Round, type RoundsReport, type SignalId } from "@/lib/shadowban-rounds";
+import { FIX_TEXT, ROUNDS, type FixId, type Round, type RoundsReport, type Signal, type SignalId } from "@/lib/shadowban-rounds";
 
 const ROUND_COPY: Record<Round, { range: string; fr: string; en: string }> = {
   R0: { range: "< 200", fr: "Jamais sorti du lot de test", en: "Never left the seed batch" },
@@ -18,6 +18,33 @@ const SIGNAL_COPY: Record<SignalId, { fr: string; en: string }> = {
   repeated_hashtags: { fr: "Mêmes hashtags sur ≥ 60 % des posts", en: "Same hashtags on ≥ 60% of posts" },
   zero_view_posts: { fr: "Posts à 0 vue (jamais diffusés)", en: "Zero-view posts (never seeded)" },
 };
+
+const FIX_FR: Record<FixId, string> = {
+  post_more: "Publie au moins 5 fois pour que l'histogramme ait un sens.",
+  change_how_you_post: "Change la façon de poster, pas le contenu : pause 48–72h, puis 1 post/jour depuis le téléphone avec un son de la bibliothèque, à 6h d'écart minimum.",
+  dont_recreate: "Ne recrée pas le compte sauf si le Statut du compte affiche des sanctions — les restrictions expirent d'elles-mêmes.",
+  fix_hook: "Corrige la slide 1 / les 1,5 premières secondes : un chiffre précis + un objet concret + une erreur ou une règle.",
+  clone_format: "Clone un format qui marche déjà dans ta niche (comptes à médiane stable 100k+/30j, pas un seul coup viral).",
+  unique_captions: "Une légende unique par post et des hashtags qui tournent — le contenu quasi identique dé-recommande tout le compte.",
+  spread_posting: "Étale les publications : jamais plusieurs posts dans l'heure, 3 par jour max, jamais le même post en miroir sur plusieurs comptes.",
+  check_account_status: "Des posts à 0 vue n'ont jamais été diffusés : vérifie le Statut du compte dans TikTok (sanction) et que le compte/post n'est pas privé.",
+  keep_going: "Rien à corriger : garde la cadence, des légendes uniques, et continue de tester les accroches de la slide 1.",
+};
+
+function signalDetail(s: Signal, en: boolean) {
+  switch (s.id) {
+    case "burst_posting":
+      return t(`${s.count} posts publiés à moins d'1h d'écart`, `${s.count} posts published less than 1h apart`, en);
+    case "high_daily_rate":
+      return t(`${s.count} jour(s) avec plus de 3 posts`, `${s.count} day(s) with more than 3 posts`, en);
+    case "duplicate_captions":
+      return t(`${s.count} posts partagent une légende identique`, `${s.count} posts share an identical caption`, en);
+    case "repeated_hashtags":
+      return t(`le même jeu de hashtags sur ${s.count} posts`, `the same hashtag set on ${s.count} posts`, en);
+    case "zero_view_posts":
+      return t(`${s.count} post(s) à 0 vue — jamais diffusé(s)`, `${s.count} post(s) with zero views — never seeded`, en);
+  }
+}
 
 function pct(n: number) {
   return `${Math.round(n * 100)}%`;
@@ -158,7 +185,7 @@ export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: bool
                 <li key={s.id}>
                   <b>{en ? SIGNAL_COPY[s.id].en : SIGNAL_COPY[s.id].fr}</b>
                   <br />
-                  <small>{s.detail}</small>
+                  <small>{signalDetail(s, en)}</small>
                 </li>
               ))}
             </ul>
@@ -170,7 +197,7 @@ export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: bool
           <h2>{t("Quoi faire", "What to do", en)}</h2>
           <ul className="ss-feat">
             {rounds.fixes.map((fix) => (
-              <li key={fix}>{fix}</li>
+              <li key={fix}>{en ? FIX_TEXT[fix] : FIX_FR[fix]}</li>
             ))}
           </ul>
         </div>
