@@ -1,5 +1,6 @@
 import { canAddAccount, readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
+import { fetchTikTokProfile, normalizeHandle, ProfileError } from "@/lib/tiktok-profile";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -32,27 +33,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  const handle = parsed.data.handle.replace(/^@/, "").toLowerCase();
+  const handle = normalizeHandle(parsed.data.handle);
+  if (!handle) return NextResponse.json({ error: "invalid" }, { status: 400 });
+
+  // Best effort: pull the public profile so the row is real from the start.
+  let profile: Awaited<ReturnType<typeof fetchTikTokProfile>> | null = null;
+  let syncError: string | undefined;
+  try {
+    profile = await fetchTikTokProfile(handle);
+  } catch (error) {
+    syncError = error instanceof ProfileError ? error.code : "network";
+  }
+
   const account = await updateStore((data) => {
     if (!canAddAccount(user.plan)) return { error: "limit" as const };
+    const existing = data.accounts.find((item) => item.userId === user.id && item.handle === (profile?.handle || handle));
+    if (existing) return { error: "exists" as const, account: existing };
     const created = {
       id: crypto.randomUUID(),
       userId: user.id,
-      handle,
+      handle: profile?.handle || handle,
       niche: parsed.data.niche || "",
-      followers: parsed.data.followers || 0,
+      followers: profile?.followers ?? parsed.data.followers ?? 0,
       avgViews: parsed.data.avgViews || 0,
-      posts: parsed.data.posts || 0,
+      posts: profile?.videos ?? parsed.data.posts ?? 0,
       verdict: parsed.data.verdict || "watch",
       notes: parsed.data.notes || "",
       createdAt: new Date().toISOString(),
+      nickname: profile?.nickname,
+      avatar: profile?.avatar,
+      bio: profile?.bio,
+      likes: profile?.likes,
+      verified: profile?.verified,
+      lastSyncAt: new Date().toISOString(),
+      syncError,
     };
     data.accounts.unshift(created);
     return created;
   });
 
   if (account && "error" in account) {
-    return NextResponse.json(account, { status: 402 });
+    return NextResponse.json(account, { status: account.error === "exists" ? 409 : 402 });
   }
   return NextResponse.json({ account });
 }

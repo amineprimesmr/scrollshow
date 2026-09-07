@@ -57,6 +57,14 @@ export type Account = {
   verdict: "keep" | "watch" | "skip";
   notes: string;
   createdAt: string;
+  /** Public profile data pulled from TikTok (clippers network). */
+  nickname?: string;
+  avatar?: string;
+  bio?: string;
+  likes?: number;
+  verified?: boolean;
+  lastSyncAt?: string;
+  syncError?: string;
 };
 
 export type Run = {

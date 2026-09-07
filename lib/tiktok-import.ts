@@ -27,7 +27,7 @@ export type ImportedTikTok = {
   images: string[];
 };
 
-function tiktokHeaders(extra?: Record<string, string>): HeadersInit {
+export function tiktokHeaders(extra?: Record<string, string>): HeadersInit {
   return {
     "User-Agent": UA,
     Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
@@ -76,7 +76,7 @@ function decodeHtml(value: string) {
     .replace(/&gt;/g, ">");
 }
 
-function scriptJson(html: string, id: string) {
+export function scriptJson(html: string, id: string) {
   const match = html.match(new RegExp(`<script[^>]*id="${id}"[^>]*>([\\s\\S]*?)</script>`));
   if (!match?.[1]) return null;
   const raw = match[1].trim();
