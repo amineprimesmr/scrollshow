@@ -74,8 +74,8 @@ export function compact(n: number) {
 
 type Geo = { w: number; h: number; step: number; baseRot: number; focusRot: number };
 
-const DESKTOP: Geo = { w: 184, h: 226, step: 58, baseRot: -58, focusRot: -30 };
-const MOBILE: Geo = { w: 128, h: 158, step: 38, baseRot: -56, focusRot: -30 };
+const DESKTOP: Geo = { w: 184, h: 226, step: 74, baseRot: -58, focusRot: -30 };
+const MOBILE: Geo = { w: 128, h: 158, step: 46, baseRot: -56, focusRot: -30 };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const smooth = (v: number) => {
@@ -169,7 +169,7 @@ export function AccountsFan() {
     const stage = stageRef.current;
     if (!stage) return;
     const g = narrowRef.current ? MOBILE : DESKTOP;
-    const cx = stage.clientWidth * (narrowRef.current ? 0.42 : 0.4);
+    const cx = stage.clientWidth * (narrowRef.current ? 0.42 : 0.44);
     const cy = stage.clientHeight * (narrowRef.current ? 0.6 : 0.55);
     for (let i = 0; i < nodes.current.length; i += 1) {
       const el = nodes.current[i];
@@ -293,9 +293,16 @@ export function AccountsFan() {
     return () => ro.disconnect();
   }, [paint]);
 
-  useEffect(() => () => {
-    if (raf.current != null) cancelAnimationFrame(raf.current);
-  }, []);
+  useEffect(
+    () => () => {
+      // StrictMode runs this cleanup once on mount: null the id so kick() can
+      // start the loop again, otherwise the fan would never animate in dev.
+      if (raf.current != null) cancelAnimationFrame(raf.current);
+      raf.current = null;
+      lastT.current = 0;
+    },
+    [],
+  );
 
   /* ---------------- pointer: press a folder to select, drag to scrub ---------------- */
   const drag = useRef<{ x: number; start: number; moved: boolean; lastX: number; lastT: number; v: number; index: number | null } | null>(null);
