@@ -175,16 +175,19 @@ export function AccountsFan() {
       const d = i - (cur.current[i] ?? target.current);
       const l = layout(d, g);
       const h = hov.current[i] ?? 0;
-      const lean = clamp(-(vel.current[i] ?? 0) * 0.9, -7, 7); // lean into the motion
+      const lean = clamp(-(vel.current[i] ?? 0) * 0.55, -5, 5); // lean into the motion
       const x = cx + l.x - g.w / 2;
-      const y = cy + l.y - g.h / 2 - 22 * h - Math.abs(lean) * 0.6;
+      const y = cy + l.y - g.h / 2 - 22 * h - Math.abs(lean) * 0.5;
       const z = l.z + 48 * h;
       const rot = l.rot + 10 * h;
       el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rot}deg) rotateZ(${lean}deg) scale(${l.scale + 0.02 * h})`;
       const ad = Math.abs(d);
-      el.style.zIndex = String(1000 - Math.round(ad * 10) + (h > 0.5 ? 5 : 0));
+      // Flat stacking: the folder nearest the focus is always on top, a hovered
+      // one rises above both neighbours. No 3D intersection surprises.
+      el.style.zIndex = String(1000 - Math.round(ad * 10) + Math.round(20 * h));
       el.style.opacity = String(clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1));
-      el.style.filter = ad > 0.6 ? `brightness(${clamp(1 - (ad - 0.6) * 0.045, 0.66, 1)})` : "none";
+      const shade = el.lastElementChild as HTMLElement | null;
+      if (shade) shade.style.opacity = String(clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h));
     }
     const handle = handleRef.current;
     const n = countRef.current;
@@ -221,8 +224,8 @@ export function AccountsFan() {
         } else {
           // Folders further from the pivot follow later: the move ripples
           // through the stack like a wave instead of sliding as one block.
-          const dist = Math.min(Math.abs(i - pivot), 7);
-          const rate = 15 - dist * 1.35;
+          const dist = Math.min(Math.abs(i - pivot), 6);
+          const rate = 19 - dist * 1.2;
           const a = 1 - Math.exp(-rate * dt);
           const next = prev + (tgt - prev) * a;
           vel.current[i] = (next - prev) / dt;
@@ -497,6 +500,7 @@ export function AccountsFan() {
                 </div>
                 <div className="ss-folder__label">@{item.handle}</div>
               </div>
+              <i className="ss-folder__shade" aria-hidden />
             </div>
           );
         })}
