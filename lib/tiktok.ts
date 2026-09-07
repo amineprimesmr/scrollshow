@@ -177,9 +177,17 @@ async function tiktokPost(url: string, accessToken: string, jsonBody: Record<str
   return res.json();
 }
 
+export class TikTokApiError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 function assertOk(data: any) {
   const err = data.error || {};
-  if (err.code && err.code !== "ok") throw new Error(err.message || JSON.stringify(data));
+  if (err.code && err.code !== "ok") throw new TikTokApiError(String(err.code), err.message || JSON.stringify(data));
   return data.data || {};
 }
 

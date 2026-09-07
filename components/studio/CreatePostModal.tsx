@@ -19,7 +19,7 @@ import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
 import { useStudio } from "./StudioContext";
-import { optionsErrorCopy, PublishStatus, type PublishProgress, TikTokPublishPanel, useTikTokCreator } from "./TikTokPublishPanel";
+import { blockedCopy, optionsErrorCopy, PublishStatus, type PublishProgress, TikTokPublishPanel, useTikTokCreator } from "./TikTokPublishPanel";
 
 function rebuildCopy(code: string, english: boolean) {
   if (code === "ai_gateway_billing") {
@@ -355,9 +355,9 @@ export function CreatePostModal() {
       const code = String(json.error || "");
       if (code.startsWith("creator_")) {
         creatorState.refresh();
-        setMessage(t("TikTok n'autorise pas la publication pour le moment. Réessaie plus tard.", "TikTok is not allowing posting right now. Please try again later.", english));
+        setMessage(blockedCopy(code.slice("creator_".length), english));
       } else {
-        setMessage(optionsErrorCopy(code, english) || code || t("Publication impossible", "Could not publish", english));
+        setMessage(optionsErrorCopy(code, english) || String(json.message || code) || t("Publication impossible", "Could not publish", english));
       }
       return;
     }

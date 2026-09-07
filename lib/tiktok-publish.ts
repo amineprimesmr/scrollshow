@@ -5,11 +5,12 @@
 
 import { resolveSettings } from "./settings";
 import { readStore } from "./store";
-import { absoluteAssetUrl, initPhotoPost, queryCreatorInfo } from "./tiktok";
+import { absoluteAssetUrl, initPhotoPost, queryCreatorInfo, TikTokApiError } from "./tiktok";
 import { loadTikTokChannel } from "./tiktok-account";
 import {
   type CreatorSnapshot,
   type TikTokPostOptions,
+  creatorBlockedReason,
   photoPostInfo,
   validatePostOptions,
 } from "./tiktok-compliance";
@@ -46,15 +47,27 @@ export async function directPostPhotos(
   const store = await readStore();
   const settings = resolveSettings(store.users.find((item) => item.id === userId));
 
-  const result = await initPhotoPost(channel.accessToken, {
-    post_info: photoPostInfo(input.options, input.description, settings.autoAddMusic),
-    source_info: {
-      source: "PULL_FROM_URL",
-      photo_cover_index: 0,
-      photo_images: input.photos.map(absoluteAssetUrl),
-    },
-    post_mode: "DIRECT_POST",
-    media_type: "PHOTO",
-  });
+  let result: Record<string, unknown>;
+  try {
+    result = await initPhotoPost(channel.accessToken, {
+      post_info: photoPostInfo(input.options, input.description, settings.autoAddMusic),
+      source_info: {
+        source: "PULL_FROM_URL",
+        photo_cover_index: 0,
+        photo_images: input.photos.map(absoluteAssetUrl),
+      },
+      post_mode: "DIRECT_POST",
+      media_type: "PHOTO",
+    });
+  } catch (error) {
+    // content/init reports the same "cannot post" conditions as creator_info
+    // (guideline 1b), plus the unaudited-client restriction; surface the code
+    // so the UI can explain instead of echoing TikTok's generic sentence.
+    if (error instanceof TikTokApiError) {
+      const blocked = creatorBlockedReason(error.code);
+      throw new PublishError(blocked ? `creator_${blocked}` : `tiktok_${error.code}`, blocked ? 429 : 400, { message: error.message });
+    }
+    throw error;
+  }
   return { publishId: String(result.publish_id || ""), creator, channel, raw: result };
 }
