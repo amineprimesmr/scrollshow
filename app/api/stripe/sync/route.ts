@@ -5,9 +5,12 @@ import { publicUser, updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const user = await readSession();
-  const back = () => NextResponse.redirect(new URL("/pricing?error=payment_pending", request.url));
-  if (!user) return NextResponse.redirect(new URL("/signup?mode=signin&next=/pricing", request.url));
   const id = new URL(request.url).searchParams.get("session_id");
+  const back = () => NextResponse.redirect(new URL("/onboarding?step=payment&error=payment_pending", request.url));
+  if (!user) {
+    const next = id && /^cs_[A-Za-z0-9_]+$/.test(id) ? `/pricing/success?session_id=${id}` : "/onboarding";
+    return NextResponse.redirect(new URL(`/signup?mode=signin&next=${encodeURIComponent(next)}`, request.url));
+  }
   if (!id) return back();
   try {
     const session = await stripe().checkout.sessions.retrieve(id, { expand: ["subscription"] });

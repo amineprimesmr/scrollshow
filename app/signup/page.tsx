@@ -4,37 +4,13 @@ import { BrandMark } from "@/components/BrandMark";
 import { afterAuthPath, googleStartUrl, signupUrl } from "@/lib/auth-urls";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import "./signup.css";
 
-const QUOTES = [
-  {
-    metric: "+100M $",
-    label: "CA generated",
-    text: "By far the most powerful tool available. You instantly see who's scaling and which ads are crushing. I use it every day, can't go without it",
-    name: "Fouad Juliene",
-    role: "Founder of Maybe Paris",
-    avatar: "/assets/avatars/gars1.png",
-    mark: "MP",
-  },
-  {
-    metric: "+20M$",
-    label: "CA generated",
-    text: "Love the fact that I can match ads to landing pages. It's super useful to see how brands structure their funnels.",
-    name: "Alex Shane",
-    role: "Founder of Fincut",
-    avatar: "/assets/avatars/leo.png",
-    mark: "F",
-  },
-  {
-    metric: "+200M$",
-    label: "CA generated",
-    text: "ScrollShow helps you see what's working for other brands so you can easily create high-converting ads for yours. A must-have for anyone serious about scaling.",
-    name: "Nick Theriot",
-    role: "Founder of Theriot Solutions",
-    avatar: "/assets/avatars/estebanprime.png",
-    mark: "TS",
-  },
+const SETUP_STEPS = [
+  { title: "1. Crée ton compte", text: "Avec Google ou ton adresse email. Aucune carte demandée à cette étape." },
+  { title: "2. Prépare ton espace", text: "Présente ton activité et personnalise ton profil. Le branchement de ton assistant peut attendre." },
+  { title: "3. Active ton accès", text: "Choisis ton offre à la fin de l’onboarding. Paiement sécurisé sur Stripe, puis accès au studio." },
 ];
 
 const GOOGLE_ERRORS: Record<string, string> = {
@@ -73,9 +49,16 @@ function SignupForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me").then(r => r.json()).then(json => {
+      if (active && json.user) router.replace(json.user.emailVerified ? afterAuthPath(json.user.plan, next, json.user.onboarded) : `/verify-email?next=${encodeURIComponent(next || "/onboarding")}`);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [router, next]);
 
   const googleHref = useMemo(
-    () => googleStartUrl({ next: next || (signin ? null : "/pricing"), mode: signin ? "signin" : null }),
+    () => googleStartUrl({ next: next || "/app", mode: signin ? "signin" : null }),
     [next, signin],
   );
 
@@ -88,7 +71,8 @@ function SignupForm() {
     }
 
     setPending(true);
-    const res = await fetch(signin ? "/api/auth/login" : "/api/auth/signup", {
+    let res: Response;
+    try { res = await fetch(signin ? "/api/auth/login" : "/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
@@ -96,7 +80,7 @@ function SignupForm() {
           ? { email, password }
           : { name: nameFromEmail(email), email, password },
       ),
-    });
+    }); } catch { setPending(false); setError("Connexion interrompue. Réessaie, tes informations sont conservées."); return; }
     const json = await res.json().catch(() => ({}));
     setPending(false);
     if (signin) {
@@ -112,7 +96,7 @@ function SignupForm() {
         setError("Could not sign in. Try again.");
         return;
       }
-      router.push(json.user?.emailVerified ? afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false) : "/verify-email");
+      router.push(json.user?.emailVerified ? afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false) : `/verify-email?next=${encodeURIComponent(next || "/onboarding")}`);
       return;
     }
     if (res.status === 409) {
@@ -138,7 +122,7 @@ function SignupForm() {
             {signin ? "Sign in to ScrollShow" : "Create your ScrollShow Account"}
           </h1>
           <p className="ss-signup__sub">
-            {signin ? "Welcome back. Pick up where you left off." : "Create your account, then choose and pay for your plan to open the studio."}
+            {signin ? "Welcome back. Pick up where you left off." : "Create your account, personalize your workspace, then activate your access."}
           </p>
 
           {!signin && step === "password" ? (
@@ -212,24 +196,11 @@ function SignupForm() {
 
       <aside className="ss-signup__proof" aria-hidden>
         <div className="ss-signup__panel">
-          <h2>Ready to build a multi-million dollar brand?</h2>
+          <h2>Ton espace, étape par étape.</h2>
           <div className="ss-signup__quotes">
-            {QUOTES.map((quote) => (
-              <article key={quote.name} className="ss-quote">
-                <div className="ss-quote__metric">
-                  <b>{quote.metric}</b> {quote.label}
-                </div>
-                <blockquote>“{quote.text}”</blockquote>
-                <div className="ss-quote__who">
-                  <img src={quote.avatar} alt="" />
-                  <div>
-                    <strong>{quote.name}</strong>
-                    <span>{quote.role}</span>
-                  </div>
-                  <span className="ss-quote__mark">{quote.mark}</span>
-                </div>
-              </article>
-            ))}
+            {SETUP_STEPS.map(step => <article key={step.title} className="ss-quote">
+              <h3>{step.title}</h3><p>{step.text}</p>
+            </article>)}
           </div>
         </div>
       </aside>

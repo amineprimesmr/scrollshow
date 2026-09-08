@@ -4,8 +4,8 @@
 
 html:has(.ss-onb),
 html:has(.ss-onb) body {
-  background: #000 !important;
-  color: #fafafa !important;
+  background: var(--ss-bg) !important;
+  color: var(--ss-ink) !important;
 }
 
 html:has(.ss-onb) body.grain {
@@ -21,10 +21,10 @@ html:has(.ss-onb) body.grain {
   --lg-shade-a: 0.55;
   --lg-blur: 28px;
   --lg-sat: 1.5;
-  --ink: #fafafa;
-  --muted: #a1a1aa;
-  --line: rgb(255 255 255 / 0.1);
-  --field: rgb(255 255 255 / 0.06);
+  --ink: var(--ss-ink);
+  --muted: var(--ss-muted);
+  --line: var(--ss-line);
+  --field: var(--ss-soft);
   position: relative;
   min-height: 100dvh;
   padding: 0 20px 48px;
@@ -114,6 +114,9 @@ html:has(.ss-onb) body.grain {
 }
 
 .ss-onb__card {
+  background: var(--ss-card);
+  color: var(--ss-ink);
+  border: 1px solid var(--ss-line);
   margin-top: 16px;
   padding: 26px;
   border-radius: 28px;
@@ -279,8 +282,8 @@ html:has(.ss-onb) body.grain {
   padding: 0 20px;
   border: 0;
   border-radius: 999px;
-  background: #fafafa;
-  color: #000;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
   font: inherit;
   font-size: 15px;
   font-weight: 700;
@@ -1002,3 +1005,12 @@ html:has(.ss-onb) body.grain {
     transform: none;
   }
 }
+/* Plan selection is content, deliberately opaque in both color themes. */
+.ss-onb-offers { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.ss-onb-offers legend { margin-bottom: 12px; font-weight: 600; }
+.ss-onb-offer { display: flex; gap: 12px; align-items: flex-start; padding: 18px; border: 1px solid var(--ss-border, #888); border-radius: 18px; background: var(--ss-card); cursor: pointer; }
+.ss-onb-offer.is-selected { outline: 2px solid currentColor; outline-offset: -2px; }
+.ss-onb-offer strong, .ss-onb-offer small { display: block; }
+.ss-onb-offer small { margin-top: 8px; line-height: 1.5; }
+.ss-onb-terms { display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+.ss-onb-terms input, .ss-onb-offer input { width: auto; flex-shrink: 0; margin-top: 4px; }

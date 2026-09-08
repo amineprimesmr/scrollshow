@@ -155,7 +155,7 @@ function ViewsHero({ english }: { english: boolean }) {
           </p>
           <div className="af-ld-hero-cta-wrap">
             <Metal preset="chromatic" strength={0.9} keepStyles>
-              <Link href="/pricing" className="af-ld-hero-cta">
+              <Link href="/signup" className="af-ld-hero-cta">
                 <Logo size={28} />
                 <span className="af-ld-hero-cta__label">{t("Créer mon espace", "Create my workspace", english)}</span>
               </Link>
@@ -267,7 +267,7 @@ export function Landing() {
                     )}
                   </span>
                 </p>
-                <Link href="/pricing" className="af-ld-dark-cta">
+                <Link href="/signup" className="af-ld-dark-cta">
                   <CtaDot />
                   {t("Commencer", "Get started", english)}
                   <span aria-hidden>›</span>
@@ -372,7 +372,7 @@ export function Landing() {
                 ))}
               </ul>
               <Metal preset="chromatic" strength={0.85} keepStyles>
-                <Link href="/pricing" className="af-ld-offer__cta">
+                <Link href="/signup" className="af-ld-offer__cta">
                   <CtaDot />
                   {t("Créer mon espace", "Create my workspace", english)}
                   <span aria-hidden>›</span>
@@ -441,7 +441,7 @@ export function Landing() {
                 </span>
               </div>
               <Metal preset="chromatic" strength={0.85} keepStyles>
-                <Link href="/pricing" className="af-ld-closing__cta">
+                <Link href="/signup" className="af-ld-closing__cta">
                   <CtaDot />
                   {t("Créer mon espace", "Create my workspace", english)}
                   <span aria-hidden>›</span>

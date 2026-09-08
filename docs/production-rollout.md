@@ -1,5 +1,39 @@
 # Livraison SaaS — configuration et recette
 
+## Refonte du parcours d'acquisition — 8 septembre 2026
+
+- Les CTA de création ouvrent `/signup`, avec Google/email ; l'authentification existante reprend l'état réel du compte. Confirmation email requise avant onboarding et paiement.
+- Onboarding : profil, business automatique ou manuel, assistant facultatif, provenance facultative, offre intégrée. Étape sauvegardée côté serveur ; les comptes ayant terminé reprennent directement l'activation.
+- Dernière étape : 29 EUR/mois ou 99 EUR à vie, consentement explicite aux conditions, ouverture directe de Stripe. Aucun appel checkout depuis la page publique Tarifs. Aucun prix imposé dans le formulaire d'inscription.
+- Le serveur refuse le checkout sans onboarding terminé. Un retour Stripe annulé reprend l'offre ; une session expirée conserve l'identifiant Stripe pendant la reconnexion. Un paiement non confirmé ne débloque pas le studio. Les abonnements existants sont réconciliés plutôt que recréés.
+- Plus de rotation automatique de clé MCP au montage de l'onboarding. La préparation/remplacement est explicite et peut être reportée. Les témoignages et chiffres d'affaires non justifiés ont été retirés du panneau d'inscription.
+- Vérifications : 35 tests automatisés, 30 contrôles HTTP/MCP isolés, build de production et TypeScript réussis. Parcours navigateur compte fictif → profil → business manuel → assistant reporté → provenance → offre, puis rechargement conservant l'étape, vérifié. Choix d'offre, consentement et erreur de fournisseur testés. Étape finale inspectée en clair/sombre et à 390 px sans débordement horizontal.
+- Limite de preuve : pas de nouvelle transaction Stripe terminée ni de nouvelle connexion Google réelle pendant cette refonte. Les tests navigateur sont sur une base fictive, sans identifiants fournisseurs ; ils ne sont pas présentés comme une recette de paiement réelle.
+- Les contraintes d'hébergement commercial et les autres vérifications de lancement listées plus bas restent applicables. Cette refonte n'achète aucun abonnement fournisseur.
+
+## État actuel — 8 septembre 2026, après bascule 16 h 06 (Paris)
+
+**Cette section remplace toutes les affirmations historiques ci-dessous. La version est en ligne, mais le lancement commercial à 100 % n'est pas certifié.**
+
+- `scrollshow.io` sert `dpl_E5g3uZT72d75BKsLcknJuoSPhHt8`, commit `6b807af`, région Frankfurt. Une autre session avait poussé tous les changements avant la bascule prévue : une courte maintenance a permis de vérifier l'absence exacte de divergence puis de finaliser la migration, sans perte constatée.
+- PostgreSQL production est désormais la source active : 4 utilisateurs et 6 posts conservés. Le post programmé du 24 août sans identifiant de publication est remis en brouillon, avec explication, pour éviter un envoi ancien involontaire. Ne pas revenir à l'ancien déploiement Blob après de nouvelles écritures sans réconciliation.
+- Snapshot final privé du 8 septembre à 14:06:19 UTC et archive chiffrée avec les 3 médias importés référencés conservés hors Git. Sauvegarde distante après bascule réussie, nettoyage sans suppression, file de publication vide, contrôle de santé authentifié `ok:true`, aucun problème.
+- Workflows GitHub activés avec secret CRON synchronisé : maintenance quotidienne et ordonnanceur toutes les cinq minutes. Exécutions manuelles `34236204464` et `34236209814` terminées avec succès. La livraison d'une alerte d'échec reste à tester ; GitHub cron reste best effort.
+- Stripe production : nouveaux prix 29 EUR/mois et 99 EUR à vie configurés ; **aucun essai gratuit pour les nouvelles ventes**. Prix historique explicitement accepté pour préserver les abonnements existants. Webhook étendu aux paiements asynchrones et remboursements. Aucun paiement ni abonnement historique modifié par la recette.
+- Resend configuré en production et preview, domaine vérifié et email technique livré. Vérification d'adresse implémentée ; parcours navigateur complet avec email puis paiement encore à valider.
+- Médiation explicitement reportée à la demande du propriétaire : aucun médiateur inventé, aucun verrou checkout lié à ce champ. Cela ne constitue pas une validation juridique des ventes.
+- Validation : 31 tests automatisés réussis, build distant Ready ; pages publiques `/pricing`, `/signup`, `/terms` HTTP 200 sans promotion d'essai gratuit. Les 22 contrôles HTTP/MCP locaux de l'itération précédente ont réussi ; ils ne remplacent pas une recette complète en production.
+
+### Décision et vérifications restantes avant promotion commerciale
+
+1. Équipe Vercel actuellement **Hobby**, usage personnel non commercial uniquement selon https://vercel.com/docs/plans/hobby. Aucun abonnement payant autorisé ni acheté. L'accès Node.js Hostinger a mené à une page d'achat, pas à un hébergement inclus utilisable. Choisir un hébergement commercial adapté avant d'envoyer une campagne payante.
+2. Exercer inscription → réception/vérification email → checkout → paiement confirmé → accès, ainsi que remboursement/annulation, avec le bon compte Stripe de test ou une opération réelle expressément autorisée. Les tests métier ne prouvent pas une transaction externe terminée.
+3. Brave : plafond fournisseur « Free credits only » confirmé ; découverte par mots-clés non activée, faute de droits de conservation/réutilisation validés. Ne pas annoncer cette fonctionnalité comme opérationnelle. Analyse de profils distincte.
+4. Publication TikTok réelle non testée ni autorisée ; vérifier le parcours sur un contenu appartenant au propriétaire. Aucun post publié pendant la bascule.
+5. Restauration distante complète avec médias et réconciliation des services externes, alerte indépendante, reprise après interruption de suppression de compte, charge et mobile/Safari restent à exercer. Les plafonds gratuits et les limites d'archive restent applicables.
+
+## Historique détaillé — ne pas utiliser les anciens états pour décider une bascule
+
 ## État constaté au 8 septembre 2026 — mise à jour prioritaire
 
 ### Complément après durcissement de la reprise

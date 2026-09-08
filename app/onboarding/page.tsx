@@ -1,6 +1,8 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
+import { OnboardingPayment } from "@/components/OnboardingPayment";
+import { hasStudioAccess } from "@/lib/plans";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { BUSINESS_KINDS } from "@/lib/business-kinds";
@@ -12,8 +14,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import "../liquid-glass.css";
 import "./onboarding.css";
 
-type Step = 0 | 1 | 2 | 3;
-const STEPS: Step[] = [0, 1, 2, 3];
+type Step = 0 | 1 | 2 | 3 | 4;
+const STEPS: Step[] = [0, 1, 2, 3, 4];
 
 const SOURCES = [
   { id: "tiktok", fr: "TikTok", en: "TikTok", logo: "/assets/platforms/tiktok.png" },
@@ -77,7 +79,7 @@ function Stat({ label, value, active }: { label: string; value: number; active: 
 function OnboardingInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = safeNextPath(params.get("next"), "/pricing");
+  const next = safeNextPath(params.get("next"), "/app");
   const [english, setEnglish] = useState(false);
   const t = useCallback((fr: string, en: string) => (english ? en : fr), [english]);
 
@@ -118,6 +120,12 @@ function OnboardingInner() {
       .then((json) => {
         const me: PublicUser = json.user;
         setUser(me);
+        setHeard(json.heardFrom || []);
+        if (me.onboarded && !hasStudioAccess(me.plan)) setStep(4);
+        else if (me.onboarded && hasStudioAccess(me.plan) && !params.get("next")) { router.replace("/app"); return; }
+        else {
+          if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 3) setStep(json.step as Step);
+        }
         setName(me.name || "");
         setCompany(json.company || "");
         setLogo(json.logo || "");
@@ -128,12 +136,13 @@ function OnboardingInner() {
         }
       })
       .catch(() => router.replace("/signup?mode=signin&next=/onboarding"));
-  }, [router]);
+  }, [router, params]);
 
   function go(target: Step) {
     setDir(target > step ? 1 : -1);
     setError("");
     setStep(target);
+    if (user && target < 4) void post({ action: "progress", step: target }).catch(() => {});
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -271,12 +280,12 @@ function OnboardingInner() {
   }
 
   /* ── step 2 · AI ─────────────────────────────────────────────────────── */
-  useEffect(() => {
-    if (step !== 2 || token) return;
-    post({ action: "key" })
-      .then((json) => setToken(json.token || ""))
-      .catch(() => setToken(""));
-  }, [step, token]);
+  async function prepareConnector() {
+    setBusy(true); setError("");
+    try { const json = await post({ action: "key" }); setToken(json.token || ""); }
+    catch { setError(t("Impossible de préparer la connexion. Réessaie ou configure-la plus tard dans le studio.", "Could not prepare the connection. Retry or configure it later in the studio.")); }
+    finally { setBusy(false); }
+  }
 
   const origin = typeof window === "undefined" ? "https://scrollshow.io" : window.location.origin;
   const mcpUrl = `${origin}/api/mcp`;
@@ -304,8 +313,10 @@ function OnboardingInner() {
   async function finish() {
     setBusy(true);
     try {
-      await post({ action: "finish", heardFrom: heard });
-      router.replace(next);
+      const json = await post({ action: "finish", heardFrom: heard });
+      setUser(json.user);
+      if (hasStudioAccess(json.user?.plan)) router.replace(next);
+      else { go(4); setBusy(false); }
     } catch {
       setError(t("Impossible de terminer. Réessaie.", "Could not finish. Try again."));
       setBusy(false);
@@ -318,6 +329,7 @@ function OnboardingInner() {
     1: [t("Ton business", "Your business"), t("Colle le lien de ton site, ta boutique, ton app ou ton TikTok. On l’analyse.", "Paste your site, store, app or TikTok link. We analyze it.")],
     2: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
     3: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
+    4: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
   };
 
   const stepClass = `ss-onb-step ${dir === 1 ? "from-right" : "from-left"}`;
@@ -338,7 +350,7 @@ function OnboardingInner() {
         <h1 className={`ss-onb__title ${stepClass}`}>{titles[step][0]}</h1>
         <p className={`ss-onb__sub ${stepClass}`}>{titles[step][1]}</p>
 
-        <div className={`ss-onb__card lg ${stepClass}`}>
+        <div className={`ss-onb__card ${stepClass}`}>
           {/* ── 0 · profile ── */}
           {step === 0 ? (
             <form
@@ -553,6 +565,9 @@ function OnboardingInner() {
           {/* ── 2 · connect Claude ── */}
           {step === 2 ? (
             <div className="ss-onb-form">
+              <p className="ss-onb-help">{t("Cette étape est facultative. L’utilisation des outils sera activée après paiement. Si tu as déjà branché ton assistant, continue sans recréer de clé.", "This step is optional. Tools become available after payment. If your assistant is already connected, continue without replacing its key.")}</p>
+              {!token && <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => void prepareConnector()}>{busy ? "…" : t("Préparer ou remplacer ma connexion", "Prepare or replace my connection")}</button>}
+              {error && <p role="alert" className="ss-onb-error">{error}</p>}
               <div className="ss-onb-clients" role="tablist">
                 {clients.map((item) => (
                   <button key={item.id} type="button" role="tab" aria-selected={client === item.id} className={`ss-onb-client ${client === item.id ? "is-on" : ""}`} onClick={() => setClient(item.id)}>
@@ -564,7 +579,7 @@ function OnboardingInner() {
                 ))}
               </div>
 
-              {client === "cursor" ? (
+              {token && client === "cursor" ? (
                 <>
                   <a className={`ss-onb-cta ${keyedUrl ? "" : "is-disabled"}`} href={cursorDeeplink}>
                     {keyedUrl ? t("Installer dans Cursor", "Install in Cursor") : t("Préparation…", "Preparing…")}
@@ -573,7 +588,7 @@ function OnboardingInner() {
                 </>
               ) : null}
 
-              {client === "codex" ? (
+              {token && client === "codex" ? (
                 <>
                   <div className="ss-onb-code">
                     <pre>{codexCli || t("Préparation…", "Preparing…")}</pre>
@@ -585,7 +600,7 @@ function OnboardingInner() {
                 </>
               ) : null}
 
-              {client === "claude" ? (
+              {token && client === "claude" ? (
                 <>
                   <div className="ss-onb-code ss-onb-code--field">
                     <pre>{keyedUrl ? keyedUrl.replace(/key=.*$/, "key=…") : t("Préparation…", "Preparing…")}</pre>
@@ -636,13 +651,14 @@ function OnboardingInner() {
               </div>
               {error ? <p className="ss-onb-error">{error}</p> : null}
               <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => void finish()}>
-                {busy ? <span className="ss-onb-spin" /> : t("Ouvrir ScrollShow", "Open ScrollShow")}
+                {busy ? <span className="ss-onb-spin" /> : hasStudioAccess(user?.plan) ? t("Ouvrir ScrollShow", "Open ScrollShow") : t("Continuer vers mon offre", "Continue to my plan")}
               </button>
               <button type="button" className="ss-onb-link ss-onb-link--center" onClick={() => go(2)}>
                 ← {t("Retour", "Back")}
               </button>
             </div>
           ) : null}
+          {step === 4 && user?.onboarded ? <OnboardingPayment english={english} initialOffer={params.get("offer") === "lifetime" ? "lifetime" : "monthly"} canceled={params.get("canceled") === "1"} pendingPayment={params.get("error") === "payment_pending"} /> : null}
         </div>
 
         <ol className="ss-onb__dots" aria-label={t("Progression", "Progress")}>

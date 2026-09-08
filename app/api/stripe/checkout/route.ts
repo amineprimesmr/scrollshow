@@ -5,11 +5,13 @@ import { siteUrl, stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { LEGAL, salesReady } from "@/lib/legal";
+import { applySubscription } from "@/lib/billing";
 
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "auth" }, { status: 401 });
   if (!user.emailVerified) return NextResponse.json({ error: "email_verification_required", portal: "/verify-email" }, { status: 403 });
+  if (!user.onboarded) return NextResponse.json({ error: "onboarding_required", portal: "/onboarding" }, { status: 403 });
   if (process.env.VERCEL_ENV === "preview" && !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) return NextResponse.json({ error: "preview_requires_test_stripe" }, { status: 503 });
   if (!salesReady()) return NextResponse.json({ error: "sales_not_open" }, { status: 503 });
   const parsed = z.object({ offer: z.enum(["monthly", "lifetime"]), termsAccepted: z.literal(true) }).safeParse(await request.json().catch(() => null));
@@ -32,14 +34,17 @@ export async function POST(request: Request) {
       stored = { ...stored, stripeCustomerId: customer.id };
     }
     const subscriptions = await client.subscriptions.list({ customer: stored.stripeCustomerId, status: "all", limit: 100 });
-    if (subscriptions.data.some(s => !["canceled", "incomplete_expired"].includes(s.status))) {
-      return NextResponse.json({ error: "subscription_exists", portal: "/app/settings?tab=plan" }, { status: 409 });
+    const existing = subscriptions.data.find(s => !["canceled", "incomplete_expired"].includes(s.status));
+    if (existing) {
+      const current = await updateStore(data => { applySubscription(data, existing, Math.floor(Date.now() / 1000)); return data.users.find(u => u.id === user.id); });
+      if (hasStudioAccess(current?.plan)) return NextResponse.json({ error: "already_subscribed", portal: "/app" }, { status: 409 });
+      return NextResponse.json({ error: "subscription_exists" }, { status: 409 });
     }
     const session = await client.checkout.sessions.create({
       mode: offer === "lifetime" ? "payment" : "subscription", customer: stored.stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${siteUrl()}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl()}/pricing`, client_reference_id: user.id,
+      cancel_url: `${siteUrl()}/onboarding?step=payment&canceled=1&offer=${offer}`, client_reference_id: user.id,
       subscription_data: offer === "monthly" ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
       metadata: { userId: user.id, offer, plan: offer === "lifetime" ? "lifetime" : "pro", termsVersion: LEGAL.version, termsAccepted: "true" },
     }, { idempotencyKey: `checkout-${user.id}-${offer}-${Math.floor(Date.now() / 1800000)}` });

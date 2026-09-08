@@ -55,6 +55,7 @@ export type BusinessProfile = {
 };
 
 export type OnboardingState = {
+  step?: number;
   completedAt?: string;
   heardFrom?: string[];
 };

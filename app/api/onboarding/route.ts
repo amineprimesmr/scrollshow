@@ -64,13 +64,14 @@ const businessSchema = z.object({
 });
 
 const keySchema = z.object({ action: z.literal("key") });
+const progressSchema = z.object({ action: z.literal("progress"), step: z.number().int().min(0).max(3) });
 
 const finishSchema = z.object({
   action: z.literal("finish"),
   heardFrom: z.array(z.string().max(30)).max(10).default([]),
 });
 
-const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, keySchema, finishSchema]);
+const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, keySchema, progressSchema, finishSchema]);
 
 export async function GET() {
   const session = await readSession();
@@ -78,7 +79,7 @@ export async function GET() {
   const data = await readStore();
   const user = data.users.find((item) => item.id === session.id);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  return NextResponse.json({ user: publicUser(user), company: user.business?.name || "", logo: user.business?.logo || "" });
+  return NextResponse.json({ user: publicUser(user), company: user.business?.name || "", logo: user.business?.logo || "", step: user.onboarding?.step || 0, heardFrom: user.onboarding?.heardFrom || [] });
 }
 
 async function storeLogo(dataUrl: string | null | undefined) {
@@ -94,8 +95,13 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
+  if (!session.emailVerified) return NextResponse.json({ error: "email_verification_required" }, { status: 403 });
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const body = parsed.data;
+  if (body.action === "progress") {
+    await updateStore(data => { const user = data.users.find(item => item.id === session.id); if (user) user.onboarding = { ...user.onboarding, step: body.step }; });
+    return NextResponse.json({ ok: true });
+  }
 
   if (body.action === "analyze") {
     try {
@@ -154,6 +160,8 @@ export async function POST(request: Request) {
   }
 
   // finish
+  const current = (await readStore()).users.find(item => item.id === session.id);
+  if (!current?.name?.trim() || !current.business?.name?.trim() || !current.business?.analyzedAt) return NextResponse.json({ error: "profile_incomplete" }, { status: 400 });
   const user = await updateStore((data) => {
     const item = data.users.find((entry) => entry.id === session.id);
     if (!item) return null;

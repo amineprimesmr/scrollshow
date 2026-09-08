@@ -9,9 +9,9 @@ import "../liquid-glass.css";
 // deleted account or password change.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await readSession();
-  if (!user) redirect("/signup?mode=signin&next=/pricing");
+  if (!user) redirect("/signup?mode=signin&next=/app");
   if (!user.emailVerified) redirect("/verify-email");
   if (!user.onboarded) redirect("/onboarding?next=/app");
-  if (!hasStudioAccess(user.plan)) redirect("/pricing");
+  if (!hasStudioAccess(user.plan)) redirect("/onboarding?step=payment");
   return <StudioShell>{children}</StudioShell>;
 }

@@ -10,6 +10,7 @@ const tessFiles = [
 ];
 
 const nextConfig: NextConfig = {
+  distDir: process.env.SCROLLSHOW_BUILD_DIR || ".next",
   reactStrictMode: true,
   // Keep client-side navigations within the studio instant: once a route's
   // RSC payload is fetched, reuse it instead of re-requesting on every click.

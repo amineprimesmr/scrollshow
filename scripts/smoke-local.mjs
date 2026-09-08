@@ -7,6 +7,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { SignJWT } from "jose";
+import { hash } from "bcryptjs";
 
 const directory = await mkdtemp(join(tmpdir(), "scrollshow-smoke-"));
 const port = "3107";
@@ -18,6 +19,9 @@ const user = { id: "smoke-user", email: "smoke@example.invalid", name: "Smoke", 
 const verificationToken = randomBytes(32).toString("base64url");
 const unverified = {...user,id:"verify-user",email:"verify@example.invalid",emailVerifiedAt:undefined,verificationHash:createHash("sha256").update(verificationToken).digest("hex"),verificationExpiresAt:Date.now()+600000};
 const snapshot = { users: [user, unverified], accounts: [], runs: [], channels: [], posts: [], media: [], apiKeys: [{ id: "smoke-key", userId: user.id, name: "Smoke", prefix: "ss_live_test", hash: createHash("sha256").update(token).digest("hex"), createdAt: now }] };
+const newcomer = { ...user, id: "newcomer", email: "new@example.invalid", plan: "free", onboarding: undefined };
+snapshot.users.push(newcomer);
+if (process.env.SCROLLSHOW_SMOKE_BROWSER === "1") snapshot.users.push({ ...user, id: "browser-fixture", email: "browser@example.invalid", name: "Browser fixture", plan: "free", onboarding: undefined, passwordHash: await hash("ScrollShow-QA-only-2026", 4) });
 await writeFile(join(directory, "store.json"), JSON.stringify(snapshot), { mode: 0o600 });
 const env = { ...process.env, NODE_ENV: "production", SCROLLSHOW_DATA_DIR: directory, AUTH_SECRET: secret, NEXT_PUBLIC_SITE_URL: base };
 for (const key of ["DATABASE_URL", "VERCEL", "SCROLLSHOW_USE_BLOB", "BLOB_READ_WRITE_TOKEN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_LIFETIME", "BRAVE_SEARCH_API_KEY", "MONID_API_KEY", "RESEND_API_KEY", "EMAIL_FROM", "CRON_SECRET", "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]) env[key] = "";
@@ -43,6 +47,23 @@ try {
   check((await fetch(base + "/api/cron/publish")).status === 401, "cron fails closed without secret");
   check((await fetch(base + "/api/cron/maintenance")).status === 401, "maintenance cannot be triggered anonymously");
   check((await fetch(base + "/api/health")).status === 401, "operational health is not exposed anonymously");
+  const newcomerJwt = await new SignJWT({ email: newcomer.email, plan: "free", sv: 0 }).setProtectedHeader({ alg: "HS256" }).setSubject(newcomer.id).setExpirationTime("10m").sign(new TextEncoder().encode(secret));
+  const newcomerHeaders = { ...headers, Cookie: `ss_session=${newcomerJwt}` };
+  const blockedCheckout = await fetch(base + "/api/stripe/checkout", { method: "POST", headers: newcomerHeaders, body: JSON.stringify({ offer: "monthly", termsAccepted: true }) });
+  check(blockedCheckout.status === 403 && (await blockedCheckout.json()).error === "onboarding_required", "checkout refuses unfinished onboarding before contacting Stripe");
+  const step = await fetch(base + "/api/onboarding", { method: "POST", headers: newcomerHeaders, body: JSON.stringify({ action: "progress", step: 1 }) });
+  check(step.ok && (await fetch(base + "/api/onboarding", { headers: newcomerHeaders }).then(r => r.json())).step === 1, "onboarding progress survives a fresh request");
+  check((await fetch(base + "/api/onboarding", { method: "POST", headers: newcomerHeaders, body: JSON.stringify({ action: "finish", heardFrom: [] }) })).status === 400, "empty profile cannot complete onboarding");
+  const needsOnboarding = await fetch(base + "/app", { headers: newcomerHeaders, redirect: "manual" });
+  check(needsOnboarding.headers.get("location")?.startsWith("/onboarding"), "unpaid new account enters onboarding, not pricing");
+  const profile = await fetch(base + "/api/onboarding", { method: "POST", headers: newcomerHeaders, body: JSON.stringify({ action: "profile", name: "Smoke", company: "Fixture" }) });
+  check(profile.ok, "onboarding saves profile before payment");
+  const finished = await fetch(base + "/api/onboarding", { method: "POST", headers: newcomerHeaders, body: JSON.stringify({ action: "finish", heardFrom: [] }) });
+  check(finished.ok && (await finished.json()).user.onboarded === true, "completed profile advances to activation");
+  const needsPayment = await fetch(base + "/app", { headers: newcomerHeaders, redirect: "manual" });
+  check(needsPayment.headers.get("location") === "/onboarding?step=payment", "completed unpaid account resumes payment instead of entering studio");
+  const expiredPayment = await fetch(base + "/api/stripe/sync?session_id=cs_test_resume", { redirect: "manual" });
+  check(new URL(expiredPayment.headers.get("location")).searchParams.get("next") === "/pricing/success?session_id=cs_test_resume", "expired checkout session preserves reconciliation through login");
   const beforeVerification = await new SignJWT({email:unverified.email,plan:unverified.plan,sv:0}).setProtectedHeader({alg:"HS256"}).setSubject(unverified.id).setExpirationTime("10m").sign(new TextEncoder().encode(secret));
   const unverifiedHeaders = { ...headers, Cookie:`ss_session=${beforeVerification}` };
   check((await fetch(base+"/api/research",{headers:unverifiedHeaders})).status===401,"unverified paid account cannot enter studio APIs");
@@ -80,6 +101,10 @@ try {
   const page = await fetch(base + "/app/discover", { headers });
   check(page.ok && (await page.text()).includes("Recherche"), "authenticated research page renders");
   console.log(`${checks} smoke checks passed; ${names.length} MCP tools available.`);
+  if (process.env.SCROLLSHOW_SMOKE_BROWSER === "1") {
+    console.log(`Isolated browser fixture ready at ${base}/signup?mode=signin. Stop with Ctrl-C after visual QA.`);
+    await new Promise(resolve => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
+  }
 } finally {
   if (child.exitCode === null) { child.kill("SIGTERM"); await once(child, "exit"); }
   await rm(directory, { recursive: true, force: true });
