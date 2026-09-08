@@ -1,0 +1,18 @@
+/** Deliberately accepts no credentials or profile data: context comes from authenticated tools. */
+export function scrollshowStarterPrompt(english = false): string {
+  return english ? `Use the connected ScrollShow SaaS MCP tools to prepare my first original TikTok photo carousel for my business.
+
+1. Call whoami, then get_content_brief. Read my business profile, available capabilities, saved research and calendar. Ask only for essential missing information; do not ask me to repeat my onboarding.
+2. Inspect list_posts before creating anything to avoid duplicate drafts. Suggest three relevant hooks, distinguish measured evidence from creative hypotheses, and choose one with a short explanation. If no research is available, say so and work from my business profile without inventing accounts or metrics.
+3. Create one private draft using create_post with status="draft": five readable slides with editable text overlays in recipe, an original hook, useful content, a clear CTA and a caption. Use only assets I have rights to use; do not copy a competitor's carousel. Never schedule, publish, share publicly or delete anything without my explicit request.
+4. Confirm the saved draft only after a successful tool response. Return its actual ID, the slide outline and the next step to review it in ScrollShow. If a write fails or times out, inspect existing posts before retrying.
+
+If ScrollShow tools are not available, stop and explain that I must first add and enable the ScrollShow MCP connector using the studio connection guide, then return to this conversation. A chat message does not install the connector. If authentication or access is refused, ask me to check my connection and account activation in ScrollShow; do not claim to be connected or simulate results. Never ask me to paste an API key into this conversation.` : `Utilise les outils MCP du SaaS ScrollShow connecté pour préparer mon premier carrousel photo TikTok original pour mon activité.
+
+1. Appelle whoami, puis get_content_brief. Lis mon profil d’entreprise, les capacités disponibles, les recherches enregistrées et mon calendrier. Demande uniquement les informations indispensables manquantes, sans me refaire l’onboarding.
+2. Consulte list_posts avant toute création pour éviter les doublons. Propose trois accroches pertinentes, distingue les observations mesurées des hypothèses créatives, puis choisis-en une avec une courte explication. Sans recherches disponibles, signale-le et pars de mon profil sans inventer de comptes ni de statistiques.
+3. Crée un seul brouillon privé avec create_post et status="draft" : cinq slides lisibles avec des textes éditables dans recipe, une accroche originale, du contenu utile, un appel à l’action clair et une légende. Utilise seulement des visuels dont j’ai les droits, sans copier le carrousel d’un concurrent. Ne programme, ne publie, ne partage publiquement et ne supprime rien sans ma demande explicite.
+4. Confirme l’enregistrement uniquement après une réponse réussie de l’outil. Donne l’identifiant réel du brouillon, le plan des slides et la prochaine étape pour le relire dans ScrollShow. Si l’écriture échoue ou expire, consulte les posts existants avant de réessayer.
+
+Si les outils ScrollShow ne sont pas disponibles, arrête-toi et explique que je dois d’abord ajouter et activer le connecteur MCP ScrollShow depuis le guide de connexion du studio, puis revenir dans cette conversation. Un message ne suffit pas à installer le connecteur. Si l’authentification ou l’accès est refusé, demande-moi de vérifier la connexion et l’activation de mon compte dans ScrollShow, sans prétendre être connecté ni simuler de résultats. Ne me demande jamais de coller une clé API dans cette conversation.`;
+}

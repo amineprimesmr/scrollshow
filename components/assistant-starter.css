@@ -1,0 +1,9 @@
+.ss-assistant-starter { display: grid; gap: 14px; padding: 24px; border: 1px solid var(--ss-line, #ffffff20); border-radius: 22px; background: var(--ss-card, #161618); margin-block: 20px; min-width: 0; }
+.ss-assistant-starter h3, .ss-assistant-starter p { margin: 0; }
+.ss-assistant-starter p { font-size: 14px; line-height: 1.6; }
+.ss-assistant-starter summary { cursor: pointer; font-size: 14px; padding-block: 8px; }
+.ss-assistant-starter textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 14px; font: inherit; font-size: 13px; line-height: 1.6; color: inherit; background: transparent; border: 1px solid var(--ss-line, #ffffff30); border-radius: 12px; }
+.ss-assistant-starter button { border: 0; border-radius: 14px; padding: 14px 20px; font: inherit; font-weight: 600; cursor: pointer; background: #f5f5f7; color: #111; transition: transform 160ms ease, opacity 160ms ease; }
+.ss-assistant-starter button:active { transform: scale(.985); }
+.ss-assistant-starter :focus-visible { outline: 2px solid #a99bff; outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { .ss-assistant-starter button { transition: none; transform: none; } }

@@ -34,6 +34,7 @@ import { loadTikTokChannel } from "@/lib/tiktok-account";
 import { loadCreator } from "@/lib/tiktok-publish";
 import { readStore } from "@/lib/store";
 import { consumeLimit } from "@/lib/rate-limit";
+import { scrollshowStarterPrompt } from "@/lib/assistant-prompts";
 
 export const maxDuration = 300;
 
@@ -56,6 +57,11 @@ function userFrom(ctx: { http?: { authInfo?: AuthInfo } }): SessionUser {
 
 const handler = createMcpHandler(
   (server) => {
+    server.registerPrompt("start_scrollshow", {
+      title: "Start with ScrollShow",
+      description: "Read the business context and create one original private editable draft. No automatic publishing.",
+      argsSchema: z.object({ language: z.enum(["fr", "en"]).optional() }),
+    }, ({ language }) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: scrollshowStarterPrompt(language === "en") } }] }));
     server.registerTool("analyze_account", {
       title: "Analyze and save a TikTok account",
       description: "Read a real public profile, measure a sample of posts when configured, and save it. Returns median views, slideshow share, top posts, provenance and sample size. Never fabricates unavailable metrics.",
@@ -523,6 +529,7 @@ const handler = createMcpHandler(
   {
     serverInfo: { name: "scrollshow", version: "1.0.0" },
     instructions:
+      "Use start_scrollshow for the first-carousel workflow. Read whoami and get_content_brief; inspect list_posts to avoid duplicates. Drafting does not authorize scheduling, publication, deletion or public sharing. Confirm writes only from successful tool responses and inspect existing posts before retrying uncertain writes. Never request API keys in chat. " +
       "You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami first: it returns the user's business profile (name, kind, link, keywords, goal, TikTok stats) that every carousel must be written for, and whether TikTok is connected. Marketplace: import_tiktok copies a public TikTok (slides + caption). The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. Use publish_now with the post id when they asked to publish now (it rasterizes editable overlays). Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
   },
 );

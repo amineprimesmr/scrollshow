@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AssistantStarter } from "@/components/AssistantStarter";
 import { BrandMark } from "@/components/BrandMark";
 import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { t as tr } from "@/lib/i18n";
@@ -93,7 +94,7 @@ export function DeveloperAccess() {
   const [creating, setCreating] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [client, setClient] = useState<ClientId>("claude-code");
+  const [client, setClient] = useState<ClientId>("claude");
   const [copied, setCopied] = useState("");
 
   const origin = typeof window === "undefined" ? "https://scrollshow.io" : window.location.origin;
@@ -129,19 +130,16 @@ export function DeveloperAccess() {
     }
   }
 
-  useEffect(() => {
-    void createKey();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function copy(id: string, text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(id);
-    window.setTimeout(() => setCopied((cur) => (cur === id ? "" : cur)), 1600);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(id);
+      window.setTimeout(() => setCopied((cur) => (cur === id ? "" : cur)), 1600);
+    } catch { setError("clipboard"); }
   }
 
   const claudeCli = `claude mcp add --transport http scrollshow ${mcpUrl} --header "Authorization: Bearer ${token}"`;
-  const claudeCodePrompt = `Set up ScrollShow for me so I can create and schedule TikTok carousels from here.\n\n1. Add the MCP server: run \`${claudeCli}\`.\n\nOnce that's done, let me know when it's ready.`;
+  const keyedUrl = `${mcpUrl}?key=${token}`;
   const codexExport = `export SCROLLSHOW_API_KEY='${token}'`;
   const codexCli = `codex mcp add scrollshow --url ${mcpUrl} --bearer-token-env-var SCROLLSHOW_API_KEY`;
   const cursorDeeplink = useMemo(() => {
@@ -155,10 +153,10 @@ export function DeveloperAccess() {
   function steps(): Step[] {
     const start: Step = {
       n: "3",
-      title: tx("Demande-lui un post", "Ask it to post"),
+      title: tx("Lance ta première mission", "Start your first task"),
       body: tx(
-        "Exemple : « Planifie un carousel demain à 18h ». Il le pose dans ton calendrier.",
-        "Example: “Schedule a carousel tomorrow at 6pm.” It lands on your calendar.",
+        "Copie le prompt sous ce guide dans une nouvelle conversation, avec ScrollShow activé. Ton assistant prépare un brouillon, sans publication automatique.",
+        "Paste the prompt below this guide into a new conversation with ScrollShow enabled. Your assistant prepares a draft, without automatic publication.",
       ),
       cta: tx("Ouvrir le calendrier", "Open the calendar"),
       href: "/app",
@@ -190,18 +188,18 @@ export function DeveloperAccess() {
       return [
         {
           n: "1",
-          title: tx("Copie ce message", "Copy this message"),
-          body: tx("Tu le colleras directement dans Claude Code au step suivant.", "You’ll paste it straight into Claude Code next."),
-          field: claudeCodePrompt,
+          title: tx("Copie la commande de connexion", "Copy the connection command"),
+          body: tx("À exécuter dans ton terminal, pas dans une conversation. Elle contient ta clé privée.", "Run in your terminal, not in a conversation. It contains your private key."),
+          field: claudeCli,
           copyId: "cc-prompt",
           sensitive: true,
         },
         {
           n: "2",
-          title: tx("Envoie-le à Claude Code", "Send it to Claude Code"),
+          title: tx("Active les outils ScrollShow", "Enable ScrollShow tools"),
           body: tx(
-            "Colle-le dans la conversation, pas dans le terminal. Claude Code ajoute le connecteur lui-même, puis tu peux lui demander de créer ton premier post.",
-            "Paste it into the chat, not the terminal. Claude Code adds the connector itself — then ask it to create your first post.",
+            "Après la commande, rouvre Claude Code et vérifie que le serveur ScrollShow est disponible. Utilise ensuite le prompt ci-dessous.",
+            "After running the command, reopen Claude Code and check that the ScrollShow server is available. Then use the prompt below.",
           ),
         },
         start,
@@ -233,16 +231,17 @@ export function DeveloperAccess() {
       {
         n: "1",
         title: tx("Copie l’adresse ScrollShow", "Copy the ScrollShow address"),
-        body: tx("Tu la colleras dans Claude au step suivant.", "You’ll paste this URL into Claude next."),
-        field: mcpUrl,
+        body: tx("Adresse privée réservée au champ URL du connecteur, jamais à la conversation.", "Private address for the connector URL field, never the conversation."),
+        field: keyedUrl,
         copyId: "url",
+        sensitive: true,
       },
       {
         n: "2",
         title: tx("Ouvre le connecteur Claude", "Open the Claude connector"),
         body: tx(
-          "Ça ouvre claude.ai avec la fenêtre « Ajouter un connecteur » déjà affichée. Colle l’adresse copiée à l’étape 1, nomme-le ScrollShow, et connecte-toi avec la clé ci-dessous.",
-          "This opens claude.ai with the “Add connector” dialog already showing. Paste the address you copied in step 1, name it ScrollShow, and sign in with the key below.",
+          "Ajoute un connecteur personnalisé nommé ScrollShow avec l’adresse de l’étape 1, puis active ses outils dans ta conversation. La clé est déjà incluse dans cette adresse.",
+          "Add a custom connector named ScrollShow using the address from step 1, then enable its tools in your conversation. The key is already included in that address.",
         ),
         cta: tx("Ouvrir claude.ai", "Open claude.ai"),
         href: "https://claude.ai/customize/connectors?modal=add-custom-connector",
@@ -273,7 +272,7 @@ export function DeveloperAccess() {
             </span>
           ))}
         </div>
-        <h2>{tx("Tes IA publient tes TikToks", "Your AI posts your TikToks")}</h2>
+        <h2>{tx("Ton IA travaille dans ScrollShow", "Your AI works in ScrollShow")}</h2>
         <p className="ss-mcp-sub">
           {tx(
             "Choisis l’outil que tu utilises. On te dit exactement quoi faire. Ensuite tu lui parles.",
@@ -283,6 +282,11 @@ export function DeveloperAccess() {
       </header>
 
       <div className="ss-mcp-panel">
+        <div className="ss-mcp-keys">
+          <p>{tx("Déjà connecté ? Passe directement au prompt, sans créer de nouvelle clé.", "Already connected? Go straight to the prompt without creating another key.")}</p>
+          {!revealed && <button type="button" className="ss-btn-purple" disabled={creating} onClick={() => void createKey()}>{creating ? "…" : tx("Créer ma connexion", "Create my connection")}</button>}
+          {error && <p role="alert">{error === "clipboard" ? tx("Copie impossible : vérifie les permissions du presse-papiers.", "Copy failed: check clipboard permissions.") : tx("Création impossible. Vérifie tes clés dans Réglages → API puis réessaie.", "Creation failed. Check your keys in Settings → API and retry.")}</p>}
+        </div>
         <div className="ss-mcp-bar">
           <div className="ss-mcp-tabs" role="tablist">
             {CLIENTS.map((item) => (
@@ -314,7 +318,7 @@ export function DeveloperAccess() {
               <div className="ss-mcp-card__action">
                 {step.field ? (
                   <CopyField
-                    value={step.field}
+                    value={step.sensitive ? step.field.replace(/ss_live_[A-Za-z0-9_-]+/g, "ss_live_••••••••") : step.field}
                     copied={copied === step.copyId}
                     onCopy={() => void copy(step.copyId || "field", step.field || "")}
                     disabled={step.sensitive && !revealed}
@@ -361,6 +365,8 @@ export function DeveloperAccess() {
         </div>
       </div>
 
+      <AssistantStarter english={english} />
+
       {revealed ? (
         <div className="ss-mcp-keys">
           <div className="ss-mcp-keys__head">
@@ -368,7 +374,7 @@ export function DeveloperAccess() {
               <h3>{tx("Ta clé ScrollShow", "Your ScrollShow key")}</h3>
               <p>{tx("Copie-la maintenant — elle ne sera plus affichée ici.", "Copy it now — it won’t be shown here again.")}</p>
             </div>
-            <CopyField value={revealed} copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
+            <CopyField value="ss_live_••••••••" copied={copied === "key"} onCopy={() => void copy("key", revealed)} />
           </div>
         </div>
       ) : null}

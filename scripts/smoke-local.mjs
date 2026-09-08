@@ -100,6 +100,13 @@ try {
   const init = await rpc("initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "scrollshow-smoke", version: "1" } }, 2);
   check(!!init.result?.serverInfo, "MCP initialize handshake");
   const list = await rpc("tools/list", {}, 3);
+  const prompts = await rpc("prompts/list", {}, 30);
+  check(prompts.result?.prompts?.some(prompt => prompt.name === "start_scrollshow"), "MCP starter prompt discoverable");
+  for (const language of ["fr", "en"]) {
+    const starter = await rpc("prompts/get", { name: "start_scrollshow", arguments: { language } }, language === "fr" ? 31 : 32);
+    const message = starter.result?.messages?.[0];
+    check(message?.role === "user" && message.content?.text?.includes("get_content_brief") && !/ss_live_|key=|Bearer /.test(message.content.text), `MCP ${language} starter prompt actionable and secret-free`);
+  }
   const names = list.result?.tools?.map(tool => tool.name) || [];
   check(["analyze_account", "discover_accounts", "compare_accounts", "get_content_brief", "export_post", "publish_status"].every(name => names.includes(name)), "MCP research and publication tools registered");
   const brief = await rpc("tools/call", { name: "get_content_brief", arguments: {} }, 4);

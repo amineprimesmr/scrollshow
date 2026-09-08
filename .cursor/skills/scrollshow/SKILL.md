@@ -7,6 +7,13 @@ description: Research TikTok accounts, compare measured slideshow performance, p
 
 Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, not a local Chrome automation app. Call `whoami` first for the business, plan, capabilities and quotas. Do not claim unavailable capabilities: discovery needs a configured search provider, detailed public-post metrics need a data provider, and live publication needs an authorized TikTok account.
 
+
+## First conversation
+
+Connection setup and a task prompt are different. Keep API keys in connector configuration, never in chat. If tools are absent, help the user enable the connector; do not pretend a pasted URL installs it. If access is refused, ask them to check account activation and credentials in ScrollShow, never to paste a secret into chat.
+
+For the first-carousel request, follow the server's `start_scrollshow` prompt: call `whoami`, `get_content_brief` and `list_posts`; use existing business context and avoid duplicate drafts. Propose three original hooks and save one five-slide editable private draft. Ask only for indispensable missing context. No automatic scheduling, publication or public sharing. Confirm creation only from a successful tool response, with the actual post ID. After an uncertain write, inspect existing posts before retrying.
+
 ## Research that leads to useful content
 
 - `analyze_account` reads and saves a named public account. `discover_accounts` searches indexed candidates by niche and verifies up to five profiles. It may take several minutes; `list_runs` retains saved results. Do not fabricate profiles or promise exhaustive TikTok search.

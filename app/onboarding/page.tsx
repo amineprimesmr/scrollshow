@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
+import { AssistantStarter } from "@/components/AssistantStarter";
 import { OnboardingPayment } from "@/components/OnboardingPayment";
 import { hasStudioAccess } from "@/lib/plans";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
@@ -306,7 +307,7 @@ function OnboardingInner() {
       await navigator.clipboard.writeText(text);
       setCopied(id);
       window.setTimeout(() => setCopied((cur) => (cur === id ? "" : cur)), 1600);
-    } catch {}
+    } catch { setError(t("Copie impossible. Réessaie depuis un navigateur autorisant le presse-papiers.", "Copy failed. Retry in a browser that allows clipboard access.")); }
   }
 
   /* ── step 3 · heard from ─────────────────────────────────────────────── */
@@ -566,6 +567,7 @@ function OnboardingInner() {
           {step === 2 ? (
             <div className="ss-onb-form">
               <p className="ss-onb-help">{t("Cette étape est facultative. L’utilisation des outils sera activée après paiement. Si tu as déjà branché ton assistant, continue sans recréer de clé.", "This step is optional. Tools become available after payment. If your assistant is already connected, continue without replacing its key.")}</p>
+              <h3>{t("1 · Connecter ScrollShow", "1 · Connect ScrollShow")}</h3>
               {!token && <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => void prepareConnector()}>{busy ? "…" : t("Préparer ou remplacer ma connexion", "Prepare or replace my connection")}</button>}
               {error && <p role="alert" className="ss-onb-error">{error}</p>}
               <div className="ss-onb-clients" role="tablist">
@@ -591,7 +593,7 @@ function OnboardingInner() {
               {token && client === "codex" ? (
                 <>
                   <div className="ss-onb-code">
-                    <pre>{codexCli || t("Préparation…", "Preparing…")}</pre>
+                    <pre>{codexCli ? codexCli.replace(/key=[^\"]+/, "key=…") : t("Préparation…", "Preparing…")}</pre>
                     <button type="button" className="ss-onb-copy" disabled={!codexCli} onClick={() => void copy("cmd", codexCli)}>
                       {copied === "cmd" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
                     </button>
@@ -610,19 +612,20 @@ function OnboardingInner() {
                   </div>
                   <p className="ss-onb-help">
                     {t(
-                      "Copie cette adresse, ouvre Claude : la fenêtre « Ajouter un connecteur » s’affiche, colle l’adresse, nomme-le ScrollShow. Rien d’autre.",
-                      "Copy this address, open Claude: the “Add connector” dialog shows, paste the address, name it ScrollShow. Nothing else.",
+                      "Cette adresse contient une clé privée : colle-la uniquement dans l’URL du connecteur Claude, jamais dans une conversation. Nomme le connecteur ScrollShow et active-le. Utilise ensuite le prompt ci-dessous.",
+                      "This address contains a private key: paste it only into Claude’s connector URL, never into a conversation. Name the connector ScrollShow and enable it. Then use the prompt below.",
                     )}
                   </p>
                   <a className="ss-onb-cta ss-onb-cta--claude" href={connectorUrl} target="_blank" rel="noreferrer">
                     <img src="/assets/ai/claude.png?v=2" alt="" />
-                    {t("Ouvrir Claude", "Open Claude")}
+                    {t("Configurer le connecteur Claude", "Configure the Claude connector")}
                   </a>
                 </>
               ) : null}
 
+              <AssistantStarter english={english} pending />
               <button type="button" className="ss-onb-cta" onClick={() => go(3)}>
-                {t("C’est fait, continuer", "Done, continue")}
+                {t("Continuer l’onboarding", "Continue onboarding")}
               </button>
               <div className="ss-onb-actions">
                 <button type="button" className="ss-onb-link" onClick={() => go(1)}>
