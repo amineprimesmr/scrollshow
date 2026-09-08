@@ -179,14 +179,15 @@ export function AccountsFan() {
       const h = hov.current[i] ?? 0;
       const lean = clamp(-(vel.current[i] ?? 0) * 0.55, -5, 5); // lean into the motion
       const x = cx + l.x - g.w / 2;
-      const y = cy + l.y - g.h / 2 - 22 * h - Math.abs(lean) * 0.5;
-      const z = l.z + 48 * h;
-      const rot = l.rot + 10 * h;
+      const y = cy + l.y - g.h / 2 - 28 * h - Math.abs(lean) * 0.5;
+      const z = l.z + 40 * h;
+      const rot = l.rot + 8 * h;
       el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rot}deg) rotateZ(${lean}deg) scale(${l.scale + 0.02 * h})`;
       const ad = Math.abs(d);
-      // Flat stacking: the folder nearest the focus is always on top, a hovered
-      // one rises above both neighbours. No 3D intersection surprises.
-      el.style.zIndex = String(1000 - Math.round(ad * 10) + Math.round(20 * h));
+      // Flat stacking: the folder nearest the focus is always on top and the
+      // order never changes — a hovered folder lifts and comes forward but
+      // stays in its slot of the pile.
+      el.style.zIndex = String(1000 - Math.round(ad * 10));
       el.style.opacity = String(clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1));
       const shade = el.lastElementChild as HTMLElement | null;
       if (shade) shade.style.opacity = String(clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h));
