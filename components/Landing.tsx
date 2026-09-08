@@ -86,7 +86,7 @@ function ViewsHero({ english }: { english: boolean }) {
           <div className="af-ld-hero-cta-wrap">
             <Metal preset="chromatic" strength={0.9} className="af-ld-metal-cta" normalizeHost>
               <Link href="/signup" className="af-ld-hero-cta">
-                <span className="af-ld-hero-cta__label">{t("Connecter Scrollshow à ton agent", "Connect Scrollshow to your agent", english)}</span>
+                <span className="af-ld-hero-cta__label">{t("Créer mes slideshows", "Create my slideshows", english)}</span>
               </Link>
             </Metal>
           </div>

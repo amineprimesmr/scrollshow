@@ -153,9 +153,57 @@ html.page-affiliate #affiliate-root {
 }
 
 .af-ld-hero-cta-wrap {
+  position: relative;
+  isolation: isolate;
   display: flex;
   justify-content: center;
   margin-top: clamp(1.35rem, 3.6vh, 1.85rem);
+}
+
+/* Une aura tourne derrière le bouton : le halo respire, l'anneau chromatique
+   fait le tour. Les deux sont décoratifs et s'arrêtent en mouvement réduit. */
+.af-ld-hero-cta-wrap::before,
+.af-ld-hero-cta-wrap::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  pointer-events: none;
+  border-radius: 999px;
+}
+
+.af-ld-hero-cta-wrap::before {
+  width: min(21rem, 86vw);
+  height: 8rem;
+  translate: -50% -50%;
+  background: conic-gradient(from 0deg, #6f8bff00, #6f8bffb3 12%, #b09cff00 30%, #00000000 55%, #7ee8c400 70%, #7ee8c48c 84%, #6f8bff00 100%);
+  filter: blur(24px);
+  opacity: .72;
+  animation: af-cta-orbit 9s linear infinite;
+}
+
+.af-ld-hero-cta-wrap::after {
+  width: min(15rem, 70vw);
+  height: 4.6rem;
+  translate: -50% -50%;
+  background: radial-gradient(ellipse at center, #9fb0ff59, #9fb0ff00 72%);
+  filter: blur(16px);
+  animation: af-cta-breathe 4.6s ease-in-out infinite;
+}
+
+@keyframes af-cta-orbit {
+  to { rotate: 1turn; }
+}
+
+@keyframes af-cta-breathe {
+  0%, 100% { opacity: .38; scale: 1; }
+  50% { opacity: .72; scale: 1.08; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-ld-hero-cta-wrap::before,
+  .af-ld-hero-cta-wrap::after { animation: none; }
 }
 
 .af-ld-hero-cta {
