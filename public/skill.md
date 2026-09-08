@@ -8,6 +8,21 @@ description: Research TikTok accounts, compare measured slideshow performance, p
 Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, not a local Chrome automation app. Call `whoami` first for the business, plan, capabilities and quotas. Do not claim unavailable capabilities: discovery needs a configured search provider, detailed public-post metrics need a data provider, and live publication needs an authorized TikTok account.
 
 
+## Install and activate
+
+Installing this skill is free. The tools only answer for a ScrollShow account with active access, so treat setup as two distinct steps.
+
+1. **Install the connector.** Add the MCP server `https://scrollshow.io/api/mcp` to the host (Claude Code: `claude mcp add --transport http scrollshow https://scrollshow.io/api/mcp`; Cursor and Codex: their MCP configuration file). The key goes in the connector configuration, never in chat, a commit or a shell history.
+2. **Get the key.** The user creates it at https://scrollshow.io/app/settings, in the developer access section. If they have no account yet, send them to https://scrollshow.io/signup.
+
+Then read the server's answer instead of guessing:
+
+- `payment_required` (HTTP 402): the account exists but has no active access. Tell the user to activate it at https://scrollshow.io/pricing, with the email the refusal names. The skill stays installed and starts working as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.
+- `invalid_key` (HTTP 401): the key is unknown or revoked. Ask the user to issue a new one in their settings and to replace it in the connector configuration.
+- No tool at all: the connector is not installed in this host. Help them add it; a pasted URL does not install anything.
+
+Never ask the user to paste a key into the conversation, never invent one, and never present the account as active until a tool call actually succeeds.
+
 ## First conversation
 
 Connection setup and a task prompt are different. Keep API keys in connector configuration, never in chat. If tools are absent, help the user enable the connector; do not pretend a pasted URL installs it. If access is refused, ask them to check account activation and credentials in ScrollShow, never to paste a secret into chat.

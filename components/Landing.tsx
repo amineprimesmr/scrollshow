@@ -1,29 +1,16 @@
 "use client";
 
+import { LandingTestimonials, LandingFAQ, LandingFooter } from "@/components/LandingBottom";
+import { PricingCards } from "@/components/PricingCards";
+import { HeroSkill } from "@/components/HeroSkill";
+import { LandingDemo } from "@/components/LandingDemo";
+import { LandingConnections } from "@/components/LandingConnections";
+import { LandingNavigation } from "@/components/LandingNavigation";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
-import { ImageGeneration } from "img-fx";
+import { useEffect, useRef, useState } from "react";
 import { Beam } from "@/components/fx/Beam";
 import { Metal } from "@/components/fx/Metal";
-import { useAppTheme, useReducedMotion } from "@/components/fx/useFx";
-
-const REELS = [
-  { src: "/assets/tiktoks/01-glowup-188k.png", slot: 1 },
-  { src: "/assets/tiktoks/02-foods-107k.png", slot: 2 },
-  { src: "/assets/tiktoks/03-guide-178k.png", slot: 3 },
-  { src: "/assets/tiktoks/07-pov-98k.png", slot: 4 },
-  { src: "/assets/tiktoks/04-marlon-65k.png", slot: 5 },
-  { src: "/assets/tiktoks/08-car-16k.png", slot: 6 },
-];
-
-const AVATARS = [
-  "/assets/avatars/gars1.png",
-  "/assets/avatars/leo.png",
-  "/assets/avatars/estebanprime.png",
-  "/assets/avatars/lucasprime.png",
-  "/assets/avatars/imranprime.png",
-];
 
 function prefersEnglish() {
   if (typeof navigator === "undefined") return false;
@@ -48,35 +35,9 @@ function CtaDot() {
   return <span className="af-ld-cta-dot" aria-hidden />;
 }
 
-function StarRow() {
-  return (
-    <span className="af-ld-stars" aria-hidden>
-      {Array.from({ length: 5 }, (_, i) => (
-        <svg key={i} viewBox="0 0 20 20">
-          <path d="M10 1.5 12.4 7l5.9.5-4.5 3.8 1.4 5.7L10 14.2 4.8 16.9l1.4-5.7L1.7 7.5 7.6 7 10 1.5Z" />
-        </svg>
-      ))}
-    </span>
-  );
-}
-
-function AvatarStack() {
-  return (
-    <span className="af-ld-avatars" aria-hidden>
-      {AVATARS.map((src) => (
-        <span key={src} className="af-ld-avatar">
-          <img src={src} alt="" width={36} height={36} />
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function ViewsHero({ english }: { english: boolean }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [phase, setPhase] = useState("boot");
-  const theme = useAppTheme();
-  const reduced = useReducedMotion();
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -91,7 +52,7 @@ function ViewsHero({ english }: { english: boolean }) {
           setPhase("expand");
         } else {
           intro = window.setTimeout(() => setPhase("intro"), 40);
-          expand = window.setTimeout(() => setPhase("expand"), 820);
+          expand = window.setTimeout(() => setPhase("expand"), 180);
         }
         io.disconnect();
       },
@@ -107,60 +68,29 @@ function ViewsHero({ english }: { english: boolean }) {
 
   return (
     <section ref={sectionRef} id="vues" className={`af-ld-views is-${phase}`}>
+      <div className="af-ld-atmosphere" aria-hidden="true">
+        <div className="af-ld-atmosphere__light af-ld-atmosphere__light--cobalt" />
+        <div className="af-ld-atmosphere__light af-ld-atmosphere__light--ice" />
+        <div className="af-ld-atmosphere__wave af-ld-atmosphere__wave--near" />
+        <div className="af-ld-atmosphere__wave af-ld-atmosphere__wave--far" />
+        <div className="af-ld-atmosphere__shade" />
+        <div className="af-ld-atmosphere__grain" />
+      </div>
       <div className="af-ld-stage">
-        <div className="af-ld-stage__cards" aria-hidden>
-          {REELS.map((reel, index) => (
-            <figure key={reel.src} className={`af-ld-reel af-ld-reel--${reel.slot}`} style={{ "--i": index } as React.CSSProperties}>
-              {reduced ? (
-                <div className="af-ld-reel__frame">
-                  <img src={reel.src} alt="" width={364} height={476} />
-                </div>
-              ) : (
-                <ImageGeneration
-                  preset={index % 2 ? "pixels-mechanic" : "pixels-organic"}
-                  theme={theme}
-                  images={reel.src}
-                  autoReveal
-                  revealInitialDelay={[0.4 + index * 0.35, 1.2 + index * 0.35]}
-                  revealDelayRange={[1.2, 2.4]}
-                  revealHoldMs={[7000, 12000]}
-                  revealFadeOutMs={500}
-                  strength={0.85}
-                  pixelScale={0.7}
-                  borderRadius={18}
-                  paused={phase === "boot"}
-                  style={{ display: "block" }}
-                >
-                  <div className="af-ld-reel__frame is-fx" />
-                </ImageGeneration>
-              )}
-            </figure>
-          ))}
-        </div>
         <div className="af-ld-stage__copy">
-          <p className="af-ld-hero-badge">
-            <span className="af-ld-hero-badge__dot" aria-hidden />
-            {t("Formats qui convertissent", "Formats that convert", english)}
-          </p>
           <h1 className="af-ld-views__title">
-            {t("Crée des carrousels", "Create carousels", english)}
-            <em>{t("pour ton business", "for your business", english)}</em>
+            <span className="af-ld-title-line">Crée et automatise tes</span>{" "}
+            <span className="af-ld-title-line">slideshows avec <span className="af-ld-title-accent">ton agent</span></span>
           </h1>
-          <p className="af-ld-hero-sub">
-            {t(
-              "Connecte TikTok, prévisualise tes carrousels, choisis la privacy, publie.",
-              "Connect TikTok, preview carousels, set privacy, publish.",
-              english,
-            )}
-          </p>
+          <HeroSkill english={english} />
           <div className="af-ld-hero-cta-wrap">
-            <Metal preset="chromatic" strength={0.9} keepStyles>
+            <Metal preset="chromatic" strength={0.9} className="af-ld-metal-cta" normalizeHost>
               <Link href="/signup" className="af-ld-hero-cta">
-                <Logo size={28} />
-                <span className="af-ld-hero-cta__label">{t("Créer mon espace", "Create my workspace", english)}</span>
+                <span className="af-ld-hero-cta__label">{t("Connecter Scrollshow à ton agent", "Connect Scrollshow to your agent", english)}</span>
               </Link>
             </Metal>
           </div>
+          <LandingDemo />
         </div>
       </div>
     </section>
@@ -169,75 +99,16 @@ function ViewsHero({ english }: { english: boolean }) {
 
 export function Landing() {
   const [english, setEnglish] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const navRef = useRef<HTMLElement | null>(null);
-  const baseId = useId();
 
   useEffect(() => {
     setEnglish(prefersEnglish());
   }, []);
 
-  useEffect(() => {
-    const nav = navRef.current;
-    const inner = nav?.querySelector<HTMLElement>(".af-ld-topnav__inner");
-    if (!nav || !inner) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const onScroll = () => {
-      const p = reduce ? 0 : Math.min(1, Math.max(0, window.scrollY / 180));
-      nav.style.setProperty("--nav-p", p.toFixed(3));
-      const frost = `blur(${(p * 14).toFixed(1)}px) saturate(${(1 + p * 0.2).toFixed(2)})`;
-      inner.style.backdropFilter = frost;
-      inner.style.setProperty("-webkit-backdrop-filter", frost);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const faq = [
-    {
-      id: "what",
-      q: t("C’est quoi ScrollShow ?", "What is ScrollShow?", english),
-      a: t(
-        "Un outil web pour connecter ton TikTok (Login Kit), voir tes stats et tes posts, puis publier un carrousel photo (Content Posting API).",
-        "A web tool to connect your TikTok (Login Kit), view stats and posts, then publish a photo carousel (Content Posting API).",
-        english,
-      ),
-    },
-    {
-      id: "how",
-      q: t("Comment je publie sur TikTok ?", "How do I post to TikTok?", english),
-      a: t(
-        "Tu crées un espace, tu cliques Continuer avec TikTok, tu choisis tes slides et la privacy, puis Publier maintenant.",
-        "Create a workspace, click Continue with TikTok, pick slides and privacy, then Publish now.",
-        english,
-      ),
-    },
-    {
-      id: "free",
-      q: t("Je dois payer ?", "Do I have to pay?", english),
-      a: t(
-        "29 € par mois, ou 99 € en un paiement pour l’accès à vie. Accès après paiement.",
-        "€29 per month, or €99 once for lifetime access. Access after payment.",
-        english,
-      ),
-    },
-  ];
 
   return (
     <div className="af-ld">
       <LiquidGlassDefs />
-      <header ref={navRef} className="af-ld-topnav">
-        <div className="af-ld-topnav__inner">
-          <Link className="af-ld-brand" href="/">
-            <Logo />
-            <span>ScrollShow</span>
-          </Link>
-          <Link className="af-ld-topnav__cta" href="/signup?mode=signin">
-            {t("Se connecter · S'inscrire", "Log in · Sign up", english)}
-          </Link>
-        </div>
-      </header>
+      <LandingNavigation english={english} />
 
       <main>
         <ViewsHero english={english} />
@@ -247,22 +118,22 @@ export function Landing() {
             <header className="af-ld-steps__header">
               <span className="af-ld-pill-light">{t("Méthode", "Method", english)}</span>
               <h2 className="af-ld-steps__title">
-                <span>{t("3 étapes simples", "3 simple steps", english)}</span>
-                <span className="is-muted">{t("pour copier ce qui marche", "to copy what works", english)}</span>
+                <span>{t("De l’idée au post,", "From idea to post,", english)}</span>
+                <span className="is-muted">{t("avec ton agent.", "with your agent.", english)}</span>
               </h2>
               <div className="af-ld-steps__intro">
                 <p>
                   <strong>
                     {t(
-                      "Une méthode claire : cherche, juge, republie.",
+                      "Connecte ton agent, trouve ton format, prépare tes slideshows.",
                       "A clear method: find, judge, republish.",
                       english,
                     )}
                   </strong>{" "}
                   <span>
                     {t(
-                      "Ta bibliothèque garde chaque compte. La deuxième recherche ne coûte plus une heure.",
-                      "Your library keeps every account. The second search no longer costs an hour.",
+                      "Tes recherches, ton contenu et ton calendrier restent dans le même espace.",
+                      "Your research, content and calendar stay in the same workspace.",
                       english,
                     )}
                   </span>
@@ -275,18 +146,18 @@ export function Landing() {
               </div>
             </header>
             <div className="af-ld-steps__grid">
-              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
+              <Beam hover size="pulse-inner" colorVariant="mono" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-icons">
-                    <Logo size={72} />
-                    <Logo size={56} />
-                    <Logo size={48} />
+                    <img className="af-app-icon" src="/assets/ai/claude-transparent.png" alt="Claude" width={60} height={60} />
+                    <img className="af-app-icon" src="/assets/ai/codex-transparent.png" alt="Codex" width={60} height={60} />
+                    <img className="af-app-icon" src="/assets/ai/cursor-transparent.png" alt="Cursor" width={60} height={60} />
                   </div>
                 </div>
-                <h3>1 - {t("Crée ton espace", "Create your workspace", english)}</h3>
-                <p>{t("Choisis ton offre et règle ton achat pour ouvrir le studio.", "Choose your plan and complete payment to open the studio.", english)}</p>
+                <h3>1 - {t("Connecte ton agent", "Connect your agent", english)}</h3>
+                <p>{t("Relie Claude, Codex ou Cursor à ton espace ScrollShow.", "Connect Claude, Codex or Cursor to your ScrollShow workspace.", english)}</p>
               </article></Beam>
-              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
+              <Beam hover size="pulse-inner" colorVariant="mono" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-chips">
                     <span>glow up</span>
@@ -295,21 +166,28 @@ export function Landing() {
                     <span>TikTok</span>
                   </div>
                 </div>
-                <h3>2 - {t("Connecte TikTok", "Connect TikTok", english)}</h3>
-                <p>{t("Autorise ton compte TikTok pour retrouver ton profil et tes publications.", "Authorize your TikTok account to access your profile and posts.", english)}</p>
+                <h3>2 - {t("Trouve ton format", "Find your format", english)}</h3>
+                <p>{t("Explore ta niche et garde les formats qui correspondent à ton produit.", "Explore your niche and save formats that fit your product.", english)}</p>
               </article></Beam>
-              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
+              <Beam hover size="pulse-inner" colorVariant="mono" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-earn">
-                    <span className="af-ld-step-earn__amount">Keep</span>
-                    <span className="af-ld-step-earn__pill">Watch · Skip</span>
+                    <svg className="af-ld-step-calendar" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="10" y="14" width="44" height="40" rx="9" stroke="currentColor" strokeWidth="2"/><path d="M10 26h44M22 9v11M42 9v11m-19 20 6 6 13-13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <span className="af-ld-step-earn__pill">{t("Prêt à publier", "Ready to publish", english)}</span>
                   </div>
                 </div>
-                <h3>3 - {t("Publie le carrousel", "Publish the carousel", english)}</h3>
+                <h3>3 - {t("Crée et programme", "Create and schedule", english)}</h3>
                 <p>{t("Choisis ton compte, la visibilité et le créneau. Suis ensuite le résultat de chaque publication.", "Choose your account, visibility and time. Then track each publication’s result.", english)}</p>
               </article></Beam>
             </div>
           </div>
+        </section>
+
+        <section id="outils" className="af-ld-tools" aria-labelledby="af-ld-tools-title">
+          <h2 id="af-ld-tools-title">Tout ton workflow, connecté.</h2>
+          <p>De la recherche à la publication, ton agent pilote ScrollShow.</p>
+          <div className="af-ld-tools__hub">ScrollShow</div>
+          <LandingConnections />
         </section>
 
         <section id="reseaux" className="af-ld-networks" aria-label={t("Plateformes", "Platforms", english)}>
@@ -333,178 +211,21 @@ export function Landing() {
           </ul>
         </section>
 
-        <section id="offre" className="af-ld-offer">
-          <div className="af-ld-offer__inner">
-            <h2>
-              <span>
-                {t("Rejoins ScrollShow", "Join ScrollShow", english)}
-                <span className="af-ld-offer__mark">
-                  <Logo size={22} />
-                </span>
-              </span>
-              <span>{t("et copie les formats", "and copy the formats", english)}</span>
-              <span>{t("qui cartonnent déjà", "that already win", english)}</span>
-            </h2>
-            <div className="af-ld-offer__proof">
-              <AvatarStack />
-              <span className="af-ld-offer__proof-meta">
-                <StarRow />
-                <span>{t("Créateurs ScrollShow", "ScrollShow creators", english)}</span>
-              </span>
-            </div>
-            <article className="af-ld-offer__card">
-              <p className="af-ld-offer__kicker">{t("Mensuel ou à vie", "Monthly or lifetime", english)}</p>
-              <p className="af-ld-offer__price-row">
-                <span className="af-ld-offer__price">29 €</span>
-                <span>{t("par mois, ou 99 € à vie", "per month, or €99 lifetime", english)}</span>
-              </p>
-              <ul>
-                {[
-                  t("Bibliothèque Keep / Watch / Skip", "Keep / Watch / Skip library", english),
-                  t("Analyse de comptes et formats TikTok", "TikTok account and format analysis", english),
-                  t("Claude, Cursor et Codex via MCP", "Claude, Cursor and Codex via MCP", english),
-                  t("FR + EN", "FR + EN", english),
-                ].map((item) => (
-                  <li key={item}>
-                    <span>✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Metal preset="chromatic" strength={0.85} keepStyles>
-                <Link href="/signup" className="af-ld-offer__cta">
-                  <CtaDot />
-                  {t("Créer mon espace", "Create my workspace", english)}
-                  <span aria-hidden>›</span>
-                </Link>
-              </Metal>
-            </article>
-          </div>
+        <section id="offre" className="af-ld-pricing" aria-labelledby="af-ld-pricing-title">
+          <header className="af-ld-pricing__heading">
+            <p>{t("Les offres", "Plans", english)}</p>
+            <h2 id="af-ld-pricing-title">{t("Un agent. Tout ton contenu.", "One agent. All your content.", english)}</h2>
+            <span>{t("Le même studio complet. Choisis ton accès.", "The same complete studio. Choose your access.", english)}</span>
+          </header>
+          <PricingCards english={english} />
+          <p className="af-ld-pricing__note">{t("L’accès à vie couvre la durée d’exploitation du service. Mêmes quotas de traitement pour les deux offres. Abonnements aux assistants IA non inclus.", "Lifetime access covers the operating lifetime of the service. Both plans have the same processing quotas. AI assistant subscriptions are not included.", english)} <Link href="/pricing">{t("Détails des offres", "Plan details", english)}</Link></p>
         </section>
 
-        <section id="faq" className="af-ld-faq">
-          <div className="af-ld-faq__inner">
-            <header className="af-ld-faq__header">
-              <div>
-                <span className="af-ld-pill-light">FAQ</span>
-                <h2>
-                  <span>{t("Tes questions.", "Your questions.", english)}</span>
-                  <span className="is-muted">{t("Nos réponses", "Our answers", english)}</span>
-                </h2>
-              </div>
-            </header>
-            <div className="af-ld-faq__list">
-              {faq.map((item) => {
-                const open = openId === item.id;
-                return (
-                  <article key={item.id} className={`af-ld-faq__item${open ? " is-open" : ""}`}>
-                    <h3>
-                      <button
-                        type="button"
-                        id={`${baseId}-${item.id}-btn`}
-                        aria-expanded={open}
-                        onClick={() => setOpenId(open ? null : item.id)}
-                      >
-                        <span>{item.q}</span>
-                        <span className="af-ld-faq__icon" aria-hidden />
-                      </button>
-                    </h3>
-                    {open ? (
-                      <div role="region">
-                        <p>{item.a}</p>
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="af-ld-closing">
-          <div className="af-ld-closing__stage">
-            <article className="af-ld-closing__card">
-              <h2>{t("Les formats sont déjà là. Copie-les.", "The formats are already out there. Copy them.", english)}</h2>
-              <p>
-                <strong>ScrollShow</strong>{" "}
-                {t(
-                  "range les comptes slideshow qui cartonnent — pour que tu publies avec un format déjà prouvé.",
-                  "files the slideshow accounts that win — so you publish with a format already proven.",
-                  english,
-                )}
-              </p>
-              <div className="af-ld-closing__proof">
-                <AvatarStack />
-                <span className="af-ld-offer__proof-meta">
-                  <StarRow />
-                  <span>{t("Créateurs ScrollShow", "ScrollShow creators", english)}</span>
-                </span>
-              </div>
-              <Metal preset="chromatic" strength={0.85} keepStyles>
-                <Link href="/signup" className="af-ld-closing__cta">
-                  <CtaDot />
-                  {t("Créer mon espace", "Create my workspace", english)}
-                  <span aria-hidden>›</span>
-                </Link>
-              </Metal>
-            </article>
-            <div className="af-ld-closing__brand" aria-hidden>
-              <Logo size={72} />
-            </div>
-          </div>
-        </section>
+        <LandingTestimonials english={english} />
+        <LandingFAQ english={english} />
       </main>
 
-      <footer className="af-ld-footer">
-        <div className="af-ld-footer__inner">
-          <div className="af-ld-footer__grid">
-            <div>
-              <Link className="af-ld-brand" href="/">
-                <Logo size={28} />
-                <span>ScrollShow</span>
-              </Link>
-              <a className="af-ld-footer__email" href="mailto:aminennasri@outlook.com">
-                aminennasri@outlook.com
-              </a>
-            </div>
-            <section>
-              <h2>{t("Navigation", "Navigation", english)}</h2>
-              <ul>
-                <li>
-                  <a href="#vues">{t("Vues", "Views", english)}</a>
-                </li>
-                <li>
-                  <a href="#comment">{t("Méthode", "Method", english)}</a>
-                </li>
-                <li>
-                  <a href="#reseaux">{t("Plateformes", "Platforms", english)}</a>
-                </li>
-                <li>
-                  <Link href="/pricing">{t("Tarifs", "Pricing", english)}</Link>
-                </li>
-                <li>
-                  <Link href="/signup?mode=signin">{t("Connexion", "Log in", english)}</Link>
-                </li>
-              </ul>
-            </section>
-            <section>
-              <h2>{t("Informations", "Information", english)}</h2>
-              <ul>
-                <li>
-                  <Link href="/terms">{t("Conditions générales", "Terms of Service", english)}</Link>
-                </li>
-                <li>
-                  <Link href="/privacy">{t("Confidentialité", "Privacy", english)}</Link>
-                </li>
-                <li>
-                  <Link href="/support">Support</Link>
-                </li>
-              </ul>
-            </section>
-          </div>
-          <p className="af-ld-footer__copy">© {new Date().getFullYear()} ScrollShow — All rights reserved</p>
-        </div>
-      </footer>
+      <LandingFooter english={english} />
     </div>
   );
 }

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__scrollshow__publish_now",
+      "mcp__scrollshow__create_post",
+      "mcp__scrollshow__update_post",
+      "mcp__scrollshow__set_visibility",
+      "mcp__scrollshow__delete_post",
+      "mcp__scrollshow__fork_post",
+      "mcp__scrollshow__reconstruct_post",
+      "mcp__scrollshow__update_recipe",
+      "mcp__scrollshow__import_tiktok"
+    ]
+  }
+}

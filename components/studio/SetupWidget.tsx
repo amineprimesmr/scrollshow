@@ -86,7 +86,7 @@ export function SetupWidget() {
           ))}
         </ul>
       </div>
-      <Metal preset="chromatic" strength={0.7} keepStyles className="ss-setup__metal">
+      <Metal preset="chromatic" strength={0.7} className="ss-setup__metal">
         <button type="button" className="ss-setup__pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           <svg className="ss-setup__ring" viewBox="0 0 36 36" aria-hidden>
             <circle cx="18" cy="18" r="15.5" />

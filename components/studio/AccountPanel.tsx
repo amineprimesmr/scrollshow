@@ -276,7 +276,7 @@ export function AccountPanel({
               {data.videos.map((v, i) => (
                 <li key={v.id}>
                   <span className="ss-acc__rank">{i + 1}</span>
-                  {v.cover ? <img src={v.cover} alt="" loading="lazy" /> : <span className="ss-acc__thumb" />}
+                  {v.cover ? <FxImage src={v.cover} width={44} height={58} radius={8} preset={i % 2 ? "pixels-mechanic" : "pixels-organic"} className="ss-acc__thumb-fx" /> : <span className="ss-acc__thumb" />}
                   <div className="ss-acc__vtitle">
                     <b>{v.title || t("Sans titre", "Untitled", en)}</b>
                     <span>

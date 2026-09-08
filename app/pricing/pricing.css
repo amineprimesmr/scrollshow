@@ -285,6 +285,17 @@ html:has(.ss-pricing) body.grain {
   color: var(--ss-info-fg);
 }
 
+/* Scoped to the offers page: account and recovery forms keep their own styling. */
+html:has(.ss-pricing--glass), html:has(.ss-pricing--glass) body { background: #000 !important; color: #fafafa !important; }
+.ss-pricing--glass { background: #000; color: #fafafa; padding-bottom: 40px; overflow: clip; }
+.ss-pricing--glass .ss-pricing__nav { width: min(1280px, calc(100% - 40px)); }
+.ss-pricing--glass .ss-pricing__hero { margin-top: 60px; }
+.ss-pricing--glass .ss-pricing__hero h1 { font-weight: 550; }
+.ss-pricing--glass .ss-pricing__hero p { color: #a4a5ae; }
+.ss-pricing__offers { padding: 0 20px; margin: 64px auto 0; }
+.ss-pricing--glass .ss-pricing__foot { max-width: 850px; color: #9598a4; font-size: 12px; line-height: 1.7; margin: 28px auto 0; }
+.ss-pricing--glass .ss-pricing__foot a { color: #b7bfdb; }
+
 .ss-upsell {
   position: fixed;
   inset: 0;

@@ -20,13 +20,14 @@ import {
   agentUpdateRecipe,
   agentWhoami,
 } from "@/lib/agent";
-import { agentOptions, keyFromUrl } from "@/lib/agent-http";
+import { agentOptions, bearerToken, keyFromUrl } from "@/lib/agent-http";
 import { resolveApiKey } from "@/lib/api-keys";
 import { hasStudioAccess } from "@/lib/plans";
 import { recipeInputSchema } from "@/lib/recipe";
 import type { SessionUser } from "@/lib/types";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyzeResearchAccount, contentBrief, discoverResearchAccounts, researchLibrary } from "@/lib/research";
 import { reconcilePublishId } from "@/lib/publish-queue";
@@ -556,8 +557,37 @@ const authHandler = withMcpAuth(handler, verifyToken, {
   resourceUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io").replace(/\/$/, "")}/api/mcp`,
 });
 
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io").replace(/\/$/, "");
+
+/** A refusal the agent can act on: say what is missing and where the user fixes it. */
+function refuse(status: number, error: string, message: string, action: string) {
+  const res = NextResponse.json({ error, message, action }, { status });
+  res.headers.set("Access-Control-Allow-Origin", "*");
+  res.headers.set(
+    "WWW-Authenticate",
+    `Bearer realm="scrollshow", error="${error}", error_description="${message}", resource_metadata="${SITE}/api/mcp"`,
+  );
+  return res;
+}
+
+/** Installing the skill is free; calling a tool needs a key attached to an active plan. */
+async function gate(request: Request) {
+  const token = bearerToken(request);
+  if (!token) return null; // no key at all: let the MCP layer answer with its discovery challenge
+  const user = await resolveApiKey(token);
+  if (!user) {
+    return refuse(401, "invalid_key", "This ScrollShow key is unknown or was revoked.", `Ask the user to create a new key at ${SITE}/app/settings and put it in the connector configuration, never in chat.`);
+  }
+  if (!hasStudioAccess(user.plan)) {
+    return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Tell the user to activate their access at ${SITE}/pricing with the account ${user.email}. The skill stays installed and works as soon as the payment is confirmed.`);
+  }
+  return null;
+}
+
 async function handle(request: Request) {
   if (request.method === "OPTIONS") return agentOptions();
+  const refusal = await gate(request);
+  if (refusal) return refusal;
   return authHandler(request);
 }
 

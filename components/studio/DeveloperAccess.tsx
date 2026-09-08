@@ -261,7 +261,7 @@ export function DeveloperAccess() {
               <img src={item.logo} alt="" style={{ background: item.bg }} />
             </span>
           ))}
-          <Metal variant="circle" preset="chromatic" strength={0.9} keepStyles>
+          <Metal variant="circle" preset="chromatic" strength={0.9}>
             <span className="ss-mcp-orbit__item is-core">
               <img src="/logo.png" alt="" />
             </span>
@@ -307,7 +307,7 @@ export function DeveloperAccess() {
 
         <div className="ss-mcp-board">
           {stepList.map((step) => (
-            <Beam key={`${client}-${step.n}`} active={Boolean(step.primary)} size="pulse-inner" colorVariant="ocean" strength={0.6} className="ss-mcp-card__beam">
+            <Beam key={`${client}-${step.n}`} active={Boolean(step.primary)} size="pulse-inner" colorVariant="mono" strength={0.6} className="ss-mcp-card__beam">
             <article className="ss-mcp-card">
               <span className="ss-mcp-card__n">{step.n}</span>
               <h3>

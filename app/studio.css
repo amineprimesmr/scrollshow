@@ -4146,15 +4146,6 @@ a.ss-btn-ghost {
   white-space: nowrap;
 }
 
-.ss-sb__spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgb(255 255 255 / 0.35);
-  border-top-color: currentColor;
-  animation: ss-spin 0.7s linear infinite;
-}
-
 .ss-sb__error {
   grid-column: 1 / -1;
   margin: 0;
@@ -6624,6 +6615,7 @@ a.ss-btn-ghost {
 }
 
 .ss-acc__list img,
+.ss-acc__thumb-fx,
 .ss-acc__thumb {
   width: 44px;
   height: 58px;
@@ -6631,6 +6623,7 @@ a.ss-btn-ghost {
   object-fit: cover;
   background: #1f1f23;
   display: block;
+  flex: none;
 }
 
 .ss-acc__vtitle {
@@ -7021,6 +7014,8 @@ a.ss-btn-ghost {
   z-index: 1;
 }
 
+/* The pill paints its own surface so the active state exists with or without
+   the liquid layer; liquid-gooey only adds the trail while it travels. */
 .ss-sidebar__pill {
   position: absolute;
   top: 0;
@@ -7028,7 +7023,18 @@ a.ss-btn-ghost {
   display: block;
   border-radius: 12px;
   pointer-events: none;
+  background: var(--lg-knob);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    inset 1px 1.5px 0 -1px rgb(var(--lg-hi) / var(--lg-hi-a)),
+    0 1px 2px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.5));
   transition: transform 0.5s cubic-bezier(0.2, 1.3, 0.4, 1), width 0.3s ease, height 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-sidebar__pill {
+    transition: none;
+  }
 }
 
 /* Orbs inside buttons and status lines */
@@ -7091,3 +7097,12 @@ a.ss-btn-ghost {
 .ss-research__metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
 .ss-research__metrics dt { color: var(--ss-muted); font-size: 12px; }
 .ss-research__metrics dd { margin: 4px 0 0; font-size: 22px; font-weight: 700; }
+
+/* metal-fx hides its own content until the shader's first copy lands. When the
+   shared WebGL context never paints (StrictMode remount, low-end GPU, a
+   context loss) the wrapped control would stay invisible — so the child is
+   forced visible and the metal is pure progressive enhancement on top. */
+.metal-fx-root {
+  opacity: 1 !important;
+  visibility: visible !important;
+}

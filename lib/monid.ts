@@ -104,3 +104,82 @@ export async function fetchAccountVideos(handle: string, pages = 2): Promise<Acc
   if (!videos.length) throw new MonidError("empty", "no posts returned");
   return videos.sort((a, b) => b.createdAt - a.createdAt);
 }
+
+/* ------------------------------------------------------------------ */
+/* Registre d'outils Monid (https://monid.ai/tools)                    */
+/* ------------------------------------------------------------------ */
+
+export type MonidTool = {
+  id: string;
+  provider: string;
+  providerName: string;
+  endpoint: string;
+  name: string;
+  description: string;
+  price: string;
+  verified: boolean;
+  status: string;
+};
+
+function toTool(raw: any): MonidTool | null {
+  const provider = String(raw?.provider || "").trim();
+  const endpoint = String(raw?.endpoint || "").trim();
+  if (!provider || !endpoint) return null;
+  const value = Number(raw?.price?.amount?.value);
+  const unit = String(raw?.price?.type || "") === "PER_RESULT" ? "résultat" : "appel";
+  const name = endpoint.split("/").filter(Boolean).pop()!.replace(/[-_]+/g, " ");
+  return {
+    id: `${provider}${endpoint}`,
+    provider,
+    providerName: String(raw?.providerName || provider),
+    endpoint,
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    description: String(raw?.description || "").trim(),
+    price: Number.isFinite(value) && value > 0 ? `$${value < 0.01 ? value.toFixed(5).replace(/0+$/, "") : value.toFixed(3)} / ${unit}` : "Tarif à l’appel",
+    verified: Array.isArray(raw?.tags) && raw.tags.includes("verified"),
+    status: String(raw?.metrics?.status || ""),
+  };
+}
+
+const discoverCache = new Map<string, { at: number; tools: MonidTool[] }>();
+const DISCOVER_TTL = 30 * 60 * 1000;
+
+/** Résultats déjà en cache, sans appel réseau ni dépense. */
+export function cachedTools(query: string, limit = 24): MonidTool[] | null {
+  const cached = discoverCache.get(query.trim().toLowerCase().slice(0, 80));
+  return cached && Date.now() - cached.at < DISCOVER_TTL ? cached.tools.slice(0, limit) : null;
+}
+
+/** Cherche des outils dans le registre Monid. Résultats mis en cache 30 min. */
+export async function discoverTools(query: string, limit = 24): Promise<MonidTool[]> {
+  if (!monidEnabled()) throw new MonidError("no_key");
+  const key = query.trim().toLowerCase().slice(0, 80);
+  const cached = discoverCache.get(key);
+  if (cached && Date.now() - cached.at < DISCOVER_TTL) return cached.tools.slice(0, limit);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const res = await fetch(`${BASE}/discover`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ query: key || "content marketing" }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) throw new MonidError("http", `discover ${res.status}`);
+    const data = await res.json().catch(() => null);
+    const tools: MonidTool[] = [];
+    const seen = new Set<string>();
+    for (const raw of (data?.results || data?.tools || []) as any[]) {
+      const tool = toTool(raw);
+      if (tool && !seen.has(tool.id)) { seen.add(tool.id); tools.push(tool); }
+    }
+    discoverCache.set(key, { at: Date.now(), tools });
+    return tools.slice(0, limit);
+  } catch (error) {
+    if (error instanceof MonidError) throw error;
+    throw new MonidError((error as Error)?.name === "AbortError" ? "timeout" : "http");
+  } finally {
+    clearTimeout(timer);
+  }
+}

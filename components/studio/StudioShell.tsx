@@ -16,7 +16,7 @@ import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
-import { LiquidNav } from "@/components/fx/LiquidNav";
+import { NavPill } from "@/components/fx/NavPill";
 import { Metal } from "@/components/fx/Metal";
 import { StudioFlash } from "./StudioFlash";
 
@@ -166,11 +166,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             <IconX size={18} />
           </button>
         </div>
-        <LiquidNav className="ss-sidebar__nav" activeKey={pathname}>
+        <NavPill className="ss-sidebar__nav" activeKey={pathname}>
           {mainNav.map((entry) => (
             <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
           ))}
-        </LiquidNav>
+        </NavPill>
         <nav className="ss-sidebar__bottom">
           {bottomNav.map((entry) => (
             <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />

@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // Le bloc du hero propose « set up https://scrollshow.io/SKILL.md » : la casse
+  // compte sur Vercel, alors que le fichier vit dans public/skill.md.
+  async rewrites() {
+    return [{ source: "/SKILL.md", destination: "/skill.md" }];
+  },
   async headers() {
     const cors = [
       { key: "Access-Control-Allow-Origin", value: "*" },
