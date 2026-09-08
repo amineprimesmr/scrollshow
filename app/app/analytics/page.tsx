@@ -1,5 +1,6 @@
-import { AnalyticsView } from "@/components/studio/views/AnalyticsView";
+import { redirect } from "next/navigation";
 
+// Analytics now live in the Overview account panel.
 export default function Page() {
-  return <AnalyticsView />;
+  redirect("/app/home");
 }

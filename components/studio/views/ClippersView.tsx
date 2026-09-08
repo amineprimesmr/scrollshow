@@ -309,7 +309,7 @@ export function ClippersView() {
         </div>
         <p className="ss-lead">
           {t("Pour les stats détaillées de tes propres comptes connectés, va dans", "For detailed stats on your own connected accounts, go to", en)}{" "}
-          <Link href="/app/analytics">Analytics</Link>.
+          <Link href="/app/home">Overview</Link>.
         </p>
       </div>
     </div>

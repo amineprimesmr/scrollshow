@@ -118,7 +118,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const hideHeader =
     onMcp ||
     pathname.startsWith("/app/home") ||
-    pathname.startsWith("/app/analytics") ||
     pathname.startsWith("/app/unshadowban");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
