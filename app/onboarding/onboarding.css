@@ -751,6 +751,69 @@ html:has(.ss-onb) body.grain {
   text-transform: capitalize;
 }
 
+/* ── Claude connector steps ── */
+.ss-onb-steps {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-onb-steps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ss-onb-steps li > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ss-onb-steps b {
+  font-size: 14px;
+  line-height: 28px;
+}
+
+.ss-onb-steps__n {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #000;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ss-onb-code--field pre {
+  padding-right: 84px;
+  font-size: 13px;
+}
+
+.ss-onb-cta--claude {
+  justify-self: start;
+  gap: 10px;
+  padding: 0 22px 0 8px;
+}
+
+.ss-onb-cta--claude img {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #d97e5b;
+  object-fit: contain;
+}
+
+.ss-onb-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── AI clients ── */
 .ss-onb-clients {
   display: grid;

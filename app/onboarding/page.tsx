@@ -2,7 +2,6 @@
 
 import { BrandMark } from "@/components/BrandMark";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
-import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { BUSINESS_KINDS } from "@/lib/business-kinds";
 import { prefersEnglish } from "@/lib/i18n";
 import { safeNextPath } from "@/lib/auth-urls";
@@ -104,7 +103,6 @@ function OnboardingInner() {
   const [revealed, setRevealed] = useState(false);
 
   // Step 2
-  const [client, setClient] = useState<AiClientId>("claude-code");
   const [token, setToken] = useState("");
   const [copied, setCopied] = useState("");
 
@@ -281,17 +279,8 @@ function OnboardingInner() {
 
   const origin = typeof window === "undefined" ? "https://scrollshow.io" : window.location.origin;
   const mcpUrl = `${origin}/api/mcp`;
-  const liveToken = token || "ss_live_YOUR_KEY";
-  const claudeCli = `claude mcp add --transport http scrollshow ${mcpUrl} --header "Authorization: Bearer ${liveToken}"\nmkdir -p ~/.claude/skills/scrollshow && curl -fsSL ${origin}/skill.md -o ~/.claude/skills/scrollshow/SKILL.md`;
-  const codexCli = `export SCROLLSHOW_API_KEY='${liveToken}'\ncodex mcp add scrollshow --url ${mcpUrl} --bearer-token-env-var SCROLLSHOW_API_KEY`;
-  const cursorDeeplink = useMemo(() => {
-    const config = btoa(JSON.stringify({ url: mcpUrl, headers: { Authorization: `Bearer ${liveToken}` } }))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-    return `cursor://anysphere.cursor-deeplink/mcp/install?name=scrollshow&config=${config}`;
-  }, [mcpUrl, liveToken]);
-  const claudeJson = JSON.stringify({ mcpServers: { scrollshow: { url: mcpUrl, headers: { Authorization: `Bearer ${liveToken}` } } } }, null, 2);
+  const liveToken = token || "";
+  const connectorUrl = "https://claude.ai/customize/connectors?modal=add-custom-connector";
 
   const firstPrompt = useMemo(() => {
     const brand = business?.name || company || "my brand";
@@ -326,7 +315,7 @@ function OnboardingInner() {
   const titles: Record<Step, [string, string]> = {
     0: [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Deux infos, et on s’occupe du reste.", "Two details, and we take it from there.")],
     1: [t("Ton business", "Your business"), t("Colle le lien de ton site, ta boutique, ton app ou ton TikTok. On l’analyse.", "Paste your site, store, app or TikTok link. We analyze it.")],
-    2: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels depuis leur chat.", "Claude, Cursor or Codex create and schedule your carousels from their chat.")],
+    2: [t("Branche Claude", "Plug in Claude"), t("Claude crée et planifie tes carrousels directement depuis la conversation.", "Claude creates and schedules your carousels straight from the chat.")],
     3: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
   };
 
@@ -560,44 +549,54 @@ function OnboardingInner() {
             </div>
           ) : null}
 
-          {/* ── 2 · connect AI ── */}
+          {/* ── 2 · connect Claude ── */}
           {step === 2 ? (
             <div className="ss-onb-form">
-              <div className="ss-onb-clients" role="tablist">
-                {AI_CLIENTS.map((item) => (
-                  <button key={item.id} type="button" role="tab" aria-selected={client === item.id} className={`ss-onb-client ${client === item.id ? "is-on" : ""}`} onClick={() => setClient(item.id)}>
-                    <span style={{ background: item.bg }}>
-                      <img src={item.logo} alt="" />
-                    </span>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              {client === "cursor" ? (
-                <a className="ss-onb-cta" href={cursorDeeplink}>
-                  {t("Installer dans Cursor en un clic", "Install in Cursor in one click")}
-                </a>
-              ) : (
-                <div className="ss-onb-code">
-                  <pre>{client === "claude-code" ? claudeCli : client === "codex" ? codexCli : claudeJson}</pre>
-                  <button type="button" className="ss-onb-copy" onClick={() => void copy("cmd", client === "claude-code" ? claudeCli : client === "codex" ? codexCli : claudeJson)}>
-                    {copied === "cmd" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
-                  </button>
-                </div>
-              )}
-              <p className="ss-onb-help">
-                {client === "claude-code"
-                  ? t("Colle ces deux lignes dans ton terminal : la première branche ScrollShow, la seconde installe le skill qui apprend à Claude Code à s’en servir.", "Paste these two lines in your terminal: the first connects ScrollShow, the second installs the skill that teaches Claude Code how to use it.")
-                  : client === "claude"
-                    ? t("Claude Desktop → Réglages → Développeur → Modifier la config, puis colle ce bloc.", "Claude Desktop → Settings → Developer → Edit config, then paste this block.")
-                    : client === "codex"
-                      ? t("Deux lignes dans ton terminal, Codex voit ScrollShow.", "Two lines in your terminal, Codex sees ScrollShow.")
-                      : t("Cursor s’ouvre et te demande de confirmer.", "Cursor opens and asks you to confirm.")}
-              </p>
+              <ol className="ss-onb-steps">
+                <li>
+                  <span className="ss-onb-steps__n">1</span>
+                  <div>
+                    <b>{t("Copie l’adresse ScrollShow", "Copy the ScrollShow address")}</b>
+                    <div className="ss-onb-code ss-onb-code--field">
+                      <pre>{mcpUrl}</pre>
+                      <button type="button" className="ss-onb-copy" onClick={() => void copy("url", mcpUrl)}>
+                        {copied === "url" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <span className="ss-onb-steps__n">2</span>
+                  <div>
+                    <b>{t("Copie ta clé", "Copy your key")}</b>
+                    <div className="ss-onb-code ss-onb-code--field">
+                      <pre>{liveToken ? `${liveToken.slice(0, 14)}…${liveToken.slice(-4)}` : t("Création de la clé…", "Creating the key…")}</pre>
+                      <button type="button" className="ss-onb-copy" disabled={!liveToken} onClick={() => void copy("key", liveToken)}>
+                        {copied === "key" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <span className="ss-onb-steps__n">3</span>
+                  <div>
+                    <b>{t("Ajoute le connecteur dans Claude", "Add the connector in Claude")}</b>
+                    <p className="ss-onb-help">
+                      {t(
+                        "Le bouton ouvre Claude avec la fenêtre « Ajouter un connecteur ». Colle l’adresse, nomme-le ScrollShow, et connecte-toi avec ta clé.",
+                        "The button opens Claude with the “Add connector” dialog. Paste the address, name it ScrollShow, and sign in with your key.",
+                      )}
+                    </p>
+                    <a className="ss-onb-cta ss-onb-cta--claude" href={connectorUrl} target="_blank" rel="noreferrer">
+                      <img src="/assets/ai/claude.png?v=2" alt="" />
+                      {t("Ouvrir Claude", "Open Claude")}
+                    </a>
+                  </div>
+                </li>
+              </ol>
 
               <div className="ss-onb-prompt">
-                <div className="ss-onb-label">{t("Ton premier message, prêt à coller", "Your first message, ready to paste")}</div>
+                <div className="ss-onb-label">{t("Ton premier message, prêt à coller dans Claude", "Your first message, ready to paste in Claude")}</div>
                 <p>{firstPrompt}</p>
                 <button type="button" className="ss-onb-copy" onClick={() => void copy("prompt", firstPrompt)}>
                   {copied === "prompt" ? t("Copié ✓", "Copied ✓") : t("Copier le message", "Copy the message")}
