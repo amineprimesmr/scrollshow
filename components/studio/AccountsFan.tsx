@@ -169,7 +169,14 @@ export function AccountsFan() {
     const stage = stageRef.current;
     if (!stage) return;
     const g = narrowRef.current ? MOBILE : DESKTOP;
-    const cx = stage.clientWidth * (narrowRef.current ? 0.42 : 0.44);
+    const n = countRef.current;
+    const pivot = Math.round(clamp(target.current, 0, Math.max(0, n - 1)));
+    const f = cur.current[pivot] ?? target.current;
+    // Keep the whole fan centred whatever is selected: its horizontal extent
+    // depends on where the opened folder sits, so recentre from that.
+    const first = layout(0 - f, g).x;
+    const last = layout(Math.max(0, n - 1) - f, g).x;
+    const cx = stage.clientWidth / 2 - (first + last) / 2;
     const cy = stage.clientHeight * (narrowRef.current ? 0.6 : 0.55);
     for (let i = 0; i < nodes.current.length; i += 1) {
       const el = nodes.current[i];
@@ -193,9 +200,7 @@ export function AccountsFan() {
       if (shade) shade.style.opacity = String(clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h));
     }
     const handle = handleRef.current;
-    const n = countRef.current;
     if (handle && n > 1) {
-      const f = cur.current[Math.round(clamp(target.current, 0, n - 1))] ?? target.current;
       const p = clamp(f / (n - 1), 0, 1);
       const w = stage.clientWidth;
       const hx = w * 0.18 + p * w * 0.64;
