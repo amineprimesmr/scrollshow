@@ -1,5 +1,5 @@
 import { createApiKey, listApiKeys } from "@/lib/api-keys";
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

@@ -1,32 +1,48 @@
 import { readSession } from "@/lib/auth";
-import { PLAN, TRIAL_DAYS } from "@/lib/plans";
+import { hasStudioAccess, PLAN } from "@/lib/plans";
+import { readStore, updateStore } from "@/lib/store";
 import { siteUrl, stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { LEGAL, salesReady } from "@/lib/legal";
 
 export async function POST(request: Request) {
   const user = await readSession();
-  if (!user) {
-    return NextResponse.json({ error: "auth", login: "/signup?next=/pricing" }, { status: 401 });
-  }
-
+  if (!user) return NextResponse.json({ error: "auth" }, { status: 401 });
+  if (!user.emailVerified) return NextResponse.json({ error: "email_verification_required", portal: "/verify-email" }, { status: 403 });
+  if (process.env.VERCEL_ENV === "preview" && !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) return NextResponse.json({ error: "preview_requires_test_stripe" }, { status: 503 });
+  if (!salesReady()) return NextResponse.json({ error: "sales_not_open" }, { status: 503 });
+  const parsed = z.object({ offer: z.enum(["monthly", "lifetime"]), termsAccepted: z.literal(true) }).safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "invalid_offer" }, { status: 400 });
+  if (hasStudioAccess(user.plan)) return NextResponse.json({ error: "already_subscribed", portal: "/app/settings?tab=plan" }, { status: 409 });
+  const offer = parsed.data.offer;
+  const priceId = offer === "lifetime" ? PLAN.lifetimePriceId : PLAN.monthlyPriceId;
+  if (!priceId || !process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "billing_not_configured" }, { status: 503 });
   try {
-    const session = await stripe().checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: PLAN.monthlyPriceId, quantity: 1 }],
+    const client = stripe();
+    const price = await client.prices.retrieve(priceId);
+    if (!price.active || price.currency !== "eur" || price.unit_amount !== (offer === "monthly" ? PLAN.monthly : PLAN.lifetime) ||
+      (offer === "monthly" ? price.recurring?.interval !== "month" || price.recurring.interval_count !== 1 : !!price.recurring)) {
+      return NextResponse.json({ error: "billing_price_mismatch" }, { status: 503 });
+    }
+    let stored = (await readStore()).users.find(u => u.id === user.id)!;
+    if (!stored.stripeCustomerId) {
+      const customer = await client.customers.create({ email: user.email, metadata: { userId: user.id } }, { idempotencyKey: `customer-${user.id}` });
+      await updateStore(data => { const u = data.users.find(u => u.id === user.id); if (u) u.stripeCustomerId = customer.id; });
+      stored = { ...stored, stripeCustomerId: customer.id };
+    }
+    const subscriptions = await client.subscriptions.list({ customer: stored.stripeCustomerId, status: "all", limit: 100 });
+    if (subscriptions.data.some(s => !["canceled", "incomplete_expired"].includes(s.status))) {
+      return NextResponse.json({ error: "subscription_exists", portal: "/app/settings?tab=plan" }, { status: 409 });
+    }
+    const session = await client.checkout.sessions.create({
+      mode: offer === "lifetime" ? "payment" : "subscription", customer: stored.stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${siteUrl()}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl()}/pricing`,
-      client_reference_id: user.id,
-      customer_email: user.email,
-      allow_promotion_codes: true,
-      subscription_data: {
-        trial_period_days: TRIAL_DAYS,
-        metadata: { userId: user.id, plan: PLAN.id },
-      },
-      metadata: { userId: user.id, plan: PLAN.id },
-    });
+      cancel_url: `${siteUrl()}/pricing`, client_reference_id: user.id,
+      subscription_data: offer === "monthly" ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
+      metadata: { userId: user.id, offer, plan: offer === "lifetime" ? "lifetime" : "pro", termsVersion: LEGAL.version, termsAccepted: "true" },
+    }, { idempotencyKey: `checkout-${user.id}-${offer}-${Math.floor(Date.now() / 1800000)}` });
     return NextResponse.json({ url: session.url });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "stripe";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  } catch { return NextResponse.json({ error: "checkout_unavailable" }, { status: 502 }); }
 }

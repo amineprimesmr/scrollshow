@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { ensureDemoWorkspace, localAutoSeedEnabled } from "@/lib/demo-workspace";
 import { resolveStoreUser } from "@/lib/local-user";
 import { platformAvailability } from "@/lib/platforms";
@@ -36,7 +36,7 @@ export async function GET() {
       const channels = data.channels.filter((item) => item.userId === userId);
       let posts = data.posts.filter((item) => item.userId === userId);
       let media = data.media.filter((item) => item.userId === userId);
-      if (!media.length) {
+      if (!media.length && localAutoSeedEnabled()) {
         const seeded = seedStudio(user.id);
         data.media.push(...seeded.media);
         media = seeded.media;

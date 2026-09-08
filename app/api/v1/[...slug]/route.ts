@@ -18,6 +18,7 @@ import {
 } from "@/lib/agent";
 import { agentCatch, agentOptions, agentResponse, requireAgentUser } from "@/lib/agent-http";
 import { NextResponse } from "next/server";
+import { analyzeResearchAccount, discoverResearchAccounts, researchLibrary, contentBrief, researchSchema } from "@/lib/research";
 
 export const maxDuration = 120;
 
@@ -31,6 +32,8 @@ export async function GET(request: Request, context: { params: Promise<{ slug?: 
     const { slug = [] } = await context.params;
     const [head, id] = slug;
     const url = new URL(request.url);
+    if (head === "research" && !id) return agentResponse({ items: await researchLibrary(user, url.searchParams.get("q") || "") });
+    if (head === "brief" && !id) return agentResponse(await contentBrief(user));
     if (head === "me" && !id) return agentResponse(await agentWhoami(user));
     if (head === "channels" && !id) return agentResponse({ channels: await agentChannels(user) });
     if (head === "media" && !id) return agentResponse({ media: await agentMedia(user) });
@@ -63,6 +66,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
     const { slug = [] } = await context.params;
     const [head, id] = slug;
     const body = await request.json().catch(() => ({}));
+    if (head === "research" && !id) {
+      const parsed = researchSchema.safeParse(body);
+      if (!parsed.success) return agentResponse({ error: "invalid" }, 400);
+      return agentResponse(parsed.data.action === "analyze" ? await analyzeResearchAccount(user, parsed.data.query, parsed.data.niche) : await discoverResearchAccounts(user, parsed.data.query));
+    }
     if (head === "posts" && !id) {
       return agentResponse(
         {
@@ -76,6 +84,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
             photo_images: body.photo_images,
             origin: body.origin,
             recipe: body.recipe,
+            tiktok: body.tiktok,
           }),
         },
         201,
@@ -101,6 +110,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
         await agentPublish(user, {
           caption: String(body.caption || body.description || body.body || ""),
           title: body.title,
+          id: body.id,
+          channelId: body.channelId || body.channel_id,
           photo_images: body.photo_images,
           image: body.image,
           privacy_level: String(body.privacy_level || ""),
@@ -134,6 +145,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug?
         image: body.image,
         photo_images: body.photo_images,
         recipe: body.recipe,
+        tiktok: body.tiktok,
       }),
     });
   } catch (error) {

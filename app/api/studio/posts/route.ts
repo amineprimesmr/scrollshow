@@ -1,9 +1,10 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { coverOf, newShareId, recipeFromPhotos, recipeInputSchema } from "@/lib/recipe";
 import { updateStore } from "@/lib/store";
 import type { StudioPost } from "@/lib/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { validatePost, postErrorResponse } from "@/lib/post-validation";
 
 const schema = z.object({
   channelIds: z.array(z.string()).optional(),
@@ -30,7 +31,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = schema.safeParse(await request.json());
+  const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const origin = parsed.data.origin || "manual";
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       body: parsed.data.body,
       date: parsed.data.date,
       time: parsed.data.time,
-      status: parsed.data.status || "scheduled",
+      status: parsed.data.status || "draft",
       image: coverOf({ image: photos[0] || "", recipe }),
       views: 0,
       likes: 0,
@@ -65,9 +66,11 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       tiktok: parsed.data.tiktok,
     };
+    validatePost(data, created);
     data.posts.unshift(created);
     return created;
-  });
+  }).catch(postErrorResponse);
 
+  if (post instanceof Response) return post;
   return NextResponse.json({ post });
 }

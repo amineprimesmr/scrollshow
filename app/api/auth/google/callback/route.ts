@@ -40,6 +40,11 @@ export async function GET(request: Request) {
         data.users.find((item) => item.googleId === profile.googleId) ||
         findUserByEmail(data, profile.email);
       if (existing) {
+        if (!existing.emailVerifiedAt && !existing.googleId) {
+          existing.passwordHash = undefined;
+          existing.sessionVersion = (existing.sessionVersion || 0) + 1;
+        }
+        existing.emailVerifiedAt = new Date().toISOString();
         existing.googleId = profile.googleId;
         if (profile.name && !existing.name) existing.name = profile.name;
         return existing;
@@ -49,11 +54,11 @@ export async function GET(request: Request) {
         email: profile.email,
         name: profile.name,
         googleId: profile.googleId,
+        emailVerifiedAt: new Date().toISOString(),
         plan: "free" as const,
         createdAt: new Date().toISOString(),
       };
       data.users.push(created);
-      data.accounts.push(...seedAccounts(created.id));
       return created;
     });
 

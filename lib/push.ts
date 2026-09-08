@@ -11,7 +11,7 @@ export function vapidPublicKey() {
 
 function configureWebPush() {
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:support@scrollshow.io",
+    process.env.VAPID_SUBJECT || "mailto:aminennasri@outlook.com",
     process.env.VAPID_PUBLIC_KEY as string,
     process.env.VAPID_PRIVATE_KEY as string,
   );

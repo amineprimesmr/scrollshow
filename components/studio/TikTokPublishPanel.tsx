@@ -33,7 +33,7 @@ export type CreatorState = {
   handle: string;
 };
 
-export function useTikTokCreator(active: boolean): CreatorState & { refresh: () => void } {
+export function useTikTokCreator(active: boolean, channelId?: string): CreatorState & { refresh: () => void } {
   const [state, setState] = useState<CreatorState>({ loading: false, connected: false, creator: null, blocked: null, error: "", handle: "" });
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((value) => value + 1), []);
@@ -42,7 +42,7 @@ export function useTikTokCreator(active: boolean): CreatorState & { refresh: () 
     if (!active) return;
     let cancelled = false;
     setState((current) => ({ ...current, loading: true, error: "" }));
-    fetch("/api/tiktok/creator", { cache: "no-store" })
+    fetch(`/api/tiktok/creator${channelId ? `?channelId=${encodeURIComponent(channelId)}` : ""}`, { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -65,7 +65,7 @@ export function useTikTokCreator(active: boolean): CreatorState & { refresh: () 
     return () => {
       cancelled = true;
     };
-  }, [active, tick]);
+  }, [active, tick, channelId]);
 
   return { ...state, refresh };
 }

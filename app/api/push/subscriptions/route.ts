@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { labelUserAgent } from "@/lib/user-agent";
 import { readStore, updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";

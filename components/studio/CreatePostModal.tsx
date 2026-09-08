@@ -66,7 +66,7 @@ export function CreatePostModal() {
   const connected = channels.filter((item) => item.connected);
   const slide = recipe.slides[slideIndex] || recipe.slides[0];
   const baked = needsReconstruct(recipe);
-  const creatorState = useTikTokCreator(postOpen && connected.length > 0);
+  const creatorState = useTikTokCreator(postOpen && connected.length > 0, channelIds[0]);
   const optionsError = validatePostOptions(options, creatorState.creator);
   const canPublish =
     connected.length > 0 &&
@@ -359,6 +359,7 @@ export function CreatePostModal() {
         description: body,
         options,
         post_id: editing?.id,
+        channel_id: channelIds[0],
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -570,12 +571,11 @@ export function CreatePostModal() {
                 {connected.map((channel) => (
                   <label key={channel.id}>
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="publish-channel"
                       checked={channelIds.includes(channel.id)}
                       onChange={(event) => {
-                        setChannelIds((current) =>
-                          event.target.checked ? [...current, channel.id] : current.filter((id) => id !== channel.id),
-                        );
+                        if (event.target.checked) setChannelIds([channel.id]);
                       }}
                     />
                     {channel.name} · {platformName(channel.platform)}

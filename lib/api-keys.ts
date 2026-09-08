@@ -10,6 +10,7 @@ export function publicApiKey(key: ApiKey) {
     name: key.name,
     prefix: key.prefix,
     createdAt: key.createdAt,
+    expiresAt: key.expiresAt || null,
     lastUsedAt: key.lastUsedAt || null,
   };
 }
@@ -24,6 +25,7 @@ export async function createApiKey(userId: string, name: string) {
     prefix: `${PREFIX}${secret.slice(0, 4)}`,
     hash: hashApiKey(token),
     createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
   };
   const created = await updateStore((data) => {
     const mine = (data.apiKeys || []).filter((key) => key.userId === userId);
@@ -44,6 +46,20 @@ export async function listApiKeys(userId: string) {
     .map(publicApiKey);
 }
 
+/**
+ * The single key ScrollShow itself hands out during onboarding. Recreated each
+ * time (the secret is never stored), and it replaces its predecessor so a user
+ * redoing onboarding can never hit the 10-key ceiling.
+ */
+export async function rotateOnboardingKey(userId: string) {
+  await updateStore((data) => {
+    data.apiKeys = (data.apiKeys || []).filter((key) => !(key.userId === userId && key.name === ONBOARDING_KEY_NAME));
+  });
+  return createApiKey(userId, ONBOARDING_KEY_NAME);
+}
+
+export const ONBOARDING_KEY_NAME = "ScrollShow";
+
 export async function revokeApiKey(userId: string, id: string) {
   await updateStore((data) => {
     data.apiKeys = (data.apiKeys || []).filter((key) => !(key.id === id && key.userId === userId));
@@ -55,10 +71,12 @@ export async function resolveApiKey(token: string): Promise<SessionUser | null> 
   if (!value.startsWith(PREFIX)) return null;
   const hash = hashApiKey(value);
   return updateStore((data) => {
+    if (data.restoreReviewRequired) return null;
     const found = (data.apiKeys || []).find((key) => hashesEqual(key.hash, hash));
     if (!found) return null;
+    if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) return null;
     const user = data.users.find((item) => item.id === found.userId);
-    if (!user) return null;
+    if (!user || user.deletionPendingAt || !user.emailVerifiedAt) return null;
     found.lastUsedAt = new Date().toISOString();
     return publicUser(user);
   });

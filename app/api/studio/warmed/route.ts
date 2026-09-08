@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { readStore, updateStore } from "@/lib/store";
 import { findListing, WARMED_CATALOG } from "@/lib/warmed";
 import type { WarmedOrder } from "@/lib/types";

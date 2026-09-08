@@ -5,6 +5,8 @@
 
 import { resolveSettings } from "./settings";
 import { readStore } from "./store";
+import { hasStudioAccess } from "./plans";
+import { signedMediaUrl } from "./media-access";
 import { absoluteAssetUrl, initPhotoPost, queryCreatorInfo, TikTokApiError } from "./tiktok";
 import { loadTikTokChannel } from "./tiktok-account";
 import {
@@ -32,9 +34,14 @@ export async function loadCreator(accessToken: string): Promise<{ creator: Creat
 
 export async function directPostPhotos(
   userId: string,
-  input: { photos: string[]; description: string; options: TikTokPostOptions },
+  input: { photos: string[]; description: string; options: TikTokPostOptions; channelId?: string },
 ) {
-  const channel = await loadTikTokChannel(userId);
+  const data = await readStore(true);
+  if (data.restoreReviewRequired) throw new PublishError("restoration_review_required", 503);
+  if (process.env.VERCEL_ENV === "preview" && process.env.ALLOW_PREVIEW_PUBLISH !== "1") throw new PublishError("preview_publishing_disabled", 403);
+  const user = data.users.find(u => u.id === userId);
+  if (!user || user.deletionPendingAt || !user.emailVerifiedAt || !hasStudioAccess(user.plan)) throw new PublishError("verified_paid_account_required", 403);
+  const channel = await loadTikTokChannel(userId, input.channelId);
   if (!channel?.accessToken) throw new PublishError("tiktok_not_connected", 401);
   if (!input.photos.length) throw new PublishError("photos_required");
 
@@ -54,7 +61,7 @@ export async function directPostPhotos(
       source_info: {
         source: "PULL_FROM_URL",
         photo_cover_index: 0,
-        photo_images: input.photos.map(absoluteAssetUrl),
+        photo_images: input.photos.map(url => signedMediaUrl(absoluteAssetUrl(url), process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io")),
       },
       post_mode: "DIRECT_POST",
       media_type: "PHOTO",
@@ -69,5 +76,6 @@ export async function directPostPhotos(
     }
     throw error;
   }
-  return { publishId: String(result.publish_id || ""), creator, channel, raw: result };
+  if (!result.publish_id) throw new PublishError("publish_result_unknown", 502);
+  return { publishId: String(result.publish_id), creator, channel, raw: result };
 }

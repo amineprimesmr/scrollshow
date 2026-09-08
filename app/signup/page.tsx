@@ -112,7 +112,7 @@ function SignupForm() {
         setError("Could not sign in. Try again.");
         return;
       }
-      router.push(afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false));
+      router.push(json.user?.emailVerified ? afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false) : "/verify-email");
       return;
     }
     if (res.status === 409) {
@@ -120,10 +120,10 @@ function SignupForm() {
       return;
     }
     if (!res.ok) {
-      setError("Use a valid email and a password with at least 8 characters.");
+      setError(res.status === 503 ? "Email delivery is temporarily unavailable. Please try again later." : "Use a valid email and a password with at least 8 characters.");
       return;
     }
-    router.push(afterAuthPath(json.user?.plan, next || "/pricing", false));
+    router.push("/verify-email");
   }
 
   return (
@@ -138,7 +138,7 @@ function SignupForm() {
             {signin ? "Sign in to ScrollShow" : "Create your ScrollShow Account"}
           </h1>
           <p className="ss-signup__sub">
-            {signin ? "Welcome back. Pick up where you left off." : "Choose a plan next. 3-day trial, then subscribe to open the studio."}
+            {signin ? "Welcome back. Pick up where you left off." : "Create your account, then choose and pay for your plan to open the studio."}
           </p>
 
           {!signin && step === "password" ? (
@@ -191,6 +191,7 @@ function SignupForm() {
           ) : null}
 
           {error || queryError ? <p className="ss-signup__error">{error || queryError}</p> : null}
+          {signin && <p><Link href="/recover">Mot de passe oublié ? / Forgot password?</Link></p>}
           <button className="ss-signup__submit" type="submit" disabled={pending}>
             {pending ? "…" : signin ? "Sign in" : step === "email" ? "Continue with Email" : "Create account"}
           </button>

@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { reconcilePublishId } from "@/lib/publish-queue";
 import { tiktokUserId } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";

@@ -1,7 +1,8 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { usedMediaUrls } from "@/lib/media-usage";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
+import { queueDeletedMedia } from "@/lib/media-cleanup";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await readSession();
@@ -14,6 +15,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const used = usedMediaUrls(data.posts.filter((post) => post.userId === session.id));
     if (used.has(item.url)) return "in_use" as const;
     data.media = data.media.filter((entry) => entry.id !== id);
+    queueDeletedMedia(data, item);
     return "deleted" as const;
   });
 

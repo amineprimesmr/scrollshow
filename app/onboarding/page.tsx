@@ -273,8 +273,7 @@ function OnboardingInner() {
   /* ── step 2 · AI ─────────────────────────────────────────────────────── */
   useEffect(() => {
     if (step !== 2 || token) return;
-    fetch("/api/keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Onboarding" }) })
-      .then((res) => res.json())
+    post({ action: "key" })
       .then((json) => setToken(json.token || ""))
       .catch(() => setToken(""));
   }, [step, token]);

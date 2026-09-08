@@ -10,7 +10,7 @@ import type {
 
 export const overlayInputSchema = z.object({
   id: z.string().optional(),
-  text: z.string().optional(),
+  text: z.string().max(2000).optional(),
   fontFamily: z.string().optional(),
   fontSize: z.number().optional(),
   fontWeight: z.union([z.number(), z.string()]).optional(),
@@ -32,7 +32,7 @@ export const slideInputSchema = z.object({
   keepPhoto: z.boolean().optional(),
   html: z.string().optional(),
   css: z.string().optional(),
-  overlays: z.array(overlayInputSchema).optional(),
+  overlays: z.array(overlayInputSchema).max(30).optional(),
 });
 
 export const recipeInputSchema = z.object({
@@ -44,7 +44,7 @@ export const recipeInputSchema = z.object({
   prompt: z.string().optional(),
   editable: z.boolean().optional(),
   replaceSlides: z.boolean().optional(),
-  slides: z.array(slideInputSchema).optional(),
+  slides: z.array(slideInputSchema).max(35).optional(),
 });
 
 export type RecipeInput = z.infer<typeof recipeInputSchema>;
@@ -349,6 +349,7 @@ function overlayLooksBroken(text: string) {
 }
 
 export function needsRasterize(recipe: CarouselRecipe) {
+  if (recipe.html || recipe.css || recipe.slides.some(s => s.html || s.css)) throw new Error("html_recipe_export_unsupported_use_overlays");
   // A slide only ever publishes as a raw upload of slide.image when it needs
   // neither: a flat/gradient background (no real photo — image would be empty,
   // photosOf() would silently drop the slide) nor overlay text (would be lost,

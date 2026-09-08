@@ -1,5 +1,5 @@
 import { agentImportTikTok, agentListMarketplace, AgentError } from "@/lib/agent";
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { ImportError } from "@/lib/tiktok-import";
 import { NextResponse } from "next/server";
 

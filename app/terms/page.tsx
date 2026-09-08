@@ -1,124 +1,23 @@
 import { LegalShell } from "@/components/LegalShell";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Terms of Service",
-  description: "ScrollShow terms: connect TikTok via Login Kit and publish photo carousels with the Content Posting API.",
-};
-
+import { LEGAL } from "@/lib/legal";
+import Link from "next/link";
+export const metadata = { title: "Conditions générales de vente et d’utilisation" };
 export default function TermsPage() {
-  return (
-    <LegalShell titleFr="Conditions d’utilisation" titleEn="Terms of Service" childrenFr={<Fr />} childrenEn={<En />} />
-  );
+  return <LegalShell titleFr="Conditions générales de vente et d’utilisation" titleEn="Terms of sale and use" childrenFr={<Terms/>} childrenEn={<Terms english/>}/>;
 }
-
-function Fr() {
-  return (
-    <div>
-      <p>
-        Les présentes conditions régissent l’accès à <strong>ScrollShow</strong> (
-        <a href="https://scrollshow.io">https://scrollshow.io</a>), un outil web pour les créateurs TikTok.
-        En créant un compte ou en utilisant le service, vous acceptez ces conditions.
-      </p>
-      <h2>1. Objet</h2>
-      <p>
-        ScrollShow permet de <strong>connecter un compte TikTok</strong> via le Login Kit officiel, de consulter
-        le profil, les statistiques et la liste des posts, puis de <strong>publier des carrousels photo</strong> via
-        l’API Content Posting TikTok (Direct Post). Vous restez responsable du contenu publié et du respect des
-        Community Guidelines TikTok.
-      </p>
-      <h2>2. Compte</h2>
-      <ul>
-        <li>Vous créez un compte avec e-mail et mot de passe.</li>
-        <li>Vous êtes responsable de votre session.</li>
-        <li>
-          Vous pouvez demander la suppression de votre compte à <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a>.
-        </li>
-      </ul>
-      <h2>3. TikTok</h2>
-      <p>
-        La connexion TikTok est optionnelle. Elle utilise OAuth (Login Kit) et les scopes :{" "}
-        <code>user.info.basic</code>, <code>user.info.profile</code>, <code>user.info.stats</code>,{" "}
-        <code>video.list</code>, <code>video.upload</code>, <code>video.publish</code>. Aucun mot de passe TikTok
-        n’est collecté. La publication n’a lieu qu’après une action explicite dans l’app.
-      </p>
-      <p>
-        Redirection OAuth : <code>https://scrollshow.io/tiktok/callback</code>. Déconnexion et révocation du jeton
-        depuis Réglages.
-      </p>
-      <h2>4. Utilisation acceptable</h2>
-      <ul>
-        <li>Pas d’usage illégal, spam, harcèlement, ou contournement de sécurité.</li>
-        <li>Pas de publication de contenus interdits par TikTok ou la loi.</li>
-        <li>Pas de revente du service ni d’accès non autorisé aux APIs.</li>
-      </ul>
-      <h2>5. Disponibilité et responsabilité</h2>
-      <p>
-        Le service est fourni « en l’état ». Nous ne garantissons pas une disponibilité ininterrompue. Dans les
-        limites légales, la responsabilité de ScrollShow est limitée aux montants payés sur les 12 derniers mois.
-      </p>
-      <h2>6. Droit applicable</h2>
-      <p>Droit français. Tribunaux français, sous réserve des règles impératives de protection des consommateurs.</p>
-      <h2>7. Contact</h2>
-      <p>
-        <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a> · <a href="https://scrollshow.io/support">Support</a> ·{" "}
-        <a href="https://scrollshow.io/privacy">Confidentialité</a>
-      </p>
-    </div>
-  );
-}
-
-function En() {
-  return (
-    <div>
-      <p>
-        These terms govern access to <strong>ScrollShow</strong> (
-        <a href="https://scrollshow.io">https://scrollshow.io</a>), a web tool for TikTok creators. By creating an
-        account or using the service, you agree to these terms.
-      </p>
-      <h2>1. Purpose</h2>
-      <p>
-        ScrollShow lets you <strong>connect a TikTok account</strong> via official Login Kit, view profile, stats,
-        and posts, then <strong>publish photo carousels</strong> via the TikTok Content Posting API (Direct Post).
-        You remain responsible for published content and TikTok Community Guidelines.
-      </p>
-      <h2>2. Account</h2>
-      <ul>
-        <li>You create an account with email and password.</li>
-        <li>You are responsible for your session.</li>
-        <li>
-          You may request account deletion at <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a>.
-        </li>
-      </ul>
-      <h2>3. TikTok</h2>
-      <p>
-        TikTok connection is optional. It uses OAuth (Login Kit) and scopes: <code>user.info.basic</code>,{" "}
-        <code>user.info.profile</code>, <code>user.info.stats</code>, <code>video.list</code>,{" "}
-        <code>video.upload</code>, <code>video.publish</code>. We never collect your TikTok password. Publishing
-        happens only after an explicit action in the app.
-      </p>
-      <p>
-        OAuth redirect: <code>https://scrollshow.io/tiktok/callback</code>. Disconnect and token revoke from
-        Settings.
-      </p>
-      <h2>4. Acceptable use</h2>
-      <ul>
-        <li>No illegal use, spam, harassment, or security circumvention.</li>
-        <li>No content banned by TikTok or by law.</li>
-        <li>No resale of the service or unauthorized API access.</li>
-      </ul>
-      <h2>5. Availability and liability</h2>
-      <p>
-        The service is provided as-is. We do not guarantee uninterrupted availability. To the extent allowed by
-        law, ScrollShow’s liability is limited to amounts paid in the last 12 months.
-      </p>
-      <h2>6. Governing law</h2>
-      <p>French law. French courts, subject to mandatory consumer-protection rules.</p>
-      <h2>7. Contact</h2>
-      <p>
-        <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a> · <a href="https://scrollshow.io/support">Support</a> ·{" "}
-        <a href="https://scrollshow.io/privacy">Privacy</a>
-      </p>
-    </div>
-  );
+function Terms({english=false}:{english?:boolean}) {
+  const t=(fr:string,en:string)=>english?en:fr;
+  return <div>
+    <p>{t("Version contractuelle", "Contract version")} : {LEGAL.version}. {LEGAL.tradeName}, {LEGAL.proprietor}, {LEGAL.registry}, {LEGAL.address}. <Link href="/legal-notice">{t("Mentions légales", "Legal notice")}</Link>.</p>
+    <h2>1. {t("Service", "Service")}</h2><p>{t("ScrollShow fournit recherche de comptes TikTok publics, création de carrousels, bibliothèque, calendrier et outils MCP. La découverte dépend des sources indexées ; les mesures portent sur un échantillon daté. Aucun résultat de vues ou de revenus n’est garanti. Le service n’est pas affilié à TikTok et ne pilote pas le Chrome local.", "ScrollShow provides public TikTok account research, carousel creation, a library, calendar and MCP tools. Discovery relies on indexed sources; metrics describe dated samples. Views and income are not guaranteed. The service is not affiliated with TikTok and does not control local Chrome.")}</p>
+    <h2>2. {t("Prix et durée", "Prices and duration")}</h2><p>{t("29 € par mois, renouvelés automatiquement jusqu’à résiliation, ou 99 € en une fois sans renouvellement. L’accès à vie couvre la durée d’exploitation du SaaS ScrollShow par PROCESS ; ce n’est pas une licence perpétuelle de logiciel téléchargeable. Toute cessation du service reste soumise aux droits impératifs des clients.", "€29 per month, automatically renewed until cancellation, or €99 once with no renewal. Lifetime access covers the operating lifetime of the ScrollShow SaaS run by PROCESS, not a perpetual downloadable software licence. Service cessation remains subject to mandatory customer rights.")}</p><p>{t("Le premier paiement est dû à la souscription. Les abonnements aux assistants IA sont séparés.", "The first payment is due on subscription. AI assistant subscriptions are separate.")}</p>
+    <h2>3. {t("Quotas et accès", "Quotas and access")}</h2><p>{t("Par utilisateur sur 24 heures : 30 analyses, 10 découvertes, 20 reconstructions, 30 rendus et 20 exports. API : 120 requêtes par minute. Les limites et autorisations TikTok s’ajoutent à ces quotas. Une adresse email confirmée est requise. L’accès démarre après confirmation du paiement par Stripe.", "Per user over 24 hours: 30 analyses, 10 discovery runs, 20 reconstructions, 30 renders and 20 exports. API: 120 requests per minute. TikTok limits and permissions also apply. A verified email is required. Access starts after Stripe confirms payment.")}</p>
+    <h2>4. {t("Commande et paiement", "Orders and payment")}</h2><p>{t("Le client choisit son offre et accepte les conditions avant paiement. Stripe traite les cartes ; PROCESS ne conserve pas le numéro complet. Le total et la périodicité sont récapitulés au paiement. La référence de commande, la version et la date d’acceptation des conditions sont conservées comme preuve.", "Customers choose an offer and accept the terms before payment. Stripe processes cards; PROCESS does not retain full card numbers. Checkout displays the total and renewal interval. Order references, the terms version and acceptance timestamp are retained as evidence.")}</p>
+    <h2>5. {t("Résiliation et rétractation", "Cancellation and withdrawal")}</h2><p>{t("Résiliez via Réglages → Facturation et le portail Stripe ; l’accès continue jusqu’à la fin de la période payée. Pour vous rétracter dans les 14 jours de la conclusion du contrat, écrivez au contact ci-dessous avec une déclaration claire, l’email du compte et la référence de commande. Aucun renoncement automatique n’est présumé. Les remboursements dus interviennent dans le délai légal, en principe sur le moyen de paiement initial.", "Cancel through Settings → Billing and the Stripe portal; access continues until the paid period ends. To withdraw within 14 days of contract conclusion, send a clear statement with your account email and order reference to the contact below. No automatic waiver is presumed. Due refunds are issued within the statutory period, normally to the original payment method.")}</p><p>{t("Modèle : « Je vous notifie ma rétractation du contrat ScrollShow conclu le [date], référence [commande], au nom de [nom], email du compte [email]. Date et signature si envoi papier. »", "Model: ‘I withdraw from my ScrollShow contract concluded on [date], order [reference], name [name], account email [email]. Date and signature for paper requests.’")}</p>
+    <h2>6. {t("Contenus et garanties", "Content and guarantees")}</h2><p>{t("Le client doit détenir les droits sur ses médias et vérifier ses posts. Programmer un post autorise son envoi à l’échéance au compte choisi ; les brouillons ne sont pas publiés. Un résultat ambigu demande vérification pour éviter un doublon. Usages illégaux, spam et contournement des protections des plateformes sont interdits. Les garanties légales de conformité des services numériques et autres droits impératifs des consommateurs restent applicables, sans exclusion.", "Customers must hold media rights and review posts. Scheduling authorizes sending at the chosen time to the selected account; drafts are not published. Ambiguous results require review to avoid duplicates. Illegal use, spam and bypassing platform protections are prohibited. Statutory digital-service conformity guarantees and mandatory consumer rights remain applicable without exclusion.")}</p>
+    <h2>7. {t("Réclamations", "Complaints")}</h2>
+    <p>{t("Réclamation écrite préalable à", "First send a written complaint to")} <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a> · {LEGAL.address}.</p>
+    {process.env.CONSUMER_MEDIATOR_NAME && process.env.CONSUMER_MEDIATOR_ADDRESS && process.env.CONSUMER_MEDIATOR_URL && <p>{process.env.CONSUMER_MEDIATOR_NAME} · {process.env.CONSUMER_MEDIATOR_ADDRESS} · <a href={process.env.CONSUMER_MEDIATOR_URL}>{t("Médiateur", "Mediator")}</a></p>}
+    <p>{t("Droit français, sans supprimer les protections impératives du pays de résidence du consommateur ni les règles légales de compétence juridictionnelle.", "French law applies without removing mandatory protections in the consumer's country of residence or statutory jurisdiction rules.")}</p><p><Link href="/privacy">{t("Confidentialité", "Privacy")}</Link></p>
+  </div>;
 }

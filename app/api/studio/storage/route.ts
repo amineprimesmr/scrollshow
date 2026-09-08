@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { sizesOf } from "@/lib/media-size";
 import { usedMediaUrls } from "@/lib/media-usage";
 import { readStore } from "@/lib/store";

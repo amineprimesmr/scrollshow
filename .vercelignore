@@ -1,0 +1,8 @@
+.env*
+.data/
+.claude/
+.cursor/
+.agents/
+docs/
+tests/
+*.log

@@ -1,4 +1,5 @@
 import { savePublicImage } from "./media-files";
+import { safeFetchBytes } from "./safe-fetch";
 
 const UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -56,10 +57,7 @@ export function parseTikTokUrl(raw: string) {
 async function resolveUrl(input: string) {
   const start = parseTikTokUrl(input);
   try {
-    const res = await fetch(start, {
-      headers: tiktokHeaders(),
-      redirect: "follow",
-    });
+    const res = await safeFetchBytes(start, { maxBytes: 5000000, headers: tiktokHeaders() as Record<string, string> });
     return res.url || start;
   } catch {
     return start;
@@ -186,11 +184,11 @@ async function oembed(url: string) {
 }
 
 async function downloadImage(url: string) {
-  const res = await fetch(url, { headers: tiktokHeaders({ Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" }) });
-  if (!res.ok) throw new ImportError("image_download_failed");
-  const bytes = Buffer.from(await res.arrayBuffer());
+  const res = await safeFetchBytes(url, { headers: tiktokHeaders({ Accept: "image/*" }) as Record<string, string> });
+  const bytes = res.bytes;
   if (bytes.length < 32) throw new ImportError("image_download_failed");
-  const contentType = res.headers.get("content-type") || "image/jpeg";
+  const contentType = res.contentType;
+  if (!contentType.startsWith("image/")) throw new ImportError("image_format_invalid");
   try {
     return await savePublicImage(bytes, contentType, url);
   } catch {
@@ -200,8 +198,8 @@ async function downloadImage(url: string) {
 
 export async function importTikTokFromUrl(input: string): Promise<ImportedTikTok> {
   const canonical = await resolveUrl(input);
-  const page = await fetch(canonical, { headers: tiktokHeaders() });
-  const html = await page.text();
+  const page = await safeFetchBytes(canonical, { maxBytes: 5000000, headers: tiktokHeaders() as Record<string, string> });
+  const html = page.bytes.toString("utf8");
   const item =
     pickItem(scriptJson(html, "__UNIVERSAL_DATA_FOR_REHYDRATION__")) ||
     pickItem(scriptJson(html, "SIGI_STATE")) ||

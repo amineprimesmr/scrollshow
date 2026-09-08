@@ -143,8 +143,8 @@ function ViewsHero({ english }: { english: boolean }) {
             {t("Formats qui convertissent", "Formats that convert", english)}
           </p>
           <h1 className="af-ld-views__title">
-            {t("Obtiens 1,2M vues", "Get 1.2M views", english)}
-            <em>{t("par semaine", "every week", english)}</em>
+            {t("Crée des carrousels", "Create carousels", english)}
+            <em>{t("pour ton business", "for your business", english)}</em>
           </h1>
           <p className="af-ld-hero-sub">
             {t(
@@ -217,8 +217,8 @@ export function Landing() {
       id: "free",
       q: t("Je dois payer ?", "Do I have to pay?", english),
       a: t(
-        "3 jours d’essai offerts sur Starter, Creator et Pro. Ensuite un abonnement est obligatoire pour ouvrir le studio.",
-        "3-day trial on Starter, Creator, and Pro. After that a subscription is required to open the studio.",
+        "29 € par mois, ou 99 € en un paiement pour l’accès à vie. Accès après paiement.",
+        "€29 per month, or €99 once for lifetime access. Access after payment.",
         english,
       ),
     },
@@ -284,7 +284,7 @@ export function Landing() {
                   </div>
                 </div>
                 <h3>1 - {t("Crée ton espace", "Create your workspace", english)}</h3>
-                <p>{t("Choisis un plan, 3 jours d’essai, puis tu ouvres le studio.", "Pick a plan, 3-day trial, then you open the studio.", english)}</p>
+                <p>{t("Choisis ton offre et règle ton achat pour ouvrir le studio.", "Choose your plan and complete payment to open the studio.", english)}</p>
               </article></Beam>
               <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
@@ -296,7 +296,7 @@ export function Landing() {
                   </div>
                 </div>
                 <h3>2 - {t("Connecte TikTok", "Connect TikTok", english)}</h3>
-                <p>{t("Login Kit officiel. Profil, stats, liste de posts — les 6 scopes.", "Official Login Kit. Profile, stats, post list — all 6 scopes.", english)}</p>
+                <p>{t("Autorise ton compte TikTok pour retrouver ton profil et tes publications.", "Authorize your TikTok account to access your profile and posts.", english)}</p>
               </article></Beam>
               <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
@@ -306,7 +306,7 @@ export function Landing() {
                   </div>
                 </div>
                 <h3>3 - {t("Publie le carrousel", "Publish the carousel", english)}</h3>
-                <p>{t("Privacy, disclosure, Direct Post. Tes stats reviennent dans Analytics.", "Privacy, disclosure, Direct Post. Stats land back in Analytics.", english)}</p>
+                <p>{t("Choisis ton compte, la visibilité et le créneau. Suis ensuite le résultat de chaque publication.", "Choose your account, visibility and time. Then track each publication’s result.", english)}</p>
               </article></Beam>
             </div>
           </div>
@@ -314,14 +314,14 @@ export function Landing() {
 
         <section id="reseaux" className="af-ld-networks" aria-label={t("Plateformes", "Platforms", english)}>
           <p className="af-ld-networks__title">
-            {t("Les automatisations fonctionnent avec", "Automations work with", english)}
+            {t("Publie sur TikTok, crée avec ton assistant", "Publish on TikTok, create with your assistant", english)}
           </p>
           <ul className="af-ld-networks__row">
             {[
               { id: "tiktok", name: "TikTok", src: "/assets/platforms/tiktok.png" },
-              { id: "instagram", name: "Instagram", src: "/assets/platforms/instagram.png" },
-              { id: "facebook", name: "Facebook", src: "/assets/platforms/facebook.png" },
-              { id: "x", name: "X", src: "/assets/platforms/x.png" },
+              { id: "claude", name: "Claude", src: "/assets/ai/claude.png" },
+              { id: "cursor", name: "Cursor", src: "/assets/ai/cursor.png" },
+              { id: "codex", name: "Codex", src: "/assets/ai/codex.png" },
             ].map((brand) => (
               <li key={brand.id}>
                 <span className={`af-ld-networks__brand${brand.id === "x" ? " is-x" : ""}${brand.id === "facebook" ? " is-facebook" : ""}`}>
@@ -353,16 +353,16 @@ export function Landing() {
               </span>
             </div>
             <article className="af-ld-offer__card">
-              <p className="af-ld-offer__kicker">{t("Essai 3 jours — puis un abonnement", "3-day trial — then a subscription", english)}</p>
+              <p className="af-ld-offer__kicker">{t("Mensuel ou à vie", "Monthly or lifetime", english)}</p>
               <p className="af-ld-offer__price-row">
-                <span className="af-ld-offer__price">0 €</span>
-                <span>{t("pendant 3 jours, ensuite à partir de 29,99 € / mois", "for 3 days, then from €29.99 / month", english)}</span>
+                <span className="af-ld-offer__price">29 €</span>
+                <span>{t("par mois, ou 99 € à vie", "per month, or €99 lifetime", english)}</span>
               </p>
               <ul>
                 {[
                   t("Bibliothèque Keep / Watch / Skip", "Keep / Watch / Skip library", english),
-                  t("Découvertes par mots-clés", "Keyword discoveries", english),
-                  t("Starter, Creator ou Pro — tu choisis avant d’entrer", "Starter, Creator, or Pro — you choose before you enter", english),
+                  t("Analyse de comptes et formats TikTok", "TikTok account and format analysis", english),
+                  t("Claude, Cursor et Codex via MCP", "Claude, Cursor and Codex via MCP", english),
                   t("FR + EN", "FR + EN", english),
                 ].map((item) => (
                   <li key={item}>
@@ -463,8 +463,8 @@ export function Landing() {
                 <Logo size={28} />
                 <span>ScrollShow</span>
               </Link>
-              <a className="af-ld-footer__email" href="mailto:hello@scrollshow.io">
-                hello@scrollshow.io
+              <a className="af-ld-footer__email" href="mailto:aminennasri@outlook.com">
+                aminennasri@outlook.com
               </a>
             </div>
             <section>

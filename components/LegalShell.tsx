@@ -25,11 +25,12 @@ export async function LegalShell({
         </Link>
         <h1>{t(titleFr, titleEn, english)}</h1>
         <p className="ss-legal__meta">
-          {t("Dernière mise à jour : 23 août 2026", "Last updated: August 23, 2026", english)} ·{" "}
+          {t("Dernière mise à jour : 8 septembre 2026", "Last updated: September 8, 2026", english)} ·{" "}
           <Link href="/">{t("Accueil", "Home", english)}</Link> ·{" "}
           <Link href="/terms">{t("Conditions", "Terms", english)}</Link> ·{" "}
           <Link href="/privacy">{t("Confidentialité", "Privacy", english)}</Link> ·{" "}
           <Link href="/support">Support</Link>
+          {" · "}<Link href="/legal-notice">{t("Mentions légales", "Legal notice", english)}</Link>
         </p>
         {english ? childrenEn : childrenFr}
       </div>

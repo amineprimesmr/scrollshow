@@ -148,14 +148,15 @@ export async function revokeAccessToken(accessToken: string) {
     client_secret: clientSecret,
     token: accessToken,
   });
-  try {
-    await fetch(REVOKE_URL, {
+  {
+    const response = await fetch(REVOKE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      signal: AbortSignal.timeout(10000),
     });
-  } catch {
-    // best-effort revoke
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.error || (result.data?.error_code && result.data.error_code !== 0)) throw new Error("tiktok_revocation_failed");
   }
 }
 

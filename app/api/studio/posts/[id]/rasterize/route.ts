@@ -1,5 +1,5 @@
 import { AgentError, agentRasterizePost } from "@/lib/agent";
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { recipeInputSchema, normalizeRecipe } from "@/lib/recipe";
 import { NextResponse } from "next/server";
 

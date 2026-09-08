@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { revokeMetaToken } from "@/lib/meta";
 import { updateStore } from "@/lib/store";
 import { revokeXToken } from "@/lib/x";

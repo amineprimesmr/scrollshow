@@ -1,9 +1,12 @@
-import { get, put } from "@vercel/blob";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { del, get, put } from "@vercel/blob";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
+import { safeFetchBytes } from "./safe-fetch";
+import { blobToken } from "./blob-config";
 
 function useBlob() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+  if (process.env.NODE_ENV !== "production" && process.env.SCROLLSHOW_USE_BLOB !== "1" && !process.env.DATABASE_URL) return false;
+  return Boolean(blobToken() || process.env.BLOB_STORE_ID);
 }
 
 function extFrom(contentType: string, url: string) {
@@ -31,6 +34,7 @@ export async function savePublicImage(bytes: Buffer, contentType: string, source
   const name = `${crypto.randomUUID()}.${ext}`;
   if (useBlob()) {
     await put(blobPath(name), bytes, {
+      token: blobToken(),
       access: "private",
       contentType: mimeFrom(ext),
       addRandomSuffix: false,
@@ -38,7 +42,7 @@ export async function savePublicImage(bytes: Buffer, contentType: string, source
     });
     return `/api/i/${name}`;
   }
-  const dir = path.join(process.cwd(), ".data", "imports");
+  const dir = path.join(process.env.SCROLLSHOW_DATA_DIR || path.join(process.cwd(), ".data"), "imports");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), bytes);
   return `/api/i/${name}`;
@@ -49,7 +53,9 @@ export async function readSlideBytes(url: string) {
   if (name) return readImportedFile(name);
   if (url.startsWith("/")) {
     try {
-      const file = path.join(process.cwd(), "public", url.replace(/^\//, ""));
+      const root = path.resolve(process.cwd(), "public");
+      const file = path.resolve(root, decodeURIComponent(url).replace(/^\//, ""));
+      if (!file.startsWith(root + path.sep)) return null;
       const bytes = await readFile(file);
       const ext = file.split(".").pop() || "jpg";
       return { bytes, contentType: mimeFrom(ext) };
@@ -58,10 +64,9 @@ export async function readSlideBytes(url: string) {
     }
   }
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const bytes = Buffer.from(await res.arrayBuffer());
-    return { bytes, contentType: res.headers.get("content-type") || "image/jpeg" };
+    const res = await safeFetchBytes(url);
+    if (!res.contentType.startsWith("image/")) return null;
+    return { bytes: res.bytes, contentType: res.contentType };
   } catch {
     return null;
   }
@@ -72,7 +77,7 @@ export async function readImportedFile(name: string) {
   const ext = name.split(".").pop() || "jpg";
   if (useBlob()) {
     try {
-      const result = await get(blobPath(name), { access: "private", useCache: true });
+      const result = await get(blobPath(name), { access: "private", useCache: true, token: blobToken() });
       if (!result?.stream) return null;
       const bytes = Buffer.from(await new Response(result.stream).arrayBuffer());
       return { bytes, contentType: mimeFrom(ext) };
@@ -81,10 +86,19 @@ export async function readImportedFile(name: string) {
     }
   }
   try {
-    const file = path.join(process.cwd(), ".data", "imports", name);
+    const file = path.join(process.env.SCROLLSHOW_DATA_DIR || path.join(process.cwd(), ".data"), "imports", name);
     const bytes = await readFile(file);
     return { bytes, contentType: mimeFrom(ext) };
   } catch {
     return null;
+  }
+}
+
+export async function deleteImportedFile(name: string) {
+  if (!/^[a-zA-Z0-9._-]+$/.test(name) || name.includes("..")) throw new Error("invalid_media_name");
+  if (useBlob()) await del(blobPath(name), { token: blobToken() });
+  else {
+    const file = path.join(process.env.SCROLLSHOW_DATA_DIR || path.join(process.cwd(), ".data"), "imports", name);
+    await unlink(file).catch(error => { if (error.code !== "ENOENT") throw error; });
   }
 }

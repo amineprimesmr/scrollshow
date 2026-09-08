@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { resolveStoreUserId } from "@/lib/local-user";
 import { isLocalDemoToken, localDemoEnabled, localDemoProfile } from "@/lib/local-demo";
 import { readStore } from "@/lib/store";

@@ -22,9 +22,12 @@ import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
 import { coerceOptions, type TikTokPostOptions } from "./tiktok-compliance";
 import { directPostPhotos, PublishError } from "./tiktok-publish";
-import { readStore, updateStore } from "./store";
+import { readStore, updateStore, localStoreEnabled } from "./store";
 import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
 import type { RecipeInput } from "./recipe";
+import { assertEditable, validatePost } from "./post-validation";
+import { consumeLimit } from "./rate-limit";
+import { queueDeletedMedia } from "./media-cleanup";
 
 export class AgentError extends Error {
   constructor(
@@ -36,10 +39,12 @@ export class AgentError extends Error {
 }
 
 export async function agentWhoami(user: SessionUser) {
-  const channel = await loadTikTokChannel(user.id);
+  const channel = (await loadTikTokChannels(user.id))[0];
   const data = await readStore();
   const business = data.users.find((item) => item.id === user.id)?.business || null;
   return {
+    capabilities: { research: true, discovery: Boolean(process.env.BRAVE_SEARCH_API_KEY), detailedMetrics: Boolean(process.env.MONID_API_KEY), export: true, publishing: "tiktok", htmlExport: false },
+    limits: { analysesPerDay: 30, discoveriesPerDay: 10, exportsPerDay: 20 },
     user: { id: user.id, email: user.email, name: user.name, plan: user.plan },
     business: business
       ? {
@@ -74,7 +79,7 @@ export async function agentChannels(user: SessionUser) {
 export async function agentMedia(user: SessionUser) {
   return updateStore((data) => {
     let media = data.media.filter((item) => item.userId === user.id);
-    if (!media.length) {
+    if (!media.length && process.env.NODE_ENV !== "production" && localStoreEnabled()) {
       const seeded = seedStudio(user.id);
       data.media.push(...seeded.media);
       media = seeded.media;
@@ -108,22 +113,8 @@ export async function agentCreatePost(
   const caption = input.caption.trim();
   if (!caption) throw new AgentError("caption_required");
   const channels = await agentChannels(user);
-  let channelId = input.channelId || channels.find((item) => item.connected)?.id || channels[0]?.id;
-  if (!channelId) {
-    const created = await updateStore((data) => {
-      const channel = {
-        id: crypto.randomUUID(),
-        userId: user.id,
-        platform: "tiktok",
-        name: user.name || "TikTok",
-        handle: user.email.split("@")[0] || "creator",
-        avatar: "/assets/avatars/leo.png",
-      };
-      data.channels.unshift(channel);
-      return channel;
-    });
-    channelId = created.id;
-  }
+  const connected = channels.filter(c => c.connected && c.platform === "tiktok");
+  const channelId = input.channelId || (connected.length === 1 ? connected[0].id : undefined);
   const origin = input.origin || "ai";
   const photos = input.photo_images?.length
     ? input.photo_images
@@ -139,11 +130,11 @@ export async function agentCreatePost(
     const created: StudioPost = {
       id: crypto.randomUUID(),
       userId: user.id,
-      channelIds: [channelId],
+      channelIds: channelId ? [channelId] : [],
       body: caption.slice(0, 2200),
       date: input.date || now.toISOString().slice(0, 10),
       time: input.time || "18:00",
-      status: input.status || "scheduled",
+      status: input.status || "draft",
       image,
       views: 0,
       likes: 0,
@@ -157,6 +148,7 @@ export async function agentCreatePost(
       createdAt: now.toISOString(),
       tiktok: input.tiktok ? coerceOptions(input.tiktok, caption) : undefined,
     };
+    validatePost(data, created);
     data.posts.unshift(created);
     return created;
   });
@@ -182,6 +174,7 @@ export async function agentUpdatePost(
   const post = await updateStore((data) => {
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
     if (!found) return null;
+    assertEditable(found);
     if (input.caption) found.body = input.caption.slice(0, 2200);
     if (input.tiktok) found.tiktok = coerceOptions({ ...found.tiktok, ...input.tiktok }, found.body);
     if (input.date) found.date = input.date;
@@ -189,6 +182,7 @@ export async function agentUpdatePost(
     if (input.status) found.status = input.status;
     if (input.channelId) found.channelIds = [input.channelId];
     if (input.origin) found.origin = input.origin;
+    validatePost(data, found);
     const recipe = ensureRecipe(found);
     if (input.recipe) {
       found.recipe = applyRecipePatch(recipe, input.recipe);
@@ -234,6 +228,7 @@ export async function agentUpdateRecipe(
         item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
     );
     if (!found) return null;
+    assertEditable(found);
     found.recipe = applyRecipePatch(ensureRecipe(found), input);
     found.image = coverOf(found);
     if (input.caption) found.body = input.caption.slice(0, 2200);
@@ -246,16 +241,19 @@ export async function agentUpdateRecipe(
 }
 
 export async function agentReconstructPost(user: SessionUser, idOrShare: string) {
+  if (!(await consumeLimit(`reconstruct:${user.id}`, 20, 86400000))) throw new AgentError("daily_reconstruction_limit", 429);
   const data = await readStore();
   const found = data.posts.find(
     (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
   );
   if (!found) throw new AgentError("post_missing", 404);
   try {
+    assertEditable(found);
     const recipe = await reconstructRecipe(ensureRecipe(found));
     const post = await updateStore((store) => {
       const item = store.posts.find((entry) => entry.id === found.id && entry.userId === user.id);
       if (!item) return null;
+      assertEditable(item);
       item.recipe = recipe;
       item.image = coverOf(item);
       return item;
@@ -273,10 +271,12 @@ export async function agentRasterizePost(user: SessionUser, idOrShare: string, r
   const found = data.posts.find(
     (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
   );
-  if (!found && !recipePatch) throw new AgentError("post_missing", 404);
+  if (!found) throw new AgentError("post_missing", 404);
+  if (!(await consumeLimit(`render:${user.id}`, 30, 86400000))) throw new AgentError("daily_render_limit", 429);
   const recipe = recipePatch || ensureRecipe(found!);
   const photo_images = await rasterizeRecipe(recipe);
   if (!photo_images.length) throw new AgentError("photos_required");
+  await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => m.userId === user.id && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, url, name: `Slide ${index+1}`, createdAt: new Date().toISOString() }); }));
   return { photo_images, recipe };
 }
 
@@ -284,6 +284,7 @@ export async function agentEnsureShare(user: SessionUser, id: string) {
   const post = await updateStore((data) => {
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
     if (!found) return null;
+    found.shareEnabled = true;
     found.recipe = ensureRecipe(found);
     found.image = coverOf(found);
     if (!found.shareId) found.shareId = newShareId();
@@ -429,6 +430,7 @@ export async function agentSetVisibility(user: SessionUser, id: string, visibili
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
     if (!found) return null;
     found.visibility = visibility;
+    if (visibility === "private") { found.shareEnabled = false; found.shareId = newShareId(); }
     found.recipe = ensureRecipe(found);
     if (!found.shareId) found.shareId = newShareId();
     return found;
@@ -441,8 +443,10 @@ export async function agentSetCalendar(user: SessionUser, id: string, inCalendar
   const post = await updateStore((data) => {
     const found = data.posts.find((item) => item.id === id && item.userId === user.id);
     if (!found) return null;
+    assertEditable(found);
     found.inCalendar = inCalendar;
-    if (inCalendar && found.status === "draft") found.status = "scheduled";
+    // Calendar membership alone is not authorization to publish a draft.
+    if (!inCalendar && found.status === "scheduled") found.status = "draft";
     return found;
   });
   if (!post) throw new AgentError("post_missing", 404);
@@ -451,11 +455,14 @@ export async function agentSetCalendar(user: SessionUser, id: string, inCalendar
 
 export async function findPostByShareId(shareId: string) {
   const data = await readStore();
-  return data.posts.find((item) => item.shareId === shareId) || null;
+  return data.posts.find((item) => item.shareId === shareId && (item.visibility === "public" || item.shareEnabled === true)) || null;
 }
 
 export async function agentDeletePost(user: SessionUser, id: string) {
   const removed = await updateStore((data) => {
+    const post = data.posts.find(p => p.id === id && p.userId === user.id);
+    if (post) assertEditable(post);
+    if (post) queueDeletedMedia(data, post);
     const before = data.posts.length;
     data.posts = data.posts.filter((item) => !(item.id === id && item.userId === user.id));
     return before !== data.posts.length;
@@ -464,105 +471,35 @@ export async function agentDeletePost(user: SessionUser, id: string) {
   return { ok: true, id };
 }
 
-export async function agentPublish(
-  user: SessionUser,
-  input: {
-    caption: string;
-    title?: string;
-    id?: string;
-    photo_images?: string[];
-    image?: string;
-    privacy_level: string;
-    allow_comment?: boolean;
-    commercial_content?: boolean;
-    brand_organic?: boolean;
-    brand_content?: boolean;
-  },
-) {
-  const store = await readStore();
-  const media = await agentMedia(user);
-  let photos = (input.photo_images?.length ? input.photo_images : [input.image || media[0]?.url]).filter(
-    Boolean,
-  ) as string[];
-  let existingId: string | undefined;
+export async function agentPublish(user: SessionUser, input: {
+  caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
+  privacy_level: string; allow_comment?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
+}) {
+  const options = coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment,
+    commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption);
+  let id: string;
   if (input.id) {
-    const found = store.posts.find((item) => item.userId === user.id && (item.id === input.id || item.shareId === input.id));
-    if (found) {
-      existingId = found.id;
-      const recipe = ensureRecipe(found);
-      photos = needsRasterize(recipe) ? await rasterizeRecipe(recipe) : photosOf(recipe);
-    }
+    const found = (await readStore()).posts.find(p => p.userId === user.id && (p.id === input.id || p.shareId === input.id));
+    if (!found) throw new AgentError("post_missing", 404);
+    await updateStore(data => {
+      const p = data.posts.find(p => p.id === found.id)!;
+      if (p.publishId || ["PREPARING", "INITIATING", "PROCESSING", "REVIEW_REQUIRED"].includes(p.publishState || "")) throw new AgentError("publication_already_started", 409);
+      p.body = input.caption; p.tiktok = options;
+      if (input.channelId) p.channelIds = [input.channelId];
+    });
+    id = found.id;
+  } else {
+    const channels = await agentChannels(user);
+    const connected = channels.filter(c => c.platform === "tiktok" && c.connected);
+    const target = input.channelId || (connected.length === 1 ? connected[0].id : undefined);
+    if (!target) throw new AgentError("channel_required");
+    const p = await agentCreatePost(user, { caption: input.caption, channelId: target, status: "draft",
+      photo_images: input.photo_images, image: input.image, tiktok: options });
+    id = p.id;
   }
-  if (!photos.length) throw new AgentError("photos_required");
-  const caption = input.caption.trim().slice(0, 2200);
-  // The MCP caller is acting for the creator, so the creator's choices must be
-  // explicit here too — nothing is defaulted (privacy, comments, disclosure).
-  const options = coerceOptions(
-    {
-      title: input.title || "",
-      privacy: input.privacy_level,
-      allowComment: input.allow_comment,
-      commercial: input.commercial_content || input.brand_organic || input.brand_content,
-      brandOrganic: input.brand_organic,
-      brandContent: input.brand_content,
-    },
-    caption,
-  );
-  let publishId = "";
-  let channelId = "";
-  try {
-    const result = await directPostPhotos(user.id, { photos, description: caption, options });
-    publishId = result.publishId;
-    channelId = result.channel.id;
-  } catch (error) {
-    if (error instanceof PublishError) throw new AgentError(error.message, error.status);
-    throw error;
-  }
-  // content/init only queues the carousel; the cron reconciles publish_id into a
-  // real published/failed verdict.
-  const post = existingId
-    ? await updateStore((data) => {
-        const current = data.posts.find((item) => item.id === existingId);
-        if (!current) return null;
-        current.body = caption;
-        current.status = "published";
-        current.tiktok = options;
-        current.publishId = publishId;
-        current.publishState = "PROCESSING";
-        current.publishError = undefined;
-        current.publishedAt = new Date().toISOString();
-        return current;
-      })
-    : null;
-  const record =
-    post ||
-    (await (async () => {
-      const created = await agentCreatePost(user, {
-        caption,
-        channelId,
-        status: "published",
-        image: photos[0],
-        photo_images: photos,
-        date: new Date().toISOString().slice(0, 10),
-        time: new Date().toISOString().slice(11, 16),
-        tiktok: options,
-      });
-      await updateStore((data) => {
-        const current = data.posts.find((item) => item.id === created.id);
-        if (!current) return;
-        current.publishId = publishId;
-        current.publishState = "PROCESSING";
-        current.publishedAt = new Date().toISOString();
-      });
-      return (await readStore()).posts.find((item) => item.id === created.id) || null;
-    })());
-  return {
-    ok: true,
-    publish_id: publishId,
-    privacy: options.privacy,
-    post: record ? publicPost(record) : null,
-    note: "TikTok is processing the post; it may take a few minutes to appear on the profile. Poll publish status via list_posts.",
-  };
+  const { dispatchPost } = await import("./publication-jobs");
+  const result = await dispatchPost(user.id, id);
+  return { ok: true, publish_id: result.publishId, post: publicPost(result.post), note: "Processing. Use publish_status to confirm the final result." };
 }
 
 function dayKey(date: Date) {

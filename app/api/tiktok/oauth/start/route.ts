@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { buildAuthorizeUrl } from "@/lib/tiktok";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";

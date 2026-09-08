@@ -422,7 +422,8 @@ export function SettingsView() {
               </label>
               <label>
                 Email
-                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                <input type="email" value={email} readOnly required />
+                <a href="/change-email">{t("Modifier l’adresse avec double confirmation", "Change address with double confirmation", english)}</a>
               </label>
             </div>
             <p className="ss-muted">ID · {user.id}</p>
@@ -724,7 +725,7 @@ export function SettingsView() {
               <h2>{t("Abonnement & facturation", "Plan & billing", english)}</h2>
               <p className="ss-lead">
                 {t("Plan actuel", "Current plan", english)} : <b>{planMeta ? "ScrollShow" : "Free"}</b>
-                {planMeta ? ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}` : ""}
+                {user.plan === "lifetime" ? t(" · Accès à vie — 99 €", " · Lifetime access — €99", english) : planMeta ? ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}` : ""}
               </p>
               <ul className="ss-feat">
                 {(planMeta ? (english ? planMeta.featuresEn : planMeta.featuresFr) : english

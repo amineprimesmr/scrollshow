@@ -10,13 +10,22 @@ on:
 
 jobs:
   publish:
+    if: vars.PRODUCTION_AUTOMATIONS_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     steps:
       - name: Trigger ScrollShow publish queue
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          code=$(curl -sS -o /tmp/body -w '%{http_code}' \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://scrollshow.io/api/cron/publish)
-          cat /tmp/body
-          echo
-          test "$code" = "200"
+          test -n "$CRON_SECRET"
+          curl --fail --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://scrollshow.io/api/cron/publish
+      - name: Check scheduler and backup freshness
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://scrollshow.io/api/health

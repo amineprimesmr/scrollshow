@@ -1,4 +1,3 @@
-import { imageSize } from "image-size";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -147,7 +146,7 @@ async function getWorker() {
 }
 
 export async function captionsFromImage(bytes: Buffer) {
-  const size = imageSize(new Uint8Array(bytes));
+  const size = await sharp(bytes, { limitInputPixels: 40000000 }).metadata();
   const { png, width, height } = await strokeMask(bytes);
   const worker = await getWorker();
   await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO, user_defined_dpi: "72" });

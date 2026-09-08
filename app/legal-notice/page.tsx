@@ -1,0 +1,6 @@
+import { LegalShell } from "@/components/LegalShell";
+import { LEGAL } from "@/lib/legal";
+export default function LegalNoticePage() {
+  const body = <div><h2>Éditeur / Publisher</h2><p>{LEGAL.tradeName} — {LEGAL.proprietor}</p><p>{LEGAL.address}</p><p>SIREN : {LEGAL.siren} · SIRET : {LEGAL.siret} · {LEGAL.registry}</p><p><a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a> · <a href="tel:+33782637720">{LEGAL.telephone}</a></p><p>Directeur de publication / Publication director : Amine Ennasri.</p><h2>Hébergement / Hosting</h2><p>Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis. <a href="https://vercel.com/legal">Informations de l’hébergeur / Hosting information</a>.</p><h2>TVA / VAT</h2><p>Franchise en base de TVA déclarée lors de l’immatriculation : TVA non applicable, article 293 B du CGI, tant que les conditions de ce régime restent remplies. Les montants présentés au paiement correspondent au total dû.</p><h2>Réclamations / Complaints</h2><p>Contacter PROCESS à l’adresse électronique ci-dessus avec l’email du compte et la référence de commande, sans transmettre de mot de passe ni de numéro de carte.</p></div>;
+  return <LegalShell titleFr="Mentions légales" titleEn="Legal notice" childrenFr={body} childrenEn={body}/>;
+}

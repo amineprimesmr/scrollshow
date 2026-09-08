@@ -32,7 +32,7 @@ function TrialBanner() {
   if (!user || isPaidPlan(user.plan)) return null;
   return (
     <div className="ss-trial">
-      <span>{t("Essai gratuit · 7 jours restants", "Free trial · 7 days left", english)}</span>
+      <span>{t("Choisis une offre pour accéder au studio", "Choose a plan to access the studio", english)}</span>
       <Link href="/app/settings?tab=plan" className="ss-trial__btn">
         {t("Upgrade", "Upgrade", english)}
       </Link>

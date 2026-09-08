@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { readStore, updateStore } from "@/lib/store";
 import { US_CHECKLIST_IDS } from "@/lib/us-guide";
 import { NextResponse } from "next/server";

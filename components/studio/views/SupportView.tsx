@@ -178,7 +178,7 @@ export function SupportView() {
             )}
           </p>
         </div>
-        <a className="ss-btn-purple" href={`mailto:support@scrollshow.io?subject=${subject}&body=${body}`}>
+        <a className="ss-btn-purple" href={`mailto:aminennasri@outlook.com?subject=${subject}&body=${body}`}>
           {t("Écrire au support", "Email support", en)}
         </a>
       </div>

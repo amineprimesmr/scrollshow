@@ -1,5 +1,5 @@
-import { LibraryView } from "@/components/studio/views/LibraryView";
+import { ResearchView } from "@/components/studio/ResearchView";
 
 export default function DiscoverPage() {
-  return <LibraryView />;
+  return <ResearchView />;
 }

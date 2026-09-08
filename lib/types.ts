@@ -68,6 +68,16 @@ export type User = {
   plan: Plan;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  sessionVersion?: number;
+  recoveryHash?: string;
+  recoveryExpiresAt?: number;
+  emailVerifiedAt?: string;
+  verificationHash?: string;
+  verificationExpiresAt?: number;
+  deletionPendingAt?: string;
+  emailChange?: { email: string; oldHash: string; newHash: string; expiresAt: number; oldConfirmed: boolean; newConfirmed: boolean };
+  billingEventAt?: number;
+  lifetimePaymentId?: string;
   createdAt: string;
   settings?: Partial<UserSettings>;
   /** Ids of completed "Post to the US" checklist items. */
@@ -134,7 +144,9 @@ export type Run = {
   id: string;
   userId: string;
   keywords: string;
-  status: "queued" | "done";
+  status: "queued" | "done" | "error";
+  accountIds?: string[];
+  error?: string;
   found: number;
   createdAt: string;
 };
@@ -233,6 +245,11 @@ export type StudioPost = {
   tiktok?: import("./tiktok-compliance").TikTokPostOptions;
   publishId?: string;
   publishState?: string;
+  publishChannelId?: string;
+  publishClaim?: string;
+  publishLeaseUntil?: number;
+  publishAttempts?: number;
+  shareEnabled?: boolean;
   publishError?: string;
   publishedAt?: string;
 };
@@ -246,6 +263,7 @@ export type MediaItem = {
 };
 
 export type ApiKey = {
+  expiresAt?: string;
   id: string;
   userId: string;
   name: string;
@@ -286,6 +304,12 @@ export type ChannelStatSnapshot = {
 };
 
 export type StoreData = {
+  restoreReviewRequired?: boolean;
+  mediaDeletionQueue?: Array<{ name: string; notBefore: number; attempts: number }>;
+  operations?: Record<string, { lastStartedAt?: number; lastSucceededAt?: number; lastFailedAt?: number; leaseUntil?: number; claim?: string }>;
+  billingEvents?: string[];
+  refundedLifetimePayments?: string[];
+  rateLimits?: Record<string, { count: number; resetAt: number }>;
   users: User[];
   accounts: Account[];
   runs: Run[];
@@ -300,6 +324,8 @@ export type StoreData = {
 };
 
 export type SessionUser = {
+  emailVerified?: boolean;
+  sessionVersion?: number;
   id: string;
   email: string;
   name: string;

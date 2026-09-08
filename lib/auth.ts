@@ -27,6 +27,7 @@ export async function signSession(user: SessionUser) {
     name: user.name,
     plan: user.plan,
     onb: user.onboarded === true,
+    sv: user.sessionVersion || 0,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
@@ -41,13 +42,11 @@ export async function readSession(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     if (!payload.sub || typeof payload.email !== "string") return null;
-    return {
-      id: payload.sub,
-      email: payload.email,
-      name: typeof payload.name === "string" ? payload.name : "",
-      plan: isPaidPlan(String(payload.plan)) ? (payload.plan as Plan) : "free",
-      onboarded: payload.onb === true,
-    };
+    const data = await readStore(true);
+    if (data.restoreReviewRequired) return null;
+    const stored = data.users.find(item => item.id === payload.sub);
+    if (!stored || stored.deletionPendingAt || (stored.sessionVersion || 0) !== (payload.sv || 0)) return null;
+    return publicUser(stored);
   } catch {
     return null;
   }
@@ -64,6 +63,11 @@ export async function setSessionCookie(user: SessionUser) {
   });
 }
 
+export async function readStudioSession() {
+  const user = await readSession();
+  return user && user.emailVerified && isPaidPlan(user.plan) ? user : null;
+}
+
 export async function clearSessionCookie() {
   (await cookies()).delete(COOKIE);
 }
@@ -73,7 +77,7 @@ export async function refreshSessionFromStore(): Promise<SessionUser | null> {
   if (!session) return null;
   const data = await readStore();
   const stored = data.users.find((item) => item.id === session.id);
-  if (!stored) return session;
+  if (!stored) return null;
   const user = publicUser(stored);
   if (user.plan !== session.plan || user.name !== session.name || user.email !== session.email || user.onboarded !== session.onboarded) {
     await setSessionCookie(user);

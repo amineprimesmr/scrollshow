@@ -24,9 +24,11 @@ async function refreshChannelIfNeeded(channel: Channel): Promise<Channel> {
   }
 }
 
-export async function loadTikTokChannel(userId: string): Promise<Channel | null> {
+export async function loadTikTokChannel(userId: string, channelId?: string): Promise<Channel | null> {
   const data = await readStore();
-  const channel = data.channels.find((item) => item.userId === userId && item.platform === "tiktok" && item.accessToken);
+  const channels = data.channels.filter((item) => item.userId === userId && item.platform === "tiktok" && item.connected !== false && item.accessToken);
+  if (!channelId && channels.length > 1) throw new Error("channel_required");
+  const channel = channelId ? channels.find(item => item.id === channelId) : channels[0];
   if (!channel?.accessToken) return null;
   return refreshChannelIfNeeded(channel);
 }
@@ -47,6 +49,6 @@ export async function tiktokUserId(session: Pick<SessionUser, "id" | "email">) {
   return resolveStoreUserId(await readStore(), session);
 }
 
-export async function loadTikTokChannelForSession(session: Pick<SessionUser, "id" | "email">) {
-  return loadTikTokChannel(await tiktokUserId(session));
+export async function loadTikTokChannelForSession(session: Pick<SessionUser, "id" | "email">, channelId?: string) {
+  return loadTikTokChannel(await tiktokUserId(session), channelId);
 }

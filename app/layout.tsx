@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Newsreader } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./theme.css";
 
-const sans = Inter({
-  subsets: ["latin"],
+const sans = localFont({
+  src: "../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+  display: "swap",
   variable: "--font-sans",
 });
 
@@ -12,9 +13,12 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
-const serif = Newsreader({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
+const serif = localFont({
+  src: [
+    { path: "../node_modules/@fontsource-variable/newsreader/files/newsreader-latin-wght-normal.woff2", style: "normal" },
+    { path: "../node_modules/@fontsource-variable/newsreader/files/newsreader-latin-wght-italic.woff2", style: "italic" },
+  ],
+  display: "swap",
   variable: "--font-serif",
 });
 

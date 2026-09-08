@@ -107,7 +107,7 @@ html:has(.ss-pricing) body.grain {
   width: min(1080px, calc(100% - 32px));
   margin: 54px auto 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -246,6 +246,12 @@ html:has(.ss-pricing) body.grain {
 }
 
 .ss-price-card__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  text-decoration: none;
   margin-top: auto;
   width: 100%;
   border: 1px solid var(--ss-ink);

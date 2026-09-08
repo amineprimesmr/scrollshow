@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
 import { fetchTikTokProfile, ProfileError } from "@/lib/tiktok-profile";
 import { NextResponse } from "next/server";

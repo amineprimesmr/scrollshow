@@ -8,6 +8,8 @@ import { loadTikTokChannel } from "./tiktok-account";
 import { coerceOptions } from "./tiktok-compliance";
 import { directPostPhotos } from "./tiktok-publish";
 import type { StudioPost, User } from "./types";
+import { dispatchPost } from "./publication-jobs";
+import { hasStudioAccess } from "./plans";
 
 // TikTok processes a DIRECT_POST asynchronously: content/init only hands back a
 // publish_id. Until status/fetch says otherwise the carousel may still fail
@@ -16,21 +18,25 @@ const TERMINAL = new Set(["PUBLISH_COMPLETE", "FAILED"]);
 
 /** Wall-clock time in a named zone -> the matching UTC instant. */
 export function zonedToUtc(date: string, time: string, timeZone: string) {
-  const naive = Date.parse(`${date}T${(time || "00:00").slice(0, 5)}:00Z`);
-  if (Number.isNaN(naive)) return Number.NaN;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(naive));
-  const at = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
-  const shifted = Date.UTC(at("year"), at("month") - 1, at("day"), at("hour"), at("minute"), at("second"));
-  return naive - (shifted - naive);
+  const target = Date.parse(`${date}T${(time || "00:00").slice(0, 5)}:00Z`);
+  if (!Number.isFinite(target)) return Number.NaN;
+  const format = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const wall = (instant: number) => {
+    const parts = format.formatToParts(new Date(instant));
+    const at = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+    return Date.UTC(at("year"), at("month")-1, at("day"), at("hour"), at("minute"), at("second"));
+  };
+  let candidate = target;
+  for (let i=0;i<4;i++) {
+    const delta = target - wall(candidate);
+    if (!delta) {
+      // A repeated wall clock time uses its first occurrence. A nonexistent
+      // spring-forward time never matches and is rejected instead of shifted.
+      return Math.min(...[candidate, candidate-1800000, candidate-3600000, candidate-7200000].filter(n => wall(n) === target));
+    }
+    candidate += delta;
+  }
+  return Number.NaN;
 }
 
 export function isDue(post: StudioPost, timeZone: string, now = Date.now()) {
@@ -59,25 +65,25 @@ async function publishPost(user: User, post: StudioPost) {
 /** Publishes every scheduled post whose slot has passed. */
 export async function runScheduledPublishes(now = Date.now()) {
   const data = await readStore();
+  if (data.restoreReviewRequired) throw new Error("restoration_review_required");
   const due: Array<{ user: User; post: StudioPost }> = [];
   for (const post of data.posts) {
-    if (post.status !== "scheduled" || post.publishId) continue;
+    if (post.status !== "scheduled" || post.publishId || ["INITIATING", "REVIEW_REQUIRED"].includes(post.publishState || "")) continue;
     const user = data.users.find((item) => item.id === post.userId);
-    if (!user) continue;
+    if (!user || user.deletionPendingAt || !user.emailVerifiedAt || !hasStudioAccess(user.plan)) continue;
     if (isDue(post, resolveSettings(user).timezone, now)) due.push({ user, post });
   }
 
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
   for (const { user, post } of due) {
     try {
-      const publishId = await publishPost(user, post);
+      const { publishId } = await dispatchPost(user.id, post.id);
       await updateStore((store) => {
         const current = store.posts.find((item) => item.id === post.id);
         if (!current) return;
         current.publishId = publishId;
         current.publishState = "PROCESSING";
         current.publishError = undefined;
-        current.publishedAt = new Date(now).toISOString();
       });
       results.push({ id: post.id, ok: true });
     } catch (error) {
@@ -107,6 +113,7 @@ async function settlePost(user: User, post: StudioPost, accessToken: string): Pr
     current.publishState = state;
     if (state === "PUBLISH_COMPLETE") {
       current.status = "published";
+      current.publishedAt = new Date().toISOString();
       current.publishError = undefined;
       const postId = (status.publicaly_available_post_id || status.publicly_available_post_id || [])[0];
       if (postId) {
@@ -150,7 +157,7 @@ export async function reconcilePublishId(userId: string, publishId: string): Pro
   if (TERMINAL.has(post.publishState || "")) {
     return { id: post.id, publishId, status: post.publishState as string, failReason: post.publishError, tiktokId: post.tiktokId };
   }
-  const channel = await loadTikTokChannel(userId);
+  const channel = await loadTikTokChannel(userId, post.publishChannelId || post.channelIds[0]);
   if (!channel?.accessToken) throw new Error("tiktok_not_connected");
   return settlePost(user, post, channel.accessToken);
 }
@@ -158,6 +165,7 @@ export async function reconcilePublishId(userId: string, publishId: string): Pro
 /** Turns publish_ids into a real published/failed verdict. */
 export async function reconcilePendingPublishes() {
   const data = await readStore();
+  if (data.restoreReviewRequired) throw new Error("restoration_review_required");
   const pending = data.posts.filter(
     (post) => post.publishId && !TERMINAL.has(post.publishState || ""),
   );
@@ -166,9 +174,9 @@ export async function reconcilePendingPublishes() {
   for (const post of pending) {
     const user = data.users.find((item) => item.id === post.userId);
     if (!user) continue;
-    const channel = await loadTikTokChannel(user.id);
-    if (!channel?.accessToken) continue;
     try {
+      const channel = await loadTikTokChannel(user.id, post.publishChannelId || post.channelIds[0]);
+      if (!channel?.accessToken) continue;
       const settled = await settlePost(user, post, channel.accessToken);
       results.push({ id: post.id, status: settled.status });
     } catch (error) {

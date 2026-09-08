@@ -1,4 +1,4 @@
-import { canAddAccount, readSession } from "@/lib/auth";
+import { canAddAccount, readStudioSession as readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "@/lib/tiktok-profile";
 import { NextResponse } from "next/server";

@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { tiktokUserId } from "@/lib/tiktok-account";
 import { revokeAccessToken } from "@/lib/tiktok";
 import { readStore, updateStore } from "@/lib/store";

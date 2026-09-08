@@ -40,7 +40,7 @@ export function SlidePreview({
     : slide.backgroundColor || "#111";
   return (
     <div className="ss-slide-preview" style={{ width, height, fontFamily: fontStack(recipe.fontFamily), background }}>
-      {photo ? <img src={photo} alt="" /> : <div className="ss-slide-preview__empty" style={{ background: "transparent" }} />}
+      {photo ? <img src={photo} alt="" onError={event => { if (!event.currentTarget.src.endsWith("/logo.png")) { event.currentTarget.src = "/logo.png"; event.currentTarget.alt = "Image indisponible"; event.currentTarget.style.objectFit = "contain"; } }} /> : <div className="ss-slide-preview__empty" style={{ background: "transparent" }} />}
       {!original
         ? slide.overlays
             .filter((overlay) => overlay.text.trim())

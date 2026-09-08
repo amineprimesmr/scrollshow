@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { checkConnectedAccount, checkLibraryAccount, checkPublicAccount, ShadowbanLookupError } from "@/lib/shadowban-check";
 import { readStore } from "@/lib/store";
 import { loadTikTokChannels } from "@/lib/tiktok-account";

@@ -1,3 +1,5 @@
+import { safeFetchBytes } from "./safe-fetch";
+
 const globalCache = globalThis as typeof globalThis & {
   __scrollshowMediaSize?: Map<string, { bytes: number | null; at: number }>;
 };
@@ -13,12 +15,8 @@ function cache() {
 async function headSize(url: string): Promise<number | null> {
   if (url.startsWith("/")) return null;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, { method: "HEAD", signal: controller.signal });
-    clearTimeout(timeout);
-    const length = res.headers.get("content-length");
-    return length ? Number(length) : null;
+    const res = await safeFetchBytes(url, { method: "HEAD", timeoutMs: 4000 });
+    return Number.isFinite(res.contentLength) && res.contentLength! >= 0 ? res.contentLength! : null;
   } catch {
     return null;
   }
@@ -28,6 +26,8 @@ async function headSize(url: string): Promise<number | null> {
 export async function sizesOf(urls: string[]): Promise<Map<string, number | null>> {
   const store = cache();
   const now = Date.now();
+  for (const [key, value] of store) if (now - value.at >= TTL_MS) store.delete(key);
+  if (store.size > 10000) store.clear();
   const unique = Array.from(new Set(urls));
   const result = new Map<string, number | null>();
   const pending: string[] = [];

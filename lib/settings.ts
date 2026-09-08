@@ -6,7 +6,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   weekStartsOn: 1,
   defaultPostTime: "18:00",
   defaultPrivacy: "PUBLIC_TO_EVERYONE",
-  defaultStatus: "scheduled",
+  defaultStatus: "draft",
   disableComments: false,
   disableDuet: true,
   disableStitch: true,

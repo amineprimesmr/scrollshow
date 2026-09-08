@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { prefersEnglish, t } from "@/lib/i18n";
 import { pushConfigured, sendPushToUser } from "@/lib/push";
 import { readStore } from "@/lib/store";

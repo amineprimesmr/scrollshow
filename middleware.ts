@@ -7,6 +7,9 @@ const PROTECTED = ["/app", "/api/accounts", "/api/runs", "/api/studio", "/api/ti
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (process.env.MAINTENANCE_MODE === "1") {
+    return new NextResponse(pathname.startsWith("/api/") ? JSON.stringify({error:"maintenance"}) : "ScrollShow est en cours de mise à jour. Merci de réessayer dans quelques minutes.", {status:503,headers:{"Retry-After":"300","Cache-Control":"no-store","Content-Type":pathname.startsWith("/api/")?"application/json":"text/plain; charset=utf-8"}});
+  }
   if (pathname === "/api/tiktok/oauth/start") return NextResponse.next();
   const needsAuth = PROTECTED.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   if (!needsAuth) return NextResponse.next();
@@ -26,12 +29,8 @@ export async function middleware(request: NextRequest) {
 
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    if (!hasStudioAccess(typeof payload.plan === "string" ? payload.plan : undefined)) {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json({ error: "payment_required" }, { status: 402 });
-      }
-      return NextResponse.redirect(new URL("/pricing", request.url));
-    }
+    // Current entitlements are checked by the Node route/layout against storage.
+    // JWT claims may be stale after checkout, cancellation or revocation.
     return NextResponse.next();
   } catch {
     if (pathname.startsWith("/api/")) {
@@ -46,18 +45,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/app",
-    "/app/:path*",
-    "/api/accounts",
-    "/api/accounts/:path*",
-    "/api/runs",
-    "/api/runs/:path*",
-    "/api/studio",
-    "/api/studio/:path*",
-    "/api/tiktok",
-    "/api/tiktok/:path*",
-    "/api/keys",
-    "/api/keys/:path*",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png).*)"],
 };

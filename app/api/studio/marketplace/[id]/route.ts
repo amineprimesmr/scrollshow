@@ -1,5 +1,5 @@
 import { agentSetCalendar, agentSetVisibility, AgentError } from "@/lib/agent";
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

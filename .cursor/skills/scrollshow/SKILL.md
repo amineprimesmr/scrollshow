@@ -1,53 +1,46 @@
 ---
 name: scrollshow
-description: Use the ScrollShow MCP server to create, schedule, and publish TikTok photo carousels, import TikToks into the marketplace, reconstruct them as editable layers, read analytics, search the research library, and write performance reports. Reach for this when the user mentions ScrollShow, TikTok carousels, studio calendar, marketplace recipes, or publishing from Cursor.
+description: Research TikTok accounts, compare measured slideshow performance, plan original carousels for a business, edit and export slides, and schedule or publish through the ScrollShow SaaS MCP server. Use for ScrollShow research, content strategy, carousel editing, calendar and analytics.
 ---
 
-# ScrollShow
+# ScrollShow SaaS
 
-You are connected to the user's ScrollShow workspace over MCP at `https://scrollshow.io/api/mcp`.
+Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, not a local Chrome automation app. Call `whoami` first for the business, plan, capabilities and quotas. Do not claim unavailable capabilities: discovery needs a configured search provider, detailed public-post metrics need a data provider, and live publication needs an authorized TikTok account.
 
-Call `whoami` first: it returns the user's **business profile** (name, kind, link, tagline, keywords, goal, TikTok stats) built at onboarding. Every carousel, caption and report must be written for that business. If TikTok is not connected, tell them to open ScrollShow → Connexions and connect TikTok. Do not invent a publish.
+## Research that leads to useful content
 
-## Marketplace
+- `analyze_account` reads and saves a named public account. `discover_accounts` searches indexed candidates by niche and verifies up to five profiles. It may take several minutes; `list_runs` retains saved results. Do not fabricate profiles or promise exhaustive TikTok search.
+- `compare_accounts` compares saved measurements. Use median views, slideshow share, views per follower, observed cadence and sample size. Dates matter; say when the evidence is old or too small. A missing metric is unknown, not zero.
+- `search_library` and `get_account` retrieve saved accounts without another external analysis.
+- `get_content_brief` supplies the business, research evidence and existing calendar. Turn those into original hooks, slide outlines, CTAs and an editorial plan. Cite concrete source posts for the observed pattern; label creative recommendations as hypotheses.
+- Save requested drafts with `create_post` and `status=draft`. Include actual slide overlays in `recipe`, not just a caption. Offer a compact rationale for the audience, hook and CTA. Do not promise views, US distribution or removal of a shadowban.
 
-Private = the user's library. Public = formats shared with other ScrollShow users, sorted by views.
+## Create and edit
 
-- `import_tiktok` — paste a public TikTok URL. This **copies** the original slides (text is still baked into the JPEGs).
-- `reconstruct_post` — **required** to make an import editable. Vision rebuilds each slide as background + text overlays (font, size, color, position). After this, `recipe.editable` is true and overlay texts can be changed.
-- `import_tiktok` with `reconstruct=true` does copy + reconstruct in one call.
-- `list_marketplace` — `tab=private` or `tab=public`
-- `set_visibility` — publish a format to public, or make it private
-- `fork_post` — clone a public format into the user's private library
-- `get_recipe` / `update_recipe` — edit in place
+`list_posts`, `list_media`, `list_marketplace`, `get_recipe` find existing work.
+`import_tiktok` copies a public slideshow. Only import or republish assets the user has the rights to use.
+The text in an imported JPEG is not editable until `reconstruct_post` produces usable overlays. Reconstruction uses OCR by default and may need manual corrections; inspect returned overlays instead of promising exact extraction.
 
-Do **not** tell the user an imported TikTok is editable until `reconstruct_post` has run (or `recipe.editable` is true). Changing caption only does not change the text on the slides.
+Use `update_recipe` for text, fonts, colors and layout; `update_post` for caption, date, channel and status. Keep unrelated positions and source references. Use `fork_post` to adapt an existing format into a private draft.
 
-## Edit an imported TikTok
+Supported publishable source is images, backgrounds and text overlays. HTML/CSS recipes can be previewed but are rejected for export/publication; convert them into supported overlays before proceeding.
 
-1. `import_tiktok` with the URL (or `list_marketplace` to find it).
-2. `reconstruct_post` with the post id.
-3. Change overlay `text` / `fontSize` / `color` / `x` / `y`, or `backgroundColor`, via `update_recipe`. Keep positions unless they asked to move them.
-4. To publish live, `publish_now` with `id` of the post so overlays are rasterized into fresh PNGs.
+`export_post` returns the recipe and a ZIP download link for the user to open while logged into ScrollShow. The archive includes rendered slides and caption. Do not claim it has been downloaded to the user's Mac unless a download actually completed.
 
-## Existing editable TikToks
+## Publish to the correct account
 
-1. `get_recipe` with the post id / shareId.
-2. Keep `fontFamily`, overlay positions, `html` and `css` unless asked otherwise.
-3. Change only the texts or images they asked for, then `update_recipe`.
-4. A share link `/r/{shareId}` dumps the same recipe as JSON.
+1. Read `list_channels`; identify the intended connected account. Pass its `channelId` explicitly when several accounts exist.
+2. Call `get_creator_options` for that channel. Use current available privacy options. Ask the user for any missing publication choice; do not choose privacy or branded-content disclosure for them.
+3. For scheduling, `create_post` or `update_post` needs date, time, one channel and `tiktok` options. Dates/times use workspace timezone. Drafting does not authorize scheduling or publishing.
+4. For an authorized immediate publication, call `publish_now` with the saved post `id`, `channelId`, caption and explicit privacy/disclosure. The service renders supported overlays and records the submission.
+5. `publish_status` reconciles `publish_id`. PROCESSING is not success; only PUBLISH_COMPLETE confirms publication. REVIEW_REQUIRED or an uncertain initialization must be checked before another attempt to avoid duplicates.
 
-## Tools
+`delete_post` removes work; `set_visibility` shares a format publicly or revokes public visibility. Share only when asked. Returning a post to private disables its share link.
 
-- `whoami` — workspace, plan, TikTok connection
-- `list_channels` / `list_media` / `list_posts` / `list_marketplace`
-- `import_tiktok` / `reconstruct_post` / `get_recipe` / `update_recipe` / `fork_post` / `set_visibility`
-- `create_post` — draft or schedule a carousel (`status=draft` or `scheduled`). Include `recipe` when you have the source.
-- `update_post` / `delete_post`
-- `publish_now` — live TikTok Direct Post. Only when they explicitly asked to publish now. Pass `id` to rasterize an editable recipe.
-- `get_analytics` / `get_report`
-- `search_library` / `get_account`
+## Reports and boundaries
 
-## How to report
+Use `get_analytics` or `get_report` for performance. Explain trends using dated measurements and distinguish lifetime counters from period growth. `shadowban_check` is a heuristic signal, never a calibrated probability or proof of platform enforcement.
 
-Present findings in plain language with a short table. Never dump raw JSON. `get_report` is the right call when they want the full picture.
+Present a short comparison plus a recommendation and the next useful action. Link account handles and source posts. Never include API credentials in a report, shared recipe, screenshot or public link. API access is not authorization for unrelated account changes, payments or publication.
+
+The assistant writes strategy and content using the user's chosen AI service. ScrollShow stores evidence and executes supported actions; it does not include the user's Claude/Cursor/Codex subscription.

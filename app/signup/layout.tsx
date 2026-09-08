@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Sign up",
-  description: "Create your ScrollShow account, then choose a plan. 3-day trial on every offer.",
+  description: "Create your ScrollShow account, then choose a plan: €29 per month or €99 lifetime. Access after payment.",
 };
 
 export default function SignupLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { accountInsights, parseKey } from "@/lib/insights";
 import { fetchAccountVideos, MonidError } from "@/lib/monid";
 import { updateStore } from "@/lib/store";

@@ -1,6 +1,7 @@
 import { fetchAccountVideos, monidEnabled } from "./monid";
 import { fetchTikTokProfile, normalizeHandle } from "./tiktok-profile";
 import type { BusinessKind, BusinessProfile, BusinessSocial } from "./types";
+import { safeFetchBytes } from "./safe-fetch";
 
 /**
  * Turns a business link into a BusinessProfile without any LLM: we fetch the
@@ -45,16 +46,8 @@ async function fetchHtml(url: URL, lang = "fr-FR,fr;q=0.9,en;q=0.8"): Promise<{ 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", "Accept-Language": lang },
-      redirect: "follow",
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (res.status === 403 || res.status === 429) throw new AnalyzeError("blocked");
-    if (!res.ok) throw new AnalyzeError("unreachable", `HTTP ${res.status}`);
-    const html = (await res.text()).slice(0, 1_500_000);
-    return { html, finalUrl: new URL(res.url || url.toString()) };
+    const res = await safeFetchBytes(url, { maxBytes: 1_500_000, headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", "Accept-Language": lang } });
+    return { html: res.bytes.toString("utf8"), finalUrl: new URL(res.url) };
   } catch (error) {
     if (error instanceof AnalyzeError) throw error;
     throw new AnalyzeError("unreachable");

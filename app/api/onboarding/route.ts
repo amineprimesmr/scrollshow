@@ -1,5 +1,6 @@
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { analyzeBusiness, AnalyzeError, enrichTikTok } from "@/lib/business-analyzer";
+import { rotateOnboardingKey } from "@/lib/api-keys";
 import { savePublicImage } from "@/lib/media-files";
 import { publicUser, readStore, updateStore } from "@/lib/store";
 import type { BusinessProfile } from "@/lib/types";
@@ -62,12 +63,14 @@ const businessSchema = z.object({
   }),
 });
 
+const keySchema = z.object({ action: z.literal("key") });
+
 const finishSchema = z.object({
   action: z.literal("finish"),
   heardFrom: z.array(z.string().max(30)).max(10).default([]),
 });
 
-const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, finishSchema]);
+const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, keySchema, finishSchema]);
 
 export async function GET() {
   const session = await readSession();
@@ -102,6 +105,12 @@ export async function POST(request: Request) {
       const code = error instanceof AnalyzeError ? error.code : "unreachable";
       return NextResponse.json({ error: code }, { status: code === "invalid_url" ? 400 : 502 });
     }
+  }
+
+  if (body.action === "key") {
+    const created = await rotateOnboardingKey(session.id);
+    if (!created) return NextResponse.json({ error: "limit" }, { status: 400 });
+    return NextResponse.json({ token: created.token });
   }
 
   if (body.action === "tiktok") {

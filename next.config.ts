@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
       { key: "Access-Control-Allow-Headers", value: "Authorization, Content-Type, mcp-session-id, Last-Event-ID, mcp-protocol-version" },
     ];
     return [
+      { source: "/:path*", headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      ] },
       { source: "/api/mcp", headers: cors },
       { source: "/api/v1/:path*", headers: cors },
     ];

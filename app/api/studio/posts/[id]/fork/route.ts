@@ -1,5 +1,5 @@
 import { agentForkPost } from "@/lib/agent";
-import { readSession } from "@/lib/auth";
+import { readStudioSession as readSession } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(

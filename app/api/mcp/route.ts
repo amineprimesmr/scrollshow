@@ -28,8 +28,14 @@ import type { SessionUser } from "@/lib/types";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
+import { analyzeResearchAccount, contentBrief, discoverResearchAccounts, researchLibrary } from "@/lib/research";
+import { reconcilePublishId } from "@/lib/publish-queue";
+import { loadTikTokChannel } from "@/lib/tiktok-account";
+import { loadCreator } from "@/lib/tiktok-publish";
+import { readStore } from "@/lib/store";
+import { consumeLimit } from "@/lib/rate-limit";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const statusSchema = z.enum(["draft", "scheduled", "published"]);
 
@@ -50,6 +56,57 @@ function userFrom(ctx: { http?: { authInfo?: AuthInfo } }): SessionUser {
 
 const handler = createMcpHandler(
   (server) => {
+    server.registerTool("analyze_account", {
+      title: "Analyze and save a TikTok account",
+      description: "Read a real public profile, measure a sample of posts when configured, and save it. Returns median views, slideshow share, top posts, provenance and sample size. Never fabricates unavailable metrics.",
+      inputSchema: z.object({ handle: z.string().min(2).max(120), niche: z.string().max(80).optional() }),
+    }, async (args, ctx) => { try { return text(await analyzeResearchAccount(userFrom(ctx), args.handle, args.niche)); } catch (e) { return fail(e); } });
+
+    server.registerTool("discover_accounts", {
+      title: "Discover TikTok accounts by niche",
+      description: "Find indexed TikTok candidates, verify up to five real profiles and save a run. Requires configured search provider; if unavailable, analyze named accounts instead. May take several minutes. Partial saved results remain available in list_runs.",
+      inputSchema: z.object({ keywords: z.string().min(2).max(80) }),
+    }, async (args, ctx) => { try { return text(await discoverResearchAccounts(userFrom(ctx), args.keywords)); } catch (e) { return fail(e); } });
+
+    server.registerTool("compare_accounts", {
+      title: "Compare saved research",
+      description: "Compare saved accounts using median views, views per follower, slideshow share, cadence, sample size and dated evidence. Does not refresh external data.",
+      inputSchema: z.object({ query: z.string().max(120).optional() }),
+      annotations: { readOnlyHint: true },
+    }, async (args, ctx) => { try { return text(await researchLibrary(userFrom(ctx), args.query)); } catch (e) { return fail(e); } });
+
+    server.registerTool("get_content_brief", {
+      title: "Plan content from the business and research",
+      description: "Read business context, saved competitor evidence and calendar. Use this to propose original hooks, slide outlines, CTAs and a content plan; then save user-requested drafts with create_post. The tool supplies evidence, the assistant writes the strategy.",
+      inputSchema: z.object({}), annotations: { readOnlyHint: true },
+    }, async (_args, ctx) => { try { return text(await contentBrief(userFrom(ctx))); } catch (e) { return fail(e); } });
+
+    server.registerTool("list_runs", {
+      title: "Read discovery history", inputSchema: z.object({}), annotations: { readOnlyHint: true },
+      description: "Read saved discovery runs, verified account IDs and failures.",
+    }, async (_args, ctx) => { try { const user = userFrom(ctx); return text({ runs: (await readStore()).runs.filter(r => r.userId === user.id) }); } catch (e) { return fail(e); } });
+
+    server.registerTool("get_creator_options", {
+      title: "Read TikTok publishing options for a chosen account",
+      description: "Read fresh allowed privacy and comment settings before asking the user to choose. channelId is required when multiple accounts are connected.",
+      inputSchema: z.object({ channelId: z.string().optional() }), annotations: { readOnlyHint: true },
+    }, async (args, ctx) => { try { const channel = await loadTikTokChannel(userFrom(ctx).id, args.channelId); if (!channel?.accessToken) throw new Error("tiktok_not_connected"); return text({ channelId: channel.id, handle: channel.handle, ...await loadCreator(channel.accessToken) }); } catch (e) { return fail(e); } });
+
+    server.registerTool("publish_status", {
+      title: "Reconcile a TikTok publication",
+      description: "Refresh the result of a submitted publication. Processing is not published; only PUBLISH_COMPLETE is final success. Never retry an ambiguous initialization blindly.",
+      inputSchema: z.object({ publishId: z.string().min(1) }),
+    }, async (args, ctx) => { try { return text(await reconcilePublishId(userFrom(ctx).id, args.publishId)); } catch (e) { return fail(e); } });
+
+    server.registerTool("export_post", {
+      title: "Export an owned carousel",
+      description: "Return the editable recipe and an authenticated browser download URL for a ZIP of slides and source. The user must be logged into ScrollShow to download. Requires ownership, including after cloning a public template.",
+      inputSchema: z.object({ id: z.string().min(1) }), annotations: { readOnlyHint: true },
+    }, async (args, ctx) => { try {
+      const user = userFrom(ctx); const post = (await readStore()).posts.find(p => p.id === args.id && p.userId === user.id);
+      if (!post) throw new Error("post_missing");
+      return text({ recipe: await agentGetRecipe(user, args.id), downloadUrl: `${process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"}/api/studio/posts/${encodeURIComponent(args.id)}/export` });
+    } catch (e) { return fail(e); } });
     server.registerTool(
       "whoami",
       {
@@ -279,6 +336,7 @@ const handler = createMcpHandler(
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
           id: z.string().optional(),
+          channelId: z.string().optional().describe("Destination account from list_channels. Required with multiple connected accounts."),
           photo_images: z.array(z.string()).optional(),
           image: z.string().optional(),
           privacy_level: z
@@ -476,6 +534,7 @@ async function verifyToken(req: Request, bearerToken?: string): Promise<AuthInfo
   bearerToken = token;
   const user = await resolveApiKey(bearerToken);
   if (!user || !hasStudioAccess(user.plan)) return undefined;
+  if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) return undefined;
   return {
     token: bearerToken,
     clientId: user.id,

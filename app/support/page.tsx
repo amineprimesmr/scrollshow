@@ -29,7 +29,7 @@ function Fr() {
       <p>Réglages → Déconnecter. Les jetons OAuth sont révoqués puis supprimés.</p>
       <h2>Contact</h2>
       <p>
-        <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a>
+        <a href="mailto:aminennasri@outlook.com">aminennasri@outlook.com</a>
       </p>
     </div>
   );
@@ -50,7 +50,7 @@ function En() {
       <p>Settings → Disconnect. OAuth tokens are revoked then deleted.</p>
       <h2>Contact</h2>
       <p>
-        <a href="mailto:hello@scrollshow.io">hello@scrollshow.io</a>
+        <a href="mailto:aminennasri@outlook.com">aminennasri@outlook.com</a>
       </p>
     </div>
   );

@@ -246,7 +246,7 @@ export function MarketplaceView() {
         <div className="ss-segment" style={{ marginBottom: 16 }}>
           {(["all", "draft", "scheduled", "published"] as const).map((f) => (
             <button key={f} type="button" className={statusFilter === f ? "is-active" : ""} onClick={() => setStatusFilter(f)}>
-              {f === "all" ? t("Tout", "All", english) : f.charAt(0).toUpperCase() + f.slice(1)}
+              {f === "all" ? t("Tout", "All", english) : f === "draft" ? t("Brouillons", "Drafts", english) : f === "scheduled" ? t("Planifiés", "Scheduled", english) : t("Publiés", "Published", english)}
             </button>
           ))}
         </div>

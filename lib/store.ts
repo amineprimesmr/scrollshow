@@ -1,141 +1,97 @@
-import { get, put } from "@vercel/blob";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { get } from "@vercel/blob";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
+import lockfile from "proper-lockfile";
+import { database, databaseEnabled } from "./database";
 import { resolveSettings } from "./settings";
 import type { Account, Run, StoreData, User } from "./types";
 
-const BLOB_NAME = "scrollshow-store.json";
-
-const globalStore = globalThis as typeof globalThis & {
-  __scrollshow?: StoreData;
-  __scrollshowReadAt?: number;
-};
-
-// A warm Fluid Compute instance can serve many requests over a long life. Without a
-// bound on the cache, an instance never sees what another one wrote to the blob —
-// connecting TikTok on instance A would read back as "not connected" on instance B.
-const BLOB_CACHE_MS = 3000;
-
 function filePath() {
-  const root = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), ".data");
-  return path.join(root, "store.json");
+  return path.join(process.env.SCROLLSHOW_DATA_DIR || path.join(process.cwd(), ".data"), "store.json");
 }
 
-const emptyStore = (): StoreData => ({
-  users: [],
-  accounts: [],
-  runs: [],
-  channels: [],
-  posts: [],
-  media: [],
-  apiKeys: [],
-  videoStats: [],
-  channelStats: [],
+export const emptyStore = (): StoreData => ({
+  users: [], accounts: [], runs: [], channels: [], posts: [], media: [], apiKeys: [],
+  videoStats: [], channelStats: [], billingEvents: [], rateLimits: {},
 });
 
-function memory(): StoreData {
-  if (!globalStore.__scrollshow) globalStore.__scrollshow = emptyStore();
-  return globalStore.__scrollshow;
-}
-
-async function readLocal(): Promise<StoreData> {
-  try {
-    const raw = await readFile(filePath(), "utf8");
-    return JSON.parse(raw) as StoreData;
-  } catch {
-    return memory();
-  }
-}
-
-async function writeLocal(data: StoreData) {
-  const target = filePath();
-  await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(target, JSON.stringify(data), "utf8");
-}
-
-async function readBlob(): Promise<StoreData> {
-  const result = await get(BLOB_NAME, { access: "private", useCache: false });
-  if (!result?.stream) return emptyStore();
-  const raw = await new Response(result.stream).text();
-  if (!raw.trim()) return emptyStore();
-  return JSON.parse(raw) as StoreData;
-}
-
-async function writeBlob(data: StoreData) {
-  await put(BLOB_NAME, JSON.stringify(data), {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-    cacheControlMaxAge: 60,
-  });
-}
-
-function useBlob() {
-  if (process.env.NODE_ENV !== "production" && process.env.SCROLLSHOW_USE_BLOB !== "1") {
-    return false;
-  }
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
-}
-
 export function localStoreEnabled() {
-  return !useBlob();
+  return !databaseEnabled() && process.env.SCROLLSHOW_USE_BLOB !== "1" && !process.env.VERCEL;
 }
 
 function normalize(data: StoreData): StoreData {
-  data.channels ||= [];
-  data.posts ||= [];
-  data.media ||= [];
-  data.accounts ||= [];
-  data.runs ||= [];
-  data.users ||= [];
-  data.apiKeys ||= [];
+  for (const key of ["users", "accounts", "runs", "channels", "posts", "media", "apiKeys"] as const) {
+    if (!Array.isArray(data[key])) throw new Error("invalid_store_snapshot");
+  }
   data.pushSubscriptions ||= [];
   data.videoStats ||= [];
   data.channelStats ||= [];
   data.warmedOrders ||= [];
+  data.billingEvents ||= [];
+  data.rateLimits ||= {};
   return data;
 }
 
-export async function readStore(fresh = false): Promise<StoreData> {
-  const cached = globalStore.__scrollshow;
-  const hasContent = Boolean(cached && (cached.users.length || cached.accounts.length || cached.channels?.length));
-  if (cached && hasContent && !fresh) {
-    const age = Date.now() - (globalStore.__scrollshowReadAt || 0);
-    if (!useBlob() || age < BLOB_CACHE_MS) return normalize(cached);
-  }
-  let data: StoreData;
+async function readLocal() {
   try {
-    data = normalize(useBlob() ? await readBlob() : await readLocal());
+    return normalize(JSON.parse(await readFile(filePath(), "utf8")));
   } catch (error) {
-    // A failed blob read must never look like an empty workspace: returning one
-    // here would let the caller mutate it and write the emptiness back.
-    if (cached) return normalize(cached);
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyStore();
     throw error;
   }
-  globalStore.__scrollshow = data;
-  globalStore.__scrollshowReadAt = Date.now();
-  return data;
+}
+
+export async function readStore(_fresh = false): Promise<StoreData> {
+  if (databaseEnabled()) {
+    const rows = await database()`SELECT data FROM scrollshow_state WHERE id = 1`;
+    if (!rows.length) throw new Error("database_not_migrated");
+    return normalize(rows[0].data);
+  }
+  if (process.env.SCROLLSHOW_USE_BLOB === "1") {
+    if (process.env.VERCEL_ENV === "preview") throw new Error("preview_must_use_isolated_database");
+    const blob = await get("scrollshow-store.json", { access: "private", useCache: false });
+    if (!blob?.stream) throw new Error("legacy_store_missing");
+    return normalize(JSON.parse(await new Response(blob.stream).text()));
+  }
+  if (!localStoreEnabled()) throw new Error("DATABASE_URL_required");
+  return readLocal();
+}
+
+/** All writes hold a database row lock or a cross-process local file lock.
+ * The compatibility JSONB document makes the migration lossless; split tables
+ * and per-workspace locks can follow without unsafe dual writes.
+ * Callbacks must not recursively call updateStore.
+ */
+export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): Promise<T> {
+  if (databaseEnabled()) {
+    const result = await database().begin(async tx => {
+      const rows = await tx`SELECT data FROM scrollshow_state WHERE id = 1 FOR UPDATE`;
+      if (!rows.length) throw new Error("database_not_migrated");
+      const data = normalize(rows[0].data);
+      const output = await fn(data);
+      await tx`UPDATE scrollshow_state SET data = ${tx.json(data as never)}, updated_at = now() WHERE id = 1`;
+      return { output };
+    });
+    return (result as { output: T }).output;
+  }
+  if (!localStoreEnabled()) throw new Error("database_migration_required");
+  const target = filePath();
+  await mkdir(path.dirname(target), { recursive: true });
+  const release = await lockfile.lock(target, { realpath: false, stale: 120000, retries: { retries: 150, minTimeout: 10, maxTimeout: 100, randomize: true } });
+  try {
+    const data = await readLocal();
+    const result = await fn(data);
+    const temp = target + "." + crypto.randomUUID() + ".tmp";
+    await writeFile(temp, JSON.stringify(data), { encoding: "utf8", mode: 0o600 });
+    await rename(temp, target);
+    return result;
+  } finally {
+    await release();
+  }
 }
 
 export async function writeStore(data: StoreData) {
-  globalStore.__scrollshow = data;
-  globalStore.__scrollshowReadAt = Date.now();
-  try {
-    if (useBlob()) await writeBlob(data);
-    else await writeLocal(data);
-  } catch {
-    // Memory still holds the workspace if disk/blob is unavailable.
-  }
-}
-
-export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>) {
-  // Always mutate the newest copy: the whole store is one JSON document, so
-  // mutating a stale one silently drops whatever another instance just wrote.
-  const data = await readStore(true);
-  const result = await fn(data);
-  await writeStore(data);
-  return result;
+  await updateStore(current => Object.assign(current, normalize(data)));
 }
 
 export function seedAccounts(userId: string): Account[] {
@@ -187,6 +143,8 @@ export function findUserByEmail(data: StoreData, email: string) {
 export function publicUser(user: User) {
   return {
     id: user.id,
+    sessionVersion: user.sessionVersion || 0,
+    emailVerified: Boolean(user.emailVerifiedAt),
     email: user.email,
     name: user.name,
     plan: user.plan,

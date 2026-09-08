@@ -3,6 +3,8 @@ import { resolveApiKey } from "./api-keys";
 import { hasStudioAccess } from "./plans";
 import type { SessionUser } from "./types";
 import { NextResponse } from "next/server";
+import { consumeLimit } from "./rate-limit";
+import { PostValidationError } from "./post-validation";
 
 export function bearerToken(request: Request) {
   const header = request.headers.get("authorization") || "";
@@ -25,6 +27,7 @@ export async function requireAgentUser(request: Request): Promise<SessionUser> {
   const user = await resolveApiKey(token);
   if (!user) throw new AgentError("unauthorized", 401);
   if (!hasStudioAccess(user.plan)) throw new AgentError("payment_required", 402);
+  if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) throw new AgentError("rate_limited", 429);
   return user;
 }
 
@@ -41,6 +44,7 @@ export function agentOptions() {
 }
 
 export function agentCatch(error: unknown) {
+  if (error instanceof PostValidationError) return agentResponse({ error: error.message }, error.message === "publication_locked" ? 409 : 400);
   if (error instanceof AgentError) return agentResponse({ error: error.message }, error.status);
   const message = error instanceof Error ? error.message : "server";
   return agentResponse({ error: message }, 500);
