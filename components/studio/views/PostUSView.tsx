@@ -37,7 +37,7 @@ const COMPARE: { label: Row; a: Row; b: Row }[] = [
   {
     label: { fr: "Pour qui", en: "Best for" },
     a: { fr: "Tests rapides, comptes FR/EN", en: "Quick tests, FR/EN accounts" },
-    b: { fr: "Clippers, comptes US long terme", en: "Clippers, long-term US accounts" },
+    b: { fr: "Comptes US long terme", en: "Long-term US accounts" },
   },
 ];
 

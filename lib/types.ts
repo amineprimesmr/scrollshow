@@ -49,6 +49,19 @@ export type WarmedOrder = {
   updatedAt: string;
 };
 
+export type AccountVideo = {
+  id: string;
+  title: string;
+  cover: string;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  kind: "photo" | "video";
+  createdAt: number; // unix seconds
+  url: string;
+};
+
 export type Account = {
   id: string;
   userId: string;
@@ -68,6 +81,12 @@ export type Account = {
   verified?: boolean;
   lastSyncAt?: string;
   syncError?: string;
+  /** Revenue model: € per 1000 views, and what the account really paid out. */
+  rpm?: number;
+  declaredRevenue?: number;
+  /** Public posts pulled on demand (Monid/TikHub), newest first. */
+  videos?: AccountVideo[];
+  videosFetchedAt?: string;
 };
 
 export type Run = {
@@ -94,6 +113,8 @@ export type Channel = {
   followers?: number;
   likes?: number;
   videoCount?: number;
+  rpm?: number;
+  declaredRevenue?: number;
 };
 
 export type OverlayAlign = "left" | "center" | "right";

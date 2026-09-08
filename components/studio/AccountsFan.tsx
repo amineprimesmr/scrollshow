@@ -2,8 +2,6 @@
 
 import { t } from "@/lib/i18n";
 import type { Account, Channel } from "@/lib/types";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStudio } from "./StudioContext";
 
@@ -104,9 +102,8 @@ function layout(d: number, g: Geo) {
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
 
-export function AccountsFan() {
-  const router = useRouter();
-  const { channels, english: en, setActiveChannel, setAddOpen } = useStudio();
+export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, viaClick: boolean) => void }) {
+  const { channels, english: en, setAddOpen } = useStudio();
   const [clippers, setClippers] = useState<Account[]>([]);
   const [sort, setSort] = useState<SortKey>("followers");
   const [selected, setSelected] = useState(0);
@@ -140,7 +137,6 @@ export function AccountsFan() {
   }, [channels, clippers, sort]);
 
   const count = items.length;
-  const totalFollowers = useMemo(() => items.reduce((n, i) => n + i.followers, 0), [items]);
 
   /* ---------------- animation state lives in refs: no React work per frame ---------------- */
   const stageRef = useRef<HTMLDivElement>(null);
@@ -172,12 +168,15 @@ export function AccountsFan() {
     const n = countRef.current;
     const pivot = Math.round(clamp(target.current, 0, Math.max(0, n - 1)));
     const f = cur.current[pivot] ?? target.current;
+    // The stage shrinks when the account panel opens: scale the whole fan so
+    // the folders never overflow the bar above.
+    const k = clamp((stage.clientHeight - 70) / (narrowRef.current ? 300 : 400), 0.55, 1);
     // Keep the whole fan centred whatever is selected: its horizontal extent
     // depends on where the opened folder sits, so recentre from that.
-    const first = layout(0 - f, g).x;
-    const last = layout(Math.max(0, n - 1) - f, g).x;
+    const first = layout(0 - f, g).x * k;
+    const last = layout(Math.max(0, n - 1) - f, g).x * k;
     const cx = stage.clientWidth / 2 - (first + last) / 2;
-    const cy = stage.clientHeight * (narrowRef.current ? 0.6 : 0.55);
+    const cy = stage.clientHeight * 0.56 + 18;
     for (let i = 0; i < nodes.current.length; i += 1) {
       const el = nodes.current[i];
       if (!el) continue;
@@ -185,11 +184,11 @@ export function AccountsFan() {
       const l = layout(d, g);
       const h = hov.current[i] ?? 0;
       const lean = clamp(-(vel.current[i] ?? 0) * 0.55, -5, 5); // lean into the motion
-      const x = cx + l.x - g.w / 2;
-      const y = cy + l.y - g.h / 2 - 28 * h - Math.abs(lean) * 0.5;
-      const z = l.z + 40 * h;
+      const x = cx + l.x * k - g.w / 2;
+      const y = cy + (l.y - 28 * h - Math.abs(lean) * 0.5) * k - g.h / 2;
+      const z = (l.z + 40 * h) * k;
       const rot = l.rot + 8 * h;
-      el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rot}deg) rotateZ(${lean}deg) scale(${l.scale + 0.02 * h})`;
+      el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rot}deg) rotateZ(${lean}deg) scale(${(l.scale + 0.02 * h) * k})`;
       const ad = Math.abs(d);
       // Flat stacking: the folder nearest the focus is always on top and the
       // order never changes — a hovered folder lifts and comes forward but
@@ -344,7 +343,13 @@ export function AccountsFan() {
       drag.current = null;
       if (!d) return;
       if (!d.moved) {
-        if (d.index != null) goToRef.current(d.index);
+        if (d.index != null) {
+          clicked.current = true;
+          goToRef.current(d.index);
+          // Same folder pressed again: still open its details.
+          onSelectRef.current?.(items[d.index] || null, true);
+          clicked.current = false;
+        }
         return;
       }
       // Project the fling, then settle on the nearest folder.
@@ -423,12 +428,14 @@ export function AccountsFan() {
   }
 
   const current = items[selected] || null;
-  const share = current && totalFollowers ? Math.round((current.followers / totalFollowers) * 100) : 0;
-
-  function openInCalendar(item: FanItem) {
-    if (item.kind === "channel") setActiveChannel(item.id.slice(3));
-    router.push("/app");
-  }
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const clicked = useRef(false);
+  useEffect(() => {
+    onSelectRef.current?.(current, clicked.current);
+    clicked.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
 
   return (
     <section className="ss-fan" aria-label={t("Tous les comptes", "All accounts", en)}>
@@ -456,9 +463,6 @@ export function AccountsFan() {
           <button type="button" className="ss-fan__chip" onClick={() => setAddOpen(true)}>
             + {t("Connecter", "Connect", en)}
           </button>
-          <Link href="/app/clippers" className="ss-fan__chip">
-            {t("Clippers", "Clippers", en)} →
-          </Link>
         </div>
       </div>
 
@@ -543,7 +547,7 @@ export function AccountsFan() {
         {!count ? (
           <div className="ss-fan__empty">
             <b>{t("Aucun compte pour l'instant", "No account yet", en)}</b>
-            <span>{t("Connecte un TikTok ou ajoute un clipper pour remplir l'éventail.", "Connect a TikTok or add a clipper to fill the fan.", en)}</span>
+            <span>{t("Connecte un TikTok ou ajoute un compte de ton réseau pour remplir l'éventail.", "Connect a TikTok or add a network account to fill the fan.", en)}</span>
             <button type="button" className="ss-btn-purple" onClick={() => setAddOpen(true)}>
               {t("Connecter un compte", "Connect an account", en)}
             </button>
@@ -551,58 +555,6 @@ export function AccountsFan() {
         ) : null}
       </div>
 
-      {current ? (
-        <div className="ss-fan__detail" key={`d-${current.id}`}>
-          <div className="ss-fan__detail-id">
-            {current.avatar ? <img src={current.avatar} alt="" /> : <span>{current.handle.slice(0, 2).toUpperCase()}</span>}
-            <div>
-              <b>{current.name}</b>
-              <span>
-                @{current.handle} · {current.platform === "tiktok" ? "TikTok" : current.platform === "instagram" ? "Instagram" : current.platform}
-                {current.verdict ? ` · ${current.verdict}` : ""}
-              </span>
-            </div>
-            <span className={`ss-badge ${current.connected ? "is-ready" : "is-wait"}`}>
-              {current.connected ? t("Connecté", "Connected", en) : current.kind === "clipper" ? t("Réseau", "Network", en) : t("Lié", "Linked", en)}
-            </span>
-          </div>
-          <dl className="ss-fan__stats">
-            <div>
-              <dt>{t("Abonnés", "Followers", en)}</dt>
-              <dd>{compact(current.followers)}</dd>
-            </div>
-            <div>
-              <dt>Likes</dt>
-              <dd>{compact(current.likes)}</dd>
-            </div>
-            <div>
-              <dt>Posts</dt>
-              <dd>{compact(current.posts)}</dd>
-            </div>
-            <div>
-              <dt>{t("Part du réseau", "Share of network", en)}</dt>
-              <dd>{share}%</dd>
-            </div>
-          </dl>
-          <div className="ss-fan__detail-actions">
-            {current.kind === "channel" ? (
-              <button type="button" className="ss-fan__chip is-on" onClick={() => openInCalendar(current)}>
-                {t("Calendrier du compte", "Account calendar", en)}
-              </button>
-            ) : (
-              <Link href="/app/clippers" className="ss-fan__chip is-on">
-                {t("Fiche clipper", "Clipper card", en)}
-              </Link>
-            )}
-            <Link href="/app/analytics" className="ss-fan__chip">
-              Analytics
-            </Link>
-            <a href={`https://www.tiktok.com/@${current.handle}`} target="_blank" rel="noreferrer" className="ss-fan__chip">
-              TikTok ↗
-            </a>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

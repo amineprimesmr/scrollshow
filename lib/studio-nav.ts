@@ -17,12 +17,12 @@ export const STUDIO_NAV: NavItem[] = [
   { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },
   { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
   { href: "/app/analytics", fr: "Analytics", en: "Analytics", icon: "chart", section: "main" },
-  { href: "/app/clippers", fr: "Clippers", en: "Clippers", icon: "user", section: "main" },
   { href: "/app/post-us", fr: "Poster aux US", en: "Post to the US", icon: "globe", section: "main" },
   { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main" },
   { href: "/app/integrations", fr: "Comptes", en: "Accounts", icon: "tiktok", section: "bottom" },
   { href: "/app/mcp", fr: "MCP", en: "MCP", icon: "mcp", section: "bottom" },
   { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "bottom" },
+  { href: "/app/clippers", fr: "Devenir clipper", en: "Become a clipper", icon: "user", section: "bottom" },
   { href: "/app/settings", fr: "Réglages", en: "Settings", icon: "settings", section: "bottom" },
 ];
 

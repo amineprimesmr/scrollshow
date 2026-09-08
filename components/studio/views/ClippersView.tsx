@@ -92,7 +92,7 @@ export function ClippersView() {
         return;
       }
       if (res.status === 402) {
-        setError(t("Passe à un plan payant pour ajouter des clippers.", "Upgrade to a paid plan to add clippers.", en));
+        setError(t("Passe à un plan payant pour ajouter des comptes.", "Upgrade to a paid plan to add accounts.", en));
         return;
       }
       if (!res.ok || !json.account) throw new Error(json.error || "failed");
@@ -135,11 +135,11 @@ export function ClippersView() {
   return (
     <div className="ss-clippers">
       <div className="ss-panel">
-        <h2>{t("Réseau clippers", "Clippers network", en)}</h2>
+        <h2>{t("Ton réseau de comptes", "Your accounts network", en)}</h2>
         <p className="ss-lead">
           {t(
-            "Les comptes TikTok qui postent pour toi ou que tu veux reverse-engineer. Les abonnés, likes et nombre de posts viennent du profil public TikTok, sans clé API. Donne un verdict, note les formats qui marchent.",
-            "The TikTok accounts posting for you or the ones you want to reverse-engineer. Followers, likes and post counts come from the public TikTok profile, no API key. Set a verdict, note the formats that work.",
+            "Les comptes TikTok qui postent pour toi ou que tu veux reverse-engineer. Les abonnés, likes et nombre de posts viennent du profil public TikTok, sans clé API. Donne un verdict, note les formats qui marchent. Ils apparaissent dans l'éventail de l'Overview.",
+            "The TikTok accounts posting for you or the ones you want to reverse-engineer. Followers, likes and post counts come from the public TikTok profile, no API key. Set a verdict, note the formats that work. They show up in the Overview fan.",
             en,
           )}
         </p>
