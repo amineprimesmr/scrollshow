@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import localFont from "next/font/local";
-import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const wordmarkFont = localFont({
   src: "../node_modules/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2",
@@ -15,6 +16,19 @@ const wordmarkFont = localFont({
 type Panel = "more" | "product" | "platforms" | "resources";
 export function LandingNavigation({ english }: { english: boolean }) {
   const [panel, setPanel] = useState<Panel | null>(null);
+  const pathname = usePathname();
+
+  // « Tarifs » vise la section offres de la page d'accueil : on y défile quand on
+  // y est déjà, et on y revient depuis une autre page grâce à l'ancre.
+  const goToPricing = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (pathname !== "/") return;
+    const target = document.getElementById("offre");
+    if (!target) return;
+    event.preventDefault();
+    setPanel(null);
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "/#offre");
+  }, [pathname]);
   const [scrolled, setScrolled] = useState(false);
   const ref = useRef<HTMLElement>(null);
   const lastTrigger = useRef<HTMLElement | null>(null);
@@ -75,14 +89,14 @@ export function LandingNavigation({ english }: { english: boolean }) {
         <div className="sn-bar"><div className="sn-left">
           <button className="sn-toggle" aria-label={panel ? t("Fermer le menu", "Close menu") : t("Ouvrir le menu", "Open menu")} aria-expanded={!!panel} aria-controls="sn-surface" onClick={e => open(panel ? null : "more", e.currentTarget)}><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden><g className="sn-line sn-line-top"><path d="M7.5 15.5h17" /></g><g className="sn-line sn-line-bottom"><path d="M7.5 15.5h17" /></g></svg></button>
           <Link className="sn-mobile-logo" href="/" aria-label="ScrollShow"><img src="/logo.png" alt="" width="32" height="32" /><span aria-hidden>SCROLLSHOW</span></Link>
-          <nav className="sn-primary" aria-label={t("Navigation principale", "Main navigation")}>{groups.map(g => <button key={g.id} id={`sn-trigger-${g.id}`} className="sn-trigger" aria-controls={`sn-panel-${g.id}`} aria-expanded={panel === g.id} onClick={e => open(panel === g.id ? null : g.id, e.currentTarget)}><span>{g.label}</span></button>)}<Link className="sn-trigger" href="/pricing"><span>{t("Tarifs", "Pricing")}</span></Link></nav>
+          <nav className="sn-primary" aria-label={t("Navigation principale", "Main navigation")}>{groups.map(g => <button key={g.id} id={`sn-trigger-${g.id}`} className="sn-trigger" aria-controls={`sn-panel-${g.id}`} aria-expanded={panel === g.id} onClick={e => open(panel === g.id ? null : g.id, e.currentTarget)}><span>{g.label}</span></button>)}<Link className="sn-trigger" href="/#offre" onClick={goToPricing}><span>{t("Tarifs", "Pricing")}</span></Link></nav>
         </div>
         <Link className="sn-wordmark" href="/" aria-label="ScrollShow"><img src="/logo.png" alt="" width="28" height="28" /><span aria-hidden>SCROLLSHOW</span></Link>
         <div className="sn-right"><Link className="sn-login" href="/signup?mode=signin">{t("Connexion", "Log in")}</Link><Link className="sn-support" href="/support" aria-label={t("Assistance", "Support")}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden><path d="M5 14v-3a7 7 0 0 1 14 0v3M5 12H3v6h4v-6H5Zm14 0h2v6h-4v-6h2Zm0 6c0 3-3 3-6 3" /></svg></Link><Link className="sn-download" href="/signup">{t("Commencer", "Get started")}</Link></div></div>
       </div>
       <div className="sn-surface lg" id="sn-surface" inert={!panel}><div className="sn-clip">
         <div className="sn-more" hidden={panel !== "more"}>
-          <div className="sn-more-primary">{groups.map(g => <button key={g.id} onClick={() => { open(g.id); requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(`#sn-panel-${g.id} .sn-back`)?.focus()); }}>{g.label}<span aria-hidden>›</span></button>)}<Link href="/pricing">{t("Tarifs", "Pricing")}<span aria-hidden>›</span></Link></div>
+          <div className="sn-more-primary">{groups.map(g => <button key={g.id} onClick={() => { open(g.id); requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(`#sn-panel-${g.id} .sn-back`)?.focus()); }}>{g.label}<span aria-hidden>›</span></button>)}<Link href="/#offre" onClick={goToPricing}>{t("Tarifs", "Pricing")}<span aria-hidden>›</span></Link></div>
           <div className="sn-more-group"><h2>{t("DÉCOUVRIR", "DISCOVER")}</h2><a href="#comment">{t("Comment ça marche", "How it works")}</a><a href="#reseaux">{t("Plateformes", "Platforms")}</a><a href="#faq">FAQ</a></div>
           <div className="sn-more-group"><h2>SCROLLSHOW</h2><Link href="/support">{t("Assistance", "Support")}</Link><Link href="/privacy">{t("Confidentialité", "Privacy")}</Link><Link href="/terms">{t("Conditions d’utilisation", "Terms of use")}</Link></div>
         </div>
