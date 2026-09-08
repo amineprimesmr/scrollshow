@@ -18,7 +18,7 @@ export function SetupWidget() {
 
   useEffect(() => {
     try {
-      setDismissed(localStorage.getItem(KEY) === "1");
+      setDismissed(sessionStorage.getItem(KEY) === "1");
     } catch {
       /* ignore */
     }
@@ -50,7 +50,7 @@ export function SetupWidget() {
   function dismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem(KEY, "1");
+      sessionStorage.setItem(KEY, "1"); // hidden for this visit only, back next time
     } catch {
       /* ignore */
     }
