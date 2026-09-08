@@ -761,6 +761,8 @@ button.ss-day__n:hover {
   font-weight: 650;
   color: var(--ss-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ss-post.is-failed .ss-post__text small {
@@ -5220,6 +5222,7 @@ a.ss-btn-ghost {
 
 .ss-folder__front {
   position: absolute;
+  z-index: 4;
   left: 0;
   right: 0;
   bottom: 0;
