@@ -6965,3 +6965,122 @@ a.ss-btn-ghost {
     width: min(320px, calc(100vw - 24px));
   }
 }
+
+/* ---- Effect libraries (img-fx, metal-fx, thinking-orbs, border-beam, liquid-gooey) ---- */
+
+.ss-fx-loading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 22px 22px;
+  padding: 18px 22px;
+  color: var(--ss-muted);
+  font-size: 14px;
+  animation: ss-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ss-acc .ss-fx-loading {
+  margin: 0;
+  padding: 12px 0;
+}
+
+.ss-loading-skel--fx {
+  padding: 18px 22px;
+}
+
+.ss-loading-skel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: var(--ss-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ss-loading-skel__card.is-fx {
+  background: var(--ss-card);
+  animation: none;
+  border: 1px solid var(--ss-line);
+}
+
+/* Sidebar liquid pill: the surface flows between links, so the active link
+   itself stays transparent and the pill carries the highlight. */
+.ss-sidebar__nav {
+  position: relative;
+}
+
+.ss-sidebar__nav.has-pill .ss-sidebar-link.is-active,
+.ss-sidebar__nav.has-pill .ss-sidebar-link.is-highlight {
+  background: transparent;
+  box-shadow: none;
+}
+
+.ss-sidebar__nav.has-pill .ss-sidebar-link {
+  position: relative;
+  z-index: 1;
+}
+
+.ss-sidebar__pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  border-radius: 12px;
+  pointer-events: none;
+  transition: transform 0.5s cubic-bezier(0.2, 1.3, 0.4, 1), width 0.3s ease, height 0.3s ease;
+}
+
+/* Orbs inside buttons and status lines */
+.ss-btn-purple canvas,
+.ss-btn-ghost canvas,
+.ss-fan__chip canvas {
+  margin-right: 8px;
+}
+
+.ss-ttp__muted--orb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-ttp__status canvas,
+.ss-mcp-card__warn canvas {
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.ss-slide-preview__busy {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+}
+
+/* Beam wrappers must not break the grids they sit in. */
+.ss-sb-card__beam {
+  display: block;
+  min-width: 0;
+}
+
+.ss-sb-card__beam > .ss-sb-card {
+  height: 100%;
+}
+
+.ss-mcp-card__beam {
+  display: block;
+  min-width: 0;
+}
+
+.ss-mcp-card__beam > .ss-mcp-card {
+  height: 100%;
+}
+
+.ss-setup__metal {
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-fx-loading {
+    animation: none;
+  }
+}

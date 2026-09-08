@@ -7,6 +7,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useStudio } from "../StudioContext";
 import { IconX } from "../icons";
+import { Beam } from "@/components/fx/Beam";
+import { Metal } from "@/components/fx/Metal";
+import { Orb } from "@/components/fx/Orb";
 import { ShadowbanDetail } from "./ShadowbanDetail";
 
 /** A card's lifecycle: connected accounts start analyzing, lookups arrive done. */
@@ -78,10 +81,7 @@ function Indicator({ level, pending }: { level: ShadowbanLevel | null; pending: 
   return (
     <div className={`ss-sb-ind ${pending ? "is-pending" : ""}`} data-level={level || ""}>
       {pending ? (
-        <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden>
-          <circle className="ss-sb-ind__track" cx="32" cy="32" r="26" />
-          <circle className="ss-sb-ind__arc" cx="32" cy="32" r="26" strokeDasharray="46 200" />
-        </svg>
+        <Orb size={64} state="searching" />
       ) : (
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden>
           {ICONS[level || "insufficient"]}
@@ -139,6 +139,7 @@ function AccountCard({
         : t("TikTok n'a pas répondu pour ce compte.", "TikTok did not answer for this account.", en);
 
   return (
+    <Beam active={selected} size="md" colorVariant={level === "likely" ? "sunset" : level === "mild" ? "sunset" : "mono"} strength={0.7} className="ss-sb-card__beam">
     <article
       className={`ss-sb-card ${card.status} ${selected ? "is-selected" : ""} ${lookup ? "is-lookup" : ""}`}
       style={{ "--i": index } as React.CSSProperties}
@@ -225,6 +226,7 @@ function AccountCard({
         </button>
       ) : null}
     </article>
+    </Beam>
   );
 }
 
@@ -396,10 +398,12 @@ export function ShadowbanView() {
             spellCheck={false}
             aria-label={t("Compte TikTok à vérifier", "TikTok account to check", en)}
           />
-          <button type="submit" className="ss-btn-purple lg-press" disabled={!query.trim() || searching}>
-            {searching ? <i className="ss-sb__spinner" aria-hidden /> : null}
-            {searching ? t("Analyse…", "Checking…", en) : t("Vérifier", "Check", en)}
-          </button>
+          <Metal preset="silver" strength={searching ? 1 : 0.7}>
+            <button type="submit" className="ss-btn-purple lg-press" disabled={!query.trim() || searching}>
+              {searching ? <Orb size={20} state="searching" invert /> : null}
+              {searching ? t("Analyse…", "Checking…", en) : t("Vérifier", "Check", en)}
+            </button>
+          </Metal>
         </form>
         {searchError ? (
           <p className="ss-sb__error ss-flash-in" role="alert">

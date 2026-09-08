@@ -20,7 +20,7 @@ import {
   agentUpdateRecipe,
   agentWhoami,
 } from "@/lib/agent";
-import { agentOptions } from "@/lib/agent-http";
+import { agentOptions, keyFromUrl } from "@/lib/agent-http";
 import { resolveApiKey } from "@/lib/api-keys";
 import { hasStudioAccess } from "@/lib/plans";
 import { recipeInputSchema } from "@/lib/recipe";
@@ -469,8 +469,11 @@ const handler = createMcpHandler(
   },
 );
 
-async function verifyToken(_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
-  if (!bearerToken) return undefined;
+async function verifyToken(req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  // Clients that cannot send headers (Claude connectors, plain URLs) carry the key in the address.
+  const token = bearerToken || keyFromUrl(req);
+  if (!token) return undefined;
+  bearerToken = token;
   const user = await resolveApiKey(bearerToken);
   if (!user || !hasStudioAccess(user.plan)) return undefined;
   return {

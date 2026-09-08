@@ -3,6 +3,10 @@
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { ImageGeneration } from "img-fx";
+import { Beam } from "@/components/fx/Beam";
+import { Metal } from "@/components/fx/Metal";
+import { useAppTheme, useReducedMotion } from "@/components/fx/useFx";
 
 const REELS = [
   { src: "/assets/tiktoks/01-glowup-188k.png", slot: 1 },
@@ -71,6 +75,8 @@ function AvatarStack() {
 function ViewsHero({ english }: { english: boolean }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [phase, setPhase] = useState("boot");
+  const theme = useAppTheme();
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -105,9 +111,29 @@ function ViewsHero({ english }: { english: boolean }) {
         <div className="af-ld-stage__cards" aria-hidden>
           {REELS.map((reel, index) => (
             <figure key={reel.src} className={`af-ld-reel af-ld-reel--${reel.slot}`} style={{ "--i": index } as React.CSSProperties}>
-              <div className="af-ld-reel__frame">
-                <img src={reel.src} alt="" width={364} height={476} />
-              </div>
+              {reduced ? (
+                <div className="af-ld-reel__frame">
+                  <img src={reel.src} alt="" width={364} height={476} />
+                </div>
+              ) : (
+                <ImageGeneration
+                  preset={index % 2 ? "pixels-mechanic" : "pixels-organic"}
+                  theme={theme}
+                  images={reel.src}
+                  autoReveal
+                  revealInitialDelay={[0.4 + index * 0.35, 1.2 + index * 0.35]}
+                  revealDelayRange={[1.2, 2.4]}
+                  revealHoldMs={[7000, 12000]}
+                  revealFadeOutMs={500}
+                  strength={0.85}
+                  pixelScale={0.7}
+                  borderRadius={18}
+                  paused={phase === "boot"}
+                  style={{ display: "block" }}
+                >
+                  <div className="af-ld-reel__frame is-fx" />
+                </ImageGeneration>
+              )}
             </figure>
           ))}
         </div>
@@ -128,10 +154,12 @@ function ViewsHero({ english }: { english: boolean }) {
             )}
           </p>
           <div className="af-ld-hero-cta-wrap">
-            <Link href="/pricing" className="af-ld-hero-cta">
-              <Logo size={28} />
-              <span className="af-ld-hero-cta__label">{t("Créer mon espace", "Create my workspace", english)}</span>
-            </Link>
+            <Metal preset="chromatic" strength={0.9} keepStyles>
+              <Link href="/pricing" className="af-ld-hero-cta">
+                <Logo size={28} />
+                <span className="af-ld-hero-cta__label">{t("Créer mon espace", "Create my workspace", english)}</span>
+              </Link>
+            </Metal>
           </div>
         </div>
       </div>
@@ -247,7 +275,7 @@ export function Landing() {
               </div>
             </header>
             <div className="af-ld-steps__grid">
-              <article className="af-ld-step-card">
+              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-icons">
                     <Logo size={72} />
@@ -257,8 +285,8 @@ export function Landing() {
                 </div>
                 <h3>1 - {t("Crée ton espace", "Create your workspace", english)}</h3>
                 <p>{t("Choisis un plan, 3 jours d’essai, puis tu ouvres le studio.", "Pick a plan, 3-day trial, then you open the studio.", english)}</p>
-              </article>
-              <article className="af-ld-step-card">
+              </article></Beam>
+              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-chips">
                     <span>glow up</span>
@@ -269,8 +297,8 @@ export function Landing() {
                 </div>
                 <h3>2 - {t("Connecte TikTok", "Connect TikTok", english)}</h3>
                 <p>{t("Login Kit officiel. Profil, stats, liste de posts — les 6 scopes.", "Official Login Kit. Profile, stats, post list — all 6 scopes.", english)}</p>
-              </article>
-              <article className="af-ld-step-card">
+              </article></Beam>
+              <Beam hover size="pulse-inner" colorVariant="ocean" strength={0.7} className="af-ld-step-card__beam"><article className="af-ld-step-card is-beamed">
                 <div className="af-ld-step-visual">
                   <div className="af-ld-step-earn">
                     <span className="af-ld-step-earn__amount">Keep</span>
@@ -279,7 +307,7 @@ export function Landing() {
                 </div>
                 <h3>3 - {t("Publie le carrousel", "Publish the carousel", english)}</h3>
                 <p>{t("Privacy, disclosure, Direct Post. Tes stats reviennent dans Analytics.", "Privacy, disclosure, Direct Post. Stats land back in Analytics.", english)}</p>
-              </article>
+              </article></Beam>
             </div>
           </div>
         </section>
@@ -343,11 +371,13 @@ export function Landing() {
                   </li>
                 ))}
               </ul>
-              <Link href="/pricing" className="af-ld-offer__cta">
-                <CtaDot />
-                {t("Créer mon espace", "Create my workspace", english)}
-                <span aria-hidden>›</span>
-              </Link>
+              <Metal preset="chromatic" strength={0.85} keepStyles>
+                <Link href="/pricing" className="af-ld-offer__cta">
+                  <CtaDot />
+                  {t("Créer mon espace", "Create my workspace", english)}
+                  <span aria-hidden>›</span>
+                </Link>
+              </Metal>
             </article>
           </div>
         </section>
@@ -410,11 +440,13 @@ export function Landing() {
                   <span>{t("Créateurs ScrollShow", "ScrollShow creators", english)}</span>
                 </span>
               </div>
-              <Link href="/pricing" className="af-ld-closing__cta">
-                <CtaDot />
-                {t("Créer mon espace", "Create my workspace", english)}
-                <span aria-hidden>›</span>
-              </Link>
+              <Metal preset="chromatic" strength={0.85} keepStyles>
+                <Link href="/pricing" className="af-ld-closing__cta">
+                  <CtaDot />
+                  {t("Créer mon espace", "Create my workspace", english)}
+                  <span aria-hidden>›</span>
+                </Link>
+              </Metal>
             </article>
             <div className="af-ld-closing__brand" aria-hidden>
               <Logo size={72} />

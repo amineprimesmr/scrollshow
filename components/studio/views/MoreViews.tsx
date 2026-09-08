@@ -6,6 +6,7 @@ import type { WarmedOrder, WarmedOrderStatus } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "../StudioContext";
+import { LoadingOrb } from "@/components/fx/Orb";
 
 type Filter = { region: "all" | "us" | "eu"; platform: "all" | "tiktok" | "instagram" };
 
@@ -126,7 +127,7 @@ export function WarmedAccountsView() {
           ))}
         </div>
 
-        {loading ? <p className="ss-lead">{t("Chargement…", "Loading…", en)}</p> : null}
+        {loading ? <LoadingOrb state="working" text={t("Chargement…", "Loading…", en)} /> : null}
         {error ? <p className="ss-lead ss-lead--err">{error}</p> : null}
         {flash ? <p className="ss-lead ss-warmed-flash">{flash}</p> : null}
 

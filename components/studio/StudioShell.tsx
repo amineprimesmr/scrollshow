@@ -16,6 +16,8 @@ import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
+import { LiquidNav } from "@/components/fx/LiquidNav";
+import { Metal } from "@/components/fx/Metal";
 import { StudioFlash } from "./StudioFlash";
 
 function initialsOf(name?: string, email?: string) {
@@ -164,11 +166,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             <IconX size={18} />
           </button>
         </div>
-        <nav className="ss-sidebar__nav">
+        <LiquidNav className="ss-sidebar__nav" activeKey={pathname}>
           {mainNav.map((entry) => (
             <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
           ))}
-        </nav>
+        </LiquidNav>
         <nav className="ss-sidebar__bottom">
           {bottomNav.map((entry) => (
             <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
@@ -180,17 +182,19 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       {onCalendar ? (
         <aside className="ss-channels">
           <h2>{t("Comptes", "Channels", english)}</h2>
-          <button
-            className="ss-btn-purple ss-btn-wide"
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setPostOpen(true);
-            }}
-          >
-            <IconPlus size={16} />
-            {t("Nouveau post", "New post", english)}
-          </button>
+          <Metal preset="silver" strength={0.8} className="ss-btn-wide">
+            <button
+              className="ss-btn-purple ss-btn-wide"
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setPostOpen(true);
+              }}
+            >
+              <IconPlus size={16} />
+              {t("Nouveau post", "New post", english)}
+            </button>
+          </Metal>
           <button className="ss-btn-ghost ss-btn-wide" type="button" onClick={() => setAddOpen(true)}>
             {t("Connecter un compte", "Connect an account", english)}
           </button>

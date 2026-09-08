@@ -20,6 +20,8 @@ import { useEffect, useRef, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
 import { useStudio } from "./StudioContext";
 import { blockedCopy, optionsErrorCopy, PublishStatus, type PublishProgress, TikTokPublishPanel, useTikTokCreator } from "./TikTokPublishPanel";
+import { Metal } from "@/components/fx/Metal";
+import { Orb } from "@/components/fx/Orb";
 
 function rebuildCopy(code: string, english: boolean) {
   if (code === "ai_gateway_billing") {
@@ -426,7 +428,8 @@ export function CreatePostModal() {
               <SlidePreview slide={slide} recipe={recipe} width={280} original={showOriginal} />
               {rebuilding ? (
                 <div className="ss-slide-preview__busy">
-                  {t("Extraction des textes…", "Extracting texts…", english)}
+                  <Orb size={64} state="solving" invert />
+                  <span>{t("Extraction des textes…", "Extracting texts…", english)}</span>
                 </div>
               ) : null}
             </div>
@@ -608,9 +611,12 @@ export function CreatePostModal() {
                       : undefined
                 }
               >
-                <button className="ss-btn-purple" type="button" disabled={!canPublish} onClick={publishNow}>
-                  {pending ? "…" : t("Publier sur TikTok", "Post to TikTok", english)}
-                </button>
+                <Metal preset="chromatic" strength={canPublish ? 0.95 : 0.35}>
+                  <button className="ss-btn-purple" type="button" disabled={!canPublish} onClick={publishNow}>
+                    {pending ? <Orb size={20} state="connecting" invert /> : null}
+                    {pending ? t("Publication…", "Publishing…", english) : t("Publier sur TikTok", "Post to TikTok", english)}
+                  </button>
+                </Metal>
               </span>
             </div>
           </div>

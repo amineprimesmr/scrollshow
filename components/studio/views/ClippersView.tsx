@@ -5,6 +5,7 @@ import type { Account } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "../StudioContext";
+import { LoadingOrb } from "@/components/fx/Orb";
 
 type Verdict = Account["verdict"];
 type Filter = "all" | Verdict;
@@ -195,7 +196,7 @@ export function ClippersView() {
             ))}
           </div>
         </div>
-        {loading ? <p className="ss-lead">{t("Chargement…", "Loading…", en)}</p> : null}
+        {loading ? <LoadingOrb state="searching" text={t("Chargement…", "Loading…", en)} /> : null}
         {!loading && !filtered.length ? (
           <p className="ss-lead">{t("Aucun compte. Ajoute un @handle ci-dessus.", "No account yet. Add a @handle above.", en)}</p>
         ) : null}

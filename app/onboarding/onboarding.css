@@ -302,6 +302,7 @@ html:has(.ss-onb) body.grain {
   transform: scale(0.97);
 }
 
+.ss-onb-cta.is-disabled,
 .ss-onb-cta:disabled {
   opacity: 0.45;
   cursor: default;
@@ -817,7 +818,7 @@ html:has(.ss-onb) body.grain {
 /* ── AI clients ── */
 .ss-onb-clients {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -974,7 +975,7 @@ html:has(.ss-onb) body.grain {
   }
 
   .ss-onb-clients {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .ss-onb-url {

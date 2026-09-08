@@ -1610,3 +1610,19 @@ html.page-affiliate #affiliate-root {
     animation: none;
   }
 }
+
+/* ---- Effect libraries ---- */
+.af-ld-reel__frame.is-fx {
+  aspect-ratio: 364 / 476;
+  height: auto;
+  background: var(--ss-card, #111);
+}
+
+.af-ld-step-card__beam {
+  display: block;
+  min-width: 0;
+}
+
+.af-ld-step-card__beam > .af-ld-step-card {
+  height: 100%;
+}

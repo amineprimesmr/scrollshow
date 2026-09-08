@@ -5,6 +5,9 @@ import { BrandMark } from "@/components/BrandMark";
 import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { t as tr } from "@/lib/i18n";
 import { useStudio } from "./StudioContext";
+import { Beam } from "@/components/fx/Beam";
+import { Metal } from "@/components/fx/Metal";
+import { Orb } from "@/components/fx/Orb";
 
 type ClientId = AiClientId;
 
@@ -259,9 +262,11 @@ export function DeveloperAccess() {
               <img src={item.logo} alt="" style={{ background: item.bg }} />
             </span>
           ))}
-          <span className="ss-mcp-orbit__item is-core">
-            <img src="/logo.png" alt="" />
-          </span>
+          <Metal variant="circle" preset="chromatic" strength={0.9} keepStyles>
+            <span className="ss-mcp-orbit__item is-core">
+              <img src="/logo.png" alt="" />
+            </span>
+          </Metal>
           {CLIENTS.slice(2).map((item) => (
             <span key={item.id} className="ss-mcp-orbit__item">
               <img src={item.logo} alt="" style={{ background: item.bg }} />
@@ -298,7 +303,8 @@ export function DeveloperAccess() {
 
         <div className="ss-mcp-board">
           {stepList.map((step) => (
-            <article key={`${client}-${step.n}`} className="ss-mcp-card">
+            <Beam key={`${client}-${step.n}`} active={Boolean(step.primary)} size="pulse-inner" colorVariant="ocean" strength={0.6} className="ss-mcp-card__beam">
+            <article className="ss-mcp-card">
               <span className="ss-mcp-card__n">{step.n}</span>
               <h3>
                 {step.n === "1" ? <BrandMark size={18} /> : null}
@@ -315,7 +321,9 @@ export function DeveloperAccess() {
                   />
                 ) : null}
                 {step.sensitive && !revealed && creating ? (
-                  <p className="ss-mcp-card__warn">{tx("Génération de ta clé…", "Generating your key…")}</p>
+                  <p className="ss-mcp-card__warn">
+                    <Orb size={20} state="weaving" /> {tx("Génération de ta clé…", "Generating your key…")}
+                  </p>
                 ) : null}
                 {step.sensitive && error ? (
                   <p className="ss-mcp-error">
@@ -348,6 +356,7 @@ export function DeveloperAccess() {
                 ) : null}
               </div>
             </article>
+            </Beam>
           ))}
         </div>
       </div>

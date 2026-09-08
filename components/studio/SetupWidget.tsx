@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { IconCheck, IconX } from "./icons";
 import { useStudio } from "./StudioContext";
+import { Metal } from "@/components/fx/Metal";
 
 const KEY = "ss-setup-collapsed";
 
@@ -85,15 +86,17 @@ export function SetupWidget() {
           ))}
         </ul>
       </div>
-      <button type="button" className="ss-setup__pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <svg className="ss-setup__ring" viewBox="0 0 36 36" aria-hidden>
-          <circle cx="18" cy="18" r="15.5" />
-          <circle cx="18" cy="18" r="15.5" style={{ strokeDasharray: `${pct} 100` }} />
-        </svg>
-        <span>
-          {t("Configuration", "Setup", en)} · {done}/{steps.length}
-        </span>
-      </button>
+      <Metal preset="chromatic" strength={0.7} keepStyles className="ss-setup__metal">
+        <button type="button" className="ss-setup__pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          <svg className="ss-setup__ring" viewBox="0 0 36 36" aria-hidden>
+            <circle cx="18" cy="18" r="15.5" />
+            <circle cx="18" cy="18" r="15.5" style={{ strokeDasharray: `${pct} 100` }} />
+          </svg>
+          <span>
+            {t("Configuration", "Setup", en)} · {done}/{steps.length}
+          </span>
+        </button>
+      </Metal>
     </div>
   );
 }

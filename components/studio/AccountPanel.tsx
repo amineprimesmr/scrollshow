@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { compact, type FanItem } from "./AccountsFan";
 import { IconChevron } from "./icons";
 import { useStudio } from "./StudioContext";
+import { FxImage } from "@/components/fx/FxImage";
+import { LoadingOrb, Orb } from "@/components/fx/Orb";
 
 type Tab = "overview" | "videos" | "formats" | "revenue";
 type Range = 30 | 90 | "all";
@@ -204,7 +206,7 @@ export function AccountPanel({
 
         {error ? <p className="ss-acc__error">{error}</p> : null}
 
-        {loading && !data ? <p className="ss-acc__muted">{t("Chargement…", "Loading…", en)}</p> : null}
+        {loading && !data ? <LoadingOrb state="searching" text={t("Lecture des statistiques…", "Reading the stats…", en)} /> : null}
 
         {data && tab === "overview" ? (
           <div className="ss-acc__grid">
@@ -218,7 +220,7 @@ export function AccountPanel({
             <Stat label={t("Revenus estimés", "Estimated revenue", en)} value={euro(data.revenue.estimated, en)} sub={`${data.revenue.rpm} € / 1k ${t("vues", "views", en)}`} accent />
             {data.videos[0] ? (
               <a className="ss-acc__best" href={data.videos[0].url || undefined} target="_blank" rel="noreferrer">
-                {data.videos[0].cover ? <img src={data.videos[0].cover} alt="" /> : <span />}
+                {data.videos[0].cover ? <FxImage src={data.videos[0].cover} width={56} height={74} radius={10} preset="pixels-mechanic" /> : <span />}
                 <div>
                   <small>{t("Meilleure vidéo", "Best video", en)}</small>
                   <b>{data.videos[0].title || t("Sans titre", "Untitled", en)}</b>
@@ -232,6 +234,7 @@ export function AccountPanel({
                 <b>{t("Pas encore de vidéos analysées", "No videos analysed yet", en)}</b>
                 {data.canFetch ? (
                   <button type="button" className="ss-fan__chip is-on" disabled={fetching} onClick={fetchVideos}>
+                    {fetching ? <Orb size={20} state="searching" invert /> : null}
                     {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les vidéos", "Analyse the videos", en)}
                   </button>
                 ) : (
@@ -264,6 +267,7 @@ export function AccountPanel({
               </span>
               {data.canFetch ? (
                 <button type="button" className="ss-fan__chip" disabled={fetching} onClick={fetchVideos}>
+                  {fetching ? <Orb size={20} state="searching" /> : null}
                   {fetching ? t("Analyse…", "Analysing…", en) : data.videos.length ? t("Actualiser", "Refresh", en) : t("Analyser les vidéos", "Analyse the videos", en)}
                 </button>
               ) : null}

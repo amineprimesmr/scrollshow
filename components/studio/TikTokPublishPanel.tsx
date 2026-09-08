@@ -13,6 +13,7 @@ import {
   validatePostOptions,
 } from "@/lib/tiktok-compliance";
 import { useCallback, useEffect, useState } from "react";
+import { Orb } from "@/components/fx/Orb";
 
 // The "Post to TikTok" page, built to the letter of TikTok's Content Sharing
 // Guidelines → Required UX Implementation in Your App (points 1-5):
@@ -163,7 +164,10 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
     <section className="ss-ttp" aria-label={t("Publier sur TikTok", "Post to TikTok", english)}>
       <header className="ss-ttp__creator">
         {loading ? (
-          <span className="ss-ttp__muted">{t("Chargement du compte TikTok…", "Loading TikTok account…", english)}</span>
+          <span className="ss-ttp__muted ss-ttp__muted--orb">
+            <Orb size={20} state="connecting" />
+            {t("Chargement du compte TikTok…", "Loading TikTok account…", english)}
+          </span>
         ) : creator ? (
           <>
             {creator.avatar ? <img src={creator.avatar} alt="" width={36} height={36} /> : <span className="ss-ttp__avatar" />}
@@ -358,7 +362,7 @@ export function PublishStatus({ progress, english, handle }: { progress: Publish
   }
   return (
     <p className="ss-ttp__status" role="status">
-      <span className="ss-spin" />{" "}
+      <Orb size={20} state="weaving" />{" "}
       {t(
         "Envoyé. TikTok traite le post — cela peut prendre quelques minutes avant qu'il soit visible sur ton profil.",
         "Sent. TikTok is processing the post — it may take a few minutes before it is visible on your profile.",
