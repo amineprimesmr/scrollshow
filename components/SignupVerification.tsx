@@ -47,16 +47,26 @@ export function SignupVerification({ email, token, next, onSignIn }: { email: st
     } catch (error) { setError(error instanceof Error ? error.message : "Connexion interrompue. Réessaie."); }
     finally { setBusy(false); }
   }
-  return <div className="ss-signup__stage" aria-busy={busy}>
-    <div className="ss-signup__mail-icon" aria-hidden>✉</div>
-    <h1 ref={heading} className="ss-signup__title" tabIndex={-1}>Vérifie ta boîte mail</h1>
-    <p className="ss-signup__sub">{expired ? "Demande un nouveau lien pour reprendre la préparation de ton espace." : token ? "Ton lien est prêt. Confirme ton adresse pour continuer." : <>Ouvre le lien envoyé{email ? <> à <strong>{email}</strong></> : " par email"}. Tu reprendras directement la préparation de ton espace.</>}</p>
-    <div className="ss-signup__notice" role="status">{message || (token ? "Ton compte et tes informations sont conservés. Si le lien a été ouvert sur un autre appareil, reconnecte-toi ici pour reprendre." : "Garde cette page ouverte : elle reprend automatiquement lorsque ton adresse est vérifiée dans ce navigateur.")}</div>
+  return <div className="ss-signup__stage ss-signup__verify" aria-busy={busy}>
+    <div className={`ss-signup__mail-art ${token && !expired ? "is-ready" : ""}`} aria-hidden="true">
+      <span className="ss-signup__mail-orbit" />
+      <svg width="42" height="42" viewBox="0 0 48 48" fill="none"><rect x="6" y="11" width="36" height="26" rx="6" stroke="currentColor" strokeWidth="2"/><path d="m8 14 13 10a5 5 0 0 0 6 0l13-10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+      <span className="ss-signup__mail-badge">{token && !expired ? "✓" : "↗"}</span>
+    </div>
+    <p className="ss-signup__eyebrow">{token && !expired ? "Une dernière étape" : "Direction ta boîte mail"}</p>
+    <h1 ref={heading} className="ss-signup__title" tabIndex={-1}>{expired ? "Un nouveau lien ?" : token ? "Tu y es presque." : "Ton invitation t’attend."}</h1>
+    <p className="ss-signup__sub">{expired ? "Renvoie un lien pour reprendre là où tu en étais." : token ? "Confirme ton adresse pour ouvrir ton espace." : "Clique sur le bouton de confirmation dans l’email."}</p>
+    {!token && email && <div className="ss-signup__email-tag">{email}</div>}
+    {!token && !message && <p className="ss-signup__waiting"><span aria-hidden="true" />En attente de confirmation</p>}
+    <div role="status" aria-live="polite">{message && <p className="ss-signup__verify-status">{message}</p>}</div>
     {error && <p className="ss-signup__error" role="alert">{error}</p>}
-    <button type="button" className="ss-signup__submit" disabled={busy || ((!token || expired) && cooldown > 0)} onClick={() => void submit(Boolean(token) && !expired)}>
+    <button type="button" className={`ss-signup__submit ${!token || expired ? "ss-signup__resend" : ""}`} disabled={busy || ((!token || expired) && cooldown > 0)} onClick={() => void submit(Boolean(token) && !expired)}>
       {busy ? "Un instant…" : token && !expired ? "Confirmer et continuer" : cooldown ? `Renvoyer dans ${cooldown} s` : "Renvoyer le lien"}
     </button>
-    <button type="button" className="ss-signup__text-button" disabled={busy} onClick={() => void resume().then(ok => { if (!ok) setMessage("Pas encore confirmé ici. Ouvre le lien reçu ou reconnecte-toi si tu l’as confirmé sur un autre appareil."); })}>J’ai déjà confirmé mon adresse</button>
-    <button type="button" className="ss-signup__text-button" disabled={busy} onClick={async () => { setBusy(true); try { await onSignIn(); } catch { setError("Impossible de revenir à la connexion. Réessaie."); } finally { setBusy(false); } }}>Revenir à la connexion</button>
+    <details className="ss-signup__verify-help"><summary>Besoin d’aide ?</summary>
+      <p>Vérifie les indésirables. Le lien reste valable 24 heures. Cette page reprend automatiquement après confirmation dans ce navigateur.</p>
+      <button type="button" className="ss-signup__text-button" disabled={busy} onClick={() => void resume().then(ok => { if (!ok) setMessage("Pas encore confirmé ici. Ouvre l’email ou reconnecte-toi si tu l’as validé sur un autre appareil."); })}>J’ai déjà confirmé mon adresse</button>
+      <button type="button" className="ss-signup__text-button" disabled={busy} onClick={async () => { setBusy(true); try { await onSignIn(); } catch { setError("Impossible de revenir à la connexion. Réessaie."); } finally { setBusy(false); } }}>Changer de compte / me reconnecter</button>
+    </details>
   </div>;
 }

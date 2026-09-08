@@ -35,8 +35,25 @@ html:has(.ss-signup) body.grain {
 
 .ss-signup__stage { animation: ss-auth-enter 220ms ease-out both; margin: 0; }
 @keyframes ss-auth-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.ss-signup__mail-icon { margin-top: 30px; width: 48px; height: 48px; border-radius: 16px; background: var(--ss-soft); display: grid; place-items: center; font-size: 25px; }
-.ss-signup__mail-icon + .ss-signup__title { margin-top: 20px; }
+.ss-signup__verify { padding-top: 38px; }
+.ss-signup__mail-art { position: relative; width: 88px; height: 88px; display: grid; place-items: center; color: var(--ss-ink); background: var(--ss-soft); border: 1px solid var(--ss-line); border-radius: 26px; margin: 8px 0 30px; animation: ss-mail-arrive 650ms cubic-bezier(.2,.8,.2,1) both; }
+.ss-signup__mail-orbit { position: absolute; inset: -9px; border: 1px solid var(--ss-line); border-radius: 33px; animation: ss-mail-pulse 3s ease-out 2; }
+.ss-signup__mail-badge { position: absolute; right: -7px; bottom: -5px; width: 29px; height: 29px; border-radius: 50%; display: grid; place-items: center; background: var(--ss-ink); color: var(--ss-on-ink); border: 3px solid var(--ss-bg); font-size: 15px; }
+.ss-signup__eyebrow { font-size: 11px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; color: var(--ss-muted); margin: 0 0 12px; }
+.ss-signup__verify .ss-signup__title { margin-top: 0; font-size: clamp(28px,3.2vw,38px); line-height: 1.12; }
+.ss-signup__verify .ss-signup__sub { margin-top: 14px; font-size: 15px; line-height: 1.6; }
+.ss-signup__email-tag { display: inline-block; max-width: 100%; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; padding: 10px 14px; border: 1px solid var(--ss-line); border-radius: 12px; margin-top: 16px; }
+.ss-signup__waiting { display: flex; align-items: center; gap: 8px; margin: 24px 0 10px; font-size: 12px; color: var(--ss-muted); }
+.ss-signup__waiting span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: ss-mail-pulse 2s ease-in-out 3; }
+.ss-signup__verify-status { font-size: 13px; line-height: 1.6; color: var(--ss-muted); margin: 18px 0 0; }
+.ss-signup__resend { background: var(--ss-soft); color: var(--ss-ink); border: 1px solid var(--ss-line); }
+.ss-signup__resend:hover { background: var(--ss-line); }
+.ss-signup__verify-help { margin-top: 24px; color: var(--ss-muted); font-size: 13px; line-height: 1.6; }
+.ss-signup__verify-help summary { cursor: pointer; width: fit-content; }
+.ss-signup__verify-help p { margin: 14px 0 8px; }
+@keyframes ss-mail-arrive { from { opacity: 0; transform: translateY(10px) rotate(-6deg); } to { opacity: 1; transform: none; } }
+@keyframes ss-mail-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .ss-signup__mail-art, .ss-signup__mail-orbit, .ss-signup__waiting span { animation: none; } }
 .ss-signup__notice { padding: 16px; margin-top: 24px; border-radius: 14px; background: var(--ss-soft); color: var(--ss-muted); font-size: 14px; line-height: 1.6; }
 .ss-signup__text-button { display: block; padding: 8px 0; border: 0; margin: 6px 0 0; background: transparent; color: var(--ss-muted); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .ss-signup__text-button:disabled { opacity: .5; cursor: default; }
