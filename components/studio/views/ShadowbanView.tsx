@@ -132,7 +132,9 @@ function AccountCard({
   const source = card.status === "done" ? card.account.source : card.source;
   const lookup = source === "lookup";
   const errorCopy =
-    card.status === "error" && card.error === "private_or_empty"
+    card.status === "error" && card.error === "timeout"
+      ? t("L'analyse a été trop longue. Réessaie.", "The analysis took too long. Try again.", en)
+      : card.status === "error" && card.error === "private_or_empty"
       ? t("Compte privé ou sans post public.", "Private account or no public posts.", en)
       : card.status === "error" && card.error === "unavailable"
         ? t("Les posts n'ont pas pu être récupérés.", "Posts could not be fetched.", en)
@@ -279,26 +281,49 @@ export function ShadowbanView() {
     generation.current.set(target.key, gen);
     const fresh = () => generation.current.get(target.key) === gen;
     setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "loading" } }));
+    // Une requête qui ne revient jamais laisserait la carte tourner sans fin, et
+    // « Relancer » reste désactivé tant qu'une analyse est en cours : au-delà de
+    // deux minutes on rend la main avec un bouton Réessayer.
+    const timeout = window.setTimeout(() => {
+      if (!fresh()) return;
+      generation.current.set(target.key, gen + 1);
+      setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: "timeout" } }));
+    }, 120_000);
     fetch(`/api/tiktok/shadowban?key=${encodeURIComponent(target.key)}`)
       .then(async (res) => {
+        window.clearTimeout(timeout);
         const json = await res.json().catch(() => ({}));
         const account = json.accounts?.[0];
         if (!res.ok || !account || account.error) throw new Error(account?.error || json.error || "shadowban_failed");
         if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { key: target.key, status: "done", account } }));
       })
       .catch((error) => {
+        window.clearTimeout(timeout);
         if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: error instanceof Error ? error.message : "shadowban_failed" } }));
       });
   }, []);
 
   // Landing on the page starts every account's analysis at once; accounts
   // that appear later (library list arriving) start theirs on arrival.
+  // Un compte n'est analysé qu'une fois par exécution : la liste de la
+  // bibliothèque arrive après les comptes connectés, et ce second rendu ne doit
+  // pas périmer l'analyse déjà en vol — sinon sa réponse est ignorée et la carte
+  // reste sur « Analyse en cours » indéfiniment.
+  const startedRun = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const runs = startedRun.current;
+    targets.forEach((tg) => {
+      if (runs.get(tg.key) === runId) return;
+      runs.set(tg.key, runId);
+      analyze(tg);
+    });
+  }, [targets, analyze, runId]);
+
+  // Seul le démontage périme les réponses encore en vol.
   useEffect(() => {
     const gens = generation.current;
-    const started = targets.filter((tg) => runId > 0 || !gens.has(tg.key));
-    started.forEach(analyze);
-    return () => started.forEach((tg) => gens.set(tg.key, (gens.get(tg.key) || 0) + 1));
-  }, [targets, analyze, runId]);
+    return () => gens.forEach((value, key) => gens.set(key, value + 1));
+  }, []);
 
   const ordered: CardState[] = useMemo(
     () => targets.map((tg) => cards[tg.key]).filter((c): c is CardState => Boolean(c)),

@@ -92,6 +92,44 @@ export function buildAuthorizeUrl(state: string) {
   return url.toString();
 }
 
+const QR_CREATE = "https://open.tiktokapis.com/v2/oauth/get_qrcode/";
+const QR_CHECK = "https://open.tiktokapis.com/v2/oauth/check_qrcode/";
+
+export type TikTokQrStatus = "new" | "scanned" | "confirmed" | "expired" | "utilised";
+
+/** Flux QR officiel : l'utilisateur autorise depuis l'app TikTok de son téléphone. */
+export async function createQrCode(state: string) {
+  const { clientKey } = envConfig();
+  const res = await fetch(QR_CREATE, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_key: clientKey, scope: oauthScopes(), state }),
+  });
+  const data = await res.json();
+  const url = data.scan_qrcode_url || data.data?.scan_qrcode_url;
+  const token = data.token || data.data?.token;
+  if (!url || !token) throw new Error(JSON.stringify(data));
+  return { scanUrl: String(url), token: String(token) };
+}
+
+export async function checkQrCode(token: string) {
+  const { clientKey, clientSecret } = envConfig();
+  const res = await fetch(QR_CHECK, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, token }),
+  });
+  const data = await res.json();
+  const payload = data.data || data;
+  if (payload.error) throw new Error(JSON.stringify(data));
+  return {
+    status: String(payload.status || "new") as TikTokQrStatus,
+    code: String(payload.code || ""),
+    state: String(payload.state || ""),
+    clientTicket: String(payload.client_ticket || ""),
+  };
+}
+
 function normalizeToken(data: Record<string, any>) {
   const access_token = data.access_token || data.data?.access_token;
   if (!access_token) throw new Error(`Token exchange failed: ${JSON.stringify(data)}`);
