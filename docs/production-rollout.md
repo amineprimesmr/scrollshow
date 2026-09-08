@@ -1,5 +1,13 @@
 # Livraison SaaS — configuration et recette
 
+## Vérification intégrée au formulaire — 8 septembre 2026
+
+- L'écran séparé de confirmation email est retiré. Inscription, connexion, attente du lien et confirmation utilisent désormais le même formulaire `/signup`.
+- Les nouveaux emails pointent sur `/signup?verify=1#token=…`. L'ancienne route ne rend plus l'ancien écran : elle transfère les liens déjà envoyés au formulaire en conservant le fragment. Le jeton est ensuite retiré de l'adresse et conservé uniquement en mémoire pour la confirmation explicite.
+- Reprise automatique après confirmation dans le même navigateur, vérification au retour de focus, bouton de reprise manuelle pour un autre appareil, renvoi avec délai d'attente, erreurs de lien expiré et déconnexion explicite pour revenir à la connexion.
+- Formulaire français, étape mot de passe modifiable, affichage/masquage du mot de passe, champs désactivés pendant envoi, focus visible, transitions courtes et respect de `prefers-reduced-motion`. Nettoyage des styles de témoignages retirés ; panneau latéral non tronqué sur petits écrans en hauteur.
+- Vérifications navigateur sur compte fictif : connexion non vérifiée reste dans `/signup`, retour à la connexion sans boucle, ancien lien avec fragment → nouveau formulaire → confirmation → onboarding. Aucune vérification n'est supprimée côté serveur et aucun email réel n'a été envoyé par cette recette.
+
 ## Refonte du parcours d'acquisition — 8 septembre 2026
 
 - Les CTA de création ouvrent `/signup`, avec Google/email ; l'authentification existante reprend l'état réel du compte. Confirmation email requise avant onboarding et paiement.

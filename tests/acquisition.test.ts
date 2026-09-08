@@ -29,3 +29,14 @@ test("landing acquisition links lead to signup; checkout requires completed onbo
   const signup = await readFile("app/signup/page.tsx", "utf8");
   assert.doesNotMatch(signup, /29\s*€|99\s*€|CA generated|multi-million dollar/);
 });
+
+test("email verification stays in signup and old email links preserve their token", async () => {
+  const signup = await readFile("app/signup/page.tsx", "utf8");
+  assert.match(signup, /SignupVerification/);
+  assert.doesNotMatch(signup, /\/verify-email/);
+  const legacy = await readFile("app/verify-email/page.tsx", "utf8");
+  assert.match(legacy, /window\.location\.hash/);
+  assert.doesNotMatch(legacy, /ss-pricing|Confirme ton adresse email/);
+  const email = await readFile("lib/email-verification.ts", "utf8");
+  assert.match(email, /accountLink\("\/signup\?verify=1"/);
+});

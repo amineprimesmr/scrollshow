@@ -16,7 +16,7 @@ export async function issueVerification(userId: string) {
 }
 export async function deliverVerification(userId: string) {
   const item = await issueVerification(userId);
-  if (item) await sendAccountEmail(item.email, "ScrollShow — Confirmer ton adresse email", `Confirme ton adresse dans les 24 heures : ${accountLink("/verify-email", item.token)}\nSi tu n’as pas créé ce compte, ignore cet email.`);
+  if (item) await sendAccountEmail(item.email, "ScrollShow — Confirmer ton adresse email", `Confirme ton adresse dans les 24 heures : ${accountLink("/signup?verify=1", item.token)}\nSi tu n’as pas créé ce compte, ignore cet email.`);
 }
 export async function redeemVerification(token: string) {
   return updateStore(data => {

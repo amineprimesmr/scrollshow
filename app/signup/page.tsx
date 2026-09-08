@@ -1,10 +1,11 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
+import { SignupVerification } from "@/components/SignupVerification";
 import { afterAuthPath, googleStartUrl, signupUrl } from "@/lib/auth-urls";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import "./signup.css";
 
 const SETUP_STEPS = [
@@ -14,9 +15,9 @@ const SETUP_STEPS = [
 ];
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  google_not_configured: "Google sign-in is not configured yet.",
-  google_denied: "Google sign-in was cancelled.",
-  google: "Could not sign in with Google. Try again.",
+  google_not_configured: "La connexion Google est momentanément indisponible.",
+  google_denied: "La connexion Google a été annulée.",
+  google: "Connexion Google interrompue. Réessaie.",
 };
 
 function GoogleMark() {
@@ -44,18 +45,32 @@ function SignupForm() {
   const signin = params.get("mode") === "signin";
   const next = params.get("next");
   const queryError = GOOGLE_ERRORS[params.get("error") || ""] || "";
-  const [step, setStep] = useState<"email" | "password">("email");
+  const [step, setStep] = useState<"email" | "password" | "verification">("email");
+  const [verificationToken, setVerificationToken] = useState("");
+  const capturedToken = useRef<string | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   useEffect(() => {
     let active = true;
+    const token = capturedToken.current ?? (new URLSearchParams(window.location.hash.slice(1)).get("token") || "");
+    capturedToken.current = token;
+    if (token) {
+      setVerificationToken(token); setStep("verification"); setChecking(false);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return;
+    }
     fetch("/api/auth/me").then(r => r.json()).then(json => {
-      if (active && json.user) router.replace(json.user.emailVerified ? afterAuthPath(json.user.plan, next, json.user.onboarded) : `/verify-email?next=${encodeURIComponent(next || "/onboarding")}`);
-    }).catch(() => {});
+      if (!active) return;
+      if (json.user?.emailVerified) router.replace(afterAuthPath(json.user.plan, next, json.user.onboarded));
+      else if (json.user) { setEmail(json.user.email); setStep("verification"); }
+      else if (params.get("verify") === "1") setStep("verification");
+    }).catch(() => {}).finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
-  }, [router, next]);
+  }, [router, next, params]);
 
   const googleHref = useMemo(
     () => googleStartUrl({ next: next || "/app", mode: signin ? "signin" : null }),
@@ -87,55 +102,58 @@ function SignupForm() {
       if (res.status === 401) {
         setError(
           json.error === "google"
-            ? "Use Continue with Google for this account."
-            : "Incorrect email or password.",
+            ? "Utilise « Continuer avec Google » pour ce compte."
+            : "Adresse email ou mot de passe incorrect.",
         );
         return;
       }
       if (!res.ok) {
-        setError("Could not sign in. Try again.");
+        setError("Connexion impossible. Réessaie dans un instant.");
         return;
       }
-      router.push(json.user?.emailVerified ? afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false) : `/verify-email?next=${encodeURIComponent(next || "/onboarding")}`);
+      if (json.user?.emailVerified) router.replace(afterAuthPath(json.user.plan, next, json.user.onboarded !== false));
+      else { setPassword(""); setStep("verification"); }
       return;
     }
     if (res.status === 409) {
-      setError("An account already exists with this email.");
+      setError("Un compte existe déjà avec cette adresse. Connecte-toi pour reprendre.");
       return;
     }
     if (!res.ok) {
-      setError(res.status === 503 ? "Email delivery is temporarily unavailable. Please try again later." : "Use a valid email and a password with at least 8 characters.");
+      setError(res.status === 503 ? "L’envoi d’emails est momentanément indisponible. Réessaie plus tard." : "Utilise une adresse valide et un mot de passe d’au moins 8 caractères.");
       return;
     }
-    router.push("/verify-email");
+    setPassword(""); setStep("verification");
   }
 
   return (
     <main className="ss-signup">
       <section className="ss-signup__form-col">
-        <form className="ss-signup__form" onSubmit={onSubmit}>
+        <div className="ss-signup__form">
           <Link href="/" className="ss-signup__brand">
             <BrandMark size={28} />
             ScrollShow
           </Link>
+          {checking ? <div className="ss-signup__stage" role="status"><p className="ss-signup__sub">Préparation de ton espace…</p></div> : step === "verification" ? <SignupVerification email={email} token={verificationToken} next={next} onSignIn={async () => { const response = await fetch("/api/auth/logout", { method: "POST" }); if (!response.ok) throw new Error("Déconnexion indisponible. Réessaie."); capturedToken.current = ""; setVerificationToken(""); setStep("email"); setError(""); router.replace(signupUrl({ next, mode: "signin" })); }} /> : <form className="ss-signup__stage" key={`${signin}-${step}`} onSubmit={onSubmit} aria-busy={pending}>
           <h1 className="ss-signup__title">
-            {signin ? "Sign in to ScrollShow" : "Create your ScrollShow Account"}
+            {signin ? "Ravi de te retrouver" : step === "password" ? "Sécurise ton compte" : "Crée ton espace ScrollShow"}
           </h1>
           <p className="ss-signup__sub">
-            {signin ? "Welcome back. Pick up where you left off." : "Create your account, personalize your workspace, then activate your access."}
+            {signin ? "Connecte-toi pour reprendre là où tu en étais." : step === "password" ? "Un mot de passe, puis on prépare ton espace ensemble." : "Ton compte d’abord. Ton espace personnalisé ensuite."}
           </p>
 
           {!signin && step === "password" ? (
             <div className="ss-signup__or" style={{ marginTop: 28 }}>
               {email}
+              <button type="button" className="ss-signup__text-button" disabled={pending} onClick={() => { setStep("email"); setError(""); }}>Modifier</button>
             </div>
           ) : (
             <>
               <a className="ss-signup__google" href={googleHref}>
                 <GoogleMark />
-                Continue with Google
+                Continuer avec Google
               </a>
-              <div className="ss-signup__or">Or</div>
+              <div className="ss-signup__or">ou</div>
             </>
           )}
 
@@ -148,7 +166,8 @@ function SignupForm() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="your@email.com"
+                placeholder="toi@exemple.fr"
+                disabled={pending}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -158,40 +177,44 @@ function SignupForm() {
           {signin || step === "password" ? (
             <>
               <label htmlFor="signup-password" style={signin ? { marginTop: 16 } : undefined}>
-                Password
+                Mot de passe
               </label>
               <input
                 id="signup-password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 minLength={signin ? 1 : 8}
                 autoComplete={signin ? "current-password" : "new-password"}
-                placeholder={signin ? "Your password" : "8+ characters"}
+                placeholder={signin ? "Ton mot de passe" : "8 caractères minimum"}
+                disabled={pending}
+                autoFocus={!signin}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
+              <button type="button" className="ss-signup__text-button" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? "Masquer" : "Afficher"} le mot de passe</button>
             </>
           ) : null}
 
-          {error || queryError ? <p className="ss-signup__error">{error || queryError}</p> : null}
-          {signin && <p><Link href="/recover">Mot de passe oublié ? / Forgot password?</Link></p>}
+          {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
+          {signin && <p><Link href="/recover">Mot de passe oublié ?</Link></p>}
           <button className="ss-signup__submit" type="submit" disabled={pending}>
-            {pending ? "…" : signin ? "Sign in" : step === "email" ? "Continue with Email" : "Create account"}
+            {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer avec mon email" : "Créer mon compte"}
           </button>
           <p className="ss-signup__foot">
             {signin ? (
               <>
-                Don&apos;t have an account? <Link href={signupUrl({ next })}>Sign up</Link>
+                Pas encore de compte ? <Link href={signupUrl({ next })}>Créer mon espace</Link>
               </>
             ) : (
               <>
-                Already have an account?{" "}
-                <Link href={signupUrl({ next, mode: "signin" })}>Sign in</Link>
+                Déjà un compte ?{" "}
+                <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>
               </>
             )}
           </p>
-        </form>
+        </form>}
+        </div>
       </section>
 
       <aside className="ss-signup__proof" aria-hidden>

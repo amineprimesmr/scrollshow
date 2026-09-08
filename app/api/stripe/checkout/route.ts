@@ -10,7 +10,7 @@ import { applySubscription } from "@/lib/billing";
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "auth" }, { status: 401 });
-  if (!user.emailVerified) return NextResponse.json({ error: "email_verification_required", portal: "/verify-email" }, { status: 403 });
+  if (!user.emailVerified) return NextResponse.json({ error: "email_verification_required", portal: "/signup?verify=1" }, { status: 403 });
   if (!user.onboarded) return NextResponse.json({ error: "onboarding_required", portal: "/onboarding" }, { status: 403 });
   if (process.env.VERCEL_ENV === "preview" && !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) return NextResponse.json({ error: "preview_requires_test_stripe" }, { status: 503 });
   if (!salesReady()) return NextResponse.json({ error: "sales_not_open" }, { status: 503 });

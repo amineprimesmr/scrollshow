@@ -22,6 +22,10 @@ const snapshot = { users: [user, unverified], accounts: [], runs: [], channels: 
 const newcomer = { ...user, id: "newcomer", email: "new@example.invalid", plan: "free", onboarding: undefined };
 snapshot.users.push(newcomer);
 if (process.env.SCROLLSHOW_SMOKE_BROWSER === "1") snapshot.users.push({ ...user, id: "browser-fixture", email: "browser@example.invalid", name: "Browser fixture", plan: "free", onboarding: undefined, passwordHash: await hash("ScrollShow-QA-only-2026", 4) });
+if (process.env.SCROLLSHOW_SMOKE_BROWSER_VERIFY === "1") {
+  const browserUser = snapshot.users.find(user => user.id === "browser-fixture");
+  if (browserUser) { browserUser.emailVerifiedAt = undefined; browserUser.verificationHash = createHash("sha256").update("browser-only-verification-token-0000000000000000").digest("hex"); browserUser.verificationExpiresAt = Date.now() + 600000; }
+}
 await writeFile(join(directory, "store.json"), JSON.stringify(snapshot), { mode: 0o600 });
 const env = { ...process.env, NODE_ENV: "production", SCROLLSHOW_DATA_DIR: directory, AUTH_SECRET: secret, NEXT_PUBLIC_SITE_URL: base };
 for (const key of ["DATABASE_URL", "VERCEL", "SCROLLSHOW_USE_BLOB", "BLOB_READ_WRITE_TOKEN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_LIFETIME", "BRAVE_SEARCH_API_KEY", "MONID_API_KEY", "RESEND_API_KEY", "EMAIL_FROM", "CRON_SECRET", "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]) env[key] = "";
@@ -66,6 +70,10 @@ try {
   check(new URL(expiredPayment.headers.get("location")).searchParams.get("next") === "/pricing/success?session_id=cs_test_resume", "expired checkout session preserves reconciliation through login");
   const beforeVerification = await new SignJWT({email:unverified.email,plan:unverified.plan,sv:0}).setProtectedHeader({alg:"HS256"}).setSubject(unverified.id).setExpirationTime("10m").sign(new TextEncoder().encode(secret));
   const unverifiedHeaders = { ...headers, Cookie:`ss_session=${beforeVerification}` };
+  const verificationRedirect = await fetch(base + "/app", { headers: unverifiedHeaders, redirect: "manual" });
+  check(verificationRedirect.headers.get("location") === "/signup?verify=1", "email confirmation uses the existing signup surface");
+  const verificationCheckout = await fetch(base + "/api/stripe/checkout", { method: "POST", headers: unverifiedHeaders, body: JSON.stringify({ offer: "monthly", termsAccepted: true }) });
+  check(verificationCheckout.status === 403 && (await verificationCheckout.json()).portal === "/signup?verify=1", "unverified checkout returns to inline verification without bypassing security");
   check((await fetch(base+"/api/research",{headers:unverifiedHeaders})).status===401,"unverified paid account cannot enter studio APIs");
   const verification = await fetch(base+"/api/auth/verification",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"confirm",token:verificationToken})});
   check(verification.ok,"verification link confirms account over HTTP");

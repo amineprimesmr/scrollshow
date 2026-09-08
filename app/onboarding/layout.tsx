@@ -10,6 +10,6 @@ export const metadata: Metadata = {
 export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
   const user = await readSession();
   if (!user) redirect("/signup?next=/onboarding");
-  if (!user.emailVerified) redirect("/verify-email");
+  if (!user.emailVerified) redirect("/signup?verify=1");
   return children;
 }

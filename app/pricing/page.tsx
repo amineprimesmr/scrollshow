@@ -15,7 +15,7 @@ export default function PricingPage() {
     setEnglish(prefersEnglish());
     fetch("/api/auth/me").then(r => r.json()).then(j => {
       setPlan(j.user?.plan || "");
-      if (j.user) setDestination(j.user.emailVerified ? afterAuthPath(j.user.plan, null, j.user.onboarded) : "/verify-email");
+      if (j.user) setDestination(j.user.emailVerified ? afterAuthPath(j.user.plan, null, j.user.onboarded) : "/signup?verify=1");
     }).catch(() => {});
   }, []);
   return <main className="ss-pricing">
