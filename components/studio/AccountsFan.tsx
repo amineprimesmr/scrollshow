@@ -451,15 +451,6 @@ export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, vi
           ))}
         </div>
         <div className="ss-fan__actions">
-          <div className="ss-fan__stack" aria-hidden>
-            {items.slice(0, 3).map((item) =>
-              item.avatar ? (
-                <img key={item.id} src={item.avatar} alt="" />
-              ) : (
-                <span key={item.id}>{item.handle.slice(0, 2).toUpperCase()}</span>
-              ),
-            )}
-          </div>
           <button type="button" className="ss-fan__chip" onClick={() => setAddOpen(true)}>
             + {t("Connecter", "Connect", en)}
           </button>

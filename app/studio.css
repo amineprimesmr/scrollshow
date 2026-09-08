@@ -5003,30 +5003,8 @@ a.ss-btn-ghost {
   color: #a1a1aa;
 }
 
-.ss-fan__stack {
-  display: flex;
-  margin-right: 4px;
-}
 
-.ss-fan__stack img,
-.ss-fan__stack span {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 2px solid #050505;
-  background: #1f1f23;
-  object-fit: cover;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  color: #fff;
-  margin-left: -9px;
-}
 
-.ss-fan__stack :first-child {
-  margin-left: 0;
-}
 
 .ss-fan__stage {
   position: relative;
