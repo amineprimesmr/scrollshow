@@ -1,5 +1,6 @@
 "use client";
 
+import { BUSINESS_KINDS } from "@/lib/business-kinds";
 import { t } from "@/lib/i18n";
 import { setStoredTheme } from "@/lib/theme";
 import { AI_CLIENTS } from "@/lib/ai-clients";
@@ -74,7 +75,7 @@ const TABS: { id: Tab; fr: string; en: string; icon: ReactNode }[] = [
   { id: "storage", fr: "Stockage", en: "Storage", icon: <IconDatabase size={16} /> },
   { id: "api", fr: "API", en: "API", icon: <IconKey size={16} /> },
   { id: "accounts", fr: "Comptes liés", en: "Connected", icon: <IconPlug size={16} /> },
-  { id: "plan", fr: "Abonnement", en: "Plan", icon: <IconCard size={16} /> },
+  { id: "plan", fr: "Facturation", en: "Billing", icon: <IconCard size={16} /> },
   { id: "danger", fr: "Danger", en: "Danger", icon: <IconAlert size={16} /> },
 ];
 
@@ -99,6 +100,12 @@ export function SettingsView() {
   const router = useRouter();
   const { user, english, channels, posts, media, reload } = useStudio();
   const [tab, setTab] = useState<Tab>("account");
+
+  // Deep links (/app/settings?tab=plan) open the right section.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    if (wanted && TABS.some((item) => item.id === wanted)) setTab(wanted as Tab);
+  }, []);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -419,6 +426,26 @@ export function SettingsView() {
               </label>
             </div>
             <p className="ss-muted">ID · {user.id}</p>
+            {user.business ? (
+              <div className="ss-biz">
+                <div className="ss-biz__logo">{user.business.logo ? <img src={user.business.logo} alt="" /> : null}</div>
+                <div className="ss-biz__text">
+                  <b>{user.business.name}</b>
+                  <span>
+                    {BUSINESS_KINDS.find((kind) => kind.id === user.business?.kind)?.[english ? "en" : "fr"]}
+                    {user.business.url ? ` · ${user.business.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}` : ""}
+                    {user.business.tiktok ? ` · @${user.business.tiktok.handle}` : ""}
+                  </span>
+                </div>
+                <a className="ss-btn-ghost" href="/onboarding?next=/app/settings">
+                  {t("Ré-analyser", "Re-analyze", english)}
+                </a>
+              </div>
+            ) : (
+              <a className="ss-btn-ghost" href="/onboarding?next=/app/settings">
+                {t("Ajouter mon business", "Add my business", english)}
+              </a>
+            )}
             <div className="ss-form-actions">
               <button className="ss-btn-purple" type="submit" disabled={busy === "profile"}>
                 {busy === "profile" ? <span className="ss-spin" /> : t("Enregistrer", "Save", english)}
@@ -694,7 +721,7 @@ export function SettingsView() {
         {tab === "plan" ? (
           <div key="plan" className="ss-tabpanel">
             <div className="ss-set-card">
-              <h2>{t("Abonnement", "Subscription", english)}</h2>
+              <h2>{t("Abonnement & facturation", "Plan & billing", english)}</h2>
               <p className="ss-lead">
                 {t("Plan actuel", "Current plan", english)} : <b>{planMeta ? "ScrollShow" : "Free"}</b>
                 {planMeta ? ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}` : ""}
@@ -734,9 +761,6 @@ export function SettingsView() {
                     {busy === "portal" ? <span className="ss-spin" /> : t("Portail Stripe", "Stripe portal", english)}
                   </button>
                 ) : null}
-                <a className="ss-btn-ghost" href="/app/billing">
-                  {t("Facturation", "Billing", english)}
-                </a>
               </div>
             </div>
           </div>

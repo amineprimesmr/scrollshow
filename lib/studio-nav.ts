@@ -8,7 +8,7 @@ export type NavItem = {
   locked?: boolean;
   badge?: boolean;
   highlight?: boolean;
-  section?: "main" | "bottom";
+  section?: "main" | "bottom" | "menu";
 };
 
 export const STUDIO_NAV: NavItem[] = [
@@ -20,9 +20,9 @@ export const STUDIO_NAV: NavItem[] = [
   { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main" },
   { href: "/app/integrations", fr: "Comptes", en: "Accounts", icon: "tiktok", section: "bottom" },
   { href: "/app/mcp", fr: "MCP", en: "MCP", icon: "mcp", section: "bottom" },
-  { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "bottom" },
+  { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "menu" },
   { href: "/app/clippers", fr: "Devenir clipper", en: "Become a clipper", icon: "user", section: "bottom" },
-  { href: "/app/settings", fr: "Réglages", en: "Settings", icon: "settings", section: "bottom" },
+  { href: "/app/settings", fr: "Réglages", en: "Settings", icon: "settings", section: "menu" },
 ];
 
 export const PAGE_TITLES = STUDIO_NAV.map(({ href, fr, en }) => ({ href, fr, en }));

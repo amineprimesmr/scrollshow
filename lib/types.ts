@@ -20,6 +20,45 @@ export type UserSettings = {
   notifyPublishFailure: boolean;
 };
 
+export type BusinessKind = "saas" | "ecommerce" | "mobile_app" | "creator" | "agency" | "service" | "media" | "other";
+
+export type BusinessSocial = { platform: "tiktok" | "instagram" | "youtube" | "x" | "linkedin" | "facebook"; url: string; handle: string };
+
+/** What ScrollShow knows about the user's business, built at onboarding from their link. */
+export type BusinessProfile = {
+  name: string;
+  url: string;
+  kind: BusinessKind;
+  logo?: string;
+  tagline?: string;
+  description?: string;
+  language?: string;
+  brandColor?: string;
+  keywords: string[];
+  socials: BusinessSocial[];
+  /** Signals found on the page: "shopify", "app-store", "play-store", "pricing-page"... */
+  signals: string[];
+  tiktok?: {
+    handle: string;
+    nickname: string;
+    avatar: string;
+    followers: number;
+    likes: number;
+    videos: number;
+    avgViews: number;
+    photoShare: number; // % of recent posts that are photo carousels
+    source: "tiktok" | "monid";
+  } | null;
+  goal?: "sell" | "installs" | "awareness" | "traffic" | "monetize" | "leads";
+  cadence?: "daily" | "3w" | "weekly" | "unsure";
+  analyzedAt: string;
+};
+
+export type OnboardingState = {
+  completedAt?: string;
+  heardFrom?: string[];
+};
+
 export type User = {
   id: string;
   email: string;
@@ -33,6 +72,8 @@ export type User = {
   settings?: Partial<UserSettings>;
   /** Ids of completed "Post to the US" checklist items. */
   usChecklist?: string[];
+  business?: BusinessProfile;
+  onboarding?: OnboardingState;
 };
 
 export type WarmedOrderStatus = "requested" | "contacted" | "delivered" | "cancelled";
@@ -263,6 +304,8 @@ export type SessionUser = {
   email: string;
   name: string;
   plan: Plan;
+  /** True once the onboarding wizard was completed (carried in the session so layouts can gate without a store read). */
+  onboarded?: boolean;
 };
 
 export type PublicUser = SessionUser & {
@@ -270,4 +313,6 @@ export type PublicUser = SessionUser & {
   hasPassword: boolean;
   hasGoogle: boolean;
   settings: UserSettings;
+  business: BusinessProfile | null;
+  onboarded: boolean;
 };

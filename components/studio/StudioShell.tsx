@@ -15,6 +15,7 @@ import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import { StudioFlash } from "./StudioFlash";
 
 function initialsOf(name?: string, email?: string) {
@@ -30,7 +31,7 @@ function TrialBanner() {
   return (
     <div className="ss-trial">
       <span>{t("Essai gratuit · 7 jours restants", "Free trial · 7 days left", english)}</span>
-      <Link href="/app/billing" className="ss-trial__btn">
+      <Link href="/app/settings?tab=plan" className="ss-trial__btn">
         {t("Upgrade", "Upgrade", english)}
       </Link>
     </div>
@@ -71,8 +72,8 @@ function SidebarProfile() {
           <Link href="/app/settings" onClick={() => setOpen(false)}>
             {t("Réglages", "Settings", english)}
           </Link>
-          <Link href="/app/billing" onClick={() => setOpen(false)}>
-            {t("Facturation", "Billing", english)}
+          <Link href="/app/support" onClick={() => setOpen(false)}>
+            {t("Support", "Support", english)}
           </Link>
           <button type="button" onClick={() => void signOut()}>
             <IconLogout size={16} />
@@ -117,6 +118,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const onMcp = pathname.startsWith("/app/mcp");
   const hideHeader =
     onMcp ||
+    onCalendar ||
     pathname.startsWith("/app/home") ||
     pathname.startsWith("/app/unshadowban");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -218,20 +220,21 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
       <section className="ss-main">
         <TrialBanner />
-        {!hideHeader ? (
-          <header className="ss-top">
-            <h1>{title}</h1>
-          </header>
-        ) : null}
-        <Suspense fallback={null}>
-          <StudioFlash />
-        </Suspense>
         <div className="ss-main__body ss-page-enter" key={pathname}>
+          {!hideHeader ? (
+            <header className="ss-top">
+              <h1>{title}</h1>
+            </header>
+          ) : null}
+          <Suspense fallback={null}>
+            <StudioFlash />
+          </Suspense>
           {children}
         </div>
       </section>
       <AddChannelModal />
       <CreatePostModal />
+      <LiquidGlassDefs />
     </div>
   );
 }

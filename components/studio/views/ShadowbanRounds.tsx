@@ -54,10 +54,10 @@ function fmt(n: number, en: boolean) {
   return Math.round(n).toLocaleString(en ? "en-US" : "fr-FR");
 }
 
-function scoreColor(p: number) {
-  if (p >= 60) return { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)", bar: "var(--ss-err-fg)" };
-  if (p >= 30) return { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)", bar: "var(--ss-warn-fg)" };
-  return { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)", bar: "var(--ss-ok-fg)" };
+function diagColor(d: RoundsReport["diagnosis"]) {
+  if (d === "throttled" || d === "content_fails_seed") return { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)" };
+  if (d === "mixed" || d === "insufficient_data") return { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)" };
+  return { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)" };
 }
 
 function diagnosisCopy(r: RoundsReport, en: boolean) {
@@ -107,7 +107,7 @@ function diagnosisCopy(r: RoundsReport, en: boolean) {
 }
 
 export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: boolean }) {
-  const color = scoreColor(rounds.probability);
+  const color = diagColor(rounds.diagnosis);
   const diag = diagnosisCopy(rounds, en);
   const maxCount = Math.max(1, ...Object.values(rounds.histogram));
   const trend = rounds.trend.changePct;
@@ -115,19 +115,8 @@ export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: bool
   return (
     <div className="ss-rounds">
       <div className="ss-rounds__score" style={{ background: color.bg, color: color.fg }}>
-        <div>
-          <span className="ss-rounds__label">{t("Probabilité de shadowban", "Shadowban probability", en)}</span>
-          <b className="ss-rounds__value">{rounds.probability}</b>
-          <span className="ss-rounds__of">/ 100</span>
-          <div className="ss-rounds__bar">
-            <i style={{ width: `${rounds.probability}%`, background: color.bar }} />
-          </div>
-          <small>
-            {t("R0", "R0", en)} {rounds.scoreBreakdown.r0} · {t("médiane", "median", en)} {rounds.scoreBreakdown.median} · {t("0 vue", "0 views", en)} {rounds.scoreBreakdown.zero} ·{" "}
-            {t("rafales", "bursts", en)} {rounds.scoreBreakdown.burst} · {t("doublons", "duplicates", en)} {rounds.scoreBreakdown.duplicates}
-          </small>
-        </div>
         <div className="ss-rounds__diag">
+          <span className="ss-rounds__label">{t("Distribution", "Distribution", en)}</span>
           <h3>{diag.title}</h3>
           <p>{diag.body}</p>
           {trend != null ? (

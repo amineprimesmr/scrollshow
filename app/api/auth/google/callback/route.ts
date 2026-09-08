@@ -4,6 +4,7 @@ import { exchangeGoogleCode, fetchGoogleProfile } from "@/lib/google-auth";
 import { findUserByEmail, publicUser, seedAccounts, updateStore } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import type { User } from "@/lib/types";
 
 type OAuthState = { state?: string; next?: string | null; mode?: "signin" | null };
 
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
         if (profile.name && !existing.name) existing.name = profile.name;
         return existing;
       }
-      const created = {
+      const created: User = {
         id: crypto.randomUUID(),
         email: profile.email,
         name: profile.name,
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
     });
 
     await setSessionCookie(publicUser(user));
-    return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next), origin));
+    return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));
   } catch {
     return fail("google");
   }

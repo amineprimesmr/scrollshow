@@ -112,7 +112,7 @@ function SignupForm() {
         setError("Could not sign in. Try again.");
         return;
       }
-      router.push(afterAuthPath(json.user?.plan, next));
+      router.push(afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false));
       return;
     }
     if (res.status === 409) {
@@ -123,7 +123,7 @@ function SignupForm() {
       setError("Use a valid email and a password with at least 8 characters.");
       return;
     }
-    router.push(afterAuthPath(json.user?.plan, next || "/pricing"));
+    router.push(afterAuthPath(json.user?.plan, next || "/pricing", false));
   }
 
   return (

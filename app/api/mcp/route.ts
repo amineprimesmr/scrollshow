@@ -413,12 +413,14 @@ const handler = createMcpHandler(
       {
         title: "TikTok shadowban / throttling check",
         description:
-          "Tell whether the connected TikTok account(s) are shadowbanned or throttled: a 0-100 probability per account, the distribution-round histogram (R0-R4) behind it, the spam/automation signals found (burst posting, duplicate captions, repeated hashtags, zero-view posts), whether the account is throttled (engagement >=1%) or the content fails the seed test (<1%), the last-10 vs previous-10 trend, and a fix list. Use when the user asks 'am I shadowbanned', 'why did my reach drop', 'why 200 views', or is about to abandon/recreate an account. Present it as a diagnosis with a table, not raw JSON.",
-        inputSchema: z.object({}),
+          "Tell whether the connected TikTok account(s), or any public account given by handle, are shadowbanned or throttled: a 0-100 probability per account, the distribution-round histogram (R0-R4) behind it, the spam/automation signals found (burst posting, duplicate captions, repeated hashtags, zero-view posts), whether the account is throttled (engagement >=1%) or the content fails the seed test (<1%), the last-10 vs previous-10 trend, and a fix list. Use when the user asks 'am I shadowbanned', 'why did my reach drop', 'why 200 views', or is about to abandon/recreate an account. Present it as a diagnosis with a table, not raw JSON.",
+        inputSchema: z.object({
+          handle: z.string().optional().describe("Check a public TikTok account by @handle or profile URL instead of the connected ones (one-off, nothing stored)."),
+        }),
       },
-      async (_args, ctx) => {
+      async (args, ctx) => {
         try {
-          return text(await agentShadowbanCheck(userFrom(ctx)));
+          return text(await agentShadowbanCheck(userFrom(ctx), args.handle?.trim() || undefined));
         } catch (error) {
           return fail(error);
         }
@@ -463,7 +465,7 @@ const handler = createMcpHandler(
   {
     serverInfo: { name: "scrollshow", version: "1.0.0" },
     instructions:
-      "You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami if you do not know whether TikTok is connected. Marketplace: import_tiktok copies a public TikTok (slides + caption). The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. Use publish_now with the post id when they asked to publish now (it rasterizes editable overlays). Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
+      "You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami first: it returns the user's business profile (name, kind, link, keywords, goal, TikTok stats) that every carousel must be written for, and whether TikTok is connected. Marketplace: import_tiktok copies a public TikTok (slides + caption). The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. Use publish_now with the post id when they asked to publish now (it rasterizes editable overlays). Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
   },
 );
 

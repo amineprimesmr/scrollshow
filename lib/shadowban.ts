@@ -42,8 +42,13 @@ function engagementRate(v: TikTokVideo) {
   return ((v.like_count || 0) + (v.comment_count || 0) + (v.share_count || 0)) / views;
 }
 
+// Median, not mean: one viral post would otherwise inflate the baseline and
+// make every normal post after it look "collapsed".
 function avg(nums: number[]) {
-  return nums.length ? nums.reduce((sum, n) => sum + n, 0) / nums.length : 0;
+  if (!nums.length) return 0;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /**
@@ -54,7 +59,7 @@ function avg(nums: number[]) {
  * a creator posting twice a week would otherwise get an empty baseline.
  */
 function splitWindows(sorted: TikTokVideo[]) {
-  const now = sorted[0]?.create_time ? sorted[0].create_time * 1000 : Date.now();
+  const now = Date.now();
   const recentCutoff = now - 7 * DAY_MS;
   const baselineCutoff = now - 35 * DAY_MS;
 
@@ -73,8 +78,15 @@ function splitWindows(sorted: TikTokVideo[]) {
   return { recent: [] as TikTokVideo[], baseline: [] as TikTokVideo[], mode: "none" as const };
 }
 
+// Views keep accumulating for about two days after publishing: a post that
+// young looks "collapsed" against the baseline when it simply isn't done yet.
+const FRESH_MS = 48 * 60 * 60 * 1000;
+
 export function analyzeShadowban(videos: TikTokVideo[]): ShadowbanReport {
-  const sorted = [...videos].sort((a, b) => b.create_time - a.create_time);
+  const all = [...videos].sort((a, b) => b.create_time - a.create_time);
+  const now = Date.now();
+  const freshIds = new Set(all.filter((v) => now - v.create_time * 1000 < FRESH_MS).map((v) => v.id));
+  const sorted = all.filter((v) => !freshIds.has(v.id));
 
   if (sorted.length < 5) {
     return {
@@ -89,7 +101,7 @@ export function analyzeShadowban(videos: TikTokVideo[]): ShadowbanReport {
       estimatedOnset: null,
       windowMode: "none",
       rounds: analyzeRounds(sorted),
-      points: sorted.map((v) => ({
+      points: all.map((v) => ({
         id: v.id,
         createdAt: new Date(v.create_time * 1000).toISOString(),
         views: v.view_count || 0,
@@ -144,13 +156,13 @@ export function analyzeShadowban(videos: TikTokVideo[]): ShadowbanReport {
     estimatedOnset: verdict === "likely" || verdict === "mild" ? (onsetVideo ? new Date(onsetVideo.create_time * 1000).toISOString() : null) : null,
     windowMode: mode,
     rounds: analyzeRounds(sorted),
-    points: sorted.map((v) => ({
+    points: all.map((v) => ({
       id: v.id,
       createdAt: new Date(v.create_time * 1000).toISOString(),
       views: v.view_count || 0,
       engagementRate: engagementRate(v),
       bucket: recentIds.has(v.id) ? "recent" : baselineIds.has(v.id) ? "baseline" : "excluded",
-      isLow: baselineAvgViews > 0 && (v.view_count || 0) <= lowThreshold,
+      isLow: !freshIds.has(v.id) && baselineAvgViews > 0 && (v.view_count || 0) <= lowThreshold,
     })),
   };
 }

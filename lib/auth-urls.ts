@@ -11,10 +11,14 @@ export function isPricingPath(value: string) {
   return value === "/pricing" || value.startsWith("/pricing?") || value.startsWith("/pricing/");
 }
 
-export function afterAuthPath(plan: string | undefined, next?: string | null) {
-  if (isPaidPlan(plan)) return safeNextPath(next, "/app");
-  const dest = safeNextPath(next, "/pricing");
-  return isPricingPath(dest) ? dest : "/pricing";
+export function afterAuthPath(plan: string | undefined, next?: string | null, onboarded = true) {
+  const dest = isPaidPlan(plan) ? safeNextPath(next, "/app") : (() => {
+    const wanted = safeNextPath(next, "/pricing");
+    return isPricingPath(wanted) ? wanted : "/pricing";
+  })();
+  // Everyone goes through onboarding once: it is where ScrollShow learns the business.
+  if (!onboarded) return `/onboarding?next=${encodeURIComponent(dest)}`;
+  return dest;
 }
 
 export function signupUrl(opts?: {

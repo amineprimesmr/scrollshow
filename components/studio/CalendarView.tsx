@@ -45,7 +45,15 @@ function byTime(a: StudioPost, b: StudioPost) {
 export function CalendarView() {
   const { posts, activeChannel, setEditing, setPostOpen, setComposeDate, user, english } = useStudio();
   const [cursor, setCursor] = useState(() => new Date());
-  const [mode, setMode] = useState<Mode>("month");
+  const [mode, setModeState] = useState<Mode>("month");
+
+  // Remember the last view (read after mount so server and client render the same first frame).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("ss-cal-mode");
+      if (saved === "day" || saved === "week") setModeState(saved);
+    } catch {}
+  }, []);
   const locale = english ? "en-US" : "fr-FR";
   const t = useCallback((fr: string, en: string) => (english ? en : fr), [english]);
   const weekStartsOn = user?.settings.weekStartsOn === 0 ? 0 : 1;
@@ -99,17 +107,17 @@ export function CalendarView() {
 
   const label = useMemo(() => {
     if (mode === "day") {
-      return cursor.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      return cursor.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
     }
     if (mode === "week") {
       const start = days[0];
       const end = days[6];
       const sameMonth = start.getMonth() === end.getMonth();
       const from = start.toLocaleDateString(locale, sameMonth ? { day: "numeric" } : { day: "numeric", month: "short" });
-      const to = end.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
+      const to = end.toLocaleDateString(locale, { day: "numeric", month: "short" });
       return `${from} – ${to}`;
     }
-    return cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    return cursor.toLocaleDateString(locale, { month: "long" });
   }, [cursor, days, locale, mode]);
 
   const step = useCallback(
@@ -131,10 +139,12 @@ export function CalendarView() {
       if (event.key === "ArrowLeft") step(-1);
       else if (event.key === "ArrowRight") step(1);
       else if (event.key.toLowerCase() === "t") setCursor(new Date());
+      else if (event.key === "Escape" && mode !== "month") setMode(mode === "day" ? "week" : "month");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, mode]);
 
   function openPost(post: StudioPost) {
     setEditing(post);
@@ -149,7 +159,30 @@ export function CalendarView() {
 
   function goToDay(date: Date) {
     setCursor(date);
-    setMode("day");
+    setModeState("day");
+    try {
+      window.localStorage.setItem("ss-cal-mode", "day");
+    } catch {}
+  }
+
+  // Switching to a finer view lands on today when it is in the visible range,
+  // otherwise on the first day of the current range; never on a stale cursor.
+  function setMode(next: Mode) {
+    setModeState(next);
+    try {
+      window.localStorage.setItem("ss-cal-mode", next);
+    } catch {}
+    if (next === "month") return;
+    const now = new Date();
+    const inRange = days.some((day) => ymd(day) === ymd(now));
+    if (inRange) setCursor(now);
+    else if (mode === "month") setCursor(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+  }
+
+  /** Click on the empty part of a day: open that day. Clicks on posts and buttons keep their own action. */
+  function onDayClick(event: React.MouseEvent, date: Date) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    goToDay(date);
   }
 
   const toolbar = (
@@ -158,13 +191,10 @@ export function CalendarView() {
         <button className="ss-btn-ghost ss-cal-nav__arrow" type="button" aria-label={t("Précédent", "Previous")} onClick={() => step(-1)}>
           <IconChevron dir="left" size={16} />
         </button>
+        <h1 className="ss-cal-label">{label}</h1>
         <button className="ss-btn-ghost ss-cal-nav__arrow" type="button" aria-label={t("Suivant", "Next")} onClick={() => step(1)}>
           <IconChevron dir="right" size={16} />
         </button>
-        <button className="ss-btn-ghost" type="button" onClick={() => setCursor(new Date())}>
-          {t("Aujourd’hui", "Today")}
-        </button>
-        <strong className="ss-cal-label">{label}</strong>
       </div>
       <div className="ss-cal-tools">
         <div className="ss-seg" role="tablist">
@@ -233,12 +263,16 @@ export function CalendarView() {
             const key = ymd(date);
             const dayPosts = byDate.get(key) || [];
             return (
-              <section key={key} className={`ss-week-col ${key === today ? "is-today" : ""}`}>
+              <section
+                key={key}
+                className={`ss-week-col ${key === today ? "is-today" : ""} ${key < today ? "is-past" : ""}`}
+                onClick={(event) => onDayClick(event, date)}
+              >
                 <header className="ss-week-col__head">
-                  <button type="button" className="ss-week-col__date" onClick={() => goToDay(date)}>
+                  <span className="ss-week-col__date">
                     <span>{date.toLocaleDateString(locale, { weekday: "short" })}</span>
                     <b className="ss-day__n">{date.getDate()}</b>
-                  </button>
+                  </span>
                   <button type="button" className="ss-day__add" aria-label={t("Nouveau post ce jour", "New post this day")} onClick={() => newPost(key)}>
                     <IconPlus size={14} />
                   </button>
@@ -269,15 +303,27 @@ export function CalendarView() {
           const key = ymd(date);
           const dayPosts = byDate.get(key) || [];
           const extra = dayPosts.length - 3;
-          const classes = ["ss-day", date.getMonth() !== cursor.getMonth() && "is-out", key === today && "is-today"]
+          const classes = ["ss-day", date.getMonth() !== cursor.getMonth() && "is-out", key === today && "is-today", key < today && "is-past"]
             .filter(Boolean)
             .join(" ");
           return (
-            <div key={key} className={classes} onDoubleClick={() => newPost(key)}>
+            <div
+              key={key}
+              className={classes}
+              role="button"
+              tabIndex={0}
+              aria-label={date.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+              onClick={(event) => onDayClick(event, date)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  goToDay(date);
+                }
+              }}
+            >
               <div className="ss-day__head">
-                <button type="button" className="ss-day__n" onClick={() => goToDay(date)} aria-label={date.toLocaleDateString(locale, { day: "numeric", month: "long" })}>
-                  {date.getDate()}
-                </button>
+                <span className="ss-day__n">{date.getDate()}</span>
                 <button type="button" className="ss-day__add" aria-label={t("Nouveau post ce jour", "New post this day")} onClick={() => newPost(key)}>
                   <IconPlus size={14} />
                 </button>
@@ -335,9 +381,7 @@ function PostCard({
       <img src={post.image} alt="" loading="lazy" />
       <span className="ss-post__text">
         {!compact ? (
-          <small>
-            {post.time} · {statusName}
-          </small>
+          <small>{large ? statusName : post.time}</small>
         ) : null}
         <p>{post.body || (english ? "Untitled post" : "Post sans titre")}</p>
       </span>

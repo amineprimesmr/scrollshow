@@ -26,6 +26,7 @@ export async function signSession(user: SessionUser) {
     email: user.email,
     name: user.name,
     plan: user.plan,
+    onb: user.onboarded === true,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
@@ -45,6 +46,7 @@ export async function readSession(): Promise<SessionUser | null> {
       email: payload.email,
       name: typeof payload.name === "string" ? payload.name : "",
       plan: isPaidPlan(String(payload.plan)) ? (payload.plan as Plan) : "free",
+      onboarded: payload.onb === true,
     };
   } catch {
     return null;
@@ -73,7 +75,7 @@ export async function refreshSessionFromStore(): Promise<SessionUser | null> {
   const stored = data.users.find((item) => item.id === session.id);
   if (!stored) return session;
   const user = publicUser(stored);
-  if (user.plan !== session.plan || user.name !== session.name || user.email !== session.email) {
+  if (user.plan !== session.plan || user.name !== session.name || user.email !== session.email || user.onboarded !== session.onboarded) {
     await setSessionCookie(user);
   }
   return user;

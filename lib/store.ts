@@ -194,6 +194,8 @@ export function publicUser(user: User) {
     hasPassword: Boolean(user.passwordHash),
     hasGoogle: Boolean(user.googleId),
     settings: resolveSettings(user),
+    business: user.business || null,
+    onboarded: Boolean(user.onboarding?.completedAt),
   };
 }
 

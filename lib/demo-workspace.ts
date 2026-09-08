@@ -18,10 +18,13 @@ function dateOffset(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Only a workspace with nothing in it gets the demo. A user who removed the
+ * demo channel but kept real library accounts must never be wiped back to it.
+ */
 function needsDemoWorkspace(data: StoreData, userId: string) {
-  const channels = data.channels.filter((item) => item.userId === userId);
-  const posts = data.posts.filter((item) => item.userId === userId);
-  return !channels.some((item) => item.platform === "tiktok" && item.accessToken) || posts.length < 3;
+  const owns = (items: Array<{ userId: string }>) => items.some((item) => item.userId === userId);
+  return !owns(data.channels) && !owns(data.posts) && !owns(data.accounts);
 }
 
 export function ensureDemoWorkspace(data: StoreData, user: User) {

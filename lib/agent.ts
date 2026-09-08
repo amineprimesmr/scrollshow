@@ -1,6 +1,7 @@
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import { fetchUserInfo, listRecentVideos, publicChannel } from "./tiktok";
-import { analyzeShadowban } from "./shadowban";
+import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
+import { checkPublicAccount, levelOf } from "./shadowban-check";
 import { FIX_TEXT } from "./shadowban-rounds";
 import {
   applyRecipePatch,
@@ -36,8 +37,23 @@ export class AgentError extends Error {
 
 export async function agentWhoami(user: SessionUser) {
   const channel = await loadTikTokChannel(user.id);
+  const data = await readStore();
+  const business = data.users.find((item) => item.id === user.id)?.business || null;
   return {
     user: { id: user.id, email: user.email, name: user.name, plan: user.plan },
+    business: business
+      ? {
+          name: business.name,
+          url: business.url,
+          kind: business.kind,
+          tagline: business.tagline || "",
+          keywords: business.keywords,
+          goal: business.goal || null,
+          cadence: business.cadence || null,
+          socials: business.socials,
+          tiktok: business.tiktok || null,
+        }
+      : null,
     tiktok: channel
       ? {
           connected: true,
@@ -829,18 +845,25 @@ export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
  * spam/automation signals found, the throttled-vs-content split, and a fix
  * list. Reads the creator's own last <=30 posts through video.list.
  */
-export async function agentShadowbanCheck(user: SessionUser) {
-  const channels = await loadTikTokChannels(user.id);
-  if (!channels.length) throw new AgentError("tiktok_not_connected", 401);
+export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
+  const channels = handle ? [] : await loadTikTokChannels(user.id);
+  if (!handle && !channels.length) throw new AgentError("tiktok_not_connected", 401);
   const accounts: Array<Record<string, unknown>> = [];
-  for (const channel of channels) {
+  const targets: Array<{ handle: string; name: string; videos: () => Promise<ShadowbanReport> }> = handle
+    ? [{ handle, name: handle, videos: async () => (await checkPublicAccount(handle)).report }]
+    : channels.map((channel) => ({
+        handle: channel.handle,
+        name: channel.name,
+        videos: async () => analyzeShadowban(await listRecentVideos(channel.accessToken as string, 30)),
+      }));
+  for (const channel of targets) {
     try {
-      const videos = await listRecentVideos(channel.accessToken as string, 30);
-      const report = analyzeShadowban(videos);
+      const report = await channel.videos();
       const r = report.rounds;
       accounts.push({
         handle: channel.handle,
         name: channel.name,
+        level: levelOf(report),
         probability: r.probability,
         diagnosis: r.diagnosis,
         verdict: report.verdict,

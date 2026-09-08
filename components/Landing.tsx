@@ -1,5 +1,6 @@
 "use client";
 
+import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -197,6 +198,7 @@ export function Landing() {
 
   return (
     <div className="af-ld">
+      <LiquidGlassDefs />
       <header ref={navRef} className="af-ld-topnav">
         <div className="af-ld-topnav__inner">
           <Link className="af-ld-brand" href="/">

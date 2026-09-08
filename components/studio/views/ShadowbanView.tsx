@@ -1,328 +1,458 @@
 "use client";
 
-import { prefersEnglish, t } from "@/lib/i18n";
-import type { ShadowbanReport, VideoPoint } from "@/lib/shadowban";
+import { t } from "@/lib/i18n";
+import type { ShadowbanAccount, ShadowbanLevel } from "@/lib/shadowban-check";
+import type { Account } from "@/lib/types";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useStudio } from "../StudioContext";
-import { ShadowbanRounds } from "./ShadowbanRounds";
+import { IconX } from "../icons";
+import { ShadowbanDetail } from "./ShadowbanDetail";
 
-const VERDICT_STYLE: Record<ShadowbanReport["verdict"], { bg: string; fg: string; barLow: string }> = {
-  insufficient_data: { bg: "var(--ss-soft)", fg: "var(--ss-muted)", barLow: "var(--ss-muted-2)" },
-  none: { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)", barLow: "var(--ss-muted-2)" },
-  mild: { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)", barLow: "var(--ss-warn-fg)" },
-  likely: { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)", barLow: "var(--ss-err-fg)" },
+/** A card's lifecycle: connected accounts start analyzing, lookups arrive done. */
+type Identity = { key: string; handle: string; name: string; avatar: string; followers: number; source: "connected" | "library" };
+
+export type CardState =
+  | (Identity & { status: "loading" })
+  | (Identity & { status: "error"; error: string })
+  | { key: string; status: "done"; account: ShadowbanAccount };
+
+export const LEVEL_COPY: Record<ShadowbanLevel, { fr: string; en: string }> = {
+  none: { fr: "Aucun risque", en: "No risk" },
+  mild: { fr: "À surveiller", en: "Watch" },
+  likely: { fr: "Shadowban", en: "Shadowban" },
+  insufficient: { fr: "Pas assez de posts", en: "Not enough posts" },
 };
 
-function pct(n: number) {
-  return `${Math.round(n * 100)}%`;
+/** One line under the indicator: the evidence behind it, never a number out of 100. */
+export function reasonOf(account: ShadowbanAccount, en: boolean) {
+  const r = account.report;
+  const drop = Math.round(r.dropPct * 100);
+  switch (account.level) {
+    case "likely":
+      if (r.rounds.zeroViewPosts >= 2) return t(`${r.rounds.zeroViewPosts} posts à 0 vue, jamais diffusés.`, `${r.rounds.zeroViewPosts} posts at 0 views, never seeded.`, en);
+      if (r.consecutiveLowCount >= 3) return t(`${r.consecutiveLowCount} posts d'affilée effondrés (−${drop} %).`, `${r.consecutiveLowCount} posts in a row collapsed (−${drop}%).`, en);
+      return t("Portée bridée : les gens qui voient les posts les aiment, TikTok ne diffuse pas.", "Throttled reach: viewers engage, TikTok won't distribute.", en);
+    case "mild":
+      if (r.consecutiveLowCount >= 2) return t(`${r.consecutiveLowCount} derniers posts sous la médiane (−${drop} %).`, `Last ${r.consecutiveLowCount} posts below average (−${drop}%).`, en);
+      if (r.rounds.trend.changePct != null && r.rounds.trend.changePct <= -0.6) return t(`Médiane en baisse de ${Math.round(-r.rounds.trend.changePct * 100)} % sur les 10 derniers.`, `Median down ${Math.round(-r.rounds.trend.changePct * 100)}% over the last 10.`, en);
+      return t(`${Math.round(r.rounds.r0Share * 100)} % des posts restent sous 200 vues.`, `${Math.round(r.rounds.r0Share * 100)}% of posts stay under 200 views.`, en);
+    case "insufficient":
+      return t(`${r.videoCount} post(s) exploitable(s), il en faut 5.`, `${r.videoCount} usable post(s), 5 needed.`, en);
+    default:
+      return t(`Portée stable sur les ${r.videoCount} derniers posts.`, `Reach steady over the last ${r.videoCount} posts.`, en);
+  }
 }
 
-function fmtDate(iso: string, en: boolean) {
-  return new Date(iso).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "short", year: "numeric" });
+export function compact(n: number, en: boolean) {
+  return new Intl.NumberFormat(en ? "en-US" : "fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
-function fmtNum(n: number, en: boolean) {
-  return Math.round(n).toLocaleString(en ? "en-US" : "fr-FR");
+function reducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function randomTag() {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let out = "";
-  for (let i = 0; i < 5; i += 1) out += chars[Math.floor(Math.random() * chars.length)];
-  return `sstest${out}`;
-}
-
-function Chart({ points, baselineAvgViews, en }: { points: VideoPoint[]; baselineAvgViews: number; en: boolean }) {
-  const chrono = [...points].reverse(); // oldest -> newest, reading left to right
-  const max = Math.max(1, ...chrono.map((p) => p.views), baselineAvgViews);
-  const width = Math.max(360, chrono.length * 26);
-  const height = 160;
-  const gap = 6;
-  const barWidth = Math.max(8, chrono.length ? width / chrono.length - gap : 20);
-  const baselineY = baselineAvgViews > 0 ? height - (baselineAvgViews / max) * height : null;
-
+function Avatar({ src, name, size = 44 }: { src: string; name: string; size?: number }) {
+  const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
-    <div style={{ overflowX: "auto" }}>
-      <svg width={width} height={height + 24} viewBox={`0 0 ${width} ${height + 24}`} role="img" aria-label={t("Vues par vidéo dans le temps", "Views per video over time", en)}>
-        {baselineY != null ? (
-          <line x1={0} y1={baselineY} x2={width} y2={baselineY} stroke="var(--ss-line)" strokeWidth={1.5} strokeDasharray="4 4" />
-        ) : null}
-        {chrono.map((p, i) => {
-          const barHeight = Math.max(2, (p.views / max) * height);
-          const x = i * (barWidth + gap);
-          const y = height - barHeight;
-          const color = p.isLow ? VERDICT_STYLE.likely.barLow : "var(--ss-ink)";
-          return (
-            <g key={p.id}>
-              <rect x={x} y={y} width={barWidth} height={barHeight} rx={4} fill={color} opacity={p.bucket === "excluded" ? 0.35 : 1}>
-                <title>
-                  {fmtDate(p.createdAt, en)} — {fmtNum(p.views, en)} {t("vues", "views", en)}
-                  {p.isLow ? ` (${t("chute", "collapsed", en)})` : ""}
-                </title>
-              </rect>
-            </g>
-          );
-        })}
-      </svg>
-      <div className="ss-shadow-legend">
-        <span>
-          <i style={{ background: "var(--ss-ink)" }} /> {t("Normal", "Normal", en)}
-        </span>
-        <span>
-          <i style={{ background: VERDICT_STYLE.likely.barLow }} /> {t("En chute (< 30% de ta moyenne)", "Collapsed (< 30% of your average)", en)}
-        </span>
-        {baselineY != null ? (
-          <span>
-            <i className="ss-shadow-legend__line" /> {t("Moyenne de référence", "Baseline average", en)}
-          </span>
-        ) : null}
-      </div>
+    <span className="ss-sb-avatar" style={{ width: size, height: size }}>
+      {src ? <img src={src} alt="" width={size} height={size} loading="lazy" /> : <b>{initial}</b>}
+    </span>
+  );
+}
+
+const ICONS: Record<ShadowbanLevel, React.ReactNode> = {
+  none: <path d="M6 12.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />,
+  mild: <path d="M12 6v8M12 18h.01" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />,
+  likely: (
+    <>
+      <path d="M3 3l18 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M10.6 5.2A10 10 0 0 1 21 12a10.6 10.6 0 0 1-2.6 3.6M6.4 6.4A10.6 10.6 0 0 0 3 12a10 10 0 0 0 13.4 4.8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </>
+  ),
+  insufficient: <path d="M7 12h10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />,
+};
+
+/** The indicator: a coloured disc with an icon, or a spinning arc while pending. */
+function Indicator({ level, pending }: { level: ShadowbanLevel | null; pending: boolean }) {
+  return (
+    <div className={`ss-sb-ind ${pending ? "is-pending" : ""}`} data-level={level || ""}>
+      {pending ? (
+        <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden>
+          <circle className="ss-sb-ind__track" cx="32" cy="32" r="26" />
+          <circle className="ss-sb-ind__arc" cx="32" cy="32" r="26" strokeDasharray="46 200" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden>
+          {ICONS[level || "insufficient"]}
+        </svg>
+      )}
     </div>
   );
 }
 
-export function ShadowbanView() {
-  const { channels } = useStudio();
-  const [english, setEnglish] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [report, setReport] = useState<ShadowbanReport | null>(null);
-  const [testTag, setTestTag] = useState("");
-  const [showTable, setShowTable] = useState(false);
+function Sparkline({ account }: { account: ShadowbanAccount }) {
+  const points = useMemo(() => [...account.report.points].reverse().slice(-14), [account]);
+  const max = Math.max(1, ...points.map((p) => p.views));
+  return (
+    <div className="ss-sb-spark" aria-hidden>
+      {points.map((p, i) => (
+        <i
+          key={p.id}
+          className={p.isLow ? "is-low" : ""}
+          style={{ height: `${Math.max(8, Math.sqrt(p.views / max) * 100)}%`, "--d": `${i * 28}ms` } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
 
-  const connected = channels.some((c) => c.platform === "tiktok" && c.connected);
-  const en = english;
-
-  useEffect(() => setEnglish(prefersEnglish()), []);
-  useEffect(() => setTestTag(randomTag()), []);
-
-  useEffect(() => {
-    if (!connected) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    fetch("/api/tiktok/shadowban")
-      .then(async (res) => {
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.error || "shadowban_failed");
-        setReport(json.report);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "shadowban_failed"))
-      .finally(() => setLoading(false));
-  }, [connected]);
-
-  const style = report ? VERDICT_STYLE[report.verdict] : VERDICT_STYLE.insufficient_data;
-
-  const verdictCopy = useMemo(() => {
-    if (!report) return { title: "", body: "" };
-    if (report.verdict === "likely") {
-      return {
-        title: t("Shadowban probable", "Likely shadowban", en),
-        body: t(
-          `Tes ${report.consecutiveLowCount} derniers posts ont chuté de ${pct(report.dropPct)} par rapport à ta moyenne. C'est la signature typique d'une suppression de portée.`,
-          `Your last ${report.consecutiveLowCount} posts dropped ${pct(report.dropPct)} below your average. That's the typical signature of a reach suppression.`,
-          en,
-        ),
-      };
-    }
-    if (report.verdict === "mild") {
-      return {
-        title: t("Signes légers", "Mild signs", en),
-        body: t(
-          `Baisse de ${pct(report.dropPct)} par rapport à ta moyenne, mais pas encore assez soutenue pour conclure à un shadowban. Un seul post faible n'est pas un signal — surveille les prochains jours.`,
-          `A ${pct(report.dropPct)} dip versus your average, but not yet sustained enough to call it a shadowban. One weak post alone isn't a signal — watch the next few days.`,
-          en,
-        ),
-      };
-    }
-    if (report.verdict === "insufficient_data") {
-      return {
-        title: t("Pas assez de données", "Not enough data", en),
-        body: t(
-          "Il faut au moins 5 posts récents pour comparer ta portée actuelle à ta moyenne. Publie un peu plus et reviens.",
-          "We need at least 5 recent posts to compare your current reach to your average. Post a bit more and check back.",
-          en,
-        ),
-      };
-    }
-    return {
-      title: t("Aucun signe de shadowban", "No sign of a shadowban", en),
-      body: t("Ta portée récente est cohérente avec ta moyenne. Rien d'anormal détecté.", "Your recent reach is consistent with your average. Nothing abnormal detected.", en),
-    };
-  }, [report, en]);
-
-  if (!connected) {
-    return (
-      <div className="ss-empty">
-        <h2>{t("Connecte TikTok d'abord", "Connect TikTok first", en)}</h2>
-        <p>{t("On analyse tes vraies vidéos pour détecter une chute de portée.", "We analyze your real videos to detect a reach drop.", en)}</p>
-        <Link className="ss-btn-purple" href="/app/integrations">
-          {t("Connecter TikTok", "Connect TikTok", en)}
-        </Link>
-      </div>
-    );
-  }
+function AccountCard({
+  card,
+  index,
+  selected,
+  en,
+  onSelect,
+  onRetry,
+  onDismiss,
+}: {
+  card: CardState;
+  index: number;
+  selected: boolean;
+  en: boolean;
+  onSelect: () => void;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
+  const done = card.status === "done" ? card.account : null;
+  const identity: { name: string; handle: string; avatar: string; followers: number } = card.status === "done" ? card.account : card;
+  const level = done ? done.level : null;
+  const median = done ? done.report.rounds.medianViews : 0;
+  const drop = done ? Math.round(done.report.dropPct * 100) : 0;
+  const source = card.status === "done" ? card.account.source : card.source;
+  const lookup = source === "lookup";
+  const errorCopy =
+    card.status === "error" && card.error === "private_or_empty"
+      ? t("Compte privé ou sans post public.", "Private account or no public posts.", en)
+      : card.status === "error" && card.error === "unavailable"
+        ? t("Les posts n'ont pas pu être récupérés.", "Posts could not be fetched.", en)
+        : t("TikTok n'a pas répondu pour ce compte.", "TikTok did not answer for this account.", en);
 
   return (
-    <div className="ss-shadow">
-      <div className="ss-shadow-head">
-        <h1>{t("Détecteur de shadowban", "Shadowban detector", en)}</h1>
-        <p className="ss-lead">
-          {t(
-            "TikTok ne publie aucun statut officiel de shadowban. Cette analyse est une estimation, calculée sur tes vraies statistiques de vues, pas une confirmation de TikTok.",
-            "TikTok publishes no official shadowban status. This analysis is an estimate computed from your real view stats, not a confirmation from TikTok.",
-            en,
-          )}
-        </p>
-      </div>
-
-      {loading ? (
-        <p className="ss-lead">{t("Analyse en cours…", "Analyzing…", en)}</p>
-      ) : error ? (
-        <p className="ss-lead">{t("Analyse impossible pour l'instant.", "Could not analyze right now.", en)}</p>
-      ) : report ? (
-        <>
-          <div className="ss-shadow-verdict" style={{ background: style.bg, color: style.fg }}>
-            <h2>{verdictCopy.title}</h2>
-            <p>{verdictCopy.body}</p>
-            {report.estimatedOnset ? (
-              <p className="ss-shadow-onset">
-                {t("Début estimé :", "Estimated onset:", en)} <b>{fmtDate(report.estimatedOnset, en)}</b>
-              </p>
-            ) : null}
+    <article
+      className={`ss-sb-card ${card.status} ${selected ? "is-selected" : ""} ${lookup ? "is-lookup" : ""}`}
+      style={{ "--i": index } as React.CSSProperties}
+      data-level={level || ""}
+    >
+      <button type="button" className="ss-sb-card__hit" onClick={onSelect} disabled={card.status !== "done"} aria-pressed={selected}>
+        <header className="ss-sb-card__who">
+          <Avatar src={identity.avatar} name={identity.name} />
+          <div>
+            <b>{identity.name}</b>
+            <span>
+              @{identity.handle}
+              {identity.followers ? ` · ${compact(identity.followers, en)} ${t("abonnés", "followers", en)}` : ""}
+            </span>
           </div>
-
-          {report.rounds ? <ShadowbanRounds rounds={report.rounds} en={en} /> : null}
-
-          {report.verdict !== "insufficient_data" ? (
-            <>
-              <div className="ss-stat-row">
-                <div className="ss-stat-card">
-                  <span>{t("Vues récentes (moy.)", "Recent views (avg)", en)}</span>
-                  <b>{fmtNum(report.recentAvgViews, en)}</b>
-                </div>
-                <div className="ss-stat-card">
-                  <span>{t("Vues de référence (moy.)", "Baseline views (avg)", en)}</span>
-                  <b>{fmtNum(report.baselineAvgViews, en)}</b>
-                </div>
-                <div className="ss-stat-card">
-                  <span>{t("Chute", "Drop", en)}</span>
-                  <b>{pct(report.dropPct)}</b>
-                </div>
-                <div className="ss-stat-card">
-                  <span>{t("Posts en chute", "Collapsed posts", en)}</span>
-                  <b>{report.consecutiveLowCount}</b>
-                </div>
-              </div>
-
-              <div className="ss-chart-card">
-                <div className="ss-chart-card__head">
-                  <div>
-                    <h2>{t("Vues par vidéo", "Views per video", en)}</h2>
-                    <p>
-                      {t(
-                        `${report.videoCount} dernières vidéos · fenêtre ${report.windowMode === "date" ? "7 vs 28 jours" : "récentes vs plus anciennes"}`,
-                        `Last ${report.videoCount} videos · ${report.windowMode === "date" ? "7-day vs 28-day" : "recent vs older"} window`,
-                        en,
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <Chart points={report.points} baselineAvgViews={report.baselineAvgViews} en={en} />
-              </div>
-
-              <button type="button" className="ss-btn-ghost" onClick={() => setShowTable((v) => !v)}>
-                {showTable ? t("Masquer le détail", "Hide details", en) : t("Voir le détail par vidéo", "View per-video details", en)}
-              </button>
-              {showTable ? (
-                <div className="ss-shadow-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{t("Date", "Date", en)}</th>
-                        <th>{t("Vues", "Views", en)}</th>
-                        <th>{t("Engagement", "Engagement", en)}</th>
-                        <th>{t("Statut", "Status", en)}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.points.map((p) => (
-                        <tr key={p.id}>
-                          <td>{fmtDate(p.createdAt, en)}</td>
-                          <td>{fmtNum(p.views, en)}</td>
-                          <td>{pct(p.engagementRate)}</td>
-                          <td>{p.isLow ? t("En chute", "Collapsed", en) : p.bucket === "excluded" ? t("Hors fenêtre", "Out of window", en) : t("Normal", "Normal", en)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </>
+          {lookup ? (
+            <em className="ss-sb-chip ss-sb-chip--ext">{t("Vérification", "Lookup", en)}</em>
+          ) : source === "connected" ? (
+            <em className="ss-sb-chip ss-sb-chip--own">{t("Connecté", "Connected", en)}</em>
           ) : null}
-        </>
-      ) : null}
+        </header>
 
-      <div className="ss-panel ss-shadow-manual">
-        <h2>{t("Vérifie toi-même (2 min)", "Verify it yourself (2 min)", en)}</h2>
-        <p className="ss-lead">
-          {t(
-            "Ce que TikTok ne montre qu'à toi ne peut pas être vérifié depuis notre API. Voici comment tester ta visibilité réelle, avec un hashtag jetable qu'on te génère.",
-            "What only TikTok shows you can't be checked from our API. Here's how to test your real visibility, with a throwaway hashtag we generate for you.",
-            en,
-          )}
-        </p>
-        <ol className="ss-shadow-steps">
-          <li>
-            {t("Poste une vidéo (même privée pour toi) avec ce hashtag unique :", "Post a video (any content) with this unique hashtag:", en)}{" "}
-            <code className="ss-shadow-tag">#{testTag}</code>
-          </li>
-          <li>{t("Attends 30 à 60 minutes.", "Wait 30–60 minutes.", en)}</li>
-          <li>
-            {t(
-              "Depuis un autre compte (ou déconnecté), cherche ce hashtag et va dans l'onglet « Récent ».",
-              "From a different account (or logged out), search that hashtag and check the \"Recent\" tab.",
-              en,
+        <div className="ss-sb-card__score">
+          <Indicator level={level} pending={card.status !== "done"} />
+          <div className="ss-sb-card__verdict">
+            {card.status === "loading" ? (
+              <>
+                <em className="ss-sb-chip is-pulse">{t("Analyse en cours", "Analyzing", en)}</em>
+                <p>{t("Lecture des 30 derniers posts…", "Reading the last 30 posts…", en)}</p>
+              </>
+            ) : card.status === "error" ? (
+              <>
+                <em className="ss-sb-chip" data-level="mild">
+                  {t("Analyse impossible", "Could not analyze", en)}
+                </em>
+                <p>{errorCopy}</p>
+              </>
+            ) : (
+              <>
+                <em className="ss-sb-chip" data-level={level || "none"}>
+                  {en ? LEVEL_COPY[level || "none"].en : LEVEL_COPY[level || "none"].fr}
+                </em>
+                <p>{reasonOf(done!, en)}</p>
+              </>
             )}
-          </li>
-          <li>
-            {t(
-              "Ta vidéo n'apparaît pas ? C'est un signe concret de suppression de portée, en plus de l'analyse ci-dessus.",
-              "Your video doesn't show up? That's a concrete sign of reach suppression, on top of the analysis above.",
-              en,
-            )}
-          </li>
-        </ol>
-        <button type="button" className="ss-btn-ghost" onClick={() => setTestTag(randomTag())}>
-          {t("Générer un autre hashtag", "Generate another hashtag", en)}
+          </div>
+        </div>
+
+        {done && level !== "insufficient" ? (
+          <>
+            <Sparkline account={done} />
+            <dl className="ss-sb-card__stats">
+              <div>
+                <dt>{t("Médiane (vues)", "Median (views)", en)}</dt>
+                <dd>{compact(median, en)}</dd>
+              </div>
+              <div>
+                <dt>{t("Chute", "Drop", en)}</dt>
+                <dd>{drop}%</dd>
+              </div>
+              <div>
+                <dt>{t("En chute", "Collapsed", en)}</dt>
+                <dd>{done.report.consecutiveLowCount}</dd>
+              </div>
+            </dl>
+          </>
+        ) : card.status === "loading" ? (
+          <div className="ss-sb-card__skeleton">
+            <i />
+            <i />
+            <i />
+          </div>
+        ) : null}
+      </button>
+
+      {card.status === "error" && onRetry ? (
+        <button type="button" className="ss-btn-ghost ss-sb-card__retry" onClick={onRetry}>
+          {t("Réessayer", "Retry", en)}
         </button>
+      ) : null}
+      {onDismiss ? (
+        <button type="button" className="ss-sb-card__close lg lg--lens lg-press" onClick={onDismiss} aria-label={t("Retirer", "Remove", en)}>
+          <IconX />
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
+const LOOKUP_ERRORS: Record<string, { fr: string; en: string }> = {
+  invalid_handle: { fr: "Entre un @handle TikTok ou un lien de profil.", en: "Enter a TikTok @handle or a profile link." },
+  not_found: { fr: "Ce compte TikTok n'existe pas.", en: "This TikTok account does not exist." },
+  private_or_empty: { fr: "Compte privé ou sans post public : rien à analyser.", en: "Private account or no public posts: nothing to analyze." },
+  unavailable: { fr: "La vérification externe est indisponible pour le moment.", en: "External lookup is unavailable right now." },
+};
+
+export function ShadowbanView() {
+  const { channels, english: en } = useStudio();
+  const [library, setLibrary] = useState<Account[]>([]);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/accounts")
+      .then((res) => res.json())
+      .then((json) => live && setLibrary(json.accounts || []))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Connected accounts first, then the library accounts added by handle.
+  const targets = useMemo<Identity[]>(
+    () => [
+      ...channels
+        .filter((c) => c.platform === "tiktok" && c.connected)
+        .map((c) => ({ key: `ch:${c.id}`, handle: c.handle, name: c.name || c.handle, avatar: c.avatar || "", followers: c.followers || 0, source: "connected" as const })),
+      ...library.map((a) => ({ key: `ac:${a.id}`, handle: a.handle, name: a.nickname || a.handle, avatar: a.avatar || "", followers: a.followers || 0, source: "library" as const })),
+    ],
+    [channels, library],
+  );
+
+  const [cards, setCards] = useState<Record<string, CardState>>({});
+  const [lookups, setLookups] = useState<CardState[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [runId, setRunId] = useState(0);
+  // One generation per account: a stale response (re-run, unmount) is ignored
+  // instead of aborted, so nothing ever rejects into the dev overlay.
+  const generation = useRef<Map<string, number>>(new Map());
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  const analyze = useCallback((target: Identity) => {
+    const gen = (generation.current.get(target.key) || 0) + 1;
+    generation.current.set(target.key, gen);
+    const fresh = () => generation.current.get(target.key) === gen;
+    setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "loading" } }));
+    fetch(`/api/tiktok/shadowban?key=${encodeURIComponent(target.key)}`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        const account = json.accounts?.[0];
+        if (!res.ok || !account || account.error) throw new Error(account?.error || json.error || "shadowban_failed");
+        if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { key: target.key, status: "done", account } }));
+      })
+      .catch((error) => {
+        if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: error instanceof Error ? error.message : "shadowban_failed" } }));
+      });
+  }, []);
+
+  // Landing on the page starts every account's analysis at once; accounts
+  // that appear later (library list arriving) start theirs on arrival.
+  useEffect(() => {
+    const gens = generation.current;
+    const started = targets.filter((tg) => runId > 0 || !gens.has(tg.key));
+    started.forEach(analyze);
+    return () => started.forEach((tg) => gens.set(tg.key, (gens.get(tg.key) || 0) + 1));
+  }, [targets, analyze, runId]);
+
+  const ordered: CardState[] = useMemo(
+    () => targets.map((tg) => cards[tg.key]).filter((c): c is CardState => Boolean(c)),
+    [targets, cards],
+  );
+  const all = useMemo(() => [...lookups, ...ordered], [lookups, ordered]);
+  const current = useMemo(() => {
+    const found = all.find((c) => c.key === selected);
+    return found?.status === "done" ? found.account : null;
+  }, [all, selected]);
+
+  const summary = useMemo(() => {
+    const done = ordered.filter((c): c is Extract<CardState, { status: "done" }> => c.status === "done");
+    const pending = ordered.filter((c) => c.status === "loading").length;
+    const likely = done.filter((c) => c.account.level === "likely").length;
+    const mild = done.filter((c) => c.account.level === "mild").length;
+    const healthy = done.filter((c) => c.account.level === "none").length;
+    const failed = ordered.filter((c) => c.status === "error").length;
+    return { pending, likely, mild, healthy, failed, total: ordered.length };
+  }, [ordered]);
+
+  const select = useCallback((key: string) => {
+    setSelected((prev) => (prev === key ? null : key));
+  }, []);
+
+  useEffect(() => {
+    if (!current || !detailRef.current) return;
+    const id = window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }), 60);
+    return () => window.clearTimeout(id);
+  }, [current]);
+
+  const submit = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      const handle = query.trim();
+      if (!handle || searching) return;
+      setSearching(true);
+      setSearchError("");
+      try {
+        const res = await fetch("/api/tiktok/shadowban", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ handle }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.account) throw new Error(json.error || "lookup_failed");
+        const account = json.account as ShadowbanAccount;
+        setLookups((prev) => [{ key: account.key, status: "done", account }, ...prev.filter((c) => c.key !== account.key)]);
+        setSelected(account.key);
+        setQuery("");
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "lookup_failed";
+        const copy = LOOKUP_ERRORS[code] || LOOKUP_ERRORS.unavailable;
+        setSearchError(en ? copy.en : copy.fr);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [query, searching, en],
+  );
+
+  const dismissLookup = useCallback((key: string) => {
+    setLookups((prev) => prev.filter((c) => c.key !== key));
+    setSelected((prev) => (prev === key ? null : prev));
+  }, []);
+
+  const summaryLine = (() => {
+    if (!summary.total) return t("Analyse n'importe quel compte TikTok, connecté ou non.", "Analyze any TikTok account, connected or not.", en);
+    if (summary.pending) return t(`Analyse de ${summary.total} compte${summary.total > 1 ? "s" : ""}…`, `Analyzing ${summary.total} account${summary.total > 1 ? "s" : ""}…`, en);
+    if (summary.likely) return t(`${summary.likely} compte${summary.likely > 1 ? "s" : ""} shadowban.`, `${summary.likely} account${summary.likely > 1 ? "s" : ""} shadowbanned.`, en);
+    if (summary.mild) return t(`${summary.mild} compte${summary.mild > 1 ? "s" : ""} à surveiller, aucun shadowban.`, `${summary.mild} account${summary.mild > 1 ? "s" : ""} to watch, no shadowban.`, en);
+    if (summary.failed && !summary.healthy) return t(`${summary.failed} compte${summary.failed > 1 ? "s" : ""} non analysé${summary.failed > 1 ? "s" : ""}.`, `${summary.failed} account${summary.failed > 1 ? "s" : ""} not analyzed.`, en);
+    if (summary.failed) return t(`${summary.healthy} sain${summary.healthy > 1 ? "s" : ""}, ${summary.failed} non analysé${summary.failed > 1 ? "s" : ""}.`, `${summary.healthy} healthy, ${summary.failed} not analyzed.`, en);
+    return t("Aucun risque sur tes comptes.", "No risk on your accounts.", en);
+  })();
+
+  return (
+    <div className="ss-sb ss-page-enter">
+      <div className="ss-sb__bar">
+        <div className="ss-sb__title">
+          <h1>Shadowban</h1>
+          <p key={summaryLine} className="ss-sb__summary">{summaryLine}</p>
+        </div>
+        <form className={`ss-sb__search lg lg--lens ${searching ? "is-busy" : ""}`} onSubmit={submit} role="search">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
+            <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M13.5 13.5 17 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (searchError) setSearchError("");
+            }}
+            placeholder={t("Vérifier un autre compte : @handle ou lien", "Check another account: @handle or link", en)}
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={t("Compte TikTok à vérifier", "TikTok account to check", en)}
+          />
+          <button type="submit" className="ss-btn-purple lg-press" disabled={!query.trim() || searching}>
+            {searching ? <i className="ss-sb__spinner" aria-hidden /> : null}
+            {searching ? t("Analyse…", "Checking…", en) : t("Vérifier", "Check", en)}
+          </button>
+        </form>
+        {searchError ? (
+          <p className="ss-sb__error ss-flash-in" role="alert">
+            {searchError}
+          </p>
+        ) : null}
       </div>
 
-      <div className="ss-panel ss-shadow-recover">
-        <h2>{t("Comment en sortir", "How to recover", en)}</h2>
-        <p className="ss-lead">
-          {t(
-            "TikTok ne confirme jamais un shadowban et il n'existe aucun moyen de le lever manuellement — il expire de lui-même. Ce qui accélère généralement le retour à la normale, d'après les créateurs et guides spécialisés :",
-            "TikTok never confirms a shadowban and there's no way to manually lift one — it expires on its own. What generally speeds up recovery, per creators and specialized guides:",
-            en,
-          )}
-        </p>
-        <ul className="ss-feat">
-          <li>{t("Arrête de poster 48 à 72h — continuer à publier pendant la chute prolonge souvent le signal négatif.", "Stop posting for 48–72h — posting through the dip often prolongs the negative signal.", en)}</li>
-          <li>{t("Repasse tes derniers posts en revue : supprime ce qui enfreint les règles de la communauté (musique, contenu signalé, liens suspects).", "Review your last posts: remove anything against Community Guidelines (music, flagged content, suspicious links).", en)}</li>
-          <li>{t("Évite les actions qui ressemblent à du spam (follow/unfollow en masse, commentaires répétitifs, republier vite).", "Avoid spam-looking behavior (mass follow/unfollow, repetitive comments, rapid reposting).", en)}</li>
-          <li>{t("Déconnecte-toi et reconnecte-toi à l'app, vide le cache.", "Log out and back into the app, clear its cache.", en)}</li>
-          <li>{t("Quand tu reprends, publie du contenu natif propre, sans forcer un CTA produit dès le premier post.", "When you resume, post clean native content — don't lead with a hard product CTA.", en)}</li>
-        </ul>
-        <p className="ss-lead">
-          {t(
-            "Durée typique observée : 3–5 jours pour une infraction mineure, 2 à 4 semaines dans le cas général, jusqu'à 60 jours pour une infraction grave.",
-            "Typical observed duration: 3–5 days for a minor first offense, 2–4 weeks in the general case, up to 60 days for a serious violation.",
-            en,
-          )}
-        </p>
+      <div className="ss-sb__body">
+        {!targets.length && !lookups.length ? (
+          <div className="ss-sb-empty">
+            <h2>{t("Aucun compte TikTok connecté", "No TikTok account connected", en)}</h2>
+            <p>
+              {t(
+                "Connecte tes comptes pour les analyser automatiquement à chaque visite, ou tape un @handle ci-dessus pour vérifier n'importe quel compte.",
+                "Connect your accounts to analyze them automatically on every visit, or type a @handle above to check any account.",
+                en,
+              )}
+            </p>
+            <Link className="ss-btn-purple" href="/app/integrations">
+              {t("Connecter TikTok", "Connect TikTok", en)}
+            </Link>
+          </div>
+        ) : null}
+
+        {all.length ? (
+          <div className="ss-sb__grid">
+            {all.map((card, i) => (
+              <AccountCard
+                key={card.key}
+                card={card}
+                index={i}
+                en={en}
+                selected={selected === card.key}
+                onSelect={() => select(card.key)}
+                onRetry={card.status === "error" ? () => { const tg = targets.find((c) => c.key === card.key); if (tg) analyze(tg); } : undefined}
+                onDismiss={card.status === "done" && card.account.source === "lookup" ? () => dismissLookup(card.key) : undefined}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {targets.length ? (
+          <div className="ss-sb__actions">
+            <button type="button" className="ss-btn-ghost" onClick={() => setRunId((n) => n + 1)} disabled={summary.pending > 0}>
+              {t("Relancer l'analyse", "Run again", en)}
+            </button>
+            <span>{t("Estimation calculée sur les vraies vues. TikTok ne publie aucun statut officiel.", "Estimate computed from real views. TikTok publishes no official status.", en)}</span>
+          </div>
+        ) : null}
+
+        <div ref={detailRef} className="ss-sb__detail-anchor" />
+        {current ? <ShadowbanDetail key={current.key} account={current} en={en} onClose={() => setSelected(null)} /> : null}
       </div>
     </div>
   );

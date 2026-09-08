@@ -45,8 +45,8 @@ export const FAQ: FaqBlock[] = [
       {
         q: { fr: "Comment savoir si je suis shadowban ?", en: "How do I know if I'm shadowbanned?" },
         a: {
-          fr: "La page Shadowban compare ta portée récente à ta moyenne et te donne un test manuel de 2 minutes avec un hashtag jetable.",
-          en: "The Shadowban page compares your recent reach to your average and gives you a 2-minute manual test with a throwaway hashtag.",
+          fr: "La page Shadowban analyse automatiquement chaque compte TikTok connecté à l'ouverture (probabilité sur 100, rounds de distribution, signaux) et la barre de recherche vérifie n'importe quel autre compte par son @handle.",
+          en: "The Shadowban page analyzes every connected TikTok account as soon as it opens (0-100 probability, distribution rounds, signals) and the search bar checks any other account by its @handle.",
         },
         href: "/app/unshadowban",
       },
