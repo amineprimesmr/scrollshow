@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountPanel } from "../AccountPanel";
 import { AccountsFan, type FanItem } from "../AccountsFan";
 import { SetupWidget } from "../SetupWidget";
@@ -30,8 +30,26 @@ export function HomeView() {
     setOpen(false);
   }, []);
 
+  // Hauteur disponible pour la scene quand le panneau est replie : tout le
+  // conteneur, moins le bandeau de l'eventail et la barre du compte (92 px).
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = root.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    const measure = () => {
+      const stage = el.querySelector<HTMLElement>(".ss-fan__stage");
+      const above = stage ? stage.getBoundingClientRect().top - el.getBoundingClientRect().top : 0;
+      el.style.setProperty("--ss-stage-max", `${Math.max(210, parent.clientHeight - above - 92)}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className={`ss-overview ${open ? "is-open" : ""}`}>
+    <div ref={root} className={`ss-overview ${open ? "is-open" : ""}`}>
       <div className="ss-overview__fan" onClick={onFanClick}>
         <AccountsFan onSelect={onSelect} onBlankClick={collapse} />
       </div>
