@@ -1,10 +1,10 @@
 import { setSessionCookie } from "@/lib/auth";
 import { afterAuthPath, signupUrl } from "@/lib/auth-urls";
 import { exchangeGoogleCode, fetchGoogleProfile } from "@/lib/google-auth";
-import { findUserByEmail, publicUser, seedAccounts, updateStore } from "@/lib/store";
+import { upsertGoogleUser } from "@/lib/google-user";
+import { publicUser } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import type { User } from "@/lib/types";
 
 type OAuthState = { state?: string; next?: string | null; mode?: "signin" | null };
 
@@ -35,32 +35,7 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeGoogleCode(origin, code);
     const profile = await fetchGoogleProfile(tokens.access_token);
-    const user = await updateStore((data) => {
-      const existing =
-        data.users.find((item) => item.googleId === profile.googleId) ||
-        findUserByEmail(data, profile.email);
-      if (existing) {
-        if (!existing.emailVerifiedAt && !existing.googleId && !existing.githubId) {
-          existing.passwordHash = undefined;
-          existing.sessionVersion = (existing.sessionVersion || 0) + 1;
-        }
-        existing.emailVerifiedAt = new Date().toISOString();
-        existing.googleId = profile.googleId;
-        if (profile.name && !existing.name) existing.name = profile.name;
-        return existing;
-      }
-      const created: User = {
-        id: crypto.randomUUID(),
-        email: profile.email,
-        name: profile.name,
-        googleId: profile.googleId,
-        emailVerifiedAt: new Date().toISOString(),
-        plan: "free" as const,
-        createdAt: new Date().toISOString(),
-      };
-      data.users.push(created);
-      return created;
-    });
+    const user = await upsertGoogleUser(profile);
 
     await setSessionCookie(publicUser(user));
     return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));

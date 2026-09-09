@@ -1,3 +1,5 @@
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
 export function googleRedirectUri(origin: string) {
   return `${origin.replace(/\/$/, "")}/api/auth/google/callback`;
 }
@@ -58,4 +60,24 @@ export async function fetchGoogleProfile(accessToken: string) {
   }
   const name = (data.name || data.email.split("@")[0] || "Creator").slice(0, 40);
   return { googleId: data.sub, email: data.email.toLowerCase(), name };
+}
+
+const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
+let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+/** Verifie un ID token Google (One Tap) : signature, audience, issuer, nonce. */
+export async function verifyGoogleIdToken(idToken: string, nonce: string) {
+  const config = googleConfig();
+  if (!config) throw new Error("google_not_configured");
+  jwks ||= createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
+  const { payload } = await jwtVerify(idToken, jwks, {
+    audience: config.clientId,
+    issuer: GOOGLE_ISSUERS,
+  });
+  const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
+  const verified = payload.email_verified;
+  if (!payload.sub || !email || verified === false || verified === "false") throw new Error("google_email");
+  if (!payload.nonce || payload.nonce !== nonce) throw new Error("google_nonce");
+  const rawName = typeof payload.name === "string" ? payload.name : "";
+  return { googleId: payload.sub, email, name: (rawName || email.split("@")[0] || "Creator").slice(0, 40) };
 }
