@@ -41,7 +41,7 @@ export async function loadTikTokChannel(userId: string, channelId?: string): Pro
  */
 export async function loadTikTokChannels(userId: string): Promise<Channel[]> {
   const data = await readStore();
-  const channels = data.channels.filter((item) => item.userId === userId && item.platform === "tiktok" && item.accessToken);
+  const channels = data.channels.filter((item) => item.userId === userId && item.platform === "tiktok" && item.connected !== false && item.accessToken);
   return Promise.all(channels.map((channel) => refreshChannelIfNeeded(channel)));
 }
 

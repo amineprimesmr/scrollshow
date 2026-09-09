@@ -26,6 +26,14 @@ if (process.env.SCROLLSHOW_SMOKE_BROWSER_VERIFY === "1") {
   const browserUser = snapshot.users.find(user => user.id === "browser-fixture");
   if (browserUser) { browserUser.emailVerifiedAt = undefined; browserUser.verificationHash = createHash("sha256").update("browser-only-verification-token-0000000000000000").digest("hex"); browserUser.verificationExpiresAt = Date.now() + 600000; }
 }
+if (process.env.SCROLLSHOW_SMOKE_BROWSER_ACCOUNT === "1") {
+  const viewer = snapshot.users.find(item => item.id === "browser-fixture");
+  if (viewer) {
+    viewer.plan = "lifetime"; viewer.onboarding = { completedAt: now };
+    const videos = Array.from({ length: 35 }, (_, i) => ({ id: String(7000000000000 + i), title: `Publication QA ${i + 1}`, cover: "", views: (i + 1) * 100, likes: i * 10, comments: i, shares: i * 2, kind: i % 2 ? "photo" : "video", createdAt: Math.floor(Date.now() / 1000) - i * 86400, url: "" }));
+    snapshot.channels.push({ id: "qa-channel", userId: viewer.id, platform: "tiktok", name: "Compte de validation", handle: "qa_fixture", avatar: "", followers: 1200, likes: 8000, videoCount: 35, videos, videosFetchedAt: now, videoSync: { source: "api", hasMore: false, complete: true, seenIds: videos.map(v => v.id), updatedAt: now } });
+  }
+}
 await writeFile(join(directory, "store.json"), JSON.stringify(snapshot), { mode: 0o600 });
 const env = { ...process.env, NODE_ENV: "production", SCROLLSHOW_DATA_DIR: directory, AUTH_SECRET: secret, NEXT_PUBLIC_SITE_URL: base };
 for (const key of ["DATABASE_URL", "VERCEL", "SCROLLSHOW_USE_BLOB", "BLOB_READ_WRITE_TOKEN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_LIFETIME", "BRAVE_SEARCH_API_KEY", "METRICS_API_KEY", "RESEND_API_KEY", "EMAIL_FROM", "CRON_SECRET", "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]) env[key] = "";
@@ -47,6 +55,10 @@ try {
   const jwt = await new SignJWT({ email: user.email, plan: "free", sv: 0 }).setProtectedHeader({ alg: "HS256" }).setSubject(user.id).setExpirationTime("10m").sign(new TextEncoder().encode(secret));
   const headers = { Cookie: `ss_session=${jwt}`, "Content-Type": "application/json" };
   check((await fetch(base + "/api/research")).status === 401, "anonymous research denied");
+  check((await fetch(base + "/api/studio/insights?key=ch:foreign", { headers })).status === 404, "foreign account insights denied");
+  check((await fetch(base + "/api/studio/insights", { method: "POST", headers, body: JSON.stringify({ key: "ch:foreign", action: "fetch_videos", days: -1 }) })).status === 400, "invalid analytics period rejected");
+  const missingState = await fetch(base + "/tiktok/callback?code=fixture", { headers, redirect: "manual" });
+  check(missingState.headers.get("location")?.includes("state_mismatch"), "TikTok callback refuses missing OAuth state before token exchange");
   check((await fetch(base + "/api/research", { headers })).status === 200, "fresh lifetime entitlement overrides stale JWT plan");
   check((await fetch(base + "/api/cron/publish")).status === 401, "cron fails closed without secret");
   check((await fetch(base + "/api/cron/maintenance")).status === 401, "maintenance cannot be triggered anonymously");

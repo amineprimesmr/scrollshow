@@ -1,7 +1,9 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { accountInsights, parseKey } from "@/lib/insights";
-import { fetchAccountVideos, MetricsError } from "@/lib/metrics";
-import { updateStore } from "@/lib/store";
+import { consumeLimit } from "@/lib/rate-limit";
+import { syncAccountPosts } from "@/lib/account-sync";
+
+export const maxDuration = 90;
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,7 +11,7 @@ function daysOf(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get("days");
   if (raw === "all") return null;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 30;
+  return Number.isFinite(n) && n > 0 && n <= 3650 ? n : 30;
 }
 
 export async function GET(request: NextRequest) {
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(insights);
 }
 
-const fetchSchema = z.object({ key: z.string().min(4), action: z.literal("fetch_videos"), days: z.union([z.number(), z.literal("all")]).optional() });
+const fetchSchema = z.object({ key: z.string().min(4), action: z.literal("fetch_videos"), restart: z.boolean().optional(), days: z.union([z.number().int().min(1).max(3650), z.literal("all")]).optional() });
 
 export async function POST(request: Request) {
   const user = await readSession();
@@ -32,60 +34,12 @@ export async function POST(request: Request) {
   if (!key) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const days = parsed.data.days === "all" ? null : parsed.data.days || 30;
 
-  const handle = await updateStore((data) =>
-    key.kind === "clipper"
-      ? data.accounts.find((a) => a.id === key.id && a.userId === user.id)?.handle || null
-      : data.channels.find((c) => c.id === key.id && c.userId === user.id)?.handle || null,
-  );
-  if (!handle) return NextResponse.json({ error: "missing" }, { status: 404 });
+  if (!await consumeLimit(`account-sync:${user.id}`, 120, 60000)) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": "60" } });
   try {
-    // Four pages ≈ 200 posts: enough for a "all time" read on most accounts.
-    const videos = await fetchAccountVideos(handle.replace(/^@/, ""), 4);
-    await updateStore((data) => {
-      const target =
-        key.kind === "clipper"
-          ? data.accounts.find((a) => a.id === key.id && a.userId === user.id)
-          : data.channels.find((c) => c.id === key.id && c.userId === user.id);
-      if (!target) return;
-      target.videos = videos;
-      target.videosFetchedAt = new Date().toISOString();
-      if (key.kind === "clipper") {
-        const account = target as (typeof data.accounts)[number];
-        if (!account.posts) account.posts = videos.length;
-      }
-    });
+    await syncAccountPosts(user.id, parsed.data.key, parsed.data.restart);
   } catch (error) {
-    const code = error instanceof MetricsError ? error.code : "http";
-    return NextResponse.json({ error: code }, { status: code === "no_key" ? 501 : 502 });
+    const code = error instanceof Error ? error.message : "sync_failed";
+    return NextResponse.json({ error: code }, { status: code === "missing" ? 404 : 502 });
   }
-  const insights = await accountInsights(user, parsed.data.key, days);
-  return NextResponse.json(insights);
-}
-
-const patchSchema = z.object({
-  key: z.string().min(4),
-  rpm: z.number().min(0).max(1000).optional(),
-  declaredRevenue: z.number().min(0).max(10_000_000).optional(),
-});
-
-export async function PATCH(request: Request) {
-  const user = await readSession();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
-  const key = parseKey(parsed.data.key);
-  if (!key) return NextResponse.json({ error: "invalid" }, { status: 400 });
-  const ok = await updateStore((data) => {
-    const target =
-      key.kind === "clipper"
-        ? data.accounts.find((a) => a.id === key.id && a.userId === user.id)
-        : data.channels.find((c) => c.id === key.id && c.userId === user.id);
-    if (!target) return false;
-    if (parsed.data.rpm !== undefined) target.rpm = parsed.data.rpm;
-    if (parsed.data.declaredRevenue !== undefined) target.declaredRevenue = parsed.data.declaredRevenue;
-    return true;
-  });
-  if (!ok) return NextResponse.json({ error: "missing" }, { status: 404 });
-  const insights = await accountInsights(user, parsed.data.key, 30);
-  return NextResponse.json(insights);
+  return NextResponse.json(await accountInsights(user, parsed.data.key, days));
 }

@@ -24,10 +24,11 @@ export function StudioFlash() {
 
   const errorCopy = {
     invalid_client: t(
-      "Connexion TikTok : identifiants sandbox incorrects. Réessaie dans une minute.",
-      "TikTok connection: sandbox credentials are wrong. Try again in a minute.",
+      "La configuration TikTok de ScrollShow doit être corrigée.",
+      "ScrollShow’s TikTok configuration needs to be corrected.",
       english,
     ),
+    invalid_scope: t("Les autorisations demandées ne sont pas disponibles pour cette application TikTok.", "The requested permissions are unavailable for this TikTok application.", english),
     invalid_grant: t(
       "Connexion TikTok : le code a expiré. Reconnecte le compte.",
       "TikTok connection: the code expired. Connect the account again.",
@@ -52,7 +53,7 @@ export function StudioFlash() {
       ? t("Meta connecté. Instagram et Facebook sont disponibles.", "Meta connected. Instagram and Facebook are available.", english)
       : connected === "x"
         ? t("X connecté.", "X connected.", english)
-        : t("TikTok connecté. Profil, stats et posts sont disponibles.", "TikTok connected. Profile, stats, and posts are available.", english);
+        : t("Compte TikTok connecté. Les fonctionnalités disponibles dépendent des autorisations accordées.", "TikTok account connected. Available features depend on the permissions you granted.", english);
 
   return (
     <p className={`ss-flash ss-flash-in ${error ? "is-error" : ""}`}>

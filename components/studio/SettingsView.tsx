@@ -975,7 +975,7 @@ function ApiTab({
         <p className="ss-muted">{t("Aucune clé pour l’instant.", "No keys yet.", english)}</p>
       )}
       <a className="ss-btn-ghost" href="/app/mcp">
-        {t("Guide MCP", "MCP guide", english)}
+        {t("Gérer les agents", "Manage agents", english)}
       </a>
     </div>
   );

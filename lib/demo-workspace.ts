@@ -22,7 +22,7 @@ function dateOffset(days: number) {
  * Only a workspace with nothing in it gets the demo. A user who removed the
  * demo channel but kept real library accounts must never be wiped back to it.
  */
-function needsDemoWorkspace(data: StoreData, userId: string) {
+export function needsDemoWorkspace(data: StoreData, userId: string) {
   const owns = (items: Array<{ userId: string }>) => items.some((item) => item.userId === userId);
   return !owns(data.channels) && !owns(data.posts) && !owns(data.accounts);
 }

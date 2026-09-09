@@ -1,5 +1,9 @@
 "use client";
 
+import { TikTokSlides } from "./TikTokSlides";
+import { PublicationTextSearch } from "./PublicationTextSearch";
+import { matchingSlide, normalizeSlideSearch, publicationTextProgress } from "@/lib/publication-text";
+import "./account-gallery.css";
 import { t } from "@/lib/i18n";
 import type { AccountInsights } from "@/lib/insights";
 import { useRouter } from "next/navigation";
@@ -11,7 +15,7 @@ import { useStudio } from "./StudioContext";
 import { FxImage } from "@/components/fx/FxImage";
 import { LoadingOrb, Orb } from "@/components/fx/Orb";
 
-type Tab = "overview" | "videos" | "formats" | "revenue";
+type Tab = "overview" | "videos" | "formats";
 type Range = 30 | 90 | "all";
 type Kind = "all" | "photo" | "video";
 type Sort = "views" | "likes" | "comments" | "shares" | "engagement" | "recent";
@@ -36,10 +40,6 @@ function engagementOf(v: { views: number; likes: number; comments: number; share
   return v.views ? Math.round(((v.likes + v.comments + v.shares) / v.views) * 1000) / 10 : 0;
 }
 
-function euro(n: number, en: boolean) {
-  return n.toLocaleString(en ? "en-US" : "fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: n >= 100 ? 0 : 2 });
-}
-
 function dateOf(unix: number, en: boolean) {
   if (!unix) return "";
   return new Date(unix * 1000).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "short" });
@@ -56,20 +56,21 @@ export function AccountPanel({
 }) {
   const router = useRouter();
   const { english: en, setActiveChannel } = useStudio();
-  const [tab, setTab] = useState<Tab>("overview");
-  const [range, setRange] = useState<Range>(30);
+  const [tab, setTab] = useState<Tab>("videos");
+  const [range, setRange] = useState<Range>("all");
   const [data, setData] = useState<AccountInsights | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind>("all");
-  const [sort, setSort] = useState<Sort>("views");
+  const [sort, setSort] = useState<Sort>("recent");
   const [query, setQuery] = useState("");
+  const [hookOnly, setHookOnly] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const [layout, setLayout] = useState<"grid" | "list">("grid");
+  const [openSlide, setOpenSlide] = useState(0);
+  function openPublication(id: string, slide = 0) { setOpenSlide(slide); setOpenPost(id); }
   const [openPost, setOpenPost] = useState<string | null>(null);
-  const [rpmDraft, setRpmDraft] = useState("");
-  const [declaredDraft, setDeclaredDraft] = useState("");
   const abort = useRef<AbortController | null>(null);
 
   const key = item?.id || null;
@@ -77,13 +78,15 @@ export function AccountPanel({
   useEffect(() => {
     setShown(PAGE);
     setOpenPost(null);
-  }, [key, range, kind, sort, query]);
+  }, [key, range, kind, sort, query, hookOnly]);
 
   useEffect(() => {
     if (!key) {
       setData(null);
       return;
     }
+    setData(null);
+    let active = true;
     // Scrubbing the fan changes the selection quickly: wait for it to settle.
     const handle = window.setTimeout(() => {
       abort.current?.abort();
@@ -95,70 +98,78 @@ export function AccountPanel({
         .then(async (res) => {
           const json = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(json.error || "failed");
-          setData(json);
-          setRpmDraft(String(json.revenue.rpm));
-          setDeclaredDraft(json.revenue.declared ? String(json.revenue.declared) : "");
+          if (active) setData(json);
         })
         .catch((err) => {
-          if (err?.name !== "AbortError") setError(t("Impossible de charger les statistiques.", "Could not load the stats.", en));
+          if (active && err?.name !== "AbortError") setError(t("Impossible de charger les statistiques.", "Could not load the stats.", en));
         })
-        .finally(() => setLoading(false));
+        .finally(() => { if (active) setLoading(false); });
     }, 260);
-    return () => window.clearTimeout(handle);
+    return () => { active = false; window.clearTimeout(handle); abort.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, range]);
 
+  const selection = useRef<string | null>(null);
+  useEffect(() => () => { selection.current = null; }, []);
+  selection.current = `${key}:${range}`;
+  const syncing = useRef(false);
+  const autoStarted = useRef<string | null>(null);
+
   async function fetchVideos() {
-    if (!key) return;
+    if (!key || syncing.current) return;
+    const requestedKey = key;
+    const requestedSelection = `${key}:${range}`;
+    syncing.current = true;
     setFetching(true);
     setError(null);
+    let restart = Boolean(data?.sync?.complete);
     try {
-      const res = await fetch("/api/studio/insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, action: "fetch_videos", days: range }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(
-          json.error === "no_key"
-            ? t("Les métriques publiques ne sont pas disponibles sur cet environnement.", "Public metrics are unavailable on this environment.", en)
-            : json.error === "empty"
-              ? t("Aucune vidéo publique trouvée pour ce compte.", "No public video found for this account.", en)
-              : t("La lecture des vidéos a échoué, réessaie.", "Reading the videos failed, try again.", en),
-        );
-        return;
+      // Each HTTP request commits one page. Switching account pauses this loop;
+      // reopening it resumes from the persisted cursor.
+      while (selection.current === requestedSelection) {
+        const res = await fetch("/api/studio/insights", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: requestedKey, action: "fetch_videos", days: range, restart }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "sync_failed");
+        if (selection.current !== requestedSelection) break;
+        setData(json);
+        restart = false;
+        if (!json.sync?.hasMore) break;
       }
-      setData(json);
-      setTab("videos");
+    } catch (failure) {
+      const code = failure instanceof Error ? failure.message : "sync_failed";
+      const reconnect = /scope|token|connection_required|unauthorized/.test(code);
+      if (selection.current === requestedSelection) setError(reconnect
+        ? t("Autorisation TikTok expirée ou incomplète. Reconnecte ce compte depuis Comptes. Les posts chargés sont conservés.", "TikTok permission expired or incomplete. Reconnect this account from Accounts. Loaded posts are preserved.", en)
+        : t("Lecture interrompue par le service de données. Les posts chargés sont conservés ; reprends la synchronisation dans un moment.", "The data service interrupted the sync. Loaded posts are preserved; resume syncing in a moment.", en));
     } finally {
+      syncing.current = false;
       setFetching(false);
     }
   }
 
-  async function saveRevenue() {
-    if (!key) return;
-    const rpm = Number(rpmDraft.replace(",", "."));
-    const declared = Number(declaredDraft.replace(",", "."));
-    const res = await fetch("/api/studio/insights", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        key,
-        rpm: Number.isFinite(rpm) ? rpm : undefined,
-        declaredRevenue: Number.isFinite(declared) ? declared : undefined,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok) setData((prev) => (prev ? { ...prev, revenue: json.revenue } : json));
-  }
+  useEffect(() => {
+    if (!key || !data || data.key !== key || !data.canFetch || fetching || autoStarted.current === key || data.sync?.error) return;
+    if (!data.sync?.complete || (data.fetchedAt && Date.now() - Date.parse(data.fetchedAt) > 6 * 3600000)) {
+      autoStarted.current = key;
+      void fetchVideos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, data, fetching]);
+
+  const metricValue = (value: number, metric = "views", suffix = "") => {
+    const missing = !data || (data.source === "none" && !data.sync?.complete) || data.stats.missingMetrics?.includes(metric);
+    return missing ? "—" : `${compact(value)}${suffix}`;
+  };
 
   const videos = useMemo(() => {
     const all = data?.videos || [];
-    const needle = query.trim().toLowerCase();
+    const needle = normalizeSlideSearch(query);
     const filtered = all.filter((v) => {
       if (kind !== "all" && v.kind !== kind) return false;
-      return !needle || v.title.toLowerCase().includes(needle);
+      return !needle || Boolean(matchingSlide(v, needle, hookOnly));
     });
     const rank: Record<Sort, (v: (typeof all)[number]) => number> = {
       views: (v) => v.views,
@@ -169,7 +180,7 @@ export function AccountPanel({
       recent: (v) => v.createdAt,
     };
     return [...filtered].sort((a, b) => rank[sort](b) - rank[sort](a));
-  }, [data, kind, sort, query]);
+  }, [data, kind, sort, query, hookOnly]);
 
   const filteredTotals = useMemo(() => {
     const views = videos.reduce((n, v) => n + v.views, 0);
@@ -217,15 +228,15 @@ export function AccountPanel({
           </div>
           <div>
             <dt>{t("Vues", "Views", en)} · {rangeLabel}</dt>
-            <dd>{s ? compact(s.views) : "—"}</dd>
+            <dd>{s ? metricValue(s.views) : "—"}</dd>
           </div>
           <div>
             <dt>{t("Vues moy.", "Avg views", en)}</dt>
-            <dd>{s ? compact(s.avgViews) : "—"}</dd>
+            <dd>{s ? metricValue(s.avgViews) : "—"}</dd>
           </div>
           <div>
-            <dt>{t("Revenus estimés", "Est. revenue", en)}</dt>
-            <dd>{data ? euro(data.revenue.estimated, en) : "—"}</dd>
+            <dt>{t("Publications chargées", "Loaded posts", en)}</dt>
+            <dd>{data ? data.sync?.loaded ?? data.videos.length : "—"}</dd>
           </div>
         </dl>
         <span className="ss-acc__toggle">
@@ -239,15 +250,13 @@ export function AccountPanel({
       <div className="ss-acc__body" aria-hidden={!expanded}>
         <div className="ss-acc__head">
           <div className="ss-acc__tabs" role="tablist">
-            {(["overview", "videos", "formats", "revenue"] as const).map((id) => (
+            {(["overview", "videos", "formats"] as const).map((id) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-on" : ""} onClick={() => setTab(id)}>
                 {id === "overview"
                   ? t("Aperçu", "Overview", en)
                   : id === "videos"
-                    ? t("Vidéos", "Videos", en)
-                    : id === "formats"
-                      ? t("Formats", "Formats", en)
-                      : t("Revenus", "Revenue", en)}
+                    ? t("Publications", "Posts", en)
+                    : t("Formats", "Formats", en)}
               </button>
             ))}
           </div>
@@ -270,6 +279,11 @@ export function AccountPanel({
           </div>
         </div>
 
+        {data ? <div className="ss-acc__sync" role="status">
+          <span>{fetching ? t("Synchronisation en cours…", "Syncing…", en) : data.sync?.complete ? t("Lecture terminée des publications accessibles", "Accessible posts loaded", en) : t("Historique partiel — synchronisation nécessaire", "Partial history — sync needed", en)} · {data.sync?.loaded ?? data.videos.length} {t("posts chargés", "loaded posts", en)}</span>
+          <small>{t("Les compteurs sont les totaux des posts publiés pendant la période choisie. Les ventes ne sont pas mesurées.", "Counters are lifetime totals for posts published in the selected period. Sales are not tracked.", en)}</small>
+          {data.canFetch ? <button type="button" className="ss-fan__chip" disabled={fetching} onClick={() => void fetchVideos()}>{fetching ? t("Chargement…", "Loading…", en) : data.sync?.complete ? t("Actualiser", "Refresh", en) : t("Reprendre la synchronisation", "Resume sync", en)}</button> : null}
+        </div> : null}
         {error ? <p className="ss-acc__error">{error}</p> : null}
 
         {loading && !data ? <LoadingOrb state="searching" text={t("Lecture des statistiques…", "Reading the stats…", en)} /> : null}
@@ -279,14 +293,13 @@ export function AccountPanel({
             <Stat label={t("Abonnés", "Followers", en)} value={compact(s!.followers)} sub={s!.growth ? `${s!.growth.followers >= 0 ? "+" : ""}${compact(s!.growth.followers)} · ${rangeLabel}` : undefined} />
             <Stat label="Likes" value={compact(s!.likes)} />
             <Stat label="Posts" value={compact(s!.posts)} />
-            <Stat label={`${t("Vues", "Views", en)} · ${rangeLabel}`} value={compact(s!.views)} sub={data.source === "none" ? t("aucune donnée vidéo", "no video data", en) : undefined} />
-            <Stat label={t("Vues moyennes", "Average views", en)} value={compact(s!.avgViews)} sub={`${t("médiane", "median", en)} ${compact(s!.medianViews)}`} />
-            <Stat label={t("Meilleur post", "Best post", en)} value={compact(s!.bestViews)} sub={t("vues", "views", en)} />
-            <Stat label={t("Engagement", "Engagement", en)} value={`${s!.engagement}%`} sub={t("likes + comm. + partages / vues", "likes + comments + shares / views", en)} />
-            <Stat label={t("Commentaires", "Comments", en)} value={compact(s!.comments)} sub={`${compact(s!.shares)} ${t("partages", "shares", en)}`} />
+            <Stat label={`${t("Vues", "Views", en)} · ${rangeLabel}`} value={metricValue(s!.views)} sub={data.source === "none" ? t("aucune donnée vidéo", "no video data", en) : undefined} />
+            <Stat label={t("Vues moyennes", "Average views", en)} value={metricValue(s!.avgViews)} sub={`${t("médiane", "median", en)} ${metricValue(s!.medianViews)}`} />
+            <Stat label={t("Meilleur post", "Best post", en)} value={metricValue(s!.bestViews)} sub={t("vues", "views", en)} />
+            <Stat label={t("Engagement", "Engagement", en)} value={data.stats.missingMetrics?.some(m => ["views", "likes", "comments", "shares"].includes(m)) ? "—" : metricValue(s!.engagement, "views", "%")} sub={t("likes + comm. + partages / vues", "likes + comments + shares / views", en)} />
+            <Stat label={t("Commentaires", "Comments", en)} value={metricValue(s!.comments, "comments")} sub={`${metricValue(s!.shares, "shares")} ${t("partages", "shares", en)}`} />
             <Stat label={t("Rythme", "Cadence", en)} value={`${s!.cadence}`} sub={t("posts / semaine", "posts / week", en)} />
             <Stat label={t("Part du réseau", "Share of network", en)} value={`${s!.share}%`} />
-            <Stat label={t("Revenus estimés", "Estimated revenue", en)} value={euro(data.revenue.estimated, en)} sub={`${data.revenue.rpm} € / 1k ${t("vues", "views", en)}`} accent />
             {data.timeline.length > 1 ? <Trend points={data.timeline} en={en} /> : null}
             {data.videos[0] ? (
               <a className="ss-acc__best" href={data.videos[0].url || undefined} target="_blank" rel="noreferrer">
@@ -303,7 +316,7 @@ export function AccountPanel({
               <div className="ss-acc__best is-empty">
                 <b>{t("Pas encore de vidéos analysées", "No videos analysed yet", en)}</b>
                 {data.canFetch ? (
-                  <button type="button" className="ss-fan__chip is-on" disabled={fetching} onClick={fetchVideos}>
+                  <button type="button" className="ss-fan__chip is-on" disabled={fetching} onClick={() => void fetchVideos()}>
                     {fetching ? <Orb size={20} state="searching" invert /> : null}
                     {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les vidéos", "Analyse the videos", en)}
                   </button>
@@ -329,14 +342,12 @@ export function AccountPanel({
         {data && tab === "videos" ? (
           <div className="ss-acc__videos">
             <div className="ss-acc__filters">
-              <input
-                className="ss-input ss-acc__search"
-                type="search"
-                value={query}
-                placeholder={t("Chercher dans les légendes…", "Search the captions…", en)}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label={t("Chercher un post", "Search a post", en)}
-              />
+              <PublicationTextSearch key={`${key}:${range}`} accountKey={key!} range={range} videos={data.videos} query={query} onQuery={setQuery}
+                hookOnly={hookOnly} onScope={setHookOnly} priorityPostId={openPost || undefined} en={en} onUpdate={(updates, hooks) => setData(previous => {
+                  if (!previous || previous.key !== key) return previous;
+                  const indexed = new Map(updates.map(v => [v.id, v.slideTexts]));
+                  return { ...previous, hooks, videos: previous.videos.map(v => indexed.has(v.id) ? { ...v, slideTexts: indexed.get(v.id) } : v) };
+                })} />
               <div className="ss-acc__range" role="group" aria-label={t("Type de post", "Post type", en)}>
                 {(["all", "photo", "video"] as const).map((k) => (
                   <button key={k} type="button" className={kind === k ? "is-on" : ""} onClick={() => setKind(k)}>
@@ -363,7 +374,7 @@ export function AccountPanel({
                 ))}
               </div>
               {data.canFetch ? (
-                <button type="button" className="ss-fan__chip" disabled={fetching} onClick={fetchVideos}>
+                <button type="button" className="ss-fan__chip" disabled={fetching} onClick={() => void fetchVideos()}>
                   {fetching ? <Orb size={20} state="searching" /> : null}
                   {fetching ? t("Analyse…", "Analysing…", en) : data.videos.length ? t("Actualiser", "Refresh", en) : t("Analyser les posts", "Analyse the posts", en)}
                 </button>
@@ -375,7 +386,9 @@ export function AccountPanel({
                 {videos.length
                   ? `${videos.length} ${t("posts", "posts", en)} · ${compact(filteredTotals.views)} ${t("vues", "views", en)} · ${compact(filteredTotals.avgViews)} ${t("vues moy.", "avg views", en)} · ${filteredTotals.engagement}% ${t("engagement", "engagement", en)} · ${rangeLabel}`
                   : data.videos.length
-                    ? t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
+                    ? query && publicationTextProgress(data.videos).pending
+                      ? t("Aucun résultat dans les images déjà lues. La recherche se complétera au fil de la lecture.", "No matches in the images read so far. More results may appear as reading continues.", en)
+                      : t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
                     : t("Aucun post sur cette période.", "No post in this range.", en)}
                 {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR")}` : ""}
               </span>
@@ -391,25 +404,20 @@ export function AccountPanel({
               <ul className="ss-acc__gallery">
                 {videos.slice(0, shown).map((v) => (
                   <li key={v.id}>
-                    <button type="button" className="ss-acc__tile lg-press" onClick={() => setOpenPost(v.id)}>
-                      {/* La signature de la vignette expire côté TikTok : le glyphe reste dessous. */}
-                      <span className="ss-acc__tile-blank">{v.kind === "photo" ? "▦" : "▶"}</span>
-                      {v.cover ? (
-                        <img
-                          src={coverSrc(v.cover)}
-                          alt=""
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.hidden = true;
-                          }}
-                        />
-                      ) : null}
-                      <span className="ss-acc__tile-kind">{v.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}</span>
-                      <span className="ss-acc__tile-meta">
-                        <b>{compact(v.views)}</b> {t("vues", "views", en)} · {compact(v.likes)} likes · {engagementOf(v)}%
-                      </span>
-                      <span className="ss-acc__tile-title">{v.title || t("Sans titre", "Untitled", en)}</span>
-                    </button>
+                    <article className="ss-posttile">
+                      {v.kind === "photo" && v.images?.length ? <TikTokSlides key={`${v.id}:${matchingSlide(v, query, hookOnly)?.index ?? 0}`} initialIndex={matchingSlide(v, query, hookOnly)?.index ?? 0} images={v.images} en={en} onOpen={slide => openPublication(v.id, slide)} /> :
+                        <button type="button" className="ss-posttile__cover" aria-label={t("Ouvrir la publication", "Open post", en)} onClick={() => openPublication(v.id)}>
+                          <span className="ss-posttile__placeholder" aria-hidden>{v.kind === "photo" ? "▦" : "▶"}</span>
+                          {v.cover ? <img src={coverSrc(v.cover)} alt="" loading="lazy" onError={e => { e.currentTarget.hidden = true; }} /> : null}
+                        </button>}
+                      <dl className="ss-posttile__counts">
+                        <div><dt>{t("Vues", "Views", en)}</dt><dd>{v.missingMetrics?.includes("views") ? "—" : compact(v.views)}</dd></div>
+                        <div><dt>Likes</dt><dd>{v.missingMetrics?.includes("likes") ? "—" : compact(v.likes)}</dd></div>
+                      </dl>
+                      {normalizeSlideSearch(query) ? <button type="button" className="ss-posttile__match" onClick={() => openPublication(v.id, matchingSlide(v, query, hookOnly)?.index ?? 0)}>
+                        {t(`Voir le texte · slide ${(matchingSlide(v, query, hookOnly)?.index ?? 0) + 1}`, `View text · slide ${(matchingSlide(v, query, hookOnly)?.index ?? 0) + 1}`, en)}
+                      </button> : null}
+                    </article>
                   </li>
                 ))}
               </ul>
@@ -423,8 +431,8 @@ export function AccountPanel({
                     ) : (
                       <span className="ss-acc__thumb" />
                     )}
-                    <button type="button" className="ss-acc__vtitle ss-acc__vopen" onClick={() => setOpenPost(v.id)}>
-                      <b>{v.title || t("Sans titre", "Untitled", en)}</b>
+                    <button type="button" className="ss-acc__vtitle ss-acc__vopen" onClick={() => openPublication(v.id, matchingSlide(v, query, hookOnly)?.index ?? 0)}>
+                      <b>{matchingSlide(v, query, hookOnly)?.text || v.slideTexts?.[0]?.text || t("Texte de la première slide en cours de lecture", "Reading the first slide text", en)}</b>
                       <span>
                         {v.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}
                         {v.createdAt ? ` · ${dateOf(v.createdAt, en)}` : ""}
@@ -445,7 +453,7 @@ export function AccountPanel({
                     <span className="ss-acc__num">
                       <b>{engagementOf(v)}%</b> eng.
                     </span>
-                    <button type="button" className="ss-fan__chip" onClick={() => setOpenPost(v.id)}>
+                    <button type="button" className="ss-fan__chip" onClick={() => openPublication(v.id, matchingSlide(v, query, hookOnly)?.index ?? 0)}>
                       {t("Voir", "Watch", en)}
                     </button>
                   </li>
@@ -479,7 +487,7 @@ export function AccountPanel({
             </div>
             {data.hooks.length ? (
               <div className="ss-acc__hooks">
-                <small>{t("Hooks qui marchent (début des titres)", "Hooks that work (title openings)", en)}</small>
+                <small>{t("Hooks des premières slides · vues moyennes observées", "First-slide hooks · observed average views", en)}</small>
                 <ul>
                   {data.hooks.map((h) => (
                     <li key={h.hook}>
@@ -495,45 +503,9 @@ export function AccountPanel({
           </div>
         ) : null}
 
-        {data && tab === "revenue" ? (
-          <div className="ss-acc__revenue">
-            <div className="ss-acc__grid">
-              <Stat label={t("Revenus estimés", "Estimated revenue", en)} value={euro(data.revenue.estimated, en)} sub={`${compact(data.revenue.views)} ${t("vues", "views", en)} × ${data.revenue.rpm} € / 1k · ${rangeLabel}`} accent />
-              <Stat label={t("Revenus déclarés", "Declared revenue", en)} value={euro(data.revenue.declared, en)} sub={t("ce que le compte a réellement rapporté", "what the account really paid out", en)} />
-              <Stat label={t("Par post", "Per post", en)} value={data.videos.length ? euro(data.revenue.estimated / data.videos.length, en) : "—"} />
-              <Stat label={t("Par 1k abonnés", "Per 1k followers", en)} value={s!.followers ? euro((data.revenue.estimated / s!.followers) * 1000, en) : "—"} />
-            </div>
-            <form
-              className="ss-acc__revform"
-              onSubmit={(e) => {
-                e.preventDefault();
-                saveRevenue();
-              }}
-            >
-              <label>
-                <span>{t("RPM (€ pour 1 000 vues)", "RPM (€ per 1,000 views)", en)}</span>
-                <input className="ss-input" inputMode="decimal" value={rpmDraft} onChange={(e) => setRpmDraft(e.target.value)} />
-              </label>
-              <label>
-                <span>{t("Revenus réels (€)", "Real revenue (€)", en)}</span>
-                <input className="ss-input" inputMode="decimal" value={declaredDraft} placeholder="0" onChange={(e) => setDeclaredDraft(e.target.value)} />
-              </label>
-              <button type="submit" className="ss-fan__chip is-on">
-                {t("Enregistrer", "Save", en)}
-              </button>
-            </form>
-            <p className="ss-acc__muted">
-              {t(
-                "L'estimation applique ton RPM aux vues de la période. Renseigne les revenus réels (Creator Rewards, deals UGC, commissions) pour comparer.",
-                "The estimate applies your RPM to the period's views. Enter real revenue (Creator Rewards, UGC deals, commissions) to compare.",
-                en,
-              )}
-            </p>
-          </div>
-        ) : null}
       </div>
 
-      {current ? <PostViewer video={current} handle={item.handle} en={en} onClose={() => setOpenPost(null)} /> : null}
+      {current ? <PostViewer initialSlide={openSlide} video={current} handle={item.handle} en={en} onClose={() => setOpenPost(null)} /> : null}
     </div>
   );
 }
@@ -543,31 +515,48 @@ export function AccountPanel({
  * fait défiler le carrousel, et les compteurs de la période sont à côté.
  */
 function PostViewer({
+  initialSlide,
   video,
   handle,
   en,
   onClose,
 }: {
+  initialSlide: number;
   video: AccountInsights["videos"][number];
   handle: string;
   en: boolean;
   onClose: () => void;
 }) {
   const id = embedId(video);
+  const [visibleSlide, setVisibleSlide] = useState(initialSlide);
+  const transcript = video.slideTexts?.find(s => s.index === visibleSlide);
   const link = video.url || (id ? `https://www.tiktok.com/@${handle}/${video.kind === "photo" ? "photo" : "video"}/${id}` : "");
 
+  const dialog = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") close.current();
+      if (e.key === "Tab" && dialog.current) {
+        const focusable = [...dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled):not([tabindex="-1"]), a[href], iframe, [tabindex="0"]')];
+        const first = focusable[0]; const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    closeButton.current?.focus({ preventScroll: true });
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
+      previousFocus?.focus({ preventScroll: true });
     };
-  }, [onClose]);
+  }, []);
 
   // Le panneau crée son propre contexte d'empilement : le lecteur doit sortir
   // du DOM du panneau pour passer au-dessus du chrome flottant du studio.
@@ -575,20 +564,20 @@ function PostViewer({
   return createPortal(
     <div className="ss-postview" role="dialog" aria-modal="true" aria-label={video.title || t("Post TikTok", "TikTok post", en)}>
       <button type="button" className="ss-postview__scrim" aria-label={t("Fermer", "Close", en)} onClick={onClose} />
-      <div className="ss-postview__sheet lg">
+      <div ref={dialog} className="ss-postview__sheet lg">
         <header className="ss-postview__head">
           <div>
             <small>@{handle} · {video.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}</small>
             <b>{video.title || t("Sans titre", "Untitled", en)}</b>
           </div>
-          <button type="button" className="ss-fan__chip lg-press" onClick={onClose}>
+          <button ref={closeButton} type="button" className="ss-fan__chip lg-press" onClick={onClose}>
             {t("Fermer", "Close", en)}
           </button>
         </header>
 
         <div className="ss-postview__body">
           <div className="ss-postview__player">
-            {id ? (
+            {video.kind === "photo" && video.images?.length ? <TikTokSlides key={video.id} images={video.images} en={en} large initialIndex={initialSlide} onSlideChange={setVisibleSlide} /> : id ? (
               <iframe
                 key={id}
                 src={`https://www.tiktok.com/embed/v2/${id}`}
@@ -632,7 +621,12 @@ function PostViewer({
                 <dd>{video.createdAt ? new Date(video.createdAt * 1000).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "—"}</dd>
               </div>
             </dl>
-            {video.title ? <p className="ss-postview__caption">{video.title}</p> : null}
+            {transcript ? <section className="ss-postview__transcript">
+              <strong>{t(`Texte de la slide ${visibleSlide + 1}`, `Slide ${visibleSlide + 1} text`, en)}</strong>
+              <p>{transcript.text || t(transcript.status === "pending" ? "Lecture en cours…" : "Aucun texte lisible détecté.", transcript.status === "pending" ? "Reading…" : "No readable text detected.", en)}</p>
+              {transcript.status === "uncertain" ? <small>{t("Lecture automatique incertaine : vérifie l’image.", "Uncertain automatic reading: check the image.", en)}</small> : null}
+            </section> : null}
+            {video.caption || video.title ? <p className="ss-postview__caption">{video.caption || video.title}</p> : null}
             {link ? (
               <a href={link} target="_blank" rel="noreferrer" className="ss-fan__chip is-on lg-press">
                 {t("Ouvrir sur TikTok ↗", "Open on TikTok ↗", en)}

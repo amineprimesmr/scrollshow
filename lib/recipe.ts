@@ -139,9 +139,13 @@ export function recipeFromPhotos(
   extra?: RecipeInput | Partial<CarouselRecipe>,
 ): CarouselRecipe {
   const extraSlides = extra?.slides || [];
-  const slides = (photos.length ? photos : ["/assets/tiktoks/01-glowup-188k.png"]).map((image, index) =>
-    defaultSlide(image, extraSlides[index] as Partial<CarouselSlide> | undefined),
-  );
+  const count = Math.max(photos.length, extraSlides.length);
+  const slides = count
+    ? Array.from({ length: count }, (_, index) => defaultSlide(
+      photos[index] || extraSlides[index]?.image || "",
+      extraSlides[index] as Partial<CarouselSlide> | undefined,
+    ))
+    : [defaultSlide("/assets/tiktoks/01-glowup-188k.png")];
   return normalizeRecipe({
     version: 1,
     origin: extra?.origin || origin,

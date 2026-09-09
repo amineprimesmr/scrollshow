@@ -66,6 +66,7 @@ export async function fetchTikTokProfile(rawHandle: string): Promise<TikTokProfi
       headers: tiktokHeaders(),
       redirect: "follow",
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
     });
     if (res.status === 404) throw new ProfileError("not_found");
     if (!res.ok) throw new ProfileError("blocked", `status ${res.status}`);

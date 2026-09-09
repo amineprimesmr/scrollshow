@@ -69,7 +69,7 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
   /** Libelles par offre : un seul endroit ou lire ce que la carte annonce. */
   const copy: Record<Offer, {
     aria: string; title: string; amount: string; unit: string; billed: string; commitment: string;
-    badge?: string; ribbon?: string; cta: string;
+    badge?: string; ribbon?: string; ribbonNote?: string; cta: string;
   }> = {
     monthly: {
       aria: t("Offre mensuelle", "Monthly plan", english),
@@ -99,6 +99,7 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
       commitment: t("Sans renouvellement", "No renewal", english),
       badge: t("Paiement unique", "One payment", english),
       ribbon: t("Offre de lancement", "Launch offer", english),
+      ribbonNote: t("Durée limitée", "Limited time", english),
       cta: t("Choisir l’accès à vie à 99 €", "Choose lifetime access for €99", english),
     },
   };
@@ -107,7 +108,12 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
       const lifetime = offer === "lifetime";
       const text = copy[offer];
       return <article key={offer} className={`sc-price${lifetime ? " sc-price--lifetime" : ""}${text.ribbon ? " sc-price--ribboned" : ""}`} aria-label={text.aria}>
-        {text.ribbon && <p className="sc-price__ribbon">{text.ribbon}</p>}
+        {text.ribbon && (
+          <p className="sc-price__ribbon">
+            <b>{text.ribbon}</b>
+            {text.ribbonNote && <i>{text.ribbonNote}</i>}
+          </p>
+        )}
         <header className="sc-price__head">
           <div className="sc-price__top">
             <h3>{text.title}</h3>

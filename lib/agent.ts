@@ -1,3 +1,4 @@
+import { researchCapabilities } from "./research/provider";
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import { fetchUserInfo, listRecentVideos, publicChannel } from "./tiktok";
 import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
@@ -28,6 +29,7 @@ import type { RecipeInput } from "./recipe";
 import { assertEditable, validatePost } from "./post-validation";
 import { consumeLimit } from "./rate-limit";
 import { queueDeletedMedia } from "./media-cleanup";
+import { dateInTimeZone, resolveSettings } from "./settings";
 
 export class AgentError extends Error {
   constructor(
@@ -41,11 +43,14 @@ export class AgentError extends Error {
 export async function agentWhoami(user: SessionUser) {
   const channel = (await loadTikTokChannels(user.id))[0];
   const data = await readStore();
-  const business = data.users.find((item) => item.id === user.id)?.business || null;
+  const owner = data.users.find((item) => item.id === user.id);
+  const business = owner?.business || null;
+  const settings = resolveSettings(owner);
   return {
-    capabilities: { research: true, discovery: Boolean(process.env.BRAVE_SEARCH_API_KEY), detailedMetrics: Boolean(process.env.METRICS_API_KEY), export: true, publishing: "tiktok", htmlExport: false },
+    capabilities: { research: true, ...researchCapabilities(), export: true, publishing: "tiktok", htmlExport: false },
     limits: { analysesPerDay: 30, discoveriesPerDay: 10, exportsPerDay: 20 },
     user: { id: user.id, email: user.email, name: user.name, plan: user.plan },
+    calendar: { timezone: settings.timezone, today: dateInTimeZone(settings.timezone), defaultPostTime: settings.defaultPostTime },
     business: business
       ? {
           name: business.name,
@@ -118,8 +123,8 @@ export async function agentCreatePost(
   const origin = input.origin || "ai";
   const photos = input.photo_images?.length
     ? input.photo_images
-    : input.recipe?.slides?.map((slide) => slide.image || "").filter(Boolean).length
-      ? (input.recipe?.slides || []).map((slide) => slide.image || "").filter(Boolean)
+    : input.recipe?.slides?.length
+      ? input.recipe.slides.map((slide) => slide.image || "")
       : [input.image || (await agentMedia(user))[0]?.url || ""];
   const recipe = input.recipe
     ? recipeFromPhotos(photos, origin, input.recipe)
@@ -742,6 +747,7 @@ export async function agentAnalytics(user: SessionUser, options: { days?: number
     calendar,
     profile,
     videos: rankedVideos.slice(0, 20),
+    coverage: { mode: "recent_sample", fetched: allVideos.length, returned: Math.min(20, rankedVideos.length), perChannelLimit: fetchCount, completeHistory: false },
     totals,
     lifetimeTotals,
     channelStats,

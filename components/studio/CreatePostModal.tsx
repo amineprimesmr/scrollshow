@@ -399,7 +399,9 @@ export function CreatePostModal() {
                   : rebuildError
                     ? rebuildError
                     : recipe.editable
-                      ? t("Les textes sont extraits. L’aperçu montre la photo originale. Modifie une ligne à droite si besoin.", "Texts are extracted. The preview shows the original photo. Edit a line on the right if you need.", english)
+                      ? showOriginal
+                        ? t("L’aperçu montre l’image originale. Passe à l’édition pour voir tes modifications.", "The preview shows the original image. Switch to the edit to see your changes.", english)
+                        : t("Ton carrousel est éditable. Modifie les textes et leur mise en page à droite.", "Your carousel is editable. Adjust the text and layout on the right.", english)
                       : t("Import brut : le texte est encore dans l’image. Recrée-le pour extraire les textes éditables.", "Raw import: text is still inside the image. Rebuild it to extract editable texts.", english)}
               </p>
               {editing?.id && (baked || rebuildError || recipe.origin === "import" || recipe.origin === "fork") && !rebuilding ? (

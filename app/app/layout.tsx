@@ -10,6 +10,7 @@ import "../liquid-glass.css";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await readSession();
   if (!user) redirect("/signup?mode=signin&next=/app");
+  if (!user.emailVerified) redirect("/signup?verify=1");
   if (!user.onboarded) redirect("/onboarding?next=/app");
   if (!hasStudioAccess(user.plan)) redirect("/onboarding?step=payment");
   return <StudioShell>{children}</StudioShell>;

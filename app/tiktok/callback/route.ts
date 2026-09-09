@@ -1,7 +1,6 @@
 import { readSession } from "@/lib/auth";
-import { exchangeCode, fetchUserInfo } from "@/lib/tiktok";
-import { resolveStoreUserId } from "@/lib/local-user";
-import { updateStore } from "@/lib/store";
+import { TikTokApiError } from "@/lib/tiktok";
+import { linkTikTokAccount } from "@/lib/tiktok-link";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -18,51 +17,21 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.redirect(`${site}/signup?mode=signin&next=/app`);
 
   const expected = (await cookies()).get("ss_oauth_state")?.value || "";
-  if (expected && state && expected !== state) {
+  if (!expected || !state || expected !== state) {
     return NextResponse.redirect(`${site}/app/integrations?error=state_mismatch`);
   }
 
+  (await cookies()).delete("ss_oauth_state");
   try {
-    const tokens = await exchangeCode(code);
-    let profile: Record<string, any> = {};
-    try {
-      profile = await fetchUserInfo(tokens.access_token);
-    } catch {
-      profile = {};
-    }
+    await linkTikTokAccount(user, code);
 
-    await updateStore((data) => {
-      const userId = resolveStoreUserId(data, user);
-      const existing = data.channels.find(
-        (item) => item.userId === userId && item.platform === "tiktok" && item.openId === (tokens.open_id || profile.open_id),
-      );
-      const next = {
-        id: existing?.id || crypto.randomUUID(),
-        userId,
-        platform: "tiktok",
-        name: profile.display_name || profile.username || "TikTok",
-        handle: profile.username || "tiktok",
-        avatar: profile.avatar_url || profile.avatar_url_100 || "/logo.png",
-        connected: true,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        openId: tokens.open_id || profile.open_id || "",
-        expiresAt: tokens.expires_at,
-        followers: Number(profile.follower_count || 0),
-        likes: Number(profile.likes_count || 0),
-        videoCount: Number(profile.video_count || 0),
-      };
-      if (existing) Object.assign(existing, next);
-      else data.channels.unshift(next);
-    });
-
-    (await cookies()).delete("ss_oauth_state");
     return NextResponse.redirect(`${site}/app/integrations?connected=tiktok`);
   } catch (error) {
-    const raw = error instanceof Error ? error.message : "oauth";
+    const raw = error instanceof TikTokApiError ? error.code : "oauth";
     let code = "oauth";
     if (raw.includes("invalid_client")) code = "invalid_client";
     else if (raw.includes("invalid_grant") || raw.includes("invalid_code")) code = "invalid_grant";
+    else if (raw.includes("invalid_scope")) code = "invalid_scope";
     else if (raw.includes("access_denied")) code = "access_denied";
     return NextResponse.redirect(`${site}/app/integrations?error=${code}`);
   }

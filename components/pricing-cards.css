@@ -6,7 +6,7 @@
      suit le nombre de cartes plutot qu'un compte fige. */
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: clamp(14px, 1.2vw, 20px);
-  width: min(100%, 1140px);
+  width: min(100%, 980px);
   margin: 0 auto;
   color: #fafafa;
   text-align: left;
@@ -29,8 +29,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: clamp(20px, 1.6vw, 24px);
-  border-radius: clamp(24px, 2.1vw, 32px);
+  padding: clamp(16px, 1.2vw, 20px);
+  border-radius: clamp(20px, 1.7vw, 26px);
   background: linear-gradient(165deg, #a7a8b326 0%, #45444e24 27%, #111111ed 87%);
   -webkit-backdrop-filter: blur(28px) saturate(115%);
   backdrop-filter: blur(28px) saturate(115%);
@@ -57,7 +57,7 @@
   opacity: .85;
   transition: opacity .5s ease;
 }
-.sc-price__head { position: relative; padding-bottom: 22px; border-bottom: 0; }
+.sc-price__head { position: relative; padding-bottom: 16px; border-bottom: 0; }
 /* Filet gravé : creux sombre + arête de lumière en dessous */
 .sc-price__head::after {
   content: "";
@@ -71,44 +71,82 @@
 }
 .sc-price__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 27px; }
 .sc-price__top h3 { margin: 0; color: #c6c6cc; font-size: clamp(14px, 1.1vw, 17px); line-height: 1.25; font-weight: 500; letter-spacing: .035em; text-transform: uppercase; }
-/* Bandeau au-dessus de la carte a vie : l'offre de lancement se lit avant le prix. */
-.sc-price--ribboned { padding-top: clamp(44px, 3.4vw, 52px); }
+/* Bandeau de la carte a vie : l'offre de lancement doit se voir avant le prix. */
+.sc-price--ribboned { padding-top: clamp(40px, 3vw, 46px); border-color: #ffca6a4d; }
+.sc-price--ribboned::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px #ffc26433, 0 18px 60px -26px #ffae4059;
+}
 .sc-price__ribbon {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin: 0;
-  padding: 9px 12px;
-  background: linear-gradient(180deg, #ffffff, #e7e7ec);
-  color: #050505;
-  font-size: clamp(11px, .9vw, 12.5px);
-  font-weight: 600;
-  letter-spacing: -.01em;
-  text-align: center;
+  padding: 8px 12px;
+  background: linear-gradient(100deg, #ffe7b0, #ffc75a 34%, #ffb033 58%, #ffdc95);
+  color: #2b1a00;
+  font-size: clamp(10px, .82vw, 11.5px);
+  font-weight: 700;
+  letter-spacing: .16em;
   text-transform: uppercase;
+  text-align: center;
+  box-shadow: inset 0 -1px 0 #00000026, 0 6px 18px -10px #ffae4099;
+}
+/* Reflet qui balaie le bandeau : le regard y revient sans que ca clignote. */
+.sc-price__ribbon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, #ffffffd9 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: sc-ribbon-sheen 4.2s ease-in-out infinite;
+}
+.sc-price__ribbon b { font-weight: 700; }
+.sc-price__ribbon i {
+  position: relative;
+  font-style: normal;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #2b1a00;
+  color: #ffd98a;
+  letter-spacing: .1em;
+}
+@keyframes sc-ribbon-sheen {
+  0%, 55% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 .sc-price__badge { flex-shrink: 0; padding: 3px 7px; background: #fff; color: #090909; border-radius: 6px; font-size: clamp(10px, .85vw, 12px); font-weight: 550; line-height: 1.1; letter-spacing: -.04em; }
-.sc-price__pricing { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; min-height: 42px; }
-.sc-price__amount { margin: 0; font-size: clamp(23px, 1.85vw, 28px); line-height: 1.12; letter-spacing: -.035em; font-weight: 500; white-space: nowrap; }
+.sc-price__pricing { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; min-height: 36px; }
+.sc-price__amount { margin: 0; font-size: clamp(20px, 1.5vw, 24px); line-height: 1.12; letter-spacing: -.035em; font-weight: 500; white-space: nowrap; }
 .sc-price__amount span { color: #aeb0b8; font-weight: 450; }
 .sc-price__billing {
   margin: 0;
   text-align: right;
-  font-size: clamp(11px, .95vw, 13px);
-  line-height: 1.45;
+  font-size: clamp(10.5px, .82vw, 12px);
+  line-height: 1.4;
   letter-spacing: -.02em;
   /* Texte gravé dans la carte : ombre au-dessus, lumière en dessous */
   color: #7d8089;
   text-shadow: 0 -1px 1px #00000099, 0 1px 0 #ffffff26;
 }
-.sc-price__features { display: grid; gap: 10px; padding: 24px 0 20px; margin: 0; list-style: none; }
-.sc-price__features li { display: grid; grid-template-columns: 38px minmax(0,1fr) 18px; align-items: center; gap: 13px; min-height: 46px; }
-.sc-price__icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(160deg, #ffffff1f, #ffffff08 55%, #ffffff03); color: #fff; box-shadow: inset 0 1px 0 #ffffff3d, inset 0 -1px 0 #0000006b, 0 1px 2px #00000047; }
-.sc-price__icon svg { width: 17px; height: 17px; }
-.sc-price__feature-label { color: #b3b3b8; font-size: clamp(13px, 1.05vw, 15px); line-height: 1.3; letter-spacing: -.045em; font-weight: 400; }
+.sc-price__features { display: grid; gap: 6px; padding: 16px 0 14px; margin: 0; list-style: none; }
+.sc-price__features li { display: grid; grid-template-columns: 32px minmax(0,1fr) 17px; align-items: center; gap: 11px; min-height: 36px; }
+.sc-price__icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(160deg, #ffffff1f, #ffffff08 55%, #ffffff03); color: #fff; box-shadow: inset 0 1px 0 #ffffff3d, inset 0 -1px 0 #0000006b, 0 1px 2px #00000047; }
+.sc-price__icon svg { width: 15px; height: 15px; }
+.sc-price__feature-label { color: #b3b3b8; font-size: clamp(12px, .95vw, 13.5px); line-height: 1.3; letter-spacing: -.045em; font-weight: 400; }
 .sc-price__status { display: flex; color: #00e583; }
-.sc-price__status svg { width: 19px; height: 19px; }
+.sc-price__status svg { width: 17px; height: 17px; }
 .sc-price__status.is-white, .sc-price__status.is-locked { color: #e3e4e6; }
 .sc-price__status.is-locked svg { width: 17px; margin-inline: auto; }
 .sc-price .sc-price__cta {
@@ -116,15 +154,15 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 50px;
+  min-height: 44px;
   margin-top: auto;
-  padding: 12px 18px;
+  padding: 10px 16px;
   border: 1px solid #ffffff33;
-  border-radius: 18px;
+  border-radius: 15px;
   background: transparent;
   color: #fff;
   text-decoration: none;
-  font-size: clamp(15px, 1.2vw, 17px);
+  font-size: clamp(14px, 1.05vw, 15.5px);
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -.035em;
@@ -182,5 +220,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .sc-price, .sc-price::before, .sc-price__cta { transition: none; }
+  .sc-price__ribbon::before { animation: none; opacity: 0; }
   .sc-price:hover { transform: none; }
 }

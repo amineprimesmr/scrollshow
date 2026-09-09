@@ -63,9 +63,9 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
       <div className="ss-oauth__card">
         <span className="ss-oauth__edge" aria-hidden />
 
-        <h1>Autoriser {client.name}</h1>
+        <h1>Connecter {client.name}</h1>
         <p className="ss-oauth__sub">
-          Cette application demande l’accès à ton espace ScrollShow, au nom de <strong>{user.email}</strong>.
+          Autorise {client.name} à travailler dans ton espace <strong>{user.email}</strong>.
         </p>
 
         <ul className="ss-oauth__perms">
@@ -89,11 +89,11 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
           <input type="hidden" name="state" value={state} />
           <input type="hidden" name="scope" value={OAUTH_SCOPE} />
           <button type="submit" name="decision" value="deny" className="ss-oauth__deny">Refuser</button>
-          <button type="submit" name="decision" value="allow" className="ss-oauth__allow">Autoriser</button>
+          <button type="submit" name="decision" value="allow" className="ss-oauth__allow">Connecter {client.name}</button>
         </form>
 
         <p className="ss-oauth__foot">
-          Tu pourras retirer cet accès à tout moment depuis Réglages → Compte.
+          Cette connexion reste enregistrée. Tu peux la retirer dans les réglages de ScrollShow.
         </p>
       </div>
     </main>

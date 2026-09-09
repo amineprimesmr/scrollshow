@@ -1,6 +1,7 @@
 import type { AccountVideo } from "./types";
+import { normalizePost } from "./research/normalize";
 
-const BASE = process.env.METRICS_API_BASE || "";
+const base = () => process.env.METRICS_API_BASE || "";
 const ENDPOINT = "/api/v1/tiktok/app/v3/fetch_user_post_videos_v3";
 
 export class MetricsError extends Error {
@@ -12,7 +13,7 @@ export class MetricsError extends Error {
 }
 
 export function metricsEnabled() {
-  return Boolean(process.env.METRICS_API_KEY && BASE);
+  return Boolean(process.env.METRICS_API_KEY && base());
 }
 
 function headers() {
@@ -26,39 +27,20 @@ function firstUrl(value: any): string {
   return firstUrl(value.url_list || value.urlList || value.url);
 }
 
-function toVideo(item: any): AccountVideo | null {
-  const id = String(item?.aweme_id || item?.id || "");
-  if (!id) return null;
-  const stats = item.statistics || {};
-  const isPhoto = Boolean(item.image_post_info);
-  const cover = isPhoto
-    ? firstUrl(item.image_post_info?.image_post_cover?.display_image) || firstUrl(item.image_post_info?.images?.[0]?.display_image)
-    : firstUrl(item.video?.cover) || firstUrl(item.video?.origin_cover) || firstUrl(item.video?.dynamic_cover);
-  const author = item.author?.unique_id || "";
-  return {
-    id,
-    title: String(item.desc || "").trim().slice(0, 140),
-    cover,
-    views: Number(stats.play_count || 0),
-    likes: Number(stats.digg_count || 0),
-    comments: Number(stats.comment_count || 0),
-    shares: Number(stats.share_count || 0),
-    kind: isPhoto ? "photo" : "video",
-    createdAt: Number(item.create_time || 0),
-    url: author ? `https://www.tiktok.com/@${author}/${isPhoto ? "photo" : "video"}/${id}` : "",
-  };
-}
+function toVideo(item: any): AccountVideo | null { return normalizePost(item); }
 
-async function runPage(handle: string, cursor: number): Promise<{ items: any[]; hasMore: boolean; cursor: number }> {
-  const res = await fetch(`${BASE}/run`, {
+export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>): Promise<any> {
+  const deadline = AbortSignal.timeout(40000);
+  const res = await fetch(`${base()}/run`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
       provider: "tikhub",
-      endpoint: ENDPOINT,
-      input: { queryParams: { unique_id: handle, count: 50, sort_type: 0, max_cursor: cursor } },
+      endpoint,
+      input: { queryParams },
     }),
     cache: "no-store",
+    signal: deadline,
   });
   if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
   if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
@@ -69,7 +51,7 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
     // Async run: poll with a simple backoff, TikHub takes a few seconds.
     for (let attempt = 0; attempt < 14 && !output; attempt += 1) {
       await new Promise((r) => setTimeout(r, attempt === 0 ? 4000 : 2500));
-      const poll = await fetch(`${BASE}/runs/${runId}`, { headers: headers(), cache: "no-store" });
+      const poll = await fetch(`${base()}/runs/${runId}`, { headers: headers(), cache: "no-store", signal: deadline });
       if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
       body = await poll.json().catch(() => ({}));
       const status = String(body.status || "").toUpperCase();
@@ -78,9 +60,25 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
     }
     if (!output) throw new MetricsError("timeout", "run still pending");
   }
-  const data = output?.data ?? output;
-  const items: any[] = data?.aweme_list || data?.data?.aweme_list || [];
-  return { items, hasMore: Boolean(data?.has_more), cursor: Number(data?.max_cursor || 0) };
+  if (!output) throw new MetricsError("http", "Missing provider result");
+  return output;
+}
+
+async function runPage(handle: string, cursor: number): Promise<{ items: any[]; hasMore: boolean; cursor: number }> {
+  const output = await runMetricsTool(ENDPOINT, { unique_id: handle, count: 50, sort_type: 0, max_cursor: cursor });
+  const envelope = output?.data ?? output;
+  const data = envelope?.data?.aweme_list ? envelope.data : envelope;
+  if (!Array.isArray(data?.aweme_list)) throw new MetricsError("http", "Missing post list");
+  return { items: data.aweme_list, hasMore: data.has_more === true || data.has_more === 1, cursor: Number(data.max_cursor || 0) };
+}
+
+export async function fetchAccountVideoPage(handle: string, cursor = 0) {
+  if (!metricsEnabled()) throw new MetricsError("no_key");
+  const result = await runPage(handle, cursor);
+  if (result.hasMore && (!Number.isFinite(result.cursor) || result.cursor <= 0 || (cursor > 0 && result.cursor >= cursor))) {
+    throw new MetricsError("http", "Pagination did not advance");
+  }
+  return { videos: result.items.map(toVideo).filter((v): v is AccountVideo => v !== null), hasMore: result.hasMore, cursor: result.hasMore ? result.cursor : undefined };
 }
 
 /** Pulls up to `pages` × 50 recent posts of a public TikTok account. */
@@ -99,6 +97,7 @@ export async function fetchAccountVideos(handle: string, pages = 2): Promise<Acc
       }
     }
     if (!result.hasMore || !result.items.length) break;
+    if (!result.cursor || result.cursor === cursor) throw new MetricsError("http", "Pagination did not advance");
     cursor = result.cursor;
   }
   if (!videos.length) throw new MetricsError("empty", "no posts returned");
@@ -159,7 +158,7 @@ export async function discoverTools(query: string, limit = 24): Promise<Connecto
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(`${BASE}/discover`, {
+    const res = await fetch(`${base()}/discover`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({ query: key || "content marketing" }),

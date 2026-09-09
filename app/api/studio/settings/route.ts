@@ -171,12 +171,16 @@ export async function DELETE() {
     data.videoStats = data.videoStats?.filter(s => !channelIds.has(s.channelId));
     data.channelStats = data.channelStats?.filter(s => !channelIds.has(s.channelId));
     data.users = data.users.filter((item) => item.id !== session.id);
+    data.tiktokQrAttempts = (data.tiktokQrAttempts || []).filter((item) => item.userId !== session.id);
     data.channels = data.channels.filter((item) => item.userId !== session.id);
     data.posts = data.posts.filter((item) => item.userId !== session.id);
     data.media = data.media.filter((item) => item.userId !== session.id);
     data.apiKeys = data.apiKeys.filter((item) => item.userId !== session.id);
     data.accounts = data.accounts.filter((item) => item.userId !== session.id);
     data.runs = data.runs.filter((item) => item.userId !== session.id);
+    data.researchJobs = data.researchJobs?.filter(item => item.userId !== session.id);
+    data.formatStudies = data.formatStudies?.filter(item => item.userId !== session.id);
+    data.publicationText = data.publicationText?.filter(item => item.userId !== session.id);
   });
 
   await clearSessionCookie();

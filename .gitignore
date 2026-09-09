@@ -9,3 +9,9 @@ out
 *.log
 .DS_Store
 *.tsbuildinfo
+
+.next-audit
+.next-local
+
+.next-verify
+artifacts/

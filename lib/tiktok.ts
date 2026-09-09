@@ -1,3 +1,4 @@
+import { parseQrStatus } from "./tiktok-qr";
 import { creatorBlockedReason, normalizeCreator } from "./tiktok-compliance";
 
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
@@ -95,7 +96,22 @@ export function buildAuthorizeUrl(state: string) {
 const QR_CREATE = "https://open.tiktokapis.com/v2/oauth/get_qrcode/";
 const QR_CHECK = "https://open.tiktokapis.com/v2/oauth/check_qrcode/";
 
-export type TikTokQrStatus = "new" | "scanned" | "confirmed" | "expired" | "utilised";
+export type { TikTokQrStatus } from "./tiktok-qr";
+
+function oauthPayload(data: Record<string, any>, ok: boolean) {
+  const payload = data.data || data;
+  const error = data.error || payload.error;
+  const code = typeof error === "string" ? error : error?.code;
+  if (!ok || (code && code !== "ok")) {
+    const description = String(data.error_description || payload.error_description || "");
+    if (code === "invalid_request" && /redirect_uri.*not.*match/i.test(description)) {
+      throw new TikTokApiError("redirect_mismatch", "TikTok authorization redirect mismatch");
+    }
+    // Keep tokens and provider response bodies out of logs and client errors.
+    throw new TikTokApiError(code || "provider_error", "TikTok authorization failed");
+  }
+  return payload;
+}
 
 /** Flux QR officiel : l'utilisateur autorise depuis l'app TikTok de son téléphone. */
 export async function createQrCode(state: string) {
@@ -104,11 +120,13 @@ export async function createQrCode(state: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_key: clientKey, scope: oauthScopes(), state }),
+    signal: AbortSignal.timeout(10000),
   });
   const data = await res.json();
-  const url = data.scan_qrcode_url || data.data?.scan_qrcode_url;
-  const token = data.token || data.data?.token;
-  if (!url || !token) throw new Error(JSON.stringify(data));
+  const payload = oauthPayload(data, res.ok);
+  const url = payload.scan_qrcode_url;
+  const token = payload.token;
+  if (typeof url !== "string" || typeof token !== "string" || !url || !token) throw new Error("invalid_qr_response");
   return { scanUrl: String(url), token: String(token) };
 }
 
@@ -118,47 +136,44 @@ export async function checkQrCode(token: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, token }),
+    signal: AbortSignal.timeout(10000),
   });
   const data = await res.json();
-  const payload = data.data || data;
-  if (payload.error) throw new Error(JSON.stringify(data));
-  return {
-    status: String(payload.status || "new") as TikTokQrStatus,
-    code: String(payload.code || ""),
-    state: String(payload.state || ""),
-    clientTicket: String(payload.client_ticket || ""),
-  };
+  return parseQrStatus(oauthPayload(data, res.ok));
 }
 
 function normalizeToken(data: Record<string, any>) {
   const access_token = data.access_token || data.data?.access_token;
-  if (!access_token) throw new Error(`Token exchange failed: ${JSON.stringify(data)}`);
+  if (!access_token) throw new Error("invalid_token_response");
   return {
     access_token,
     refresh_token: data.refresh_token || data.data?.refresh_token || "",
     open_id: data.open_id || data.data?.open_id || "",
-    scope: data.scope || data.data?.scope || oauthScopes(),
+    scope: data.scope ?? data.data?.scope ?? "",
     expires_at: Date.now() + Number(data.expires_in || data.data?.expires_in || 86400) * 1000,
   };
 }
 
-export async function exchangeCode(code: string) {
+export async function exchangeCode(code: string, qrRedirectUri?: string | null) {
   const { clientKey, clientSecret, redirectUri: uri } = envConfig();
   const body = new URLSearchParams({
     client_key: clientKey,
     client_secret: clientSecret,
     code,
     grant_type: "authorization_code",
-    redirect_uri: uri,
   });
+  // The QR flow does not request the web callback. Use the URI returned with
+  // its code, if any; never attach an unrelated web redirect to a QR grant.
+  const redirect = qrRedirectUri === undefined ? uri : qrRedirectUri;
+  if (redirect) body.set("redirect_uri", redirect);
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
+    signal: AbortSignal.timeout(10000),
   });
   const data = await res.json();
-  if (data.error || data.message === "error") throw new Error(JSON.stringify(data));
-  return normalizeToken(data);
+  return normalizeToken(oauthPayload(data, res.ok));
 }
 
 export async function refreshAccessToken(refreshToken: string) {
@@ -173,10 +188,10 @@ export async function refreshAccessToken(refreshToken: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
+    signal: AbortSignal.timeout(10000),
   });
   const data = await res.json();
-  if (data.error || data.message === "error") throw new Error(JSON.stringify(data));
-  return normalizeToken(data);
+  return normalizeToken(oauthPayload(data, res.ok));
 }
 
 export async function revokeAccessToken(accessToken: string) {
@@ -212,8 +227,12 @@ async function tiktokPost(url: string, accessToken: string, jsonBody: Record<str
       "Content-Type": "application/json; charset=UTF-8",
     },
     body: JSON.stringify(jsonBody),
+    signal: AbortSignal.timeout(15000),
+    cache: "no-store",
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new TikTokApiError(String(data.error?.code || `http_${res.status}`), "TikTok request failed");
+  return data;
 }
 
 export class TikTokApiError extends Error {
@@ -230,11 +249,22 @@ function assertOk(data: any) {
   return data.data || {};
 }
 
-export async function fetchUserInfo(accessToken: string) {
+export function profileFieldsForScopes(scopes?: string) {
+  if (!scopes) return "open_id,union_id,avatar_url,display_name";
+  const granted = new Set(scopes.split(/[ ,]+/));
+  return ["open_id", "union_id", "avatar_url", "display_name",
+    ...(granted.has("user.info.profile") ? ["username", "bio_description", "profile_deep_link", "is_verified"] : []),
+    ...(granted.has("user.info.stats") ? ["follower_count", "following_count", "likes_count", "video_count"] : []),
+  ].join(",");
+}
+
+export async function fetchUserInfo(accessToken: string, fields = USER_INFO_FIELDS, timeoutMs = 15000) {
   const url = new URL(USER_INFO);
-  url.searchParams.set("fields", USER_INFO_FIELDS);
+  url.searchParams.set("fields", fields);
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(timeoutMs),
+    cache: "no-store",
   });
   const data = await res.json();
   const err = data.error || {};
@@ -249,10 +279,28 @@ export type TikTokVideo = {
   like_count: number;
   comment_count: number;
   share_count: number;
+  title?: string;
+  duration?: number;
   video_description?: string;
   cover_image_url?: string;
   share_url?: string;
 };
+
+/** One resumable page; never label a capped sample as a complete history. */
+export async function listVideoPage(accessToken: string, cursor?: number) {
+  const url = new URL(VIDEO_LIST);
+  url.searchParams.set("fields", VIDEO_LIST_FIELDS);
+  const data = assertOk(await tiktokPost(url.toString(), accessToken, {
+    max_count: 20, ...(cursor === undefined ? {} : { cursor }),
+  }));
+  if (!Array.isArray(data.videos)) throw new TikTokApiError("invalid_response", "Missing video list");
+  const hasMore = data.has_more === true;
+  const next = Number(data.cursor);
+  if (hasMore && (!Number.isFinite(next) || next <= 0 || (cursor !== undefined && next >= cursor))) {
+    throw new TikTokApiError("invalid_cursor", "Pagination did not advance");
+  }
+  return { videos: data.videos as TikTokVideo[], hasMore, cursor: hasMore ? next : undefined };
+}
 
 /**
  * TikTok's video.list caps a single request at 20 items; a shadowban read on
@@ -312,6 +360,7 @@ export function publicChannel(channel: {
   handle: string;
   avatar: string;
   accessToken?: string;
+  connected?: boolean;
   followers?: number;
   likes?: number;
   videoCount?: number;
@@ -322,7 +371,7 @@ export function publicChannel(channel: {
     name: channel.name,
     handle: channel.handle,
     avatar: channel.avatar,
-    connected: Boolean(channel.accessToken),
+    connected: Boolean(channel.accessToken) && channel.connected !== false,
     followers: channel.followers || 0,
     likes: channel.likes || 0,
     videoCount: channel.videoCount || 0,

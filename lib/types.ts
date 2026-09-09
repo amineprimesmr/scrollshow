@@ -112,9 +112,35 @@ export type AccountVideo = {
   likes: number;
   comments: number;
   shares: number;
+  saves?: number;
+  caption?: string;
+  images?: string[];
+  slideTexts?: PublicationSlideText[];
+  hashtags?: string[];
+  missingMetrics?: Array<"views" | "likes" | "comments" | "shares" | "saves">;
+  measuredAt?: string;
   kind: "photo" | "video";
   createdAt: number; // unix seconds
   url: string;
+};
+
+export type PublicationSlideText = {
+  index: number;
+  imageKey: string;
+  text: string;
+  status: "pending" | "read" | "uncertain" | "failed";
+  confidence: number | null;
+  updatedAt?: string;
+};
+
+export type VideoSync = {
+  source: "tiktok" | "api";
+  cursor?: number;
+  hasMore: boolean;
+  complete: boolean;
+  seenIds: string[];
+  updatedAt: string;
+  error?: string;
 };
 
 export type Account = {
@@ -136,12 +162,11 @@ export type Account = {
   verified?: boolean;
   lastSyncAt?: string;
   syncError?: string;
-  /** Revenue model: € per 1000 views, and what the account really paid out. */
-  rpm?: number;
-  declaredRevenue?: number;
   /** Public posts pulled on demand from the metrics provider, newest first. */
   videos?: AccountVideo[];
   videosFetchedAt?: string;
+  videoSync?: VideoSync;
+  researchCoverage?: { complete: boolean; pages: number; windowDays: number; measuredAt: string; reason: string };
 };
 
 export type Run = {
@@ -165,16 +190,16 @@ export type Channel = {
   connected?: boolean;
   accessToken?: string;
   refreshToken?: string;
+  scopes?: string;
   openId?: string;
   expiresAt?: number;
   followers?: number;
   likes?: number;
   videoCount?: number;
-  rpm?: number;
-  declaredRevenue?: number;
   /** Public posts pulled on demand from the metrics provider, newest first. */
   videos?: AccountVideo[];
   videosFetchedAt?: string;
+  videoSync?: VideoSync;
 };
 
 export type OverlayAlign = "left" | "center" | "right";
@@ -344,6 +369,10 @@ export type OAuthToken = {
 };
 
 export type StoreData = {
+  tiktokQrAttempts?: import("./tiktok-qr-session").TikTokQrAttempt[];
+  publicationText?: Array<PublicationSlideText & { userId: string; postId: string }>;
+  researchJobs?: import("./research/model").ResearchJob[];
+  formatStudies?: import("./research/model").FormatStudy[];
   restoreReviewRequired?: boolean;
   mediaDeletionQueue?: Array<{ name: string; notBefore: number; attempts: number }>;
   operations?: Record<string, { lastStartedAt?: number; lastSucceededAt?: number; lastFailedAt?: number; leaseUntil?: number; claim?: string }>;

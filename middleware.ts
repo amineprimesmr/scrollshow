@@ -14,19 +14,8 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get("ss_session")?.value;
   const secret = process.env.AUTH_SECRET;
 
-  // Déjà connecté : /signup n'a rien à montrer. On envoie directement dans
-  // l'espace, sans repasser par l'écran Google. `?force=1` laisse la porte
-  // ouverte pour se connecter avec un autre compte.
-  if (pathname === "/signup" && token && secret && !request.nextUrl.searchParams.has("force")) {
-    try {
-      await jwtVerify(token, new TextEncoder().encode(secret));
-      const next = request.nextUrl.searchParams.get("next");
-      const dest = next && next.startsWith("/") && !next.startsWith("//") ? next : "/app";
-      return NextResponse.redirect(new URL(dest, request.url));
-    } catch {
-      // Jeton invalide : on laisse la page d'inscription s'afficher.
-    }
-  }
+  // Signup resolves the current account through /api/auth/me. A signed but
+  // revoked or unverified cookie must not force an endless redirect to /app.
 
   const needsAuth = PROTECTED.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   if (!needsAuth) return NextResponse.next();

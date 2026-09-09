@@ -6,6 +6,7 @@ const tessFiles = [
   "./node_modules/tesseract.js-core/**/*",
   "./node_modules/wasm-feature-detect/**/*",
   "./node_modules/@tesseract.js-data/eng/**/*",
+  "./node_modules/@tesseract.js-data/fra/**/*",
   "./node_modules/sharp/**/*",
 ];
 
@@ -22,9 +23,12 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["tesseract.js", "tesseract.js-core", "wasm-feature-detect", "sharp"],
   outputFileTracingIncludes: {
+    "/api/studio/insights/text": tessFiles,
     "/api/studio/posts/[id]/reconstruct": tessFiles,
     "/api/v1/[...slug]": tessFiles,
     "/api/mcp": tessFiles,
+    "/api/research/studies": tessFiles,
+    "/api/research/studies/[id]": tessFiles,
   },
   turbopack: {
     root: path.join(__dirname),

@@ -187,9 +187,10 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <NavPill className="ss-sidebar__nav" activeKey={pathname}>
-          {mainNav.map((entry) => (
-            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
-          ))}
+          {(["content", "growth"] as const).map(group => <div key={group}>
+            <p className="ss-sidebar__group">{group === "content" ? t("Contenu", "Content", english) : t("Outils de croissance", "Growth tools", english)}</p>
+            {mainNav.filter(entry => entry.group === group).map(entry => <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />)}
+          </div>)}
         </NavPill>
         <nav className="ss-sidebar__bottom">
           {bottomNav.map((entry) => (

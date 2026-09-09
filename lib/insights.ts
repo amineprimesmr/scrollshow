@@ -1,9 +1,7 @@
-import { agentAnalytics } from "./agent";
 import { metricsEnabled } from "./metrics";
 import { readStore } from "./store";
+import { withPublicationText } from "./publication-text";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
-
-export const DEFAULT_RPM = 0.6; // € per 1000 views — TikTok rewards / UGC deals ballpark, editable
 
 export type InsightFormat = { id: string; label: string; count: number; views: number; avgViews: number; bestViews: number };
 export type InsightHook = { hook: string; count: number; avgViews: number };
@@ -18,6 +16,7 @@ export type AccountInsights = {
   platform: string;
   connected: boolean;
   stats: {
+    missingMetrics?: string[];
     followers: number;
     likes: number;
     posts: number;
@@ -42,7 +41,7 @@ export type AccountInsights = {
   formats: InsightFormat[];
   hooks: InsightHook[];
   studio: { posts: number; published: number; scheduled: number; views: number; best: AccountVideo | null };
-  revenue: { rpm: number; declared: number; estimated: number; views: number };
+  sync: { complete: boolean; hasMore: boolean; error?: string; loaded: number; source: "tiktok" | "api" } | null;
   source: "tiktok" | "api" | "none";
   canFetch: boolean;
   fetchedAt: string | null;
@@ -78,6 +77,7 @@ function statsOf(videos: AccountVideo[]) {
     ? Math.round(sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
     : 0;
   return {
+    missingMetrics: [...new Set(videos.flatMap(v => v.missingMetrics || []))],
     views,
     videoLikes,
     comments,
@@ -140,7 +140,7 @@ function buildFormats(videos: AccountVideo[]): InsightFormat[] {
 function buildHooks(videos: AccountVideo[]): InsightHook[] {
   const map = new Map<string, { count: number; views: number }>();
   for (const v of videos) {
-    const hook = hookOf(v.title);
+    const hook = hookOf(v.slideTexts?.find(s => s.index === 0 && (s.status === "read" || s.status === "pending"))?.text || "");
     if (!hook) continue;
     const entry = map.get(hook) || { count: 0, views: 0 };
     entry.count += 1;
@@ -177,21 +177,6 @@ function studioSummary(posts: StudioPost[]): AccountInsights["studio"] {
   };
 }
 
-function tiktokVideoToAccountVideo(v: any, handle: string): AccountVideo {
-  return {
-    id: String(v.id),
-    title: String(v.title || v.video_description || "").slice(0, 140),
-    cover: String(v.cover_image_url || ""),
-    views: Number(v.period_views ?? v.view_count ?? 0),
-    likes: Number(v.period_likes ?? v.like_count ?? 0),
-    comments: Number(v.period_comments ?? v.comment_count ?? 0),
-    shares: Number(v.period_shares ?? v.share_count ?? 0),
-    kind: v.kind === "video" ? "video" : "photo",
-    createdAt: Number(v.create_time || 0),
-    url: String(v.share_url || (handle ? `https://www.tiktok.com/@${handle}/video/${v.id}` : "")),
-  };
-}
-
 /** Posts per week over the range — null range falls back to the observed span. */
 function cadenceOf(videos: AccountVideo[], days: number | null) {
   if (!videos.length) return 0;
@@ -206,12 +191,7 @@ function cadenceOf(videos: AccountVideo[], days: number | null) {
 
 /** The panel filters and re-sorts client side; ship the whole range, richest first. */
 function sortVideos(videos: AccountVideo[]) {
-  return [...videos].sort((a, b) => b.views - a.views || b.createdAt - a.createdAt).slice(0, 300);
-}
-
-function revenueOf(views: number, rpm: number | undefined, declared: number | undefined) {
-  const r = typeof rpm === "number" && rpm >= 0 ? rpm : DEFAULT_RPM;
-  return { rpm: r, declared: declared || 0, estimated: Math.round((views / 1000) * r * 100) / 100, views };
+  return [...videos].sort((a, b) => b.views - a.views || b.createdAt - a.createdAt);
 }
 
 export async function accountInsights(user: SessionUser, key: string, days: number | null): Promise<AccountInsights | null> {
@@ -226,12 +206,15 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
   if (parsed.kind === "clipper") {
     const account = accounts.find((a) => a.id === parsed.id);
     if (!account) return null;
-    return clipperInsights(account, networkFollowers, days);
+    return clipperInsights({ ...account, videos: account.videos?.map(v => withPublicationText(v, user.id, store)) }, networkFollowers, days);
   }
 
   const channel = channels.find((c) => c.id === parsed.id);
   if (!channel) return null;
-  return channelInsights(user, channel, store.posts.filter((p) => p.userId === user.id), networkFollowers, days);
+  const result = await channelInsights(user, channel, store.posts.filter((p) => p.userId === user.id), networkFollowers, days);
+  result.videos = result.videos.map(v => withPublicationText(v, user.id, store));
+  result.hooks = buildHooks(result.videos);
+  return result;
 }
 
 function clipperInsights(account: Account, networkFollowers: number, days: number | null): AccountInsights {
@@ -252,7 +235,7 @@ function clipperInsights(account: Account, networkFollowers: number, days: numbe
       likes: account.likes || 0,
       posts: account.posts || all.length,
       ...agg,
-      avgViews: videos.length ? agg.avgViews : account.avgViews || 0,
+      avgViews: agg.avgViews,
       share: networkFollowers ? Math.round(((account.followers || 0) / networkFollowers) * 100) : 0,
       cadence: cadenceOf(videos, days),
       growth: null,
@@ -262,7 +245,7 @@ function clipperInsights(account: Account, networkFollowers: number, days: numbe
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: { posts: 0, published: 0, scheduled: 0, views: 0, best: null },
-    revenue: revenueOf(agg.views, account.rpm, account.declaredRevenue),
+    sync: account.videoSync ? { complete: account.videoSync.complete, hasMore: account.videoSync.hasMore, error: account.videoSync.error, loaded: all.length, source: account.videoSync.source } : null,
     source: all.length ? "api" : "none",
     canFetch: metricsEnabled(),
     fetchedAt: account.videosFetchedAt || null,
@@ -314,23 +297,7 @@ async function channelInsights(
   for (const video of channel.videos || []) add(video, false);
   if ((channel.videos || []).length) source = "api";
 
-  if (channel.platform === "tiktok" && channel.accessToken) {
-    try {
-      const analytics = await agentAnalytics(user, { days: days || undefined });
-      const stat = analytics.channelStats?.find((c: any) => c.id === channel.id);
-      if (stat) {
-        followers = stat.followers;
-        likes = stat.likes;
-        postCount = stat.videoCount;
-        growth = stat.growth || null;
-      }
-      const apiVideos = (analytics.videos || []).filter((v: any) => !v.channelHandle || v.channelHandle === channel.handle);
-      for (const v of apiVideos) add(tiktokVideoToAccountVideo(v, channel.handle), true);
-      if (apiVideos.length) source = "tiktok";
-    } catch {
-      /* fall back to what the store knows */
-    }
-  }
+  if (channel.videoSync?.source === "tiktok") source = "tiktok";
   for (const p of mine) {
     if (p.status !== "published" && !p.views) continue;
     add(
@@ -338,6 +305,7 @@ async function channelInsights(
         id: p.tiktokId || p.id,
         title: p.body.slice(0, 140),
         cover: p.image,
+        images: p.recipe?.slides.map(s => s.image),
         views: p.views,
         likes: p.likes,
         comments: p.comments,
@@ -379,9 +347,9 @@ async function channelInsights(
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: studioSummary(mine),
-    revenue: revenueOf(agg.views, channel.rpm, channel.declaredRevenue),
+    sync: channel.videoSync ? { complete: channel.videoSync.complete, hasMore: channel.videoSync.hasMore, error: channel.videoSync.error, loaded: (channel.videos || []).length, source: channel.videoSync.source } : null,
     source,
-    canFetch: metricsEnabled() && channel.platform === "tiktok" && Boolean(channel.handle),
+    canFetch: channel.platform === "tiktok" && (Boolean(channel.accessToken && channel.connected !== false) || (metricsEnabled() && Boolean(channel.handle))),
     fetchedAt: channel.videosFetchedAt || null,
     rangeDays: days,
   };

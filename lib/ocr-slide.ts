@@ -72,7 +72,7 @@ function restoreSpaces(text: string) {
 
 type Box = { text: string; x0: number; y0: number; x1: number; y1: number; confidence: number };
 
-async function strokeMask(bytes: Buffer) {
+export async function strokeMask(bytes: Buffer) {
   const { data, info } = await sharp(bytes).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const width = info.width;
   const height = info.height;

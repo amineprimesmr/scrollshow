@@ -104,3 +104,33 @@ Le serveur de dev tourne souvent déjà sur le port 3000 depuis une autre
 session (même dossier, hot reload) : ouvrir `http://localhost:3000` dans le
 Chrome de l'utilisateur, qui est déjà connecté (compte « Dev Local »), plutôt
 que de relancer un serveur ou tenter de se connecter.
+
+## Moteur de recherche
+`lib/research/` (modèle, jobs, provider, normalisation, statistiques, OCR, formats,
+schéma collecteur) + routes `app/api/research/{route,jobs,studies,collector}` et
+`app/api/cron/research`. UI : `components/studio/ResearchView.tsx` + `research.css`.
+Doc de référence : `docs/research-engine-2026-09-09.md`.
+- Une tâche avance **par étapes**, chacune sous bail exclusif de 180 s : une réponse
+  tardive ne doit jamais écraser une pause ou une reprise. Garder cet invariant.
+- Distinguer toujours « valeur inconnue » et « zéro » dans les compteurs ; les
+  statistiques ne portent que sur les posts aux compteurs connus.
+- Bornes par défaut (10 comptes retenus, 3 pages/compte, 2 pages de recherche par
+  mot-clé, 30 jours) et plafonds durs : ne pas les relever sans mesurer le coût
+  fournisseur. Garde-fou global : `RESEARCH_PROVIDER_DAILY_LIMIT`.
+- Un compte rejeté conserve son motif explicite : ne jamais masquer la sélection.
+- Le cron recherche tourne **toutes les cinq minutes via GitHub Actions**
+  (`.github/workflows/publish-scheduled.yml`, job `research`), pas via `vercel.json` :
+  Vercel Hobby refuse cette fréquence.
+- Le collecteur Chrome est optionnel et local (`SCROLLSHOW_COLLECTOR_TOKEN`,
+  `scripts/research-browser.ts`) ; ce jeton ne doit jamais atteindre le navigateur client.
+
+## Recherche de texte dans les slides
+`lib/publication-text*.ts` + `app/api/studio/insights/text` +
+`components/studio/PublicationTextSearch.tsx`. OCR local (tesseract, `eng` + `fra`).
+Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes` dans
+`next.config.ts`, sinon le binaire manque en production.
+
+## Build et vérification
+`npm run typecheck`, `npm test` (84 tests), puis build isolé
+`SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
+pendant qu'un `next dev` tourne, il écrase `.next`.

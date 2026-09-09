@@ -7,3 +7,11 @@
 docs/
 tests/
 *.log
+
+.next-audit/
+.next-prod/
+.next-prodcheck/
+
+.mcp.json
+
+mcp.json

@@ -2,9 +2,11 @@
 
 import { dateInTimeZone } from "@/lib/settings";
 import type { StudioPost } from "@/lib/types";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IconAlert, IconCalendar, IconCheck, IconChevron, IconInbox, IconPlus } from "./icons";
 import { useStudio } from "./StudioContext";
+import { SlidePreview } from "./SlidePreview";
 
 type Mode = "day" | "week" | "month";
 type Status = "published" | "scheduled" | "draft" | "failed";
@@ -43,7 +45,7 @@ function byTime(a: StudioPost, b: StudioPost) {
 }
 
 export function CalendarView() {
-  const { posts, activeChannel, setEditing, setPostOpen, setComposeDate, user, english } = useStudio();
+  const { posts, activeChannel, setEditing, setPostOpen, setComposeDate, user, english, loaded, syncError, reload } = useStudio();
   const [cursor, setCursor] = useState(() => new Date());
   const [mode, setModeState] = useState<Mode>("month");
 
@@ -216,13 +218,31 @@ export function CalendarView() {
         </button>
       </div>
       <div className="ss-cal-stats" aria-label={t("Résumé de la période", "Period summary")}>
+        {loaded ? <>
         <Stat tone="good" icon={<IconCheck size={14} />} count={stats.published} name={t("publiés", "published")} />
         <Stat tone="info" icon={<IconCalendar size={14} />} count={stats.scheduled} name={t("planifiés", "scheduled")} />
         <Stat tone="warn" icon={<IconInbox size={14} />} count={stats.draft} name={t("brouillons", "drafts")} />
         {stats.failed > 0 ? <Stat tone="bad" icon={<IconAlert size={14} />} count={stats.failed} name={t("échecs", "failed")} /> : null}
+        </> : !syncError ? <span role="status">{t("Chargement du calendrier…", "Loading calendar…")}</span> : null}
+        {syncError ? <div className="ss-cal-sync-error" role="status">
+          <IconAlert size={14} />
+          <span>{syncError === "session_expired"
+            ? t("Ta session a expiré. Reconnecte-toi pour retrouver ton calendrier.", "Your session expired. Sign in to see your calendar.")
+            : syncError === "offline"
+              ? t("Hors connexion. Le calendrier se mettra à jour au retour du réseau.", "Offline. Your calendar will update when the connection returns.")
+              : t("Actualisation interrompue. Nouvelle tentative automatique en cours.", "Refresh interrupted. Retrying automatically.")}</span>
+          {syncError === "session_expired"
+            ? <Link className="ss-btn-ghost" href="/signup?mode=signin&next=/app">{t("Me reconnecter", "Sign in")}</Link>
+            : <button className="ss-btn-ghost" type="button" onClick={() => void reload()}>{t("Réessayer", "Retry")}</button>}
+        </div> : null}
       </div>
     </div>
   );
+
+  if (!loaded) return <>{toolbar}<div className="ss-empty" aria-busy={!syncError}>
+    <IconCalendar size={28} />
+    <p>{syncError ? t("En attente du calendrier", "Waiting for calendar") : t("Récupération de tes publications…", "Fetching your posts…")}</p>
+  </div></>;
 
   if (mode === "day") {
     const key = ymd(cursor);
@@ -375,10 +395,15 @@ function PostCard({
     failed: english ? "Failed" : "Échec",
   }[status];
   const classes = ["ss-post", `is-${status}`, compact && "is-compact", large && "is-large"].filter(Boolean).join(" ");
+  const slide = post.recipe?.slides[0];
   return (
     <button type="button" className={classes} onClick={() => onOpen(post)} title={`${post.time} · ${statusName}`}>
       <span className="ss-post__bar" />
-      <img src={post.image} alt="" loading="lazy" />
+      {slide && post.recipe && !slide.html && !post.recipe.html ? (
+        <span className="ss-post__preview" aria-hidden="true">
+          <SlidePreview slide={slide} recipe={post.recipe} width={large ? 40 : compact ? 20 : 24} />
+        </span>
+      ) : <img src={post.image} alt="" loading="lazy" />}
       <span className="ss-post__text">
         {!compact ? (
           <small>{large ? statusName : post.time}</small>

@@ -215,7 +215,7 @@ export async function listGrants(userId: string) {
   const clients = data.oauthClients || [];
   const seen = new Map<string, { grantId: string; clientId: string; name: string; createdAt: string }>();
   for (const token of data.oauthTokens || []) {
-    if (token.userId !== userId || seen.has(token.grantId)) continue;
+    if (token.userId !== userId || token.refreshExpiresAt <= Date.now() || token.resource !== MCP_RESOURCE || seen.has(token.grantId)) continue;
     seen.set(token.grantId, {
       grantId: token.grantId,
       clientId: token.clientId,

@@ -1,75 +1,60 @@
 import { readStudioSession as readSession } from "@/lib/auth";
-import { ensureDemoWorkspace, localAutoSeedEnabled } from "@/lib/demo-workspace";
+import { ensureDemoWorkspace, localAutoSeedEnabled, needsDemoWorkspace } from "@/lib/demo-workspace";
 import { resolveStoreUser } from "@/lib/local-user";
 import { platformAvailability } from "@/lib/platforms";
-import { coverOf, ensureRecipe, newShareId } from "@/lib/recipe";
-import { resolveSettings } from "@/lib/settings";
+import { coverOf, ensureRecipe } from "@/lib/recipe";
 import { seedStudio } from "@/lib/studio-seed";
-import { publicUser, updateStore } from "@/lib/store";
+import { publicUser, readStore, updateStore } from "@/lib/store";
 import { publicChannel } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 
-export async function GET() {
+const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie" };
+
+export async function GET(request: Request) {
   try {
     const user = await readSession();
-    if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
 
-    const payload = await updateStore((data) => {
-      let stored = resolveStoreUser(data, user);
-
-      if (!stored && localAutoSeedEnabled()) {
-        stored = {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          plan: user.plan,
-          createdAt: new Date().toISOString(),
+    let data = await readStore();
+    // Demo initialization is local only, and runs once when actually needed.
+    // Normal studio reads must never lock and rewrite the whole database.
+    if (localAutoSeedEnabled() && (needsDemoWorkspace(data, user.id) || !data.media.some(item => item.userId === user.id))) {
+      data = await updateStore(current => {
+        const stored = resolveStoreUser(current, user);
+        if (stored) ensureDemoWorkspace(current, stored);
+        if (!current.media.some(item => item.userId === user.id)) current.media.push(...seedStudio(user.id).media);
+        return current;
+      });
+    }
+    const stored = resolveStoreUser(data, user);
+    if (!stored) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+    const payload = {
+      channels: data.channels.filter(item => item.userId === user.id).map(publicChannel),
+      posts: data.posts.filter(item => item.userId === user.id),
+      media: data.media.filter(item => item.userId === user.id),
+      user: publicUser(stored),
+      availability: platformAvailability(),
+    };
+    // Hash only this workspace's visible data, before legacy normalization.
+    // Unchanged polls transfer no recipes/media and trigger no React rerender.
+    const etag = `W/"studio-v1-${createHash("sha256").update(JSON.stringify(payload)).digest("base64url")}"`;
+    const headers = { ...privateHeaders, ETag: etag };
+    if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+    return NextResponse.json({
+      ...payload,
+      posts: payload.posts.map(post => {
+        const recipe = ensureRecipe(post);
+        return {
+          ...post, recipe, origin: post.origin || recipe.origin,
+          image: coverOf({ ...post, recipe }),
+          visibility: post.visibility || "private",
+          inCalendar: post.inCalendar !== false,
         };
-        data.users.push(stored);
-      }
-
-      if (localAutoSeedEnabled() && stored) {
-        ensureDemoWorkspace(data, stored);
-      }
-
-      const userId = stored?.id || user.id;
-      const channels = data.channels.filter((item) => item.userId === userId);
-      let posts = data.posts.filter((item) => item.userId === userId);
-      let media = data.media.filter((item) => item.userId === userId);
-      if (!media.length && localAutoSeedEnabled()) {
-        const seeded = seedStudio(user.id);
-        data.media.push(...seeded.media);
-        media = seeded.media;
-      }
-      return {
-        channels: channels.map(publicChannel),
-        posts: posts.map((post) => {
-          const recipe = ensureRecipe(post);
-          post.recipe = recipe;
-          post.origin = post.origin || recipe.origin;
-          post.image = coverOf(post);
-          if (!post.shareId) post.shareId = newShareId();
-          if (!post.visibility) post.visibility = "private";
-          if (post.inCalendar === undefined) post.inCalendar = true;
-          return post;
-        }),
-        media,
-        user: stored
-          ? publicUser(stored)
-          : {
-              ...user,
-              createdAt: new Date().toISOString(),
-              hasPassword: false,
-              hasGoogle: false,
-              hasGithub: false,
-              settings: resolveSettings(null),
-            },
-      };
-    });
-
-    return NextResponse.json({ ...payload, availability: platformAvailability() });
+      }),
+    }, { headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "studio_failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500, headers: privateHeaders });
   }
 }

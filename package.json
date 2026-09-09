@@ -11,16 +11,18 @@
     "billing:provision": "node scripts/provision-billing.mjs",
     "dev": "next dev --turbopack",
     "dev:remote": "SCROLLSHOW_USE_BLOB=1 next dev --turbopack",
-    "dev:local": "next dev --turbopack",
+    "dev:local": "DATABASE_URL= SCROLLSHOW_USE_BLOB= VERCEL= NEXT_PUBLIC_SITE_URL=http://localhost:3000 TIKTOK_REDIRECT_URI=http://localhost:3000/tiktok/callback STRIPE_SECRET_KEY= STRIPE_WEBHOOK_SECRET= RESEND_API_KEY= CRON_SECRET= SCROLLSHOW_BUILD_DIR=.next-local next dev --turbopack --hostname 127.0.0.1 --port 3000",
     "seed:local": "node scripts/seed-local.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "research:browser": "tsx scripts/research-browser.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/fra": "^1.0.0",
     "@types/qrcode": "^1.5.6",
     "@vercel/blob": "^2.8.0",
     "ai": "^7.0.77",
@@ -38,7 +40,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "stripe": "^22.5.0",
     "tesseract.js": "^7.0.0",
     "thinking-orbs": "^0.3.1",
@@ -54,13 +56,14 @@
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@types/web-push": "^3.6.4",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4.1.11",
     "tsx": "^4.23.13",
     "typescript": "^5.9.2"
   },
   "overrides": {
     "next": {
-      "sharp": "^0.35.3",
+      "sharp": "^0.35.4",
       "postcss": "^8.5.23"
     }
   }

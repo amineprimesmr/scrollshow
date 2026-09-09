@@ -216,7 +216,6 @@ function AnalyticsPanel({ english, shown }: { english: boolean; shown: boolean }
   const views = useCountUp(2.7, shown);
   const likes = useCountUp(54.8, shown, 1250);
   const shares = useCountUp(3.2, shown, 1350);
-  const revenue = useCountUp(1000, shown, 1450);
   const nf = english ? "en-US" : "fr-FR";
   const one = (v: number) =>
     v.toLocaleString(nf, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -225,7 +224,6 @@ function AnalyticsPanel({ english, shown }: { english: boolean; shown: boolean }
     { key: "views", label: t("Vues de la vidéo", "Video views", english), value: `${one(views)} M`, delta: "+2,7 M", active: true },
     { key: "likes", label: t("J’aime", "Likes", english), value: `${one(likes)} K`, delta: "+54,8 K" },
     { key: "shares", label: t("Partages", "Shares", english), value: `${one(shares)} K`, delta: "+3,2 K" },
-    { key: "revenue", label: t("Revenus app", "App revenue", english), value: `${Math.round(revenue).toLocaleString(nf)} $`, delta: t("/ semaine", "/ week", english) },
   ];
 
   return (
@@ -245,7 +243,7 @@ function AnalyticsPanel({ english, shown }: { english: boolean; shown: boolean }
             {t("J’aime", "Likes", english)} <b>51K</b> · Followers <b>2.5K</b> · {t("Suivis", "Following", english)} <b>39</b>
           </span>
         </span>
-        <span className="af-ld-spot__dash-period">{t("28 derniers jours", "Last 28 days", english)}</span>
+        <span className="af-ld-spot__dash-period">{t("Exemple illustratif · 28 jours", "Illustrative example · 28 days", english)}</span>
       </div>
 
       <div className="af-ld-spot__kpis">

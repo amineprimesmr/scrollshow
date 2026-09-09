@@ -1,0 +1,27 @@
+.ss-agent-setup { max-width: 1040px; margin: 0 auto; padding: 40px 24px; }
+.ss-agent-setup .ss-mcp-hero { padding: 0 0 30px; }
+.ss-agent-setup .ss-mcp-hero h2 { font-size: clamp(28px, 4vw, 44px); text-wrap: balance; }
+.ss-agent-setup .ss-mcp-sub { line-height: 1.6; }
+.ss-agent-setup .ss-mcp-panel { border: 0; background: none; box-shadow: none; overflow: visible; }
+.ss-agent-setup .ss-mcp-keys { padding: 24px; border-radius: 24px; background: var(--ss-card); }
+.ss-agent-setup .ss-mcp-keys h3 { margin: 0 0 12px; font-size: 18px; }
+.ss-agent-setup .ss-mcp-keys p { margin: 8px 0 16px; color: var(--ss-muted); line-height: 1.65; }
+.ss-agent-setup details > summary { cursor: pointer; font-size: 14px; font-weight: 550; }
+.ss-agent-setup details[open] > summary { margin-bottom: 22px; }
+.ss-agent-setup .ss-mcp-tabs { flex-wrap: wrap; }
+.ss-agent-setup .ss-mcp-copy { margin: 18px 0; }
+.ss-agent-setup .ss-mcp-copy button { width: auto; min-width: 64px; padding: 0 12px; }
+.ss-agent-setup .ss-mcp-copy input { min-width: 0; }
+.ss-agent-setup__example .ss-assistant-starter { margin: 0; padding: 0; border: 0; background: none; }
+.ss-agent-setup__technical { margin-top: 20px; }
+.ss-agent-setup__technical code { overflow-wrap: anywhere; }
+.ss-agent-connections { list-style: none; padding: 0; margin: 0; }
+.ss-agent-connections li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-top: 1px solid var(--ss-border); }
+.ss-agent-connections li > span { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.ss-agent-connections li > span > span { color: var(--ss-muted); font-size: 13px; }
+.ss-agent-connections button { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .ss-agent-setup { padding: 28px 12px; }
+  .ss-agent-setup .ss-mcp-keys { padding: 20px 16px; }
+  .ss-agent-connections li { align-items: flex-start; flex-direction: column; gap: 12px; }
+}

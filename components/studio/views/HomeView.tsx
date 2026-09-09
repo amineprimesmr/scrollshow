@@ -8,11 +8,11 @@ import { SetupWidget } from "../SetupWidget";
 /** Overview = the accounts fan, full page, with an expandable account panel. */
 export function HomeView() {
   const [current, setCurrent] = useState<FanItem | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const onSelect = useCallback((item: FanItem | null, viaClick: boolean) => {
     setCurrent(item);
-    if (viaClick && item) setOpen(true);
+    if (item) setOpen(true);
     if (!item) setOpen(false);
   }, []);
 

@@ -17,10 +17,13 @@ import {
   agentWhoami,
 } from "@/lib/agent";
 import { agentCatch, agentOptions, agentResponse, requireAgentUser } from "@/lib/agent-http";
-import { NextResponse } from "next/server";
-import { analyzeResearchAccount, discoverResearchAccounts, researchLibrary, contentBrief, researchSchema } from "@/lib/research";
+import { after, NextResponse } from "next/server";
+import { discoverResearchAccounts, researchLibrary, contentBrief, researchSchema } from "@/lib/research";
 
-export const maxDuration = 120;
+import { startResearch, workResearch, listResearchJobs, getResearchJob, advanceResearch, controlResearch } from "@/lib/research/jobs";
+import { prepareStudy, advanceStudy, getStudy, saveInterpretation, formatLibrary, exportStudy } from "@/lib/research/formats";
+import { filtersSchema } from "@/lib/research/model";
+export const maxDuration = 300;
 
 export function OPTIONS() {
   return agentOptions();
@@ -33,6 +36,9 @@ export async function GET(request: Request, context: { params: Promise<{ slug?: 
     const [head, id] = slug;
     const url = new URL(request.url);
     if (head === "research" && !id) return agentResponse({ items: await researchLibrary(user, url.searchParams.get("q") || "") });
+    if(head==="research-jobs") return agentResponse(id?await getResearchJob(user,id):{jobs:await listResearchJobs(user)});
+    if(head==="format-studies"&&id&&slug[2]==="export") return new NextResponse(Buffer.from(await exportStudy(user,id)),{headers:{"Content-Type":"application/zip","Content-Disposition":`attachment; filename="research-${id}.zip"`,"Cache-Control":"private, no-store"}});
+    if(head==="format-studies") return agentResponse(id?await getStudy(user,id):await formatLibrary(user));
     if (head === "brief" && !id) return agentResponse(await contentBrief(user));
     if (head === "me" && !id) return agentResponse(await agentWhoami(user));
     if (head === "channels" && !id) return agentResponse({ channels: await agentChannels(user) });
@@ -69,7 +75,20 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
     if (head === "research" && !id) {
       const parsed = researchSchema.safeParse(body);
       if (!parsed.success) return agentResponse({ error: "invalid" }, 400);
-      return agentResponse(parsed.data.action === "analyze" ? await analyzeResearchAccount(user, parsed.data.query, parsed.data.niche) : await discoverResearchAccounts(user, parsed.data.query));
+      const job=parsed.data.action==="analyze"?await startResearch(user,{kind:"analyze",keywords:[parsed.data.query]}):await discoverResearchAccounts(user,parsed.data.query);
+      after(()=>workResearch(user,job.id));return agentResponse(job,202);
+    }
+    if(head==="research-jobs") {
+      if(!id){const job=await startResearch(user,body);if(job.input.source==="provider")after(()=>workResearch(user,job.id));return agentResponse(job,202);}
+      if(body.action==="advance")return agentResponse(await advanceResearch(user,id));
+      if(!["pause","resume","stop"].includes(body.action))return agentResponse({error:"invalid_action"},400);
+      const job=await controlResearch(user,id,body.action,body.filters?filtersSchema.partial().parse(body.filters):undefined);
+      if(body.action==="resume"&&job.input.source==="provider")after(()=>workResearch(user,id));return agentResponse(job);
+    }
+    if(head==="format-studies") {
+      if(id&&body.interpretation)return agentResponse(await saveInterpretation(user,id,body.interpretation));
+      const studyId=id||(await prepareStudy(user,String(body.accountId||""),String(body.postId||""))).id;
+      return agentResponse(await advanceStudy(user,studyId));
     }
     if (head === "posts" && !id) {
       return agentResponse(
