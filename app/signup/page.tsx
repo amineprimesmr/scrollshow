@@ -1,5 +1,6 @@
 "use client";
 
+import { Atmosphere } from "@/components/Atmosphere";
 import { BrandMark } from "@/components/BrandMark";
 import { SignupVerification } from "@/components/SignupVerification";
 import { afterAuthPath, githubStartUrl, googleStartUrl, signupUrl } from "@/lib/auth-urls";
@@ -147,7 +148,7 @@ function SignupForm() {
 
   return (
     <main className="ss-signup">
-      <div className="ss-signup__bg" aria-hidden />
+      <Atmosphere />
       <div className="ss-signup__noise" aria-hidden />
 
       <section className="ss-signup__hero">

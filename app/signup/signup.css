@@ -25,17 +25,7 @@ html:has(.ss-signup) body.grain { background-image: none; }
 .ss-signup * { box-sizing: border-box; }
 .ss-signup a { color: inherit; text-decoration: none; }
 
-/* Decor : halo gris central, puis grain fin par-dessus. */
-.ss-signup__bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(ellipse 58% 42% at 50% 48%, rgba(88, 96, 108, 0.16), transparent 68%),
-    #000;
-}
-
+/* Decor : l'atmosphere animee de la landing, puis le grain fin par-dessus. */
 .ss-signup__noise {
   position: fixed;
   inset: 0;

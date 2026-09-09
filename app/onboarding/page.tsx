@@ -1,5 +1,6 @@
 "use client";
 
+import { Atmosphere } from "@/components/Atmosphere";
 import { BrandMark } from "@/components/BrandMark";
 import { AssistantStarter } from "@/components/AssistantStarter";
 import { OnboardingPayment } from "@/components/OnboardingPayment";
@@ -14,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../liquid-glass.css";
 import "./onboarding.css";
+import "@/components/atmosphere.css";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 const STEPS: Step[] = [0, 1, 2, 3, 4];
@@ -338,11 +340,14 @@ function OnboardingInner() {
   return (
     <main className="ss-onb">
       <LiquidGlassDefs />
-      <div className="ss-onb__glow" aria-hidden />
+      <Atmosphere />
       <header className="ss-onb__top">
         <span className="ss-onb__brand">
-          <BrandMark size={26} />
-          ScrollShow
+          <span className="ss-onb__brand-spin" aria-hidden />
+          <span className="ss-onb__brand-label">
+            <BrandMark size={15} />
+            ScrollShow
+          </span>
         </span>
         {user ? <span className="ss-onb__who">{user.email}</span> : null}
       </header>

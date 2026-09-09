@@ -1,0 +1,119 @@
+/* Fond anime repris du hero de la landing (.af-ld-atmosphere dans landing.css) :
+   deux lumieres qui alternent cobalt et glace, deux vagues bleues en contre-jour,
+   une ombre mobile et une trame de points. Duplique plutot que partage : la
+   landing est en cours de refonte, on ne veut pas coupler les deux surfaces. */
+
+.ss-atmo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: #01040c;
+  opacity: 0.68;
+  /* Le masque est immobile : la lumiere qui derive ne decouvre jamais le bas. */
+  -webkit-mask-image: linear-gradient(#000 0%, #000 16%, rgb(0 0 0 / 0.88) 36%, rgb(0 0 0 / 0.48) 59%, rgb(0 0 0 / 0.12) 78%, transparent 97%);
+  mask-image: linear-gradient(#000 0%, #000 16%, rgb(0 0 0 / 0.88) 36%, rgb(0 0 0 / 0.48) 59%, rgb(0 0 0 / 0.12) 78%, transparent 97%);
+}
+
+.ss-atmo__light,
+.ss-atmo__shade {
+  position: absolute;
+  inset: -40%;
+  will-change: transform, opacity;
+}
+
+.ss-atmo__light--cobalt {
+  background: radial-gradient(ellipse 62% 65% at 38% 29%,
+    #1555e8 0%, #0a3295 24%, #041632 49%, transparent 74%);
+  animation: ss-atmo-cobalt 14s ease-in-out infinite;
+}
+
+.ss-atmo__light--ice {
+  background: radial-gradient(ellipse 56% 60% at 68% 30%,
+    #0787bc 0%, #075487 22%, #031c3e 46%, transparent 72%);
+  animation: ss-atmo-ice 14s ease-in-out infinite;
+}
+
+.ss-atmo__shade {
+  background:
+    radial-gradient(ellipse 32% 70% at 48% 55%, rgb(0 2 9 / 0.85), transparent 76%),
+    linear-gradient(0deg, #000 10%, transparent 67%);
+  animation: ss-atmo-shade 14s ease-in-out infinite;
+}
+
+.ss-atmo__wave {
+  position: absolute;
+  inset: -35%;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.ss-atmo__wave--near {
+  background: radial-gradient(ellipse 72% 74% at 48% 80%,
+    transparent 46%, rgb(2 13 42 / 0.9) 49%,
+    rgb(10 49 157 / 0.72) 53%, rgb(25 100 255 / 0.88) 57%,
+    rgb(59 153 255 / 0.78) 59%, rgb(13 64 180 / 0.35) 63%, transparent 69%);
+  filter: blur(14px);
+  animation: ss-atmo-wave-near 12s ease-in-out infinite alternate;
+}
+
+.ss-atmo__wave--far {
+  background: radial-gradient(ellipse 88% 80% at 58% 90%,
+    transparent 48%, rgb(0 5 23 / 0.85) 51%,
+    rgb(4 42 139 / 0.72) 56%, rgb(6 120 220 / 0.9) 59%,
+    rgb(19 161 239 / 0.55) 61%, transparent 68%);
+  filter: blur(20px);
+  animation: ss-atmo-wave-far 15s ease-in-out -6s infinite alternate;
+}
+
+.ss-atmo__grain {
+  position: absolute;
+  inset: 0;
+  /* Trame de points reguliere, pas du bruit de pellicule. */
+  background-image: radial-gradient(circle, rgb(181 201 234 / 0.3) 1px, transparent 1.5px);
+  background-size: 7px 7px;
+  opacity: 0.32;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(#000 8%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(#000 8%, #000 66%, transparent 100%);
+}
+
+@keyframes ss-atmo-wave-near {
+  0% { transform: translate(-8%, -10%) scale(1.02); opacity: 0.95; }
+  50% { opacity: 0.65; }
+  100% { transform: translate(12%, 9%) scale(1.14); opacity: 1; }
+}
+
+@keyframes ss-atmo-wave-far {
+  0% { transform: translate(12%, 8%) scale(1.08); opacity: 0.45; }
+  50% { opacity: 0.95; }
+  100% { transform: translate(-12%, -12%) scale(0.98); opacity: 0.65; }
+}
+
+/* Phases cobalt puis bleu glace, avec un creux sombre entre les deux. */
+@keyframes ss-atmo-cobalt {
+  0%, 100% { transform: translate(-5%, -3%) scale(1); opacity: 1; }
+  25% { transform: translate(3%, 1%) scale(1.05); opacity: 0.72; }
+  50% { transform: translate(10%, -4%) scale(0.96); opacity: 0.08; }
+  75% { transform: translate(-8%, 3%) scale(1.02); opacity: 0.35; }
+}
+
+@keyframes ss-atmo-ice {
+  0%, 100% { transform: translate(8%, -2%) scale(0.96); opacity: 0.04; }
+  25% { transform: translate(3%, 2%) scale(1); opacity: 0.25; }
+  50% { transform: translate(-8%, -2%) scale(1.06); opacity: 1; }
+  75% { transform: translate(4%, -4%) scale(1); opacity: 0.5; }
+}
+
+@keyframes ss-atmo-shade {
+  0%, 100% { transform: translate(9%, 0); opacity: 0.7; }
+  50% { transform: translate(-10%, -3%); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-atmo__light,
+  .ss-atmo__wave,
+  .ss-atmo__shade { animation: none !important; }
+}
