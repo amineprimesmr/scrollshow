@@ -1,12 +1,11 @@
 "use client";
 
 import { Atmosphere } from "@/components/Atmosphere";
+import { HeroSkill } from "@/components/HeroSkill";
 import { AuthNav } from "@/components/AuthNav";
-import { AssistantStarter } from "@/components/AssistantStarter";
 import { OnboardingPayment } from "@/components/OnboardingPayment";
 import { hasStudioAccess } from "@/lib/plans";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
-import { AI_CLIENTS, type AiClientId } from "@/lib/ai-clients";
 import { BUSINESS_KINDS } from "@/lib/business-kinds";
 import { prefersEnglish } from "@/lib/i18n";
 import { safeNextPath } from "@/lib/auth-urls";
@@ -30,6 +29,10 @@ const SOURCES = [
   { id: "clipper", fr: "Un clipper", en: "A clipper", emoji: "✂️" },
   { id: "other", fr: "Autre", en: "Other", emoji: "✨" },
 ] as const;
+
+/** L'onboarding ne propose que les trois modeles que ScrollShow sert vraiment. */
+const SHOWN_KIND_IDS: BusinessKind[] = ["saas", "mobile_app", "ecommerce"];
+const SHOWN_KINDS = BUSINESS_KINDS.filter((kind) => SHOWN_KIND_IDS.includes(kind.id));
 
 const KIND_ICON: Record<BusinessKind, string> = {
   saas: "🧩",
@@ -125,7 +128,6 @@ function OnboardingInner() {
   const [revealed, setRevealed] = useState(false);
 
   // Step 2
-  const [client, setClient] = useState<AiClientId>("claude");
   const [token, setToken] = useState("");
   const [copied, setCopied] = useState("");
 
@@ -305,26 +307,13 @@ function OnboardingInner() {
     finally { setBusy(false); }
   }
 
-  const origin = typeof window === "undefined" ? "https://scrollshow.io" : window.location.origin;
-  const mcpUrl = `${origin}/api/mcp`;
-  const liveToken = token || "";
-  /** One address carries the key: nothing else to paste anywhere. */
-  const keyedUrl = liveToken ? `${mcpUrl}?key=${liveToken}` : "";
-  const connectorUrl = "https://claude.ai/customize/connectors?modal=add-custom-connector";
-  const codexCli = keyedUrl ? `codex mcp add scrollshow --url "${keyedUrl}"` : "";
-  const cursorDeeplink = useMemo(() => {
-    if (!keyedUrl) return "#";
-    const config = btoa(JSON.stringify({ url: keyedUrl })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    return `cursor://anysphere.cursor-deeplink/mcp/install?name=scrollshow&config=${config}`;
-  }, [keyedUrl]);
-  const clients = AI_CLIENTS.filter((item) => item.id !== "claude-code");
-
-  async function copy(id: string, text: string) {
+  async function copyKey() {
+    if (!token) return;
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(id);
-      window.setTimeout(() => setCopied((cur) => (cur === id ? "" : cur)), 1600);
-    } catch { setError(t("Copie impossible. Réessaie depuis un navigateur autorisant le presse-papiers.", "Copy failed. Retry in a browser that allows clipboard access.")); }
+      await navigator.clipboard.writeText(token);
+      setCopied("key");
+      window.setTimeout(() => setCopied((cur) => (cur === "key" ? "" : cur)), 1600);
+    } catch { setError(t("Copie impossible. Sélectionne la clé à la main.", "Copy failed. Select the key manually.")); }
   }
 
   /* ── step 3 · heard from ─────────────────────────────────────────────── */
@@ -424,12 +413,12 @@ function OnboardingInner() {
                     value={business.tagline || ""}
                     onChange={(e) => setBusiness({ ...business, tagline: e.target.value })}
                     placeholder={manual ? t("Décris ton business en une phrase : ce que tu vends, à qui.", "Describe your business in one line: what you sell, to whom.") : t("Description", "Description")}
-                    rows={2}
-                    maxLength={200}
+                    rows={4}
+                    maxLength={280}
                   />
 
                   <div className="ss-onb-kinds" role="radiogroup" aria-label={t("Type de business", "Business type")}>
-                    {BUSINESS_KINDS.map((kind) => (
+                    {SHOWN_KINDS.map((kind) => (
                       <button
                         key={kind.id}
                         type="button"
@@ -443,18 +432,6 @@ function OnboardingInner() {
                       </button>
                     ))}
                   </div>
-
-                  {business.socials.filter((s) => s.platform !== "tiktok").length ? (
-                    <div className="ss-onb-socials">
-                      {business.socials
-                        .filter((s) => s.platform !== "tiktok")
-                        .map((s) => (
-                          <span key={s.platform}>
-                            {s.platform} · @{s.handle}
-                          </span>
-                        ))}
-                    </div>
-                  ) : null}
 
                   {error ? <p className="ss-onb-error">{error}</p> : null}
                   <button type="button" className="ss-onb-cta" disabled={busy || !business.name.trim() || (manual && !(business.tagline || "").trim())} onClick={() => void saveBusiness()}>
@@ -576,67 +553,34 @@ function OnboardingInner() {
           {/* ── 3 · brancher l'agent ── */}
           {step === 3 ? (
             <div className="ss-onb-form">
-              <p className="ss-onb-help">{t("Cette étape est facultative. L’utilisation des outils sera activée après paiement. Si tu as déjà branché ton assistant, continue sans recréer de clé.", "This step is optional. Tools become available after payment. If your assistant is already connected, continue without replacing its key.")}</p>
-              <h3>{t("1 · Connecter ScrollShow", "1 · Connect ScrollShow")}</h3>
-              {!token && <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => void prepareConnector()}>{busy ? "…" : t("Préparer ou remplacer ma connexion", "Prepare or replace my connection")}</button>}
-              {error && <p role="alert" className="ss-onb-error">{error}</p>}
-              <div className="ss-onb-clients" role="tablist">
-                {clients.map((item) => (
-                  <button key={item.id} type="button" role="tab" aria-selected={client === item.id} className={`ss-onb-client ${client === item.id ? "is-on" : ""}`} onClick={() => setClient(item.id)}>
-                    <span style={{ background: item.bg }}>
-                      <img src={item.logo} alt="" />
-                    </span>
-                    {item.label}
+              <HeroSkill english={english} />
+
+              <p className="ss-onb-help">
+                {t(
+                  "Ton agent installe le skill et branche ScrollShow tout seul. Il te demandera une clé : elle se colle dans sa configuration, jamais dans la conversation.",
+                  "Your agent installs the skill and connects ScrollShow on its own. It will ask for a key: paste it into its configuration, never into the chat.",
+                )}
+              </p>
+
+              {token ? (
+                <div className="ss-onb-key">
+                  <code>{`${token.slice(0, 7)}${"•".repeat(16)}`}</code>
+                  <button type="button" className="ss-onb-cta ss-onb-cta--inline ss-onb-cta--ghost" onClick={() => void copyKey()}>
+                    {copied === "key" ? t("Copiée ✓", "Copied ✓") : t("Copier la clé", "Copy the key")}
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <button type="button" className="ss-onb-cta ss-onb-cta--ghost" disabled={busy} onClick={() => void prepareConnector()}>
+                  {busy ? <span className="ss-onb-spin" /> : t("Créer ma clé de connexion", "Create my connection key")}
+                </button>
+              )}
 
-              {token && client === "cursor" ? (
-                <>
-                  <a className={`ss-onb-cta ${keyedUrl ? "" : "is-disabled"}`} href={cursorDeeplink}>
-                    {keyedUrl ? t("Installer dans Cursor", "Install in Cursor") : t("Préparation…", "Preparing…")}
-                  </a>
-                  <p className="ss-onb-help">{t("Un clic. Cursor s’ouvre et te demande de confirmer.", "One click. Cursor opens and asks you to confirm.")}</p>
-                </>
-              ) : null}
+              {error ? <p role="alert" className="ss-onb-error">{error}</p> : null}
 
-              {token && client === "codex" ? (
-                <>
-                  <div className="ss-onb-code">
-                    <pre>{codexCli ? codexCli.replace(/key=[^\"]+/, "key=…") : t("Préparation…", "Preparing…")}</pre>
-                    <button type="button" className="ss-onb-copy" disabled={!codexCli} onClick={() => void copy("cmd", codexCli)}>
-                      {copied === "cmd" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
-                    </button>
-                  </div>
-                  <p className="ss-onb-help">{t("Une commande dans ton terminal, c’est branché.", "One command in your terminal, done.")}</p>
-                </>
-              ) : null}
-
-              {token && client === "claude" ? (
-                <>
-                  <div className="ss-onb-code ss-onb-code--field">
-                    <pre>{keyedUrl ? keyedUrl.replace(/key=.*$/, "key=…") : t("Préparation…", "Preparing…")}</pre>
-                    <button type="button" className="ss-onb-copy" disabled={!keyedUrl} onClick={() => void copy("url", keyedUrl)}>
-                      {copied === "url" ? t("Copié ✓", "Copied ✓") : t("Copier", "Copy")}
-                    </button>
-                  </div>
-                  <p className="ss-onb-help">
-                    {t(
-                      "Cette adresse contient une clé privée : colle-la uniquement dans l’URL du connecteur Claude, jamais dans une conversation. Nomme le connecteur ScrollShow et active-le. Utilise ensuite le prompt ci-dessous.",
-                      "This address contains a private key: paste it only into Claude’s connector URL, never into a conversation. Name the connector ScrollShow and enable it. Then use the prompt below.",
-                    )}
-                  </p>
-                  <a className="ss-onb-cta ss-onb-cta--claude" href={connectorUrl} target="_blank" rel="noreferrer">
-                    <img src="/assets/ai/claude.png?v=2" alt="" />
-                    {t("Configurer le connecteur Claude", "Configure the Claude connector")}
-                  </a>
-                </>
-              ) : null}
-
-              <AssistantStarter english={english} pending />
               <button type="button" className="ss-onb-cta" onClick={() => go(4)}>
-                {t("Continuer l’onboarding", "Continue onboarding")}
+                {t("Continuer", "Continue")}
               </button>
+
               <div className="ss-onb-actions">
                 <button type="button" className="ss-onb-link" onClick={() => go(2)}>
                   ← {t("Retour", "Back")}

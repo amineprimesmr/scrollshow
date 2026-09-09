@@ -296,6 +296,10 @@ html:has(.ss-onb) body.grain {
 .ss-onb-result__tagline,
 .ss-onb-result__name {
   border-radius: 18px;
+  padding: 14px 18px;
+  line-height: 1.55;
+  min-height: 96px;
+  resize: vertical;
   background:
     linear-gradient(#080a0f, #080a0f) padding-box,
     conic-gradient(
@@ -636,7 +640,30 @@ html:has(.ss-onb) body.grain {
   font-size: 14px;
 }
 
-.ss-onb-kinds,
+.ss-onb-kinds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.ss-onb-kinds .ss-onb-chip {
+  justify-content: flex-start;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  background: rgb(255 255 255 / 0.03);
+  border-color: rgb(255 255 255 / 0.09);
+}
+
+.ss-onb-kinds .ss-onb-chip.is-on {
+  background: #fff;
+  color: #0a0a0a;
+  border-color: #fff;
+  font-weight: 600;
+}
+
 .ss-onb-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -644,10 +671,6 @@ html:has(.ss-onb) body.grain {
 }
 
 .ss-onb-grid--4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.ss-onb-kinds {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -838,10 +861,6 @@ html:has(.ss-onb) body.grain {
   font-weight: 800;
 }
 
-.ss-onb-code--field pre {
-  padding-right: 84px;
-  font-size: 13px;
-}
 
 .ss-onb-cta--claude {
   justify-self: start;
@@ -857,96 +876,16 @@ html:has(.ss-onb) body.grain {
   object-fit: contain;
 }
 
-.ss-onb-copy:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 
-/* ── AI clients ── */
-.ss-onb-clients {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
 
-.ss-onb-client {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 12px 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgb(255 255 255 / 0.04);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 650;
-  cursor: pointer;
-  transition: transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1), background-color 0.16s ease, border-color 0.16s ease;
-}
 
-.ss-onb-client:active {
-  transform: scale(0.96);
-}
 
-.ss-onb-client.is-on {
-  border-color: rgb(255 255 255 / 0.6);
-  background: rgb(255 255 255 / 0.1);
-}
 
-.ss-onb-client span {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  overflow: hidden;
-}
 
-.ss-onb-client img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-}
 
-.ss-onb-code {
-  position: relative;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #0b0b0d;
-}
 
-.ss-onb-code pre {
-  margin: 0;
-  padding: 14px 92px 14px 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #d4d4d8;
-}
 
-.ss-onb-copy {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: #fafafa;
-  color: #000;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1);
-}
 
-.ss-onb-copy:active {
-  transform: scale(0.95);
-}
 
 .ss-onb-help {
   margin: -6px 0 0;
@@ -971,11 +910,6 @@ html:has(.ss-onb) body.grain {
   line-height: 1.5;
 }
 
-.ss-onb-prompt .ss-onb-copy {
-  top: auto;
-  bottom: 10px;
-  right: 10px;
-}
 
 /* ── dots ── */
 .ss-onb__dots {
@@ -1015,24 +949,16 @@ html:has(.ss-onb) body.grain {
   }
 
   .ss-onb-row,
-  .ss-onb-kinds,
   .ss-onb-grid,
   .ss-onb-grid--4 {
     grid-template-columns: 1fr 1fr;
   }
 
-  .ss-onb-clients {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 
   .ss-onb-url {
     flex-direction: column;
   }
 
-  .ss-onb-code pre {
-    padding-right: 14px;
-    padding-top: 46px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1077,4 +1003,25 @@ html:has(.ss-onb) body.grain {
   width: 44px;
   height: 44px;
   border-radius: 12px;
+}
+
+/* Cle de connexion : visible mais tronquee, elle se copie sans se lire. */
+.ss-onb-key {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.03);
+}
+
+.ss-onb-key code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: #b4b4b4;
+  letter-spacing: 0.02em;
 }
