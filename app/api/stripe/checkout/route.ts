@@ -7,6 +7,13 @@ import { z } from "zod";
 import { LEGAL, salesReady } from "@/lib/legal";
 import { applySubscription } from "@/lib/billing";
 
+/**
+ * A incrementer des que la forme de la session change. Sans ca, Stripe refuse
+ * la nouvelle requete pendant 30 minutes : une cle d'idempotence ne peut pas
+ * etre reutilisee avec des parametres differents.
+ */
+const CHECKOUT_SHAPE = "v2";
+
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "auth" }, { status: 401 });
@@ -52,7 +59,7 @@ export async function POST(request: Request) {
       // On reste vendeur : activer Managed Payments est une decision fiscale,
       // elle se prend dans le tableau de bord, pas ici.
       ...({ managed_payments: { enabled: false } } as object),
-    }, { idempotencyKey: `checkout-${user.id}-${offer}-${Math.floor(Date.now() / 1800000)}` });
+    }, { idempotencyKey: `checkout-${CHECKOUT_SHAPE}-${user.id}-${offer}-${Math.floor(Date.now() / 1800000)}` });
     return NextResponse.json({ url: session.url });
   } catch (error) {
     // Sans cette trace, une panne de paiement est invisible cote serveur.
