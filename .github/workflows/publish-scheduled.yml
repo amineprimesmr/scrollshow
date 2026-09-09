@@ -29,3 +29,17 @@ jobs:
           curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer $CRON_SECRET" \
             https://scrollshow.io/api/health
+
+  research:
+    if: vars.PRODUCTION_AUTOMATIONS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Advance ScrollShow research queue
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail --silent --show-error --max-time 250 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://scrollshow.io/api/cron/research
