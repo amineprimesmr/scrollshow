@@ -475,9 +475,9 @@ html:has(.ss-onb) body.grain {
 .ss-onb-hints {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
   margin: -2px 0 0;
+  padding-left: 2px;
   padding: 0;
   list-style: none;
 }

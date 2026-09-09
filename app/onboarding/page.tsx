@@ -383,12 +383,12 @@ function OnboardingInner() {
               {!analyzing && !revealed ? (
                 <>
                   <label className="ss-onb-field">
-                    <span>{t("Lien de ton business", "Your business link")}</span>
                     <div className="ss-onb-url">
                       <input
+                        aria-label={t("Lien de ton business", "Your business link")}
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
-                        placeholder={t("monsite.com", "mysite.com")}
+                        placeholder={t("Lien de ton business", "Your business link")}
                         inputMode="url"
                         autoFocus
                         onKeyDown={(e) => (e.key === "Enter" ? void analyze() : null)}
