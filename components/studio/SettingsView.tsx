@@ -983,8 +983,8 @@ function ApiTab({
       </h2>
       <p className="ss-lead">
         {t(
-          "Dans TikTok, Partager → ScrollShow ajoute le compte (profil ou vidéo) à ta bibliothèque. Sans partage, le raccourci lit le lien copié dans le presse-papiers.",
-          "In TikTok, Share → ScrollShow adds the account (profile or video) to your library. Run it without input and it reads the link from your clipboard.",
+          "Dans TikTok, Partager → ScrollShow importe le post (vidéo ou carrousel) dans ta Bibliothèque, comme « Importer un TikTok ». Sans partage, le raccourci lit le lien copié dans le presse-papiers.",
+          "In TikTok, Share → ScrollShow imports the post (video or carousel) into your Library, like “Import a TikTok”. Run it without input and it reads the link from your clipboard.",
           english,
         )}
       </p>
@@ -1001,7 +1001,7 @@ function ApiTab({
             {t("Installer le raccourci", "Install the shortcut", english)}
           </a>
         </li>
-        <li>{t("Dans TikTok : Partager → ScrollShow. Une notification confirme l’ajout.", "In TikTok: Share → ScrollShow. A notification confirms it.", english)}</li>
+        <li>{t("Sur un post TikTok : Partager → ScrollShow. Une notification confirme l’import.", "On a TikTok post: Share → ScrollShow. A notification confirms the import.", english)}</li>
       </ol>
       <p className="ss-muted">
         {t("Le raccourci est signé et partageable tel quel : chaque personne colle sa propre clé à l’installation.", "The shortcut is signed and shareable as is: each person pastes their own key on install.", english)}
