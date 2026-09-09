@@ -6,11 +6,16 @@ import { NextResponse } from "next/server";
 import { consumeLimit } from "./rate-limit";
 import { PostValidationError } from "./post-validation";
 
-export function bearerToken(request: Request) {
+/** En-tete seul. La specification MCP interdit le jeton dans l'URL, et une URL
+ *  finit dans les journaux du serveur, du proxy et de l'historique. */
+export function headerToken(request: Request) {
   const header = request.headers.get("authorization") || "";
   const match = header.match(/^Bearer\s+(.+)$/i);
-  if (match?.[1]) return match[1].trim();
-  return keyFromUrl(request);
+  return match?.[1]?.trim() || "";
+}
+
+export function bearerToken(request: Request) {
+  return headerToken(request) || keyFromUrl(request);
 }
 
 export function keyFromUrl(request: Request) {

@@ -7,6 +7,7 @@ import { stripe } from "@/lib/stripe";
 import { readStore } from "@/lib/store";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
 import { revokeAccessToken } from "@/lib/tiktok";
+import { revokeAllForUser } from "@/lib/oauth";
 
 const profileSchema = z.object({
   action: z.literal("profile"),
@@ -81,6 +82,7 @@ export async function PATCH(request: Request) {
         }
       }
       user.passwordHash = await hashPassword(body.newPassword);
+      revokeAllForUser(data, user.id);
       user.sessionVersion = (user.sessionVersion || 0) + 1;
       return user;
     });

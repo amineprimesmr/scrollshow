@@ -308,6 +308,39 @@ export type ChannelStatSnapshot = {
   capturedAt: string;
 };
 
+export type OAuthClient = {
+  id: string;
+  name: string;
+  redirectUris: string[];
+  uri?: string;
+  createdAt: string;
+};
+
+export type OAuthCode = {
+  hash: string;
+  clientId: string;
+  userId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  resource: string;
+  scope: string;
+  expiresAt: number;
+};
+
+export type OAuthToken = {
+  /** Une autorisation = un couple utilisateur/agent, revocable d'un bloc. */
+  grantId: string;
+  clientId: string;
+  userId: string;
+  resource: string;
+  scope: string;
+  accessHash: string;
+  refreshHash: string;
+  accessExpiresAt: number;
+  refreshExpiresAt: number;
+  createdAt: string;
+};
+
 export type StoreData = {
   restoreReviewRequired?: boolean;
   mediaDeletionQueue?: Array<{ name: string; notBefore: number; attempts: number }>;
@@ -322,6 +355,11 @@ export type StoreData = {
   posts: StudioPost[];
   media: MediaItem[];
   apiKeys: ApiKey[];
+  oauthClients?: OAuthClient[];
+  oauthCodes?: OAuthCode[];
+  oauthTokens?: OAuthToken[];
+  /** Jetons de renouvellement deja consommes : un rejeu revoque toute l'autorisation. */
+  oauthUsedRefresh?: { hash: string; grantId: string }[];
   pushSubscriptions?: PushSubscriptionRecord[];
   videoStats?: VideoStatSnapshot[];
   channelStats?: ChannelStatSnapshot[];

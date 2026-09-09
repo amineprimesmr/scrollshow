@@ -1004,24 +1004,3 @@ html:has(.ss-onb) body.grain {
   height: 44px;
   border-radius: 12px;
 }
-
-/* Cle de connexion : visible mais tronquee, elle se copie sans se lire. */
-.ss-onb-key {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 6px 6px 16px;
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.03);
-}
-
-.ss-onb-key code {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  color: #b4b4b4;
-  letter-spacing: 0.02em;
-}

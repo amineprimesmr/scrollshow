@@ -269,6 +269,29 @@ export function SettingsView() {
     await patch(preferencesPayload());
   }
 
+  const [grants, setGrants] = useState<{ grantId: string; name: string; createdAt: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/studio/connections")
+      .then((res) => (res.ok ? res.json() : { grants: [] }))
+      .then((json) => setGrants(json.grants || []))
+      .catch(() => {});
+  }, []);
+
+  async function revokeGrant(grantId: string) {
+    setBusy(`grant:${grantId}`);
+    try {
+      const res = await fetch("/api/studio/connections", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grantId }),
+      });
+      if (res.ok) setGrants((await res.json()).grants || []);
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function unlinkGoogle() {
     await patch({ action: "unlink_google" });
   }
@@ -515,6 +538,26 @@ export function SettingsView() {
               {user.hasGoogle && !user.hasPassword && !user.hasGithub ? (
                 <p className="ss-muted">{t("Crée un mot de passe avant de délier Google.", "Create a password before unlinking Google.", english)}</p>
               ) : null}
+            </div>
+
+            <div className="ss-set-card">
+              <h2>{t("Agents connectés", "Connected agents", english)}</h2>
+              <p className="ss-lead">
+                {grants.length
+                  ? t("Ces agents peuvent lire et écrire dans ton espace. Retirer l’accès prend effet immédiatement.", "These agents can read and write in your workspace. Removing access takes effect immediately.", english)
+                  : t("Aucun agent connecté. Ton assistant en ajoutera un quand tu autoriseras l’accès depuis lui.", "No agent connected yet. Your assistant adds one when you approve access from it.", english)}
+              </p>
+              {grants.map((grant) => (
+                <div key={grant.grantId} className="ss-form-actions">
+                  <strong>{grant.name}</strong>
+                  <span className="ss-muted">
+                    {new Date(grant.createdAt).toLocaleDateString(english ? "en-US" : "fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                  <button className="ss-btn-ghost" type="button" disabled={busy === `grant:${grant.grantId}`} onClick={() => void revokeGrant(grant.grantId)}>
+                    {t("Retirer l’accès", "Remove access", english)}
+                  </button>
+                </div>
+              ))}
             </div>
 
             <div className="ss-set-card">

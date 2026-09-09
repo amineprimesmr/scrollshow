@@ -1,6 +1,5 @@
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { analyzeBusiness, AnalyzeError, enrichTikTok } from "@/lib/business-analyzer";
-import { rotateOnboardingKey } from "@/lib/api-keys";
 import { savePublicImage } from "@/lib/media-files";
 import { publicUser, readStore, updateStore } from "@/lib/store";
 import type { BusinessProfile } from "@/lib/types";
@@ -63,7 +62,6 @@ const businessSchema = z.object({
   }),
 });
 
-const keySchema = z.object({ action: z.literal("key") });
 const progressSchema = z.object({ action: z.literal("progress"), step: z.number().int().min(0).max(4) });
 
 const finishSchema = z.object({
@@ -71,7 +69,7 @@ const finishSchema = z.object({
   heardFrom: z.array(z.string().max(30)).max(10).default([]),
 });
 
-const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, keySchema, progressSchema, finishSchema]);
+const schema = z.discriminatedUnion("action", [analyzeSchema, tiktokSchema, profileSchema, businessSchema, progressSchema, finishSchema]);
 
 export async function GET() {
   const session = await readSession();
@@ -112,11 +110,6 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.action === "key") {
-    const created = await rotateOnboardingKey(session.id);
-    if (!created) return NextResponse.json({ error: "limit" }, { status: 400 });
-    return NextResponse.json({ token: created.token });
-  }
 
   if (body.action === "tiktok") {
     const tiktok = await enrichTikTok(body.handle);

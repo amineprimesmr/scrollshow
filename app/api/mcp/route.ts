@@ -20,8 +20,10 @@ import {
   agentUpdateRecipe,
   agentWhoami,
 } from "@/lib/agent";
-import { agentOptions, bearerToken, keyFromUrl } from "@/lib/agent-http";
+import { agentOptions, headerToken } from "@/lib/agent-http";
 import { resolveApiKey } from "@/lib/api-keys";
+import { MCP_RESOURCE, OAUTH_SCOPE, resolveAccessToken } from "@/lib/oauth";
+import { publicUser } from "@/lib/store";
 import { hasStudioAccess } from "@/lib/plans";
 import { recipeInputSchema } from "@/lib/recipe";
 import type { SessionUser } from "@/lib/types";
@@ -535,16 +537,32 @@ const handler = createMcpHandler(
   },
 );
 
-async function verifyToken(req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
-  // Clients that cannot send headers (Claude connectors, plain URLs) carry the key in the address.
-  const token = bearerToken || keyFromUrl(req);
+/**
+ * Deux porteurs valides : un jeton OAuth (voie normale, l'agent l'obtient seul)
+ * ou une cle `ss_live_` (comptes crees avant OAuth). Aucun jeton n'est accepte
+ * dans l'URL : la specification l'interdit, et une URL fuit dans les journaux.
+ */
+async function userFromToken(token: string) {
+  if (!token) return null;
+  const granted = await resolveAccessToken(token, MCP_RESOURCE);
+  if (granted) {
+    const { readStore } = await import("@/lib/store");
+    const data = await readStore();
+    const item = data.users.find((entry) => entry.id === granted.userId);
+    if (!item || item.deletionPendingAt || !item.emailVerifiedAt) return null;
+    return publicUser(item);
+  }
+  return resolveApiKey(token);
+}
+
+async function verifyToken(_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  const token = bearerToken?.trim();
   if (!token) return undefined;
-  bearerToken = token;
-  const user = await resolveApiKey(bearerToken);
+  const user = await userFromToken(token);
   if (!user || !hasStudioAccess(user.plan)) return undefined;
   if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) return undefined;
   return {
-    token: bearerToken,
+    token,
     clientId: user.id,
     scopes: ["scrollshow"],
     extra: { user },
@@ -565,21 +583,22 @@ function refuse(status: number, error: string, message: string, action: string) 
   res.headers.set("Access-Control-Allow-Origin", "*");
   res.headers.set(
     "WWW-Authenticate",
-    `Bearer realm="scrollshow", error="${error}", error_description="${message}", resource_metadata="${SITE}/api/mcp"`,
+    `Bearer realm="scrollshow", error="${error}", error_description="${message}", ` +
+      `resource_metadata="${SITE}/.well-known/oauth-protected-resource", scope="${OAUTH_SCOPE}"`,
   );
   return res;
 }
 
-/** Installing the skill is free; calling a tool needs a key attached to an active plan. */
+/** Installer le skill est gratuit ; appeler un outil demande un acces actif. */
 async function gate(request: Request) {
-  const token = bearerToken(request);
-  if (!token) return null; // no key at all: let the MCP layer answer with its discovery challenge
-  const user = await resolveApiKey(token);
+  const token = headerToken(request);
+  if (!token) return null; // aucun porteur : la couche MCP repond son defi de decouverte
+  const user = await userFromToken(token);
   if (!user) {
-    return refuse(401, "invalid_key", "This ScrollShow key is unknown or was revoked.", `Ask the user to create a new key at ${SITE}/app/settings and put it in the connector configuration, never in chat.`);
+    return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Start the authorization again: the agent will open ${SITE} in a browser so the user can approve it. Never ask the user for a key in chat.`);
   }
   if (!hasStudioAccess(user.plan)) {
-    return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Tell the user to activate their access at ${SITE}/pricing with the account ${user.email}. The skill stays installed and works as soon as the payment is confirmed.`);
+    return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Tell the user to activate their access at ${SITE}/pricing with the account ${user.email}. The authorization stays valid and the tools unlock as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.`);
   }
   return null;
 }

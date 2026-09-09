@@ -128,8 +128,6 @@ function OnboardingInner() {
   const [revealed, setRevealed] = useState(false);
 
   // Step 2
-  const [token, setToken] = useState("");
-  const [copied, setCopied] = useState("");
 
   // Step 3
   const [heard, setHeard] = useState<string[]>([]);
@@ -300,21 +298,6 @@ function OnboardingInner() {
   }
 
   /* ── step 2 · AI ─────────────────────────────────────────────────────── */
-  async function prepareConnector() {
-    setBusy(true); setError("");
-    try { const json = await post({ action: "key" }); setToken(json.token || ""); }
-    catch { setError(t("Impossible de préparer la connexion. Réessaie ou configure-la plus tard dans le studio.", "Could not prepare the connection. Retry or configure it later in the studio.")); }
-    finally { setBusy(false); }
-  }
-
-  async function copyKey() {
-    if (!token) return;
-    try {
-      await navigator.clipboard.writeText(token);
-      setCopied("key");
-      window.setTimeout(() => setCopied((cur) => (cur === "key" ? "" : cur)), 1600);
-    } catch { setError(t("Copie impossible. Sélectionne la clé à la main.", "Copy failed. Select the key manually.")); }
-  }
 
   /* ── step 3 · heard from ─────────────────────────────────────────────── */
   async function finish() {
@@ -557,23 +540,10 @@ function OnboardingInner() {
 
               <p className="ss-onb-help">
                 {t(
-                  "Ton agent installe le skill et branche ScrollShow tout seul. Il te demandera une clé : elle se colle dans sa configuration, jamais dans la conversation.",
-                  "Your agent installs the skill and connects ScrollShow on its own. It will ask for a key: paste it into its configuration, never into the chat.",
+                  "Ton agent installe le skill et se branche tout seul. Il ouvrira cette page dans ton navigateur pour que tu autorises l’accès : aucune clé à copier, rien à coller.",
+                  "Your agent installs the skill and connects on its own. It will open this site in your browser so you can approve access: no key to copy, nothing to paste.",
                 )}
               </p>
-
-              {token ? (
-                <div className="ss-onb-key">
-                  <code>{`${token.slice(0, 7)}${"•".repeat(16)}`}</code>
-                  <button type="button" className="ss-onb-cta ss-onb-cta--inline ss-onb-cta--ghost" onClick={() => void copyKey()}>
-                    {copied === "key" ? t("Copiée ✓", "Copied ✓") : t("Copier la clé", "Copy the key")}
-                  </button>
-                </div>
-              ) : (
-                <button type="button" className="ss-onb-cta ss-onb-cta--ghost" disabled={busy} onClick={() => void prepareConnector()}>
-                  {busy ? <span className="ss-onb-spin" /> : t("Créer ma clé de connexion", "Create my connection key")}
-                </button>
-              )}
 
               {error ? <p role="alert" className="ss-onb-error">{error}</p> : null}
 

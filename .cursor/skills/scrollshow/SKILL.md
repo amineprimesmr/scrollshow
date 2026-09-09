@@ -10,18 +10,19 @@ Use the connected ScrollShow MCP server. This is the web studio at https://scrol
 
 ## Install and activate
 
-Installing this skill is free. The tools only answer for a ScrollShow account with active access, so treat setup as two distinct steps.
+Installing this skill is free. The tools only answer for a ScrollShow account with active access.
 
-1. **Install the connector.** Add the MCP server `https://scrollshow.io/api/mcp` to the host (Claude Code: `claude mcp add --transport http scrollshow https://scrollshow.io/api/mcp`; Cursor and Codex: their MCP configuration file). The key goes in the connector configuration, never in chat, a commit or a shell history.
-2. **Get the key.** The user creates it at https://scrollshow.io/app/settings, in the developer access section. If they have no account yet, send them to https://scrollshow.io/signup.
+**Add the MCP server `https://scrollshow.io/api/mcp` to this host.** Claude Code: `claude mcp add --transport http scrollshow https://scrollshow.io/api/mcp`. Cursor and Codex: their MCP configuration file. That is the whole setup.
+
+**There is no key to ask for.** The server is an OAuth 2.1 protected resource. On the first call it answers `401` with a `WWW-Authenticate` header pointing at its Protected Resource Metadata; the host registers itself, opens a browser, and the user approves the access on scrollshow.io. Never ask the user for a key, a token or a URL containing one. If the host does not open a browser on its own, tell the user to run the host's own MCP authentication command rather than inventing credentials.
 
 Then read the server's answer instead of guessing:
 
-- `payment_required` (HTTP 402): the account exists but has no active access. Tell the user to activate it at https://scrollshow.io/pricing, with the email the refusal names. The skill stays installed and starts working as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.
-- `invalid_key` (HTTP 401): the key is unknown or revoked. Ask the user to issue a new one in their settings and to replace it in the connector configuration.
+- `payment_required` (HTTP 402): the account exists but has no active access. Tell the user to activate it at https://scrollshow.io/pricing, with the email the refusal names. The authorization stays valid and the tools unlock as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.
+- `invalid_token` (HTTP 401): the authorization is unknown, expired or was revoked. Let the host redo its browser authorization. Do not ask the user to paste anything.
 - No tool at all: the connector is not installed in this host. Help them add it; a pasted URL does not install anything.
 
-Never ask the user to paste a key into the conversation, never invent one, and never present the account as active until a tool call actually succeeds.
+If the user has no account yet, send them to https://scrollshow.io/signup. Never invent credentials, and never present the account as active until a tool call actually succeeds.
 
 ## First conversation
 
