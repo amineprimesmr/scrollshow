@@ -129,7 +129,7 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   }, []);
 
   const items = useMemo(() => {
-    const list = [...channels.map(fromChannel), ...clippers.map(fromAccount)];
+    const list = [...channels.filter((item) => !item.tracked).map(fromChannel), ...clippers.map(fromAccount)];
     const seen = new Set<string>();
     const unique = list.filter((item) => {
       const key = `${item.platform}:${item.handle}`;

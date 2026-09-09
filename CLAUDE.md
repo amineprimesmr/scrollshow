@@ -75,6 +75,16 @@ liste) et lisibles en entier dans le studio via l'embed officiel
 `components/studio/CalendarView.tsx` : une seule `PostCard` pour jour/semaine/
 mois, navigation par flèches selon la vue, résumé calculé sur la période
 affichée uniquement. Garder ces invariants si on ajoute une vue.
+- Glisser-déposer maison (pointer events) : appui long 260 ms au doigt, 6 px à
+  la souris ; cibles = `[data-drop="day"][data-date]` et la corbeille
+  `[data-drop="trash"]` (portal, verre). Déposer sur la corbeille ouvre une
+  confirmation ; un déplacement fait un `PATCH { date }` qui ne rejoue que
+  `validateSchedule` (un post planifié à l'ancienne doit pouvoir bouger).
+  Un post publié ou en cours de publication est verrouillé (`isLocked`).
+- Comptes du calendrier = `ownedChannels()` (`lib/owned-channels.ts`) :
+  comptes connectés + comptes suivis de l'Overview exposés comme comptes
+  `tracked` (non connectés, brouillons seulement). Même liste dans le snapshot
+  studio, `agentChannels` et le composeur ; `validatePost` accepte les deux.
 
 ## Onboarding et profil business
 Après inscription (email ou Google) tout le monde passe par `/onboarding` :

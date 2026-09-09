@@ -568,10 +568,10 @@ export function CreatePostModal() {
             </button>
               </>
             )}
-            {connected.length ? (
+            {channels.length ? (
               <div className="ss-checks">
-                {connected.map((channel) => (
-                  <label key={channel.id}>
+                {[...connected, ...channels.filter((item) => !item.connected)].map((channel) => (
+                  <label key={channel.id} className={channel.connected ? "" : "is-muted"}>
                     <input
                       type="radio"
                       name="publish-channel"
@@ -581,6 +581,7 @@ export function CreatePostModal() {
                       }}
                     />
                     {channel.name} · {platformName(channel.platform)}
+                    {!channel.connected ? ` · ${t("non connecté, brouillon seulement", "not connected, draft only", english)}` : ""}
                   </label>
                 ))}
               </div>

@@ -134,7 +134,9 @@ function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; 
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, english, channels, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
+  const { user, english, channels, posts, activeChannel, setActiveChannel, setAddOpen, setPostOpen, setEditing } = useStudio();
+  const postCount = (id: string | "all") =>
+    posts.filter((post) => post.inCalendar !== false && (id === "all" || post.channelIds.includes(id))).length;
   const item = PAGE_TITLES.find((entry) => navActive(pathname, entry.href));
   const title = item ? (english ? item.en : item.fr) : "ScrollShow";
   const onCalendar = pathname === "/app" || pathname === "/app/calendar";
@@ -216,25 +218,30 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           <button className="ss-btn-ghost ss-btn-wide" type="button" onClick={() => setAddOpen(true)}>
             {t("Connecter un compte", "Connect an account", english)}
           </button>
-          <button className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`} onClick={() => setActiveChannel("all")}>
+          <button className={`ss-channel ${activeChannel === "all" ? "is-active" : ""}`} onClick={() => setActiveChannel("all")} aria-pressed={activeChannel === "all"}>
             <BrandMark size={28} alt="" />
             <span>
               <b>{t("Tous les comptes", "All channels", english)}</b>
+              <span>{postCount("all")} {postCount("all") > 1 ? t("posts", "posts", english) : "post"}</span>
             </span>
           </button>
           {channels.map((channel) => (
             <button
               key={channel.id}
               className={`ss-channel ${activeChannel === channel.id ? "is-active" : ""}`}
-              onClick={() => setActiveChannel(channel.id)}
+              onClick={() => setActiveChannel(activeChannel === channel.id ? "all" : channel.id)}
+              aria-pressed={activeChannel === channel.id}
+              title={activeChannel === channel.id ? t("Afficher tous les comptes", "Show all channels", english) : t("Afficher seulement ce compte", "Show only this channel", english)}
             >
               <img src={channel.avatar || platformById(channel.platform)?.logo || "/logo.png"} alt="" />
               <span>
                 <b>{channel.name}</b>
                 <span>
                   {platformName(channel.platform)} · @{channel.handle}
+                  {channel.tracked ? ` · ${t("non connecté", "not connected", english)}` : ""}
                 </span>
               </span>
+              <em className="ss-channel__count">{postCount(channel.id)}</em>
             </button>
           ))}
         </aside>

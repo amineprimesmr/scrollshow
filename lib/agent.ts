@@ -1,3 +1,4 @@
+import { ownedChannels } from "./owned-channels";
 import { researchCapabilities } from "./research/provider";
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
 import { fetchUserInfo, listRecentVideos, publicChannel } from "./tiktok";
@@ -81,7 +82,7 @@ export async function agentWhoami(user: SessionUser) {
 
 export async function agentChannels(user: SessionUser) {
   const data = await readStore();
-  return data.channels.filter((item) => inScope(item, user)).map(publicChannel);
+  return ownedChannels(data, user);
 }
 
 export async function agentMedia(user: SessionUser) {

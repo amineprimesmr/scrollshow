@@ -34,6 +34,9 @@ type StudioContextValue = {
   composeDate: string | null;
   setComposeDate: (date: string | null) => void;
   reload: (options?: { throwOnError?: boolean }) => Promise<void>;
+  /** Mise a jour optimiste d'un post (deplacement dans le calendrier) avant confirmation serveur. */
+  patchPostLocal: (id: string, patch: Partial<StudioPost>) => void;
+  removePostLocal: (id: string) => void;
 };
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -137,6 +140,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setEnglish(englishFrom(user));
   }, [user]);
 
+  const patchPostLocal = useCallback((id: string, patch: Partial<StudioPost>) => {
+    setPosts((list) => list.map((post) => (post.id === id ? { ...post, ...patch } : post)));
+  }, []);
+  const removePostLocal = useCallback((id: string) => {
+    setPosts((list) => list.filter((post) => post.id !== id));
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -158,8 +168,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       composeDate,
       setComposeDate,
       reload,
+      patchPostLocal,
+      removePostLocal,
     }),
-    [user, english, channels, posts, media, availability, loaded, syncError, activeChannel, addOpen, postOpen, editing, composeDate, reload],
+    [user, english, channels, posts, media, availability, loaded, syncError, activeChannel, addOpen, postOpen, editing, composeDate, reload, patchPostLocal, removePostLocal],
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;

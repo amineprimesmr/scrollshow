@@ -361,12 +361,14 @@ export function publicChannel(channel: {
   avatar: string;
   accessToken?: string;
   connected?: boolean;
+  tracked?: boolean;
   followers?: number;
   likes?: number;
   videoCount?: number;
 }) {
   return {
     id: channel.id,
+    tracked: Boolean(channel.tracked),
     platform: channel.platform,
     name: channel.name,
     handle: channel.handle,

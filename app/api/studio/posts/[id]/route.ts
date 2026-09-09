@@ -4,7 +4,7 @@ import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
-import { assertEditable, validatePost, postErrorResponse } from "@/lib/post-validation";
+import { assertEditable, validatePost, validateSchedule, postErrorResponse } from "@/lib/post-validation";
 import { inScope } from "@/lib/projects";
 
 const schema = z.object({
@@ -45,7 +45,13 @@ export async function PATCH(
     assertEditable(found);
     const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
     Object.assign(found, rest);
-    validatePost(data, found);
+    // Un simple deplacement (date/heure) ne rejoue pas toute la validation de
+    // publication : un post planifie a l'ancienne (sans options TikTok) doit
+    // pouvoir bouger dans le calendrier, il sera revalide a la publication.
+    const keys = Object.keys(parsed.data);
+    const scheduleOnly = keys.length > 0 && keys.every((key) => key === "date" || key === "time");
+    if (scheduleOnly) validateSchedule(found);
+    else validatePost(data, found);
     if (origin) found.origin = origin;
     const recipe = ensureRecipe(found);
     if (recipePatch) {

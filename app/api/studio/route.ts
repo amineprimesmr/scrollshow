@@ -1,3 +1,4 @@
+import { ownedChannels } from "@/lib/owned-channels";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { ensureDemoWorkspace, localAutoSeedEnabled, needsDemoWorkspace } from "@/lib/demo-workspace";
 import { resolveStoreUser } from "@/lib/local-user";
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
     const stored = resolveStoreUser(data, user);
     if (!stored) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
     const payload = {
-      channels: data.channels.filter(item => inScope(item, user)).map(publicChannel),
+      channels: ownedChannels(data, user),
       posts: data.posts.filter(item => inScope(item, user)),
       media: data.media.filter(item => inScope(item, user)),
       user: withProject(publicUser(stored), resolveProject(data, user.id, user.projectId)),

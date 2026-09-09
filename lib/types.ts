@@ -214,6 +214,8 @@ export type Channel = {
   handle: string;
   avatar: string;
   connected?: boolean;
+  /** Compte suivi (collection accounts) expose comme compte du projet, sans jeton : brouillons seulement. */
+  tracked?: boolean;
   accessToken?: string;
   refreshToken?: string;
   scopes?: string;

@@ -268,3 +268,11 @@ export function NavIcon({ name, size = 18 }: { name: string; size?: number }) {
   const Icon = NAV_ICON_MAP[name] || IconHome;
   return <Icon size={size} />;
 }
+
+export function IconTrash(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.2A1.5 1.5 0 0 0 8.8 20.5h6.4a1.5 1.5 0 0 0 1.5-1.3L17.5 7M10 11v6M14 11v6" {...stroke} />
+    </Svg>
+  );
+}
