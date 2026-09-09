@@ -6580,6 +6580,300 @@ a.ss-btn-ghost {
   flex-wrap: wrap;
 }
 
+.ss-acc__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ss-acc__search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.ss-acc__sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #71717a;
+}
+
+.ss-acc__sort select {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.ss-acc__more {
+  margin: 10px auto 0;
+  display: block;
+}
+
+.ss-acc__trend {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+
+.ss-acc__trend small,
+.ss-acc__trend > span {
+  font-size: 11px;
+  color: #71717a;
+}
+
+.ss-acc__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+}
+
+.ss-acc__bars span {
+  flex: 1 1 0;
+  min-width: 2px;
+  max-width: 34px;
+  border-radius: 3px 3px 1px 1px;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.ss-acc__bars span.is-on {
+  background: linear-gradient(180deg, rgb(34 197 94 / 0.85), rgb(34 197 94 / 0.25));
+}
+
+.ss-acc__gallery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.ss-acc__tile {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 2px;
+  width: 100%;
+  aspect-ratio: 9 / 14;
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #1f1f23;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.ss-acc__tile:hover {
+  transform: translateY(-2px);
+}
+
+.ss-acc__tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ss-acc__tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.05) 40%, rgb(0 0 0 / 0.82));
+}
+
+.ss-acc__tile > span {
+  position: relative;
+  z-index: 1;
+}
+
+.ss-acc__tile-blank {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  color: rgb(255 255 255 / 0.35);
+}
+
+.ss-acc__tile-kind {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(var(--lg-blur, 14px)) saturate(var(--lg-sat, 1.5));
+  -webkit-backdrop-filter: blur(var(--lg-blur, 14px)) saturate(var(--lg-sat, 1.5));
+}
+
+.ss-acc__tile-meta {
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.85);
+}
+
+.ss-acc__tile-title {
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ss-acc__vopen {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---- Lecteur de post ------------------------------------------------ */
+
+.ss-postview {
+  position: fixed;
+  inset: 0;
+  /* Au-dessus du widget de configuration flottant (z-index 100). */
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.ss-postview__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(10px) saturate(var(--lg-sat, 1.5));
+  -webkit-backdrop-filter: blur(10px) saturate(var(--lg-sat, 1.5));
+  cursor: pointer;
+}
+
+.ss-postview__sheet {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  border-radius: 24px;
+  padding: 18px;
+  animation: lg-pop 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.ss-postview__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ss-postview__head small {
+  display: block;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.ss-postview__head b {
+  display: block;
+  font-size: 15px;
+  max-width: 52ch;
+}
+
+.ss-postview__body {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.ss-postview__player {
+  position: relative;
+  min-height: 540px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0d0f;
+}
+
+.ss-postview__player iframe,
+.ss-postview__player img {
+  width: 100%;
+  height: 100%;
+  min-height: 540px;
+  border: 0;
+  display: block;
+  object-fit: contain;
+}
+
+.ss-postview__side {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.ss-postview__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.ss-postview__stats div {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.ss-postview__stats dt {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+
+.ss-postview__stats dd {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.ss-postview__caption {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #d4d4d8;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 720px) {
+  .ss-postview__body {
+    grid-template-columns: 1fr;
+  }
+  .ss-postview__player,
+  .ss-postview__player iframe,
+  .ss-postview__player img {
+    min-height: 460px;
+  }
+}
+
 .ss-acc__videos-head {
   display: flex;
   align-items: center;
@@ -6598,7 +6892,7 @@ a.ss-btn-ghost {
 
 .ss-acc__list li {
   display: grid;
-  grid-template-columns: 26px 44px minmax(0, 1fr) repeat(3, 84px) auto;
+  grid-template-columns: 26px 44px minmax(0, 1fr) repeat(5, 76px) auto;
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
@@ -6944,6 +7238,9 @@ a.ss-btn-ghost {
   .ss-acc__list li {
     grid-template-columns: 26px 44px minmax(0, 1fr) auto;
   }
+  .ss-acc__filters {
+    gap: 6px;
+  }
   .ss-acc__list .ss-acc__num:nth-of-type(n + 2) {
     display: none;
   }
@@ -7139,3 +7436,11 @@ a.ss-btn-ghost {
 
 @keyframes ss-qr-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .ss-qr__code { animation: none; } }
+
+/* Connexion de compte : le réseau concerné est nommé par son logo. */
+.ss-fan__connect img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}

@@ -29,7 +29,14 @@ export async function safeFetchBytes(input: string | URL, options: { maxBytes?: 
       const request = (url.protocol === "https:" ? https : http).get(url, {
         method: options.method || "GET",
         headers: { ...options.headers, "Accept-Encoding": "identity" },
-        lookup: (_host, _opts, callback) => callback(null, answer.address, answer.family),
+        // Node's autoSelectFamily asks for `all`: it then expects a list, and
+        // answering with a bare string leaves the socket without an address.
+        lookup: (_host, opts, callback) =>
+          (opts as { all?: boolean })?.all
+            ? (callback as unknown as (err: null, addresses: { address: string; family: number }[]) => void)(null, [
+                { address: answer.address, family: answer.family },
+              ])
+            : callback(null, answer.address, answer.family),
       }, response => {
         const chunks: Buffer[] = [];
         let size = 0;

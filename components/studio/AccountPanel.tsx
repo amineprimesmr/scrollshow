@@ -3,7 +3,8 @@
 import { t } from "@/lib/i18n";
 import type { AccountInsights } from "@/lib/insights";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { compact, type FanItem } from "./AccountsFan";
 import { IconChevron } from "./icons";
 import { useStudio } from "./StudioContext";
@@ -12,6 +13,28 @@ import { LoadingOrb, Orb } from "@/components/fx/Orb";
 
 type Tab = "overview" | "videos" | "formats" | "revenue";
 type Range = 30 | 90 | "all";
+type Kind = "all" | "photo" | "video";
+type Sort = "views" | "likes" | "comments" | "shares" | "engagement" | "recent";
+
+const PAGE = 24;
+
+/** TikTok covers are hotlink-protected: always go through our own proxy. */
+function coverSrc(url: string) {
+  if (!url) return "";
+  if (!/^https:\/\//.test(url)) return url;
+  return `/api/studio/tiktok/cover?url=${encodeURIComponent(url)}`;
+}
+
+/** The post id is enough to embed the real TikTok, video or carousel alike. */
+function embedId(video: { id: string; url: string }) {
+  const fromUrl = video.url.match(/\/(?:video|photo)\/(\d+)/)?.[1];
+  const id = fromUrl || video.id;
+  return /^\d{6,}$/.test(id) ? id : null;
+}
+
+function engagementOf(v: { views: number; likes: number; comments: number; shares: number }) {
+  return v.views ? Math.round(((v.likes + v.comments + v.shares) / v.views) * 1000) / 10 : 0;
+}
 
 function euro(n: number, en: boolean) {
   return n.toLocaleString(en ? "en-US" : "fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: n >= 100 ? 0 : 2 });
@@ -39,11 +62,22 @@ export function AccountPanel({
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [kind, setKind] = useState<Kind>("all");
+  const [sort, setSort] = useState<Sort>("views");
+  const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(PAGE);
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
+  const [openPost, setOpenPost] = useState<string | null>(null);
   const [rpmDraft, setRpmDraft] = useState("");
   const [declaredDraft, setDeclaredDraft] = useState("");
   const abort = useRef<AbortController | null>(null);
 
   const key = item?.id || null;
+
+  useEffect(() => {
+    setShown(PAGE);
+    setOpenPost(null);
+  }, [key, range, kind, sort, query]);
 
   useEffect(() => {
     if (!key) {
@@ -88,7 +122,7 @@ export function AccountPanel({
       if (!res.ok) {
         setError(
           json.error === "no_key"
-            ? t("Clé Monid absente côté serveur (MONID_API_KEY).", "Monid key missing on the server (MONID_API_KEY).", en)
+            ? t("Les métriques publiques ne sont pas disponibles sur cet environnement.", "Public metrics are unavailable on this environment.", en)
             : json.error === "empty"
               ? t("Aucune vidéo publique trouvée pour ce compte.", "No public video found for this account.", en)
               : t("La lecture des vidéos a échoué, réessaie.", "Reading the videos failed, try again.", en),
@@ -119,6 +153,37 @@ export function AccountPanel({
     if (res.ok) setData((prev) => (prev ? { ...prev, revenue: json.revenue } : json));
   }
 
+  const videos = useMemo(() => {
+    const all = data?.videos || [];
+    const needle = query.trim().toLowerCase();
+    const filtered = all.filter((v) => {
+      if (kind !== "all" && v.kind !== kind) return false;
+      return !needle || v.title.toLowerCase().includes(needle);
+    });
+    const rank: Record<Sort, (v: (typeof all)[number]) => number> = {
+      views: (v) => v.views,
+      likes: (v) => v.likes,
+      comments: (v) => v.comments,
+      shares: (v) => v.shares,
+      engagement: (v) => engagementOf(v),
+      recent: (v) => v.createdAt,
+    };
+    return [...filtered].sort((a, b) => rank[sort](b) - rank[sort](a));
+  }, [data, kind, sort, query]);
+
+  const filteredTotals = useMemo(() => {
+    const views = videos.reduce((n, v) => n + v.views, 0);
+    const inter = videos.reduce((n, v) => n + v.likes + v.comments + v.shares, 0);
+    return {
+      views,
+      likes: videos.reduce((n, v) => n + v.likes, 0),
+      comments: videos.reduce((n, v) => n + v.comments, 0),
+      shares: videos.reduce((n, v) => n + v.shares, 0),
+      engagement: views ? Math.round((inter / views) * 1000) / 10 : 0,
+      avgViews: videos.length ? Math.round(views / videos.length) : 0,
+    };
+  }, [videos]);
+
   function openCalendar() {
     if (!item) return;
     if (item.kind === "channel") setActiveChannel(item.id.slice(3));
@@ -127,6 +192,7 @@ export function AccountPanel({
 
   if (!item) return null;
   const s = data?.stats;
+  const current = openPost ? (data?.videos || []).find((v) => v.id === openPost) || null : null;
   const rangeLabel = range === "all" ? t("Tout", "All", en) : `${range} ${t("jours", "days", en)}`;
 
   return (
@@ -214,13 +280,17 @@ export function AccountPanel({
             <Stat label="Likes" value={compact(s!.likes)} />
             <Stat label="Posts" value={compact(s!.posts)} />
             <Stat label={`${t("Vues", "Views", en)} · ${rangeLabel}`} value={compact(s!.views)} sub={data.source === "none" ? t("aucune donnée vidéo", "no video data", en) : undefined} />
-            <Stat label={t("Vues moyennes", "Average views", en)} value={compact(s!.avgViews)} />
+            <Stat label={t("Vues moyennes", "Average views", en)} value={compact(s!.avgViews)} sub={`${t("médiane", "median", en)} ${compact(s!.medianViews)}`} />
+            <Stat label={t("Meilleur post", "Best post", en)} value={compact(s!.bestViews)} sub={t("vues", "views", en)} />
             <Stat label={t("Engagement", "Engagement", en)} value={`${s!.engagement}%`} sub={t("likes + comm. + partages / vues", "likes + comments + shares / views", en)} />
+            <Stat label={t("Commentaires", "Comments", en)} value={compact(s!.comments)} sub={`${compact(s!.shares)} ${t("partages", "shares", en)}`} />
+            <Stat label={t("Rythme", "Cadence", en)} value={`${s!.cadence}`} sub={t("posts / semaine", "posts / week", en)} />
             <Stat label={t("Part du réseau", "Share of network", en)} value={`${s!.share}%`} />
             <Stat label={t("Revenus estimés", "Estimated revenue", en)} value={euro(data.revenue.estimated, en)} sub={`${data.revenue.rpm} € / 1k ${t("vues", "views", en)}`} accent />
+            {data.timeline.length > 1 ? <Trend points={data.timeline} en={en} /> : null}
             {data.videos[0] ? (
               <a className="ss-acc__best" href={data.videos[0].url || undefined} target="_blank" rel="noreferrer">
-                {data.videos[0].cover ? <FxImage src={data.videos[0].cover} width={56} height={74} radius={10} preset="pixels-mechanic" /> : <span />}
+                {data.videos[0].cover ? <FxImage src={coverSrc(data.videos[0].cover)} width={56} height={74} radius={10} preset="pixels-mechanic" /> : <span />}
                 <div>
                   <small>{t("Meilleure vidéo", "Best video", en)}</small>
                   <b>{data.videos[0].title || t("Sans titre", "Untitled", en)}</b>
@@ -238,7 +308,7 @@ export function AccountPanel({
                     {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les vidéos", "Analyse the videos", en)}
                   </button>
                 ) : (
-                  <span>{item.kind === "clipper" ? t("Clé Monid requise pour lire les posts publics.", "Monid key required to read public posts.", en) : t("Connecte le compte pour lire ses vidéos.", "Connect the account to read its videos.", en)}</span>
+                  <span>{item.kind === "clipper" ? t("Lecture des posts publics indisponible ici.", "Reading public posts is unavailable here.", en) : t("Connecte le compte pour lire ses vidéos.", "Connect the account to read its videos.", en)}</span>
                 )}
               </div>
             )}
@@ -258,48 +328,135 @@ export function AccountPanel({
 
         {data && tab === "videos" ? (
           <div className="ss-acc__videos">
-            <div className="ss-acc__videos-head">
-              <span className="ss-acc__muted">
-                {data.videos.length
-                  ? t(`Top ${data.videos.length} par vues · ${rangeLabel}`, `Top ${data.videos.length} by views · ${rangeLabel}`, en)
-                  : t("Aucune vidéo sur cette période.", "No video in this range.", en)}
-                {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR")}` : ""}
-              </span>
+            <div className="ss-acc__filters">
+              <input
+                className="ss-input ss-acc__search"
+                type="search"
+                value={query}
+                placeholder={t("Chercher dans les légendes…", "Search the captions…", en)}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label={t("Chercher un post", "Search a post", en)}
+              />
+              <div className="ss-acc__range" role="group" aria-label={t("Type de post", "Post type", en)}>
+                {(["all", "photo", "video"] as const).map((k) => (
+                  <button key={k} type="button" className={kind === k ? "is-on" : ""} onClick={() => setKind(k)}>
+                    {k === "all" ? t("Tout", "All", en) : k === "photo" ? t("Carrousels", "Carousels", en) : t("Vidéos", "Videos", en)}
+                  </button>
+                ))}
+              </div>
+              <label className="ss-acc__sort">
+                <span>{t("Trier par", "Sort by", en)}</span>
+                <select className="ss-input" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                  <option value="views">{t("Vues", "Views", en)}</option>
+                  <option value="likes">Likes</option>
+                  <option value="comments">{t("Commentaires", "Comments", en)}</option>
+                  <option value="shares">{t("Partages", "Shares", en)}</option>
+                  <option value="engagement">{t("Engagement", "Engagement", en)}</option>
+                  <option value="recent">{t("Plus récents", "Most recent", en)}</option>
+                </select>
+              </label>
+              <div className="ss-acc__range" role="group" aria-label={t("Affichage", "Layout", en)}>
+                {(["grid", "list"] as const).map((l) => (
+                  <button key={l} type="button" className={layout === l ? "is-on" : ""} onClick={() => setLayout(l)}>
+                    {l === "grid" ? t("Galerie", "Gallery", en) : t("Liste", "List", en)}
+                  </button>
+                ))}
+              </div>
               {data.canFetch ? (
                 <button type="button" className="ss-fan__chip" disabled={fetching} onClick={fetchVideos}>
                   {fetching ? <Orb size={20} state="searching" /> : null}
-                  {fetching ? t("Analyse…", "Analysing…", en) : data.videos.length ? t("Actualiser", "Refresh", en) : t("Analyser les vidéos", "Analyse the videos", en)}
+                  {fetching ? t("Analyse…", "Analysing…", en) : data.videos.length ? t("Actualiser", "Refresh", en) : t("Analyser les posts", "Analyse the posts", en)}
                 </button>
               ) : null}
             </div>
-            <ol className="ss-acc__list">
-              {data.videos.map((v, i) => (
-                <li key={v.id}>
-                  <span className="ss-acc__rank">{i + 1}</span>
-                  {v.cover ? <FxImage src={v.cover} width={44} height={58} radius={8} preset={i % 2 ? "pixels-mechanic" : "pixels-organic"} className="ss-acc__thumb-fx" /> : <span className="ss-acc__thumb" />}
-                  <div className="ss-acc__vtitle">
-                    <b>{v.title || t("Sans titre", "Untitled", en)}</b>
-                    <span>
-                      {v.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)} · {dateOf(v.createdAt, en)}
+
+            <div className="ss-acc__videos-head">
+              <span className="ss-acc__muted">
+                {videos.length
+                  ? `${videos.length} ${t("posts", "posts", en)} · ${compact(filteredTotals.views)} ${t("vues", "views", en)} · ${compact(filteredTotals.avgViews)} ${t("vues moy.", "avg views", en)} · ${filteredTotals.engagement}% ${t("engagement", "engagement", en)} · ${rangeLabel}`
+                  : data.videos.length
+                    ? t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
+                    : t("Aucun post sur cette période.", "No post in this range.", en)}
+                {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR")}` : ""}
+              </span>
+            </div>
+
+            {!data.videos.length && !data.canFetch ? (
+              <p className="ss-acc__muted">
+                {t("Connecte le compte ou active les métriques publiques pour lire ses posts.", "Connect the account or enable public metrics to read its posts.", en)}
+              </p>
+            ) : null}
+
+            {layout === "grid" ? (
+              <ul className="ss-acc__gallery">
+                {videos.slice(0, shown).map((v) => (
+                  <li key={v.id}>
+                    <button type="button" className="ss-acc__tile lg-press" onClick={() => setOpenPost(v.id)}>
+                      {/* La signature de la vignette expire côté TikTok : le glyphe reste dessous. */}
+                      <span className="ss-acc__tile-blank">{v.kind === "photo" ? "▦" : "▶"}</span>
+                      {v.cover ? (
+                        <img
+                          src={coverSrc(v.cover)}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.hidden = true;
+                          }}
+                        />
+                      ) : null}
+                      <span className="ss-acc__tile-kind">{v.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}</span>
+                      <span className="ss-acc__tile-meta">
+                        <b>{compact(v.views)}</b> {t("vues", "views", en)} · {compact(v.likes)} likes · {engagementOf(v)}%
+                      </span>
+                      <span className="ss-acc__tile-title">{v.title || t("Sans titre", "Untitled", en)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ol className="ss-acc__list">
+                {videos.slice(0, shown).map((v, i) => (
+                  <li key={v.id}>
+                    <span className="ss-acc__rank">{i + 1}</span>
+                    {v.cover ? (
+                      <FxImage src={coverSrc(v.cover)} width={44} height={58} radius={8} preset={i % 2 ? "pixels-mechanic" : "pixels-organic"} className="ss-acc__thumb-fx" />
+                    ) : (
+                      <span className="ss-acc__thumb" />
+                    )}
+                    <button type="button" className="ss-acc__vtitle ss-acc__vopen" onClick={() => setOpenPost(v.id)}>
+                      <b>{v.title || t("Sans titre", "Untitled", en)}</b>
+                      <span>
+                        {v.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}
+                        {v.createdAt ? ` · ${dateOf(v.createdAt, en)}` : ""}
+                      </span>
+                    </button>
+                    <span className="ss-acc__num">
+                      <b>{compact(v.views)}</b> {t("vues", "views", en)}
                     </span>
-                  </div>
-                  <span className="ss-acc__num">
-                    <b>{compact(v.views)}</b> {t("vues", "views", en)}
-                  </span>
-                  <span className="ss-acc__num">
-                    <b>{compact(v.likes)}</b> likes
-                  </span>
-                  <span className="ss-acc__num">
-                    <b>{compact(v.comments)}</b> {t("comm.", "comments", en)}
-                  </span>
-                  {v.url ? (
-                    <a href={v.url} target="_blank" rel="noreferrer" className="ss-fan__chip">
-                      ↗
-                    </a>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+                    <span className="ss-acc__num">
+                      <b>{compact(v.likes)}</b> likes
+                    </span>
+                    <span className="ss-acc__num">
+                      <b>{compact(v.comments)}</b> {t("comm.", "comments", en)}
+                    </span>
+                    <span className="ss-acc__num">
+                      <b>{compact(v.shares)}</b> {t("partages", "shares", en)}
+                    </span>
+                    <span className="ss-acc__num">
+                      <b>{engagementOf(v)}%</b> eng.
+                    </span>
+                    <button type="button" className="ss-fan__chip" onClick={() => setOpenPost(v.id)}>
+                      {t("Voir", "Watch", en)}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {videos.length > shown ? (
+              <button type="button" className="ss-fan__chip ss-acc__more" onClick={() => setShown((n) => n + PAGE)}>
+                {t(`Voir ${Math.min(PAGE, videos.length - shown)} de plus`, `Show ${Math.min(PAGE, videos.length - shown)} more`, en)}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -375,6 +532,140 @@ export function AccountPanel({
           </div>
         ) : null}
       </div>
+
+      {current ? <PostViewer video={current} handle={item.handle} en={en} onClose={() => setOpenPost(null)} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Le post entier, dans le studio : l'embed officiel TikTok joue la vidéo ou
+ * fait défiler le carrousel, et les compteurs de la période sont à côté.
+ */
+function PostViewer({
+  video,
+  handle,
+  en,
+  onClose,
+}: {
+  video: AccountInsights["videos"][number];
+  handle: string;
+  en: boolean;
+  onClose: () => void;
+}) {
+  const id = embedId(video);
+  const link = video.url || (id ? `https://www.tiktok.com/@${handle}/${video.kind === "photo" ? "photo" : "video"}/${id}` : "");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [onClose]);
+
+  // Le panneau crée son propre contexte d'empilement : le lecteur doit sortir
+  // du DOM du panneau pour passer au-dessus du chrome flottant du studio.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="ss-postview" role="dialog" aria-modal="true" aria-label={video.title || t("Post TikTok", "TikTok post", en)}>
+      <button type="button" className="ss-postview__scrim" aria-label={t("Fermer", "Close", en)} onClick={onClose} />
+      <div className="ss-postview__sheet lg">
+        <header className="ss-postview__head">
+          <div>
+            <small>@{handle} · {video.kind === "photo" ? t("Carrousel", "Carousel", en) : t("Vidéo", "Video", en)}</small>
+            <b>{video.title || t("Sans titre", "Untitled", en)}</b>
+          </div>
+          <button type="button" className="ss-fan__chip lg-press" onClick={onClose}>
+            {t("Fermer", "Close", en)}
+          </button>
+        </header>
+
+        <div className="ss-postview__body">
+          <div className="ss-postview__player">
+            {id ? (
+              <iframe
+                key={id}
+                src={`https://www.tiktok.com/embed/v2/${id}`}
+                title={video.title || `TikTok ${id}`}
+                allow="encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : video.cover ? (
+              <img src={coverSrc(video.cover)} alt="" />
+            ) : (
+              <p className="ss-acc__muted">{t("Ce post n'a pas d'identifiant TikTok lisible.", "This post has no readable TikTok id.", en)}</p>
+            )}
+          </div>
+
+          <div className="ss-postview__side">
+            <dl className="ss-postview__stats">
+              <div>
+                <dt>{t("Vues", "Views", en)}</dt>
+                <dd>{video.views.toLocaleString(en ? "en-US" : "fr-FR")}</dd>
+              </div>
+              <div>
+                <dt>Likes</dt>
+                <dd>{video.likes.toLocaleString(en ? "en-US" : "fr-FR")}</dd>
+              </div>
+              <div>
+                <dt>{t("Commentaires", "Comments", en)}</dt>
+                <dd>{video.comments.toLocaleString(en ? "en-US" : "fr-FR")}</dd>
+              </div>
+              <div>
+                <dt>{t("Partages", "Shares", en)}</dt>
+                <dd>{video.shares.toLocaleString(en ? "en-US" : "fr-FR")}</dd>
+              </div>
+              <div>
+                <dt>{t("Engagement", "Engagement", en)}</dt>
+                <dd>{engagementOf(video)}%</dd>
+              </div>
+              <div>
+                <dt>{t("Publié le", "Published", en)}</dt>
+                <dd>{video.createdAt ? new Date(video.createdAt * 1000).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "—"}</dd>
+              </div>
+            </dl>
+            {video.title ? <p className="ss-postview__caption">{video.title}</p> : null}
+            {link ? (
+              <a href={link} target="_blank" rel="noreferrer" className="ss-fan__chip is-on lg-press">
+                {t("Ouvrir sur TikTok ↗", "Open on TikTok ↗", en)}
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Vues publiées par bucket sur la période — barres, pas de librairie. */
+function Trend({ points, en }: { points: AccountInsights["timeline"]; en: boolean }) {
+  const max = Math.max(...points.map((p) => p.views), 1);
+  const total = points.reduce((n, p) => n + p.posts, 0);
+  return (
+    <div className="ss-acc__trend">
+      <small>{t("Vues des posts publiés", "Views of published posts", en)}</small>
+      <div className="ss-acc__bars" role="img" aria-label={t(`${total} posts sur la période`, `${total} posts over the range`, en)}>
+        {points.map((p) => (
+          <span
+            key={p.start}
+            style={{ height: `${Math.max(2, Math.round((p.views / max) * 100))}%` }}
+            title={`${new Date(p.start * 1000).toLocaleDateString(en ? "en-US" : "fr-FR")} · ${compact(p.views)} ${t("vues", "views", en)} · ${p.posts} ${t("posts", "posts", en)}`}
+            className={p.posts ? "is-on" : ""}
+          />
+        ))}
+      </div>
+      <span>
+        {points[0]?.label} → {points[points.length - 1]?.label}
+      </span>
     </div>
   );
 }

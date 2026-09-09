@@ -522,7 +522,7 @@ function OnboardingInner() {
                         <Stat label={t("posts", "posts")} value={business.tiktok.videos} active={revealed} />
                         {business.tiktok.avgViews ? <Stat label={t("vues / post", "views / post")} value={business.tiktok.avgViews} active={revealed} /> : null}
                       </div>
-                      {business.tiktok.source === "monid" ? (
+                      {business.tiktok.source === "api" ? (
                         <p className="ss-onb-tt__note">
                           {business.tiktok.photoShare >= 50
                             ? t(`${business.tiktok.photoShare} % de tes derniers posts sont déjà des carrousels. On va les faire décoller.`, `${business.tiktok.photoShare}% of your recent posts are already carousels. We will make them fly.`)

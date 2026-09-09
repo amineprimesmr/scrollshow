@@ -12,7 +12,7 @@ const checks = [
   ['TikTok OAuth', Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET)],
   ['Keyword discovery provider', Boolean(process.env.BRAVE_SEARCH_API_KEY)],
   ['Persistent research library license confirmed', process.env.BRAVE_SEARCH_LIBRARY_LICENSE_CONFIRMED === '1'],
-  ['Detailed account metrics', Boolean(process.env.MONID_API_KEY)],
+  ['Detailed account metrics', Boolean(process.env.METRICS_API_KEY)],
   ['Recovery email delivery', Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)],
   ['Encrypted backups', Boolean(process.env.BACKUP_ENCRYPTION_KEY && Buffer.from(process.env.BACKUP_ENCRYPTION_KEY, 'base64').length === 32)],
   ['Sales explicitly enabled after acceptance testing', process.env.SALES_ENABLED === '1'],

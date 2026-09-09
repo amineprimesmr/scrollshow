@@ -43,7 +43,7 @@ export async function agentWhoami(user: SessionUser) {
   const data = await readStore();
   const business = data.users.find((item) => item.id === user.id)?.business || null;
   return {
-    capabilities: { research: true, discovery: Boolean(process.env.BRAVE_SEARCH_API_KEY), detailedMetrics: Boolean(process.env.MONID_API_KEY), export: true, publishing: "tiktok", htmlExport: false },
+    capabilities: { research: true, discovery: Boolean(process.env.BRAVE_SEARCH_API_KEY), detailedMetrics: Boolean(process.env.METRICS_API_KEY), export: true, publishing: "tiktok", htmlExport: false },
     limits: { analysesPerDay: 30, discoveriesPerDay: 10, exportsPerDay: 20 },
     user: { id: user.id, email: user.email, name: user.name, plan: user.plan },
     business: business

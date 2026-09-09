@@ -14,7 +14,7 @@ const wordmarkFont = localFont({
 });
 
 type Panel = "more" | "product" | "platforms" | "resources";
-export function LandingNavigation({ english }: { english: boolean }) {
+export function LandingNavigation({ english, signedIn = false }: { english: boolean; signedIn?: boolean }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const pathname = usePathname();
 
@@ -92,7 +92,7 @@ export function LandingNavigation({ english }: { english: boolean }) {
           <nav className="sn-primary" aria-label={t("Navigation principale", "Main navigation")}>{groups.map(g => <button key={g.id} id={`sn-trigger-${g.id}`} className="sn-trigger" aria-controls={`sn-panel-${g.id}`} aria-expanded={panel === g.id} onClick={e => open(panel === g.id ? null : g.id, e.currentTarget)}><span>{g.label}</span></button>)}<Link className="sn-trigger" href="/#offre" onClick={goToPricing}><span>{t("Tarifs", "Pricing")}</span></Link></nav>
         </div>
         <Link className="sn-wordmark" href="/" aria-label="ScrollShow"><img src="/logo.png" alt="" width="28" height="28" /><span aria-hidden>SCROLLSHOW</span></Link>
-        <div className="sn-right"><Link className="sn-login" href="/signup?mode=signin">{t("Connexion", "Log in")}</Link><Link className="sn-support" href="/support" aria-label={t("Assistance", "Support")}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden><path d="M5 14v-3a7 7 0 0 1 14 0v3M5 12H3v6h4v-6H5Zm14 0h2v6h-4v-6h2Zm0 6c0 3-3 3-6 3" /></svg></Link><Link className="sn-download" href="/signup">{t("Commencer", "Get started")}</Link></div></div>
+        <div className="sn-right">{signedIn ? null : <Link className="sn-login" href="/signup?mode=signin">{t("Connexion", "Log in")}</Link>}<Link className="sn-support" href="/support" aria-label={t("Assistance", "Support")}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden><path d="M5 14v-3a7 7 0 0 1 14 0v3M5 12H3v6h4v-6H5Zm14 0h2v6h-4v-6h2Zm0 6c0 3-3 3-6 3" /></svg></Link><Link className="sn-download" href={signedIn ? "/app" : "/signup"}>{signedIn ? t("Mon espace", "My workspace") : t("Commencer", "Get started")}</Link></div></div>
       </div>
       <div className="sn-surface lg" id="sn-surface" inert={!panel}><div className="sn-clip">
         <div className="sn-more" hidden={panel !== "more"}>
@@ -100,7 +100,7 @@ export function LandingNavigation({ english }: { english: boolean }) {
           <div className="sn-more-group"><h2>{t("DÉCOUVRIR", "DISCOVER")}</h2><a href="#comment">{t("Comment ça marche", "How it works")}</a><a href="#reseaux">{t("Plateformes", "Platforms")}</a><a href="#faq">FAQ</a></div>
           <div className="sn-more-group"><h2>SCROLLSHOW</h2><Link href="/support">{t("Assistance", "Support")}</Link><Link href="/privacy">{t("Confidentialité", "Privacy")}</Link><Link href="/terms">{t("Conditions d’utilisation", "Terms of use")}</Link></div>
         </div>
-        {groups.map(g => <section className="sn-panel" id={`sn-panel-${g.id}`} key={g.id} hidden={panel !== g.id} aria-labelledby={`sn-trigger-${g.id}`}><button className="sn-back" onClick={() => { open("more"); requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(".sn-more-primary button")?.focus()); }}>‹ {t("Tous les menus", "All menus")}</button><div className="sn-intro"><span>{g.title}</span><p>{g.description}</p></div>{g.cards.map(c => <article className="sn-card" key={c.title}><div className={`sn-card-art ${c.image.includes("tiktoks") ? "" : "sn-card-art-icon"}`}><img src={c.image} alt="" width="160" height="240" /></div><div className="sn-card-copy"><h2>{c.title}</h2><p>{c.description}</p><div><Link className="sn-card-cta" href={c.href}>{t("Découvrir", "Discover")}</Link><Link className="sn-card-explore" href="/signup">{t("Commencer", "Get started")}</Link></div></div></article>)}</section>)}
+        {groups.map(g => <section className="sn-panel" id={`sn-panel-${g.id}`} key={g.id} hidden={panel !== g.id} aria-labelledby={`sn-trigger-${g.id}`}><button className="sn-back" onClick={() => { open("more"); requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(".sn-more-primary button")?.focus()); }}>‹ {t("Tous les menus", "All menus")}</button><div className="sn-intro"><span>{g.title}</span><p>{g.description}</p></div>{g.cards.map(c => <article className="sn-card" key={c.title}><div className={`sn-card-art ${c.image.includes("tiktoks") ? "" : "sn-card-art-icon"}`}><img src={c.image} alt="" width="160" height="240" /></div><div className="sn-card-copy"><h2>{c.title}</h2><p>{c.description}</p><div><Link className="sn-card-cta" href={c.href}>{t("Découvrir", "Discover")}</Link><Link className="sn-card-explore" href={signedIn ? "/app" : "/signup"}>{signedIn ? t("Mon espace", "My workspace") : t("Commencer", "Get started")}</Link></div></div></article>)}</section>)}
       </div></div></header>
   </>;
 }

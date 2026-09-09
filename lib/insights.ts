@@ -1,5 +1,5 @@
 import { agentAnalytics } from "./agent";
-import { monidEnabled } from "./monid";
+import { metricsEnabled } from "./metrics";
 import { readStore } from "./store";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
 
@@ -7,6 +7,7 @@ export const DEFAULT_RPM = 0.6; // € per 1000 views — TikTok rewards / UGC d
 
 export type InsightFormat = { id: string; label: string; count: number; views: number; avgViews: number; bestViews: number };
 export type InsightHook = { hook: string; count: number; avgViews: number };
+export type InsightPoint = { label: string; start: number; views: number; posts: number; engagement: number };
 
 export type AccountInsights = {
   key: string;
@@ -22,16 +23,27 @@ export type AccountInsights = {
     posts: number;
     views: number;
     avgViews: number;
+    medianViews: number;
+    bestViews: number;
+    /** Interactions on the videos of the range, not the lifetime profile counters. */
+    videoLikes: number;
+    comments: number;
+    shares: number;
     engagement: number; // (likes+comments+shares)/views, %
     share: number; // % of the network followers
+    /** Posts published per week over the range. */
+    cadence: number;
     growth: { followers: number; likes: number; videoCount: number } | null;
   };
+  /** Every post of the range, richest first. The UI does its own filtering. */
   videos: AccountVideo[];
+  /** Posts published in the range, oldest bucket first. */
+  timeline: InsightPoint[];
   formats: InsightFormat[];
   hooks: InsightHook[];
   studio: { posts: number; published: number; scheduled: number; views: number; best: AccountVideo | null };
   revenue: { rpm: number; declared: number; estimated: number; views: number };
-  source: "tiktok" | "monid" | "none";
+  source: "tiktok" | "api" | "none";
   canFetch: boolean;
   fetchedAt: string | null;
   rangeDays: number | null;
@@ -54,6 +66,58 @@ function hookOf(title: string) {
     .slice(0, 4)
     .join(" ");
   return clean.length >= 6 ? clean : "";
+}
+
+function statsOf(videos: AccountVideo[]) {
+  const views = videos.reduce((n, v) => n + v.views, 0);
+  const videoLikes = videos.reduce((n, v) => n + v.likes, 0);
+  const comments = videos.reduce((n, v) => n + v.comments, 0);
+  const shares = videos.reduce((n, v) => n + v.shares, 0);
+  const sorted = [...videos].map((v) => v.views).sort((a, b) => a - b);
+  const medianViews = sorted.length
+    ? Math.round(sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
+    : 0;
+  return {
+    views,
+    videoLikes,
+    comments,
+    shares,
+    medianViews,
+    bestViews: sorted.length ? sorted[sorted.length - 1] : 0,
+    avgViews: videos.length ? Math.round(views / videos.length) : 0,
+    engagement: views ? Math.round(((videoLikes + comments + shares) / views) * 1000) / 10 : 0,
+  };
+}
+
+/** Buckets the posts by day (short ranges) or week, so the panel can draw a trend. */
+function buildTimeline(videos: AccountVideo[], days: number | null): InsightPoint[] {
+  const dated = videos.filter((v) => v.createdAt > 0);
+  if (!dated.length) return [];
+  const oldest = Math.min(...dated.map((v) => v.createdAt));
+  const span = days ? days : Math.max(1, Math.ceil((Date.now() / 1000 - oldest) / 86400));
+  const bucketDays = span <= 31 ? 1 : span <= 120 ? 7 : 30;
+  const size = bucketDays * 86400;
+  const end = Math.floor(Date.now() / 1000);
+  const start = days ? end - days * 86400 : oldest;
+  const buckets = new Map<number, InsightPoint>();
+  const count = Math.min(120, Math.max(1, Math.ceil((end - start) / size)));
+  for (let i = 0; i < count; i += 1) {
+    const at = end - (count - i) * size;
+    buckets.set(i, { label: new Date(at * 1000).toISOString().slice(0, 10), start: at, views: 0, posts: 0, engagement: 0 });
+  }
+  const inter = new Map<number, number>();
+  for (const v of dated) {
+    const index = Math.min(count - 1, Math.max(0, Math.floor((v.createdAt - (end - count * size)) / size)));
+    const bucket = buckets.get(index);
+    if (!bucket) continue;
+    bucket.views += v.views;
+    bucket.posts += 1;
+    inter.set(index, (inter.get(index) || 0) + v.likes + v.comments + v.shares);
+  }
+  return [...buckets.entries()].map(([index, b]) => ({
+    ...b,
+    engagement: b.views ? Math.round(((inter.get(index) || 0) / b.views) * 1000) / 10 : 0,
+  }));
 }
 
 function buildFormats(videos: AccountVideo[]): InsightFormat[] {
@@ -128,6 +192,23 @@ function tiktokVideoToAccountVideo(v: any, handle: string): AccountVideo {
   };
 }
 
+/** Posts per week over the range — null range falls back to the observed span. */
+function cadenceOf(videos: AccountVideo[], days: number | null) {
+  if (!videos.length) return 0;
+  const dated = videos.filter((v) => v.createdAt > 0).map((v) => v.createdAt);
+  const span = days
+    ? days
+    : dated.length > 1
+      ? Math.max(1, (Math.max(...dated) - Math.min(...dated)) / 86400)
+      : 7;
+  return Math.round((videos.length / span) * 7 * 10) / 10;
+}
+
+/** The panel filters and re-sorts client side; ship the whole range, richest first. */
+function sortVideos(videos: AccountVideo[]) {
+  return [...videos].sort((a, b) => b.views - a.views || b.createdAt - a.createdAt).slice(0, 300);
+}
+
 function revenueOf(views: number, rpm: number | undefined, declared: number | undefined) {
   const r = typeof rpm === "number" && rpm >= 0 ? rpm : DEFAULT_RPM;
   return { rpm: r, declared: declared || 0, estimated: Math.round((views / 1000) * r * 100) / 100, views };
@@ -157,8 +238,7 @@ function clipperInsights(account: Account, networkFollowers: number, days: numbe
   const all = account.videos || [];
   const cutoff = days ? Date.now() / 1000 - days * 86400 : 0;
   const videos = all.filter((v) => !cutoff || v.createdAt >= cutoff);
-  const views = videos.reduce((n, v) => n + v.views, 0);
-  const inter = videos.reduce((n, v) => n + v.likes + v.comments + v.shares, 0);
+  const agg = statsOf(videos);
   return {
     key: `ac:${account.id}`,
     kind: "clipper",
@@ -171,19 +251,20 @@ function clipperInsights(account: Account, networkFollowers: number, days: numbe
       followers: account.followers || 0,
       likes: account.likes || 0,
       posts: account.posts || all.length,
-      views,
-      avgViews: videos.length ? Math.round(views / videos.length) : account.avgViews || 0,
-      engagement: views ? Math.round((inter / views) * 1000) / 10 : 0,
+      ...agg,
+      avgViews: videos.length ? agg.avgViews : account.avgViews || 0,
       share: networkFollowers ? Math.round(((account.followers || 0) / networkFollowers) * 100) : 0,
+      cadence: cadenceOf(videos, days),
       growth: null,
     },
-    videos: [...videos].sort((a, b) => b.views - a.views).slice(0, 12),
+    videos: sortVideos(videos),
+    timeline: buildTimeline(videos, days),
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: { posts: 0, published: 0, scheduled: 0, views: 0, best: null },
-    revenue: revenueOf(views, account.rpm, account.declaredRevenue),
-    source: all.length ? "monid" : "none",
-    canFetch: monidEnabled(),
+    revenue: revenueOf(agg.views, account.rpm, account.declaredRevenue),
+    source: all.length ? "api" : "none",
+    canFetch: metricsEnabled(),
     fetchedAt: account.videosFetchedAt || null,
     rangeDays: days,
   };
@@ -197,12 +278,41 @@ async function channelInsights(
   days: number | null,
 ): Promise<AccountInsights> {
   const mine = posts.filter((p) => p.channelIds?.includes(channel.id) && p.inCalendar !== false);
-  let videos: AccountVideo[] = [];
   let growth: AccountInsights["stats"]["growth"] = null;
   let followers = channel.followers || 0;
   let likes = channel.likes || 0;
   let postCount = channel.videoCount || 0;
   let source: AccountInsights["source"] = "none";
+
+  // Three sources, merged by video id: the TikTok API (authoritative when the
+  // channel is connected), the public metrics provider (fills the gap when the
+  // token misses the video.list scope or the account posted outside ScrollShow),
+  // and our own calendar as a last resort.
+  const merged = new Map<string, AccountVideo>();
+  const add = (video: AccountVideo, authoritative: boolean) => {
+    const prev = merged.get(video.id);
+    if (!prev) {
+      merged.set(video.id, video);
+      return;
+    }
+    // Descriptive fields come from the more trustworthy record; counters are
+    // whichever source saw the most (a stale read never lowers a fresh one).
+    const base = authoritative ? { ...prev, ...video } : { ...video, ...prev };
+    merged.set(video.id, {
+      ...base,
+      title: base.title || prev.title || video.title,
+      cover: base.cover || prev.cover || video.cover,
+      url: base.url || prev.url || video.url,
+      createdAt: base.createdAt || prev.createdAt || video.createdAt,
+      views: Math.max(prev.views, video.views),
+      likes: Math.max(prev.likes, video.likes),
+      comments: Math.max(prev.comments, video.comments),
+      shares: Math.max(prev.shares, video.shares),
+    });
+  };
+
+  for (const video of channel.videos || []) add(video, false);
+  if ((channel.videos || []).length) source = "api";
 
   if (channel.platform === "tiktok" && channel.accessToken) {
     try {
@@ -214,18 +324,17 @@ async function channelInsights(
         postCount = stat.videoCount;
         growth = stat.growth || null;
       }
-      videos = (analytics.videos || [])
-        .filter((v: any) => !v.channelHandle || v.channelHandle === channel.handle)
-        .map((v: any) => tiktokVideoToAccountVideo(v, channel.handle));
-      source = "tiktok";
+      const apiVideos = (analytics.videos || []).filter((v: any) => !v.channelHandle || v.channelHandle === channel.handle);
+      for (const v of apiVideos) add(tiktokVideoToAccountVideo(v, channel.handle), true);
+      if (apiVideos.length) source = "tiktok";
     } catch {
       /* fall back to what the store knows */
     }
   }
-  if (!videos.length && mine.length) {
-    videos = mine
-      .filter((p) => p.status === "published" || p.views > 0)
-      .map((p) => ({
+  for (const p of mine) {
+    if (p.status !== "published" && !p.views) continue;
+    add(
+      {
         id: p.tiktokId || p.id,
         title: p.body.slice(0, 140),
         cover: p.image,
@@ -236,10 +345,18 @@ async function channelInsights(
         kind: p.kind || "photo",
         createdAt: Math.floor(Date.parse(`${p.date}T${p.time || "12:00"}:00`) / 1000) || 0,
         url: p.tiktokUrl || "",
-      }));
+      },
+      false,
+    );
   }
-  const views = videos.reduce((n, v) => n + v.views, 0);
-  const inter = videos.reduce((n, v) => n + v.likes + v.comments + v.shares, 0);
+
+  const cutoff = days ? Date.now() / 1000 - days * 86400 : 0;
+  const all = [...merged.values()];
+  // A post with no known date can only be counted when the range is "all".
+  const videos = all.filter((v) => !cutoff || (v.createdAt && v.createdAt >= cutoff));
+  const agg = statsOf(videos);
+  if (source === "none" && all.length) source = "api";
+
   return {
     key: `ch:${channel.id}`,
     kind: "channel",
@@ -251,21 +368,21 @@ async function channelInsights(
     stats: {
       followers,
       likes,
-      posts: postCount,
-      views,
-      avgViews: videos.length ? Math.round(views / videos.length) : 0,
-      engagement: views ? Math.round((inter / views) * 1000) / 10 : 0,
+      posts: postCount || all.length,
+      ...agg,
       share: networkFollowers ? Math.round((followers / networkFollowers) * 100) : 0,
+      cadence: cadenceOf(videos, days),
       growth,
     },
-    videos: [...videos].sort((a, b) => b.views - a.views).slice(0, 12),
+    videos: sortVideos(videos),
+    timeline: buildTimeline(videos, days),
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: studioSummary(mine),
-    revenue: revenueOf(views, channel.rpm, channel.declaredRevenue),
+    revenue: revenueOf(agg.views, channel.rpm, channel.declaredRevenue),
     source,
-    canFetch: false,
-    fetchedAt: null,
+    canFetch: metricsEnabled() && channel.platform === "tiktok" && Boolean(channel.handle),
+    fetchedAt: channel.videosFetchedAt || null,
     rangeDays: days,
   };
 }

@@ -451,8 +451,10 @@ export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, vi
           ))}
         </div>
         <div className="ss-fan__actions">
-          <button type="button" className="ss-fan__chip" onClick={() => setAddOpen(true)}>
-            + {t("Connecter", "Connect", en)}
+          <button type="button" className="ss-fan__chip ss-fan__connect" onClick={() => setAddOpen(true)}>
+            <span aria-hidden>+</span>
+            <img src="/assets/platforms/tiktok.png" alt="" width={16} height={16} />
+            {t("Connecter un compte", "Connect an account", en)}
           </button>
         </div>
       </div>

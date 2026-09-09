@@ -96,7 +96,7 @@ Les fichiers `.data/operations/*` contiennent des secrets locaux de préproducti
 - Transactions PostgreSQL sur un document JSONB de compatibilité ; verrou inter-processus + remplacement atomique du fichier local ; aucun échec de sauvegarde caché.
 - Droits de session relus sur le serveur, révocation par version de session, récupération de compte par email.
 - Un compte TikTok destinataire par post, publication verrouillée et résultat ambigu nécessitant vérification.
-- Recherche de comptes réels, bibliothèque comparative, médiane et échantillon explicites ; découverte indexée via Brave et métriques publiques via Monid.
+- Recherche de comptes réels, bibliothèque comparative, médiane et échantillon explicites ; découverte indexée via Brave et métriques publiques via le prestataire de métriques.
 - Huit nouveaux outils MCP et skill SaaS identique dans public, Cursor et Claude ; export ZIP de recettes et slides.
 - URL de médias privés vérifiées ; liens temporaires pour TikTok ; retour à privé révoquant les liens de partage.
 - Requêtes média distantes bornées avec résolution DNS épinglée ; imports bornés ; dépendances actualisées ; polices de l'application embarquées.
@@ -120,7 +120,7 @@ Les fichiers `.data/operations/*` contiennent des secrets locaux de préproducti
 3. Configurer le stockage privé Blob, AUTH_SECRET (32 caractères aléatoires minimum), URL du site et CRON_SECRET. Pour travailler sur des données de production, utiliser un environnement staging séparé ; ne pas pointer le dev courant vers ces secrets.
 4. Configurer Stripe. `npm run billing:provision` affiche les tarifs manquants ; `npm run billing:provision -- --apply` crée les deux produits/tarifs avec la clé explicitement fournie. Le script ne crée pas de souscription. Renseigner STRIPE_PRICE_PRO_MONTHLY et STRIPE_PRICE_LIFETIME. Utiliser une clé test pour la recette. Le checkout vérifie montant, devise et intervalle.
 5. Configurer webhook Stripe et son secret : checkout.session.completed, checkout.session.async_payment_succeeded, customer.subscription.updated, customer.subscription.deleted, charge.refunded. Tester achat mensuel, essai, impayé, annulation, achat à vie, remboursement, événements dupliqués et désordonnés. Les anciens abonnements avec d'autres price IDs doivent faire l'objet d'une migration explicite avant activation de leurs webhooks dans cette version.
-6. Configurer Brave Search (BRAVE_SEARCH_API_KEY), Monid (MONID_API_KEY), puis Resend (RESEND_API_KEY et EMAIL_FROM avec domaine vérifié). La découverte reste désactivée sans moteur connecté ; les profils peuvent être analysés sans métriques détaillées. La récupération de compte ne peut envoyer de message sans fournisseur email.
+6. Configurer Brave Search (BRAVE_SEARCH_API_KEY), les métriques publiques (METRICS_API_KEY, METRICS_API_BASE), puis Resend (RESEND_API_KEY et EMAIL_FROM avec domaine vérifié). La découverte reste désactivée sans moteur connecté ; les profils peuvent être analysés sans métriques détaillées. La récupération de compte ne peut envoyer de message sans fournisseur email.
 7. Vérifier l'approbation de l'application TikTok et du domaine des médias. Recette avec deux comptes pour confirmer le destinataire et le statut final. Tester expiration des tokens, refus créateur et erreur réseau après initialisation. Aucune publication réelle n'a été déclenchée pendant le développement.
 8. Exécuter `npm run readiness`, `npm test`, `npm run typecheck`, `npm audit --omit=dev`, `npm run build`. Relancer le serveur après changement d'environnement.
 

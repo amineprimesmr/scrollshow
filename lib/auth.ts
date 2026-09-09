@@ -52,6 +52,20 @@ export async function readSession(): Promise<SessionUser | null> {
   }
 }
 
+/** Le visiteur a-t-il un cookie de session valide ?
+ *  Vérifie seulement la signature et l'expiration : assez pour adapter un CTA
+ *  public, sans le coût d'une lecture du store à chaque affichage de la page. */
+export async function hasSession() {
+  const token = (await cookies()).get(COOKIE)?.value;
+  if (!token || !process.env.AUTH_SECRET) return false;
+  try {
+    const { payload } = await jwtVerify(token, secret());
+    return Boolean(payload.sub);
+  } catch {
+    return false;
+  }
+}
+
 export async function setSessionCookie(user: SessionUser) {
   const token = await signSession(user);
   (await cookies()).set(COOKIE, token, {

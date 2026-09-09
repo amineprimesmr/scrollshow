@@ -1,4 +1,4 @@
-import { fetchAccountVideos, monidEnabled } from "./monid";
+import { fetchAccountVideos, metricsEnabled } from "./metrics";
 import { fetchTikTokProfile, normalizeHandle } from "./tiktok-profile";
 import type { BusinessKind, BusinessProfile, BusinessSocial } from "./types";
 import { safeFetchBytes } from "./safe-fetch";
@@ -266,7 +266,7 @@ export async function analyzeBusiness(rawUrl: string): Promise<BusinessProfile> 
   };
 }
 
-/** Public TikTok stats for the brand: profile page first, Monid for recent posts when the key is set. */
+/** Public TikTok stats for the brand: profile page first, metrics provider for recent posts when configured. */
 export async function enrichTikTok(rawHandle: string): Promise<BusinessProfile["tiktok"]> {
   const handle = normalizeHandle(rawHandle);
   if (!handle) return null;
@@ -278,17 +278,17 @@ export async function enrichTikTok(rawHandle: string): Promise<BusinessProfile["
   }
   let avgViews = 0;
   let photoShare = 0;
-  let source: "tiktok" | "monid" = "tiktok";
-  if (monidEnabled()) {
+  let source: "tiktok" | "api" = "tiktok";
+  if (metricsEnabled()) {
     try {
       const videos = await fetchAccountVideos(handle, 1);
       if (videos.length) {
         avgViews = Math.round(videos.reduce((sum, item) => sum + item.views, 0) / videos.length);
         photoShare = Math.round((videos.filter((item) => item.kind === "photo").length / videos.length) * 100);
-        source = "monid";
+        source = "api";
       }
     } catch {
-      /* Monid is an enrichment, never a blocker. */
+      /* The metrics provider is an enrichment, never a blocker. */
     }
   }
   return {

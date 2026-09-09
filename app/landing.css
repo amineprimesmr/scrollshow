@@ -1615,3 +1615,97 @@ html:has(.af-demo-dialog[open]) { overflow: hidden; }
   .af-demo__frame, .af-demo__play, .af-demo__scrim { transition: none; }
   .af-demo__poster:hover .af-demo__play { transform: none; }
 }
+
+/* ── Méthodes : deux impasses, une qui tient ─────────────────────────────── */
+
+.af-ld-step-card .af-ld-step-visual {
+  position: relative;
+}
+
+/* Verdict posé en bas de la vignette : le résultat avant même de lire. */
+.af-ld-step-verdict {
+  position: absolute;
+  left: 50%;
+  bottom: 0.7rem;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(10 10 12 / 0.72);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.af-ld-step-verdict::before {
+  content: "✕";
+  display: grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.af-ld-step-verdict.is-ko {
+  color: #a1a1aa;
+}
+
+.af-ld-step-verdict.is-ko::before {
+  background: rgb(255 255 255 / 0.08);
+  color: #d4d4d8;
+}
+
+.af-ld-step-verdict.is-ok {
+  color: #f4f4f5;
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+.af-ld-step-verdict.is-ok::before {
+  content: "✓";
+  background: #22c55e;
+  color: #04160a;
+}
+
+/* Les deux impasses reculent, la bonne méthode avance. */
+.af-ld-step-card.is-fail .af-ld-step-visual > *:not(.af-ld-step-verdict) {
+  opacity: 0.52;
+  filter: saturate(0.35);
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+
+.af-ld-step-card.is-fail:hover .af-ld-step-visual > *:not(.af-ld-step-verdict) {
+  opacity: 0.72;
+  filter: saturate(0.6);
+}
+
+.af-ld-step-card.is-fail h3 {
+  color: #a1a1aa;
+}
+
+.af-ld-step-card.is-win {
+  border-color: rgb(var(--ss-glass-rgb) / 0.18);
+  background: linear-gradient(180deg, #1a1a1e 0%, #141416 100%);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.04),
+    0 24px 54px rgb(0 0 0 / 0.42);
+}
+
+.af-ld-step-card.is-win .af-ld-step-visual {
+  background: linear-gradient(180deg, #232329 0%, #141417 100%);
+}
+
+/* Le bloc plateformes vit maintenant dans l'en-tête des offres. */
+.af-ld-pricing__networks {
+  margin-top: clamp(0.9rem, 2.4vh, 1.35rem);
+  padding: 0;
+  content-visibility: visible;
+}

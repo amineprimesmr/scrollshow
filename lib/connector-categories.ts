@@ -1,5 +1,5 @@
-/** Recherches autorisées sans compte : la clé Monid est partagée, on borne son usage. */
-export const MONID_CATEGORIES = [
+/** Recherches autorisées sans compte : la clé est partagée, on borne son usage. */
+export const CONNECTOR_CATEGORIES = [
   { key: "tiktok", label: "TikTok" },
   { key: "instagram", label: "Instagram" },
   { key: "youtube", label: "YouTube" },
@@ -10,8 +10,8 @@ export const MONID_CATEGORIES = [
   { key: "e-commerce", label: "E-commerce" },
 ] as const;
 
-export const MONID_CATEGORY_KEYS: readonly string[] = MONID_CATEGORIES.map(c => c.key);
+export const CONNECTOR_CATEGORY_KEYS: readonly string[] = CONNECTOR_CATEGORIES.map(c => c.key);
 
-export function isPublicMonidQuery(query: string) {
-  return MONID_CATEGORY_KEYS.includes(query.trim().toLowerCase());
+export function isPublicConnectorQuery(query: string) {
+  return CONNECTOR_CATEGORY_KEYS.includes(query.trim().toLowerCase());
 }

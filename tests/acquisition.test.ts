@@ -20,7 +20,10 @@ test("session expiry preserves Stripe reconciliation without opening redirects",
 test("landing acquisition links lead to signup; checkout requires completed onboarding", async () => {
   const landing = await readFile("components/Landing.tsx", "utf8");
   assert.doesNotMatch(landing, /href="\/pricing" className="af-ld-(?:hero|dark|offer__|closing__)cta/);
-  assert.match(landing, /href="\/signup" className="af-ld-hero-cta"/);
+  // Le CTA passe par une variable depuis que le hero est enveloppé dans <Metal> :
+  // ce qui compte est qu'un visiteur déconnecté atterrisse sur /signup.
+  assert.match(landing, /const ctaHref = signedIn \? "\/app" : "\/signup"/);
+  assert.match(landing, /href=\{ctaHref\} className="af-ld-hero-cta"/);
   const checkout = await readFile("app/api/stripe/checkout/route.ts", "utf8");
   assert.match(checkout, /!user\.onboarded/);
   assert.match(checkout, /cancel_url:.*onboarding\?step=payment/);

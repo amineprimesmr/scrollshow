@@ -11,11 +11,26 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(pathname.startsWith("/api/") ? JSON.stringify({error:"maintenance"}) : "ScrollShow est en cours de mise à jour. Merci de réessayer dans quelques minutes.", {status:503,headers:{"Retry-After":"300","Cache-Control":"no-store","Content-Type":pathname.startsWith("/api/")?"application/json":"text/plain; charset=utf-8"}});
   }
   if (pathname === "/api/tiktok/oauth/start") return NextResponse.next();
+  const token = request.cookies.get("ss_session")?.value;
+  const secret = process.env.AUTH_SECRET;
+
+  // Déjà connecté : /signup n'a rien à montrer. On envoie directement dans
+  // l'espace, sans repasser par l'écran Google. `?force=1` laisse la porte
+  // ouverte pour se connecter avec un autre compte.
+  if (pathname === "/signup" && token && secret && !request.nextUrl.searchParams.has("force")) {
+    try {
+      await jwtVerify(token, new TextEncoder().encode(secret));
+      const next = request.nextUrl.searchParams.get("next");
+      const dest = next && next.startsWith("/") && !next.startsWith("//") ? next : "/app";
+      return NextResponse.redirect(new URL(dest, request.url));
+    } catch {
+      // Jeton invalide : on laisse la page d'inscription s'afficher.
+    }
+  }
+
   const needsAuth = PROTECTED.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   if (!needsAuth) return NextResponse.next();
 
-  const token = request.cookies.get("ss_session")?.value;
-  const secret = process.env.AUTH_SECRET;
   if (!token || !secret) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });

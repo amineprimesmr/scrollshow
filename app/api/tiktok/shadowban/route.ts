@@ -12,7 +12,7 @@ function errorCode(error: unknown) {
 /**
  * GET  /api/tiktok/shadowban              → every connected + library TikTok account, analyzed
  * GET  /api/tiktok/shadowban?key=ch:<id>  → one connected account
- * GET  /api/tiktok/shadowban?key=ac:<id>  → one library account (posts via Monid)
+ * GET  /api/tiktok/shadowban?key=ac:<id>  → one library account (public posts)
  * POST /api/tiktok/shadowban {handle}     → one-off public check, nothing stored
  */
 export async function GET(request: Request) {

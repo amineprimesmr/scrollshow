@@ -1,6 +1,6 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { accountInsights, parseKey } from "@/lib/insights";
-import { fetchAccountVideos, MonidError } from "@/lib/monid";
+import { fetchAccountVideos, MetricsError } from "@/lib/metrics";
 import { updateStore } from "@/lib/store";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -32,22 +32,31 @@ export async function POST(request: Request) {
   if (!key) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const days = parsed.data.days === "all" ? null : parsed.data.days || 30;
 
-  if (key.kind === "clipper") {
-    const handle = await updateStore((data) => data.accounts.find((a) => a.id === key.id && a.userId === user.id)?.handle || null);
-    if (!handle) return NextResponse.json({ error: "missing" }, { status: 404 });
-    try {
-      const videos = await fetchAccountVideos(handle, 2);
-      await updateStore((data) => {
-        const account = data.accounts.find((a) => a.id === key.id && a.userId === user.id);
-        if (!account) return;
-        account.videos = videos;
-        account.videosFetchedAt = new Date().toISOString();
+  const handle = await updateStore((data) =>
+    key.kind === "clipper"
+      ? data.accounts.find((a) => a.id === key.id && a.userId === user.id)?.handle || null
+      : data.channels.find((c) => c.id === key.id && c.userId === user.id)?.handle || null,
+  );
+  if (!handle) return NextResponse.json({ error: "missing" }, { status: 404 });
+  try {
+    // Four pages ≈ 200 posts: enough for a "all time" read on most accounts.
+    const videos = await fetchAccountVideos(handle.replace(/^@/, ""), 4);
+    await updateStore((data) => {
+      const target =
+        key.kind === "clipper"
+          ? data.accounts.find((a) => a.id === key.id && a.userId === user.id)
+          : data.channels.find((c) => c.id === key.id && c.userId === user.id);
+      if (!target) return;
+      target.videos = videos;
+      target.videosFetchedAt = new Date().toISOString();
+      if (key.kind === "clipper") {
+        const account = target as (typeof data.accounts)[number];
         if (!account.posts) account.posts = videos.length;
-      });
-    } catch (error) {
-      const code = error instanceof MonidError ? error.code : "http";
-      return NextResponse.json({ error: code }, { status: code === "no_key" ? 501 : 502 });
-    }
+      }
+    });
+  } catch (error) {
+    const code = error instanceof MetricsError ? error.code : "http";
+    return NextResponse.json({ error: code }, { status: code === "no_key" ? 501 : 502 });
   }
   const insights = await accountInsights(user, parsed.data.key, days);
   return NextResponse.json(insights);

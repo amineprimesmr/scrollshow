@@ -1,23 +1,23 @@
 import type { CSSProperties } from "react";
-import { MonidTools } from "@/components/MonidTools";
+
+import { ConnectorRegistry } from "@/components/ConnectorRegistry";
 
 const connections = [
+  { name: "TikTok", detail: "ton canal de diffusion", image: "/assets/platforms/tiktok.png", color: "#69e5de" },
   { name: "Claude", detail: "ton agent IA", image: "/assets/ai/claude.png", color: "#dba38c" },
   { name: "Codex", detail: "ton agent IA", image: "/assets/ai/codex.png", color: "#e2e4ed" },
   { name: "Cursor", detail: "ton espace de code", image: "/assets/ai/cursor.png", color: "#a9b8e7" },
-  { name: "TikTok", detail: "ton canal de diffusion", image: "/assets/platforms/tiktok.png", color: "#69e5de" },
-  { name: "Chrome", detail: "ton navigateur sur Mac", icon: "browser", color: "#9fb9fc" },
-  { name: "Recherche", detail: "explore ta niche", icon: "search", color: "#9bafff" },
-  { name: "Comptes", detail: "analyse les créateurs", icon: "users", color: "#d4a0e7" },
-  { name: "Formats", detail: "repère les slideshows", icon: "layers", color: "#b8a0f2" },
-  { name: "Bibliothèque", detail: "garde tes inspirations", icon: "library", color: "#e8b877" },
-  { name: "Médias", detail: "retrouve tes visuels", icon: "image", color: "#8bbfb4" },
-  { name: "Briefs", detail: "prépare ton contenu", icon: "document", color: "#b6abe9" },
-  { name: "Carrousels", detail: "organise tes slides", icon: "slides", color: "#a2b3ed" },
-  { name: "Calendrier", detail: "programme tes posts", icon: "calendar", color: "#e7b48d" },
-  { name: "Publication", detail: "publie sur TikTok", icon: "send", color: "#8cd4b3" },
-  { name: "Statistiques", detail: "suis tes résultats", icon: "chart", color: "#99beed" },
-  { name: "Monid", detail: "1 700+ outils & API", icon: "plug", color: "#c8cdff" },
+  { name: "Instagram", detail: "tes carrousels ailleurs", image: "/assets/platforms/instagram.png", color: "#e7a0c4" },
+  { name: "YouTube", detail: "tes formats longs", image: "/assets/platforms/youtube.svg", color: "#f08a8a" },
+  { name: "Snapchat", detail: "ton audience mobile", image: "/assets/platforms/snapchat.png", color: "#f5e08a" },
+  { name: "Reddit", detail: "les sujets qui montent", image: "/assets/platforms/reddit.png", color: "#f0a878" },
+  { name: "Telegram", detail: "tes alertes de publication", image: "/assets/platforms/telegram.svg", color: "#8fc9ee" },
+  { name: "Google Reviews", detail: "la preuve sociale", image: "/assets/platforms/google-reviews.png", color: "#9bb8f0" },
+  { name: "Apify", detail: "la donnée des créateurs", image: "/assets/platforms/apify.svg", color: "#f0b078" },
+  { name: "ElevenLabs", detail: "les voix de tes vidéos", image: "/assets/platforms/elevenlabs.svg", color: "#d4d4d8" },
+  { name: "TikTok Shop", detail: "tes produits en ligne", image: "/assets/platforms/tiktok-shop.svg", color: "#f08aa0" },
+  { name: "SEO & GEO", detail: "ta visibilité en recherche", image: "/assets/platforms/seo.svg", color: "#8fd4a8" },
+  { name: "Web Search", detail: "explore ta niche", icon: "search", color: "#9bafff" },
 ];
 
 const paths: Record<string, string> = {
@@ -62,7 +62,7 @@ export function LandingConnections() {
           </li>
         ))}
       </ul>
-      <MonidTools />
+      <ConnectorRegistry />
       <a className="af-connections__footer" href="#comment">
         <strong>Un agent. Tout ton workflow.</strong>
         <span>Découvre comment ça marche <span aria-hidden="true">→</span></span>

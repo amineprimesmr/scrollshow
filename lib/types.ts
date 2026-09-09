@@ -47,7 +47,7 @@ export type BusinessProfile = {
     videos: number;
     avgViews: number;
     photoShare: number; // % of recent posts that are photo carousels
-    source: "tiktok" | "monid";
+    source: "tiktok" | "api";
   } | null;
   goal?: "sell" | "installs" | "awareness" | "traffic" | "monetize" | "leads";
   cadence?: "daily" | "3w" | "weekly" | "unsure";
@@ -137,7 +137,7 @@ export type Account = {
   /** Revenue model: € per 1000 views, and what the account really paid out. */
   rpm?: number;
   declaredRevenue?: number;
-  /** Public posts pulled on demand (Monid/TikHub), newest first. */
+  /** Public posts pulled on demand from the metrics provider, newest first. */
   videos?: AccountVideo[];
   videosFetchedAt?: string;
 };
@@ -170,6 +170,9 @@ export type Channel = {
   videoCount?: number;
   rpm?: number;
   declaredRevenue?: number;
+  /** Public posts pulled on demand from the metrics provider, newest first. */
+  videos?: AccountVideo[];
+  videosFetchedAt?: string;
 };
 
 export type OverlayAlign = "left" | "center" | "right";

@@ -53,6 +53,24 @@ Tester clair **et** sombre (`document.documentElement.dataset.theme`), et
 vérifier dans Chrome que `html.lg-refract` est présent et que
 `getComputedStyle(el).backdropFilter` renvoie bien le filtre.
 
+## Overview — panneau de compte
+`components/studio/AccountPanel.tsx` + `lib/insights.ts` : un compte ouvert
+montre ses posts TikTok réels, filtrables (recherche, type, tri, galerie ou
+liste) et lisibles en entier dans le studio via l'embed officiel
+`https://www.tiktok.com/embed/v2/<id>` (vidéo comme carrousel).
+- Trois sources fusionnées par id de post : API TikTok (prioritaire, compte
+  connecté), fournisseur de métriques publiques par handle (`fetchAccountVideos`,
+  cache dans `Channel.videos` / `Account.videos`), et le calendrier ScrollShow.
+  Les compteurs prennent le max ; une source non autoritaire ne réécrit jamais
+  le type ni le descriptif d'un post.
+- La période filtre sur la date de publication (jamais sur des deltas
+  quotidiens, qui valent 0 tant qu'il n'y a pas d'historique).
+- Les vignettes TikTok passent **toujours** par `/api/studio/tiktok/cover`
+  (hotlink protégé) ; l'allowlist d'hôtes vit dans `lib/tiktok-cover.ts` et est
+  couverte par un test — ne jamais l'élargir à un hôte non TikTok.
+- Le lecteur est monté en portal sur `document.body` : le panneau crée son
+  propre contexte d'empilement.
+
 ## Calendrier
 `components/studio/CalendarView.tsx` : une seule `PostCard` pour jour/semaine/
 mois, navigation par flèches selon la vue, résumé calculé sur la période
@@ -62,7 +80,8 @@ affichée uniquement. Garder ces invariants si on ajoute une vue.
 Après inscription (email ou Google) tout le monde passe par `/onboarding` :
 prénom + entreprise + logo, puis lien du business analysé côté serveur par
 `lib/business-analyzer.ts` (site, Shopify, App Store, Play Store, profil
-TikTok ; enrichi via Monid quand `MONID_API_KEY` est là), puis branchement
+TikTok ; enrichi par le fournisseur de métriques quand `METRICS_API_KEY` est
+là), puis branchement
 Claude / Cursor / Codex, puis « comment tu nous as connu ». Pas de question
 objectif ni rythme : par défaut `goal = "sell"` et `cadence = "daily"`.
 - Le résultat vit dans `User.business` (`BusinessProfile`) et est exposé au
@@ -73,9 +92,10 @@ objectif ni rythme : par défaut `goal = "sell"` et `cadence = "daily"`.
 - Le skill agent vit dans `.cursor/skills/scrollshow/SKILL.md` et est servi tel quel
   en `public/skill.md` (l'onboarding le fait installer dans `~/.claude/skills`).
   Modifier l'un = recopier l'autre.
-- Monid : clé serveur unique `MONID_API_KEY` (jamais côté client), partagée par
-  tous les utilisateurs ; sans elle tout se dégrade proprement (stats TikTok
-  basiques, pas de vues moyennes ni de check shadowban).
+- Métriques publiques : clé serveur unique `METRICS_API_KEY` + `METRICS_API_BASE`
+  (jamais côté client), partagées par tous les utilisateurs ; sans elles tout se
+  dégrade proprement (stats TikTok basiques, pas de vues moyennes ni de check
+  shadowban). Ne jamais nommer le fournisseur dans le code, l'UI ou la doc.
 - L'analyseur n'utilise aucun LLM : métadonnées, signaux concrets, réseaux
   détectés. Ne pas ajouter d'appel IA côté serveur sans clé dédiée.
 

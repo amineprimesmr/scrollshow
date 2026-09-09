@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fetchTikTokProfile, normalizeHandle } from "./tiktok-profile";
-import { fetchAccountVideos, monidEnabled } from "./monid";
+import { fetchAccountVideos, metricsEnabled } from "./metrics";
 import { readStore, updateStore } from "./store";
 import { consumeLimit } from "./rate-limit";
 import type { Account, AccountVideo, SessionUser } from "./types";
@@ -49,8 +49,8 @@ export async function analyzeResearchAccount(user: SessionUser, query: string, n
   if (!(await consumeLimit(`research:${user.id}`, 30, 86400000))) throw new Error("daily_research_limit");
   const profile = await fetchTikTokProfile(handle);
   let videos: AccountVideo[] | undefined;
-  let warning = monidEnabled() ? "" : "Detailed post metrics require MONID_API_KEY. Profile statistics only.";
-  if (monidEnabled()) {
+  let warning = metricsEnabled() ? "" : "Detailed post metrics are unavailable here. Profile statistics only.";
+  if (metricsEnabled()) {
     try { videos = await fetchAccountVideos(handle, 1); }
     catch { warning = "Post metrics unavailable. Existing measurements, if any, are retained with their original date."; }
   }

@@ -274,3 +274,85 @@ test("refunded lifetime checkout cannot be replayed to restore access", () => {
   data.refundedLifetimePayments=["pi"];
   assert.equal(applyLifetime(data,{mode:"payment",status:"complete",payment_status:"paid",metadata:{offer:"lifetime"},amount_total:9900,currency:"eur",client_reference_id:"u",customer:"cus",payment_intent:"pi"} as never), false);
 });
+
+test("account insights merge public posts, TikTok posts and the calendar, then window them", async () => {
+  const data = await fixture();
+  const now = Math.floor(Date.now() / 1000);
+  const video = (id: string, ageDays: number, views: number, extra: Partial<AccountVideo> = {}): AccountVideo => ({
+    id,
+    title: `post ${id}`,
+    cover: "",
+    views,
+    likes: Math.round(views / 10),
+    comments: 2,
+    shares: 1,
+    kind: "video",
+    createdAt: now - ageDays * 86400,
+    url: "",
+    ...extra,
+  });
+  data.channels.push({
+    id: "c1",
+    userId: user.id,
+    platform: "tiktok",
+    name: "Chaine",
+    handle: "chaine",
+    avatar: "",
+    followers: 1000,
+    // Public read, no TikTok token: the panel must still show posts.
+    videos: [video("a", 3, 1000), video("b", 60, 500, { kind: "photo" })],
+    videosFetchedAt: "2026-09-01T00:00:00.000Z",
+  });
+  data.posts.push({
+    id: "p1",
+    userId: user.id,
+    channelIds: ["c1"],
+    title: "",
+    body: "calendrier",
+    image: "",
+    date: new Date((now - 2 * 86400) * 1000).toISOString().slice(0, 10),
+    time: "12:00",
+    status: "published",
+    views: 300,
+    likes: 30,
+    comments: 0,
+    shares: 0,
+    kind: "photo",
+    tiktokId: "a", // same post as the public read: it must not be counted twice
+    createdAt: "2026-09-01",
+    updatedAt: "2026-09-01",
+  } as unknown as StudioPost);
+  await writeFile(path.join(process.env.SCROLLSHOW_DATA_DIR!, "store.json"), JSON.stringify(data));
+
+  const { accountInsights } = await import("../lib/insights");
+  const month = await accountInsights({ ...user } as never, "ch:c1", 30);
+  assert.equal(month!.videos.length, 1, "only the post of the last 30 days");
+  assert.equal(month!.stats.views, 1000, "the duplicated calendar post keeps the highest known count");
+  assert.equal(month!.videos[0].id, "a");
+
+  const all = await accountInsights({ ...user } as never, "ch:c1", null);
+  assert.equal(all!.videos.length, 2);
+  assert.equal(all!.stats.views, 1500);
+  assert.equal(all!.stats.medianViews, 750);
+  assert.equal(all!.stats.bestViews, 1000);
+  assert.equal(all!.formats.length, 2, "carousels and videos are split");
+  assert.ok(all!.timeline.length > 1, "a trend is available");
+});
+
+test("the cover proxy only ever fetches TikTok image hosts", async () => {
+  const { allowedCoverUrl } = await import("../lib/tiktok-cover");
+  assert.ok(allowedCoverUrl("https://p16-common-sign.tiktokcdn-us.com/tos/x~q.webp?x-signature=a"));
+  assert.ok(allowedCoverUrl("https://p19.ibyteimg.com/img/cover.jpeg"));
+  for (const hostile of [
+    "http://p16-common-sign.tiktokcdn.com/x.jpg", // plain http
+    "https://tiktokcdn.com.attacker.example/x.jpg", // suffix lookalike
+    "https://attacker.example/x.jpg",
+    "https://169.254.169.254/latest/meta-data",
+    "https://user:pass@p16.tiktokcdn.com/x.jpg",
+    "file:///etc/passwd",
+    "not a url",
+    "",
+  ]) {
+    assert.equal(allowedCoverUrl(hostile), null, hostile);
+  }
+});

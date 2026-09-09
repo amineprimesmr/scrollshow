@@ -32,7 +32,6 @@ export function LandingDemo() {
           </button>
         </div>
       </div>
-      <p className="af-demo__caption">Ton contenu. Tes comptes. Un seul espace.</p>
       <dialog ref={dialogRef} className="af-demo-dialog" aria-labelledby="af-demo-dialog-title" onClick={event => { if (event.target === event.currentTarget) dialogRef.current?.close(); }}>
         <div className="af-demo-dialog__content">
           <header>

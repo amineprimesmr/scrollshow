@@ -1,22 +1,22 @@
 import type { AccountVideo } from "./types";
 
-const BASE = "https://api.monid.ai/v1";
+const BASE = process.env.METRICS_API_BASE || "";
 const ENDPOINT = "/api/v1/tiktok/app/v3/fetch_user_post_videos_v3";
 
-export class MonidError extends Error {
+export class MetricsError extends Error {
   code: "no_key" | "http" | "timeout" | "empty";
-  constructor(code: MonidError["code"], message?: string) {
+  constructor(code: MetricsError["code"], message?: string) {
     super(message || code);
     this.code = code;
   }
 }
 
-export function monidEnabled() {
-  return Boolean(process.env.MONID_API_KEY);
+export function metricsEnabled() {
+  return Boolean(process.env.METRICS_API_KEY && BASE);
 }
 
 function headers() {
-  return { Authorization: `Bearer ${process.env.MONID_API_KEY}`, "Content-Type": "application/json" };
+  return { Authorization: `Bearer ${process.env.METRICS_API_KEY}`, "Content-Type": "application/json" };
 }
 
 function firstUrl(value: any): string {
@@ -60,8 +60,8 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
     }),
     cache: "no-store",
   });
-  if (res.status === 401) throw new MonidError("no_key", "Monid rejected the key");
-  if (!res.ok && res.status !== 202) throw new MonidError("http", `Monid ${res.status}`);
+  if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
+  if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
   let body: any = await res.json().catch(() => ({}));
   let output = body.output ?? body.result?.output ?? body.data?.output;
   const runId = body.runId || body.id || body.run?.id;
@@ -70,13 +70,13 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
     for (let attempt = 0; attempt < 14 && !output; attempt += 1) {
       await new Promise((r) => setTimeout(r, attempt === 0 ? 4000 : 2500));
       const poll = await fetch(`${BASE}/runs/${runId}`, { headers: headers(), cache: "no-store" });
-      if (!poll.ok) throw new MonidError("http", `Monid poll ${poll.status}`);
+      if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
       body = await poll.json().catch(() => ({}));
       const status = String(body.status || "").toUpperCase();
-      if (status === "FAILED" || status === "ERROR") throw new MonidError("http", body.error || "run failed");
+      if (status === "FAILED" || status === "ERROR") throw new MetricsError("http", body.error || "run failed");
       output = body.output ?? body.result?.output ?? body.data?.output;
     }
-    if (!output) throw new MonidError("timeout", "Monid run still pending");
+    if (!output) throw new MetricsError("timeout", "run still pending");
   }
   const data = output?.data ?? output;
   const items: any[] = data?.aweme_list || data?.data?.aweme_list || [];
@@ -85,7 +85,7 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
 
 /** Pulls up to `pages` × 50 recent posts of a public TikTok account. */
 export async function fetchAccountVideos(handle: string, pages = 2): Promise<AccountVideo[]> {
-  if (!monidEnabled()) throw new MonidError("no_key");
+  if (!metricsEnabled()) throw new MetricsError("no_key");
   const seen = new Set<string>();
   const videos: AccountVideo[] = [];
   let cursor = 0;
@@ -101,15 +101,15 @@ export async function fetchAccountVideos(handle: string, pages = 2): Promise<Acc
     if (!result.hasMore || !result.items.length) break;
     cursor = result.cursor;
   }
-  if (!videos.length) throw new MonidError("empty", "no posts returned");
+  if (!videos.length) throw new MetricsError("empty", "no posts returned");
   return videos.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /* ------------------------------------------------------------------ */
-/* Registre d'outils Monid (https://monid.ai/tools)                    */
+/* Registre de connecteurs tiers                                      */
 /* ------------------------------------------------------------------ */
 
-export type MonidTool = {
+export type ConnectorTool = {
   id: string;
   provider: string;
   providerName: string;
@@ -121,7 +121,7 @@ export type MonidTool = {
   status: string;
 };
 
-function toTool(raw: any): MonidTool | null {
+function toTool(raw: any): ConnectorTool | null {
   const provider = String(raw?.provider || "").trim();
   const endpoint = String(raw?.endpoint || "").trim();
   if (!provider || !endpoint) return null;
@@ -141,18 +141,18 @@ function toTool(raw: any): MonidTool | null {
   };
 }
 
-const discoverCache = new Map<string, { at: number; tools: MonidTool[] }>();
+const discoverCache = new Map<string, { at: number; tools: ConnectorTool[] }>();
 const DISCOVER_TTL = 30 * 60 * 1000;
 
 /** Résultats déjà en cache, sans appel réseau ni dépense. */
-export function cachedTools(query: string, limit = 24): MonidTool[] | null {
+export function cachedTools(query: string, limit = 24): ConnectorTool[] | null {
   const cached = discoverCache.get(query.trim().toLowerCase().slice(0, 80));
   return cached && Date.now() - cached.at < DISCOVER_TTL ? cached.tools.slice(0, limit) : null;
 }
 
-/** Cherche des outils dans le registre Monid. Résultats mis en cache 30 min. */
-export async function discoverTools(query: string, limit = 24): Promise<MonidTool[]> {
-  if (!monidEnabled()) throw new MonidError("no_key");
+/** Cherche des outils dans le registre. Résultats mis en cache 30 min. */
+export async function discoverTools(query: string, limit = 24): Promise<ConnectorTool[]> {
+  if (!metricsEnabled()) throw new MetricsError("no_key");
   const key = query.trim().toLowerCase().slice(0, 80);
   const cached = discoverCache.get(key);
   if (cached && Date.now() - cached.at < DISCOVER_TTL) return cached.tools.slice(0, limit);
@@ -166,9 +166,9 @@ export async function discoverTools(query: string, limit = 24): Promise<MonidToo
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!res.ok) throw new MonidError("http", `discover ${res.status}`);
+    if (!res.ok) throw new MetricsError("http", `discover ${res.status}`);
     const data = await res.json().catch(() => null);
-    const tools: MonidTool[] = [];
+    const tools: ConnectorTool[] = [];
     const seen = new Set<string>();
     for (const raw of (data?.results || data?.tools || []) as any[]) {
       const tool = toTool(raw);
@@ -177,8 +177,8 @@ export async function discoverTools(query: string, limit = 24): Promise<MonidToo
     discoverCache.set(key, { at: Date.now(), tools });
     return tools.slice(0, limit);
   } catch (error) {
-    if (error instanceof MonidError) throw error;
-    throw new MonidError((error as Error)?.name === "AbortError" ? "timeout" : "http");
+    if (error instanceof MetricsError) throw error;
+    throw new MetricsError((error as Error)?.name === "AbortError" ? "timeout" : "http");
   } finally {
     clearTimeout(timer);
   }

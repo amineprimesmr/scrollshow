@@ -1,4 +1,4 @@
-import { fetchAccountVideos, MonidError, monidEnabled } from "./monid";
+import { fetchAccountVideos, MetricsError, metricsEnabled } from "./metrics";
 import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
 import { listRecentVideos, type TikTokVideo } from "./tiktok";
 import { updateStore } from "./store";
@@ -83,16 +83,16 @@ const LIBRARY_TTL_MS = 12 * 60 * 60 * 1000;
 
 /**
  * Analyzes a library account (added by handle, no OAuth) from the public
- * posts Monid pulled for it. Stored posts are reused for 12h, then refreshed
+ * public posts pulled for it. Stored posts are reused for 12h, then refreshed
  * and written back so the Overview panel sees the same data.
  */
 export async function checkLibraryAccount(account: Account): Promise<ShadowbanAccount> {
   const fetchedAt = account.videosFetchedAt ? Date.parse(account.videosFetchedAt) : 0;
   // Time-based only: an account that came back empty is remembered as empty
-  // for the same 12h instead of costing a 40s Monid round on every visit.
+  // for the same 12h instead of costing a 40s upstream round on every visit.
   const stale = !fetchedAt || Date.now() - fetchedAt > LIBRARY_TTL_MS;
   let videos = account.videos || [];
-  if (stale && monidEnabled()) {
+  if (stale && metricsEnabled()) {
     const persist = async (list: AccountVideo[]) => {
       const fetched = new Date().toISOString();
       await updateStore((data) => {
@@ -107,10 +107,10 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
       videos = await fetchAccountVideos(account.handle, 1);
       await persist(videos);
     } catch (error) {
-      if (error instanceof MonidError && error.code === "empty") await persist([]);
+      if (error instanceof MetricsError && error.code === "empty") await persist([]);
       if (!videos.length) {
-        if (error instanceof MonidError && error.code === "empty") throw new ShadowbanLookupError("private_or_empty");
-        throw new ShadowbanLookupError("unavailable", error instanceof Error ? error.message : "monid_failed");
+        if (error instanceof MetricsError && error.code === "empty") throw new ShadowbanLookupError("private_or_empty");
+        throw new ShadowbanLookupError("unavailable", error instanceof Error ? error.message : "metrics_failed");
       }
     }
   }
@@ -130,13 +130,13 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
 
 /**
  * Analyzes any public TikTok account from its handle or profile URL: public
- * profile for identity, last posts through Monid (TikHub) for the numbers.
+ * profile for identity, last posts through the metrics provider for the numbers.
  * Nothing is stored — it's a one-off check, not an added account.
  */
 export async function checkPublicAccount(raw: string): Promise<ShadowbanAccount> {
   const handle = normalizeHandle(raw);
   if (!handle || !/^[a-z0-9._]{1,30}$/.test(handle)) throw new ShadowbanLookupError("invalid_handle");
-  if (!monidEnabled()) throw new ShadowbanLookupError("unavailable", "MONID_API_KEY missing");
+  if (!metricsEnabled()) throw new ShadowbanLookupError("unavailable", "metrics provider not configured");
 
   const [profile, videos] = await Promise.all([
     fetchTikTokProfile(handle).catch((error) => {
@@ -144,8 +144,8 @@ export async function checkPublicAccount(raw: string): Promise<ShadowbanAccount>
       return null;
     }),
     fetchAccountVideos(handle, 1).catch((error) => {
-      if (error instanceof MonidError && error.code === "empty") return [] as AccountVideo[];
-      if (error instanceof MonidError) throw new ShadowbanLookupError("unavailable", error.message);
+      if (error instanceof MetricsError && error.code === "empty") return [] as AccountVideo[];
+      if (error instanceof MetricsError) throw new ShadowbanLookupError("unavailable", error.message);
       throw error;
     }),
   ]);

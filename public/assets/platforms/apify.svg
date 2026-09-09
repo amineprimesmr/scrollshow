@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Apify">
+  <rect width="200" height="200" rx="26" fill="#fff"/>
+  <g stroke-linejoin="round" stroke-width="8">
+    <path d="M12 10 84 10 12 118Z" fill="#22A24F" stroke="#22A24F"/>
+    <path d="M116 10 188 10 188 118Z" fill="#2568F5" stroke="#2568F5"/>
+    <path d="M100 102 190 190 10 190Z" fill="#FA6105" stroke="#FA6105"/>
+  </g>
+</svg>
