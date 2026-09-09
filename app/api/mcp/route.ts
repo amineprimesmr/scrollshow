@@ -595,7 +595,7 @@ async function gate(request: Request) {
   if (!token) return null; // aucun porteur : la couche MCP repond son defi de decouverte
   const user = await userFromToken(token);
   if (!user) {
-    return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Start the authorization again: the agent will open ${SITE} in a browser so the user can approve it. Never ask the user for a key in chat.`);
+    return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Open ${SITE}/connect for the user and tell them the one action for their host (Claude Code: /mcp then scrollshow then Authenticate). Never ask the user for a key in chat, and never build an authorization URL yourself.`);
   }
   if (!hasStudioAccess(user.plan)) {
     return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Tell the user to activate their access at ${SITE}/pricing with the account ${user.email}. The authorization stays valid and the tools unlock as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.`);

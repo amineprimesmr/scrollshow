@@ -16,7 +16,15 @@ Installing this skill is free. The tools only answer for a ScrollShow account wi
 
 **Add the MCP server `https://scrollshow.io/api/mcp` to this host.** Claude Code: `claude mcp add --transport http scrollshow https://scrollshow.io/api/mcp`. Cursor and Codex: their MCP configuration file. That is the whole setup.
 
-**There is no key to ask for.** The server is an OAuth 2.1 protected resource. On the first call it answers `401` with a `WWW-Authenticate` header pointing at its Protected Resource Metadata; the host registers itself, opens a browser, and the user approves the access on scrollshow.io. Never ask the user for a key, a token or a URL containing one. If the host does not open a browser on its own, tell the user to run the host's own MCP authentication command rather than inventing credentials.
+**There is no key to ask for.** The server is an OAuth 2.1 protected resource. On the first call it answers `401` with a `WWW-Authenticate` header pointing at its Protected Resource Metadata; the host registers itself, opens a browser, and the user approves the access on scrollshow.io. Never ask the user for a key, a token or a URL containing one, and never build an authorization URL yourself: only the host can, because it holds the client id and the PKCE verifier.
+
+**When you cannot finish the authorization here** — a non-interactive session, or a host that shows the server as "needs authentication" — do not stop at that statement. It leaves the user with nothing to do. Instead:
+
+1. Open <https://scrollshow.io/connect> for them (`open` on macOS, `xdg-open` on Linux, `start` on Windows), and say you just opened it. If you cannot open a browser, print the link on its own line.
+2. Tell them the single action for their host, in one sentence: Claude Code, `/mcp` then *scrollshow* then *Authenticate*; Claude app or web, Settings, Connectors, *scrollshow*, *Connect*; Cursor and Codex, reopen the conversation.
+3. Say what it unlocks, concretely and briefly: reading their business to write hooks for their audience, building an editable five-slide carousel, scheduling it — publishing only on request.
+
+Keep it to a few lines, warm and concrete. The user is one click away, not stuck.
 
 Then read the server's answer instead of guessing:
 

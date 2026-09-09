@@ -1,0 +1,242 @@
+/* Page d'aide a la connexion d'un agent. Meme grammaire sombre que
+   l'authentification : fond anime, carte a arete scintillante. */
+
+html:has(.ss-connect),
+html:has(.ss-connect) body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+html:has(.ss-connect) body.grain { background-image: none; }
+
+.ss-connect {
+  position: relative;
+  min-height: 100svh;
+  padding: 56px 20px 64px;
+  background: #000;
+  color: #fff;
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.ss-connect * { box-sizing: border-box; }
+.ss-connect a { color: inherit; }
+
+.ss-connect__inner {
+  position: relative;
+  z-index: 2;
+  width: min(540px, 100%);
+  margin: 0 auto;
+  text-align: center;
+}
+
+.ss-connect__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 26px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.ss-connect h1 {
+  margin: 0;
+  font-size: clamp(30px, 5.5vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  background: linear-gradient(90deg, #ffffff 0%, #f2f2f2 38%, #8a8a8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ss-connect__sub {
+  margin: 12px auto 26px;
+  max-width: 420px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #8d8d8d;
+  text-wrap: pretty;
+}
+
+.ss-connect__sub strong { color: #fff; font-weight: 600; }
+
+/* Carte */
+.ss-connect__card {
+  position: relative;
+  overflow: hidden;
+  padding: 28px 24px 24px;
+  border-radius: 30px;
+  text-align: left;
+  background:
+    radial-gradient(ellipse 90% 62% at 50% 16%, rgb(72 78 88 / 0.28) 0%, rgb(28 30 36 / 0.16) 46%, transparent 72%),
+    radial-gradient(circle at 50% 0%, #16181c 0%, #08090b 68%, #030304 100%);
+  border: 1px solid rgb(255 255 255 / 0.11);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.03) inset, 0 30px 80px rgb(0 0 0 / 0.55);
+}
+
+.ss-connect__edge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 62%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.25), #fff, rgb(255 255 255 / 0.25), transparent);
+}
+
+/* Etapes */
+.ss-connect__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.ss-connect__steps > li {
+  display: flex;
+  gap: 14px;
+  padding: 16px 0;
+}
+
+.ss-connect__steps > li + li { border-top: 1px solid rgb(255 255 255 / 0.08); }
+.ss-connect__steps > li:first-child { padding-top: 4px; }
+
+.ss-connect__mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  font-size: 12px;
+  font-weight: 600;
+  color: #d4d4d4;
+}
+
+.ss-connect__steps > li.is-done .ss-connect__mark {
+  border-color: transparent;
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.ss-connect__steps b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ss-connect__steps p {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #8d8d8d;
+  overflow-wrap: anywhere;
+}
+
+.ss-connect__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 12px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.15), 0 0 18px rgb(255 255 255 / 0.28);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ss-connect__cta:active { transform: scale(0.97); }
+
+/* Hôtes */
+.ss-connect__hosts {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.ss-connect__hosts li {
+  padding: 11px 14px;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.03);
+}
+
+.ss-connect__hosts strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ss-connect__hosts span {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #d4d4d4;
+}
+
+.ss-connect__hosts em {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-style: normal;
+  color: #6a6a6a;
+}
+
+/* Ce que ça débloque */
+.ss-connect__after {
+  margin-top: 26px;
+  text-align: left;
+}
+
+.ss-connect__after h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #d4d4d4;
+}
+
+.ss-connect__after ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 9px;
+}
+
+.ss-connect__after li {
+  display: flex;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #8d8d8d;
+}
+
+.ss-connect__after li::before { content: "✓"; color: #fff; flex: none; }
+
+.ss-connect__foot {
+  margin: 24px 0 0;
+  font-size: 12.5px;
+  color: #555;
+}
+
+.ss-connect__foot a { color: #b4b4b4; }
+.ss-connect__foot a:hover { color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-connect * { transition: none !important; }
+}
