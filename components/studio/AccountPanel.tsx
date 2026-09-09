@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { compact, type FanItem } from "./AccountsFan";
 import { IconChevron } from "./icons";
+import { coverSrc } from "./cover";
 import { useStudio } from "./StudioContext";
 import { FxImage } from "@/components/fx/FxImage";
 import { LoadingOrb, Orb } from "@/components/fx/Orb";
@@ -21,13 +22,6 @@ type Kind = "all" | "photo" | "video";
 type Sort = "views" | "likes" | "comments" | "shares" | "engagement" | "recent";
 
 const PAGE = 24;
-
-/** TikTok covers are hotlink-protected: always go through our own proxy. */
-function coverSrc(url: string) {
-  if (!url) return "";
-  if (!/^https:\/\//.test(url)) return url;
-  return `/api/studio/tiktok/cover?url=${encodeURIComponent(url)}`;
-}
 
 /** The post id is enough to embed the real TikTok, video or carousel alike. */
 function embedId(video: { id: string; url: string }) {

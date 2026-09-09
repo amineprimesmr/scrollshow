@@ -3,6 +3,7 @@
 import { t } from "@/lib/i18n";
 import type { Account, Channel } from "@/lib/types";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { coverSrc } from "./cover";
 import { useStudio } from "./StudioContext";
 
 /* ------------------------------------------------------------------ */
@@ -33,7 +34,7 @@ function fromChannel(c: Channel): FanItem {
     platform: c.platform,
     handle: c.handle,
     name: c.name || c.handle,
-    avatar: c.avatar || "",
+    avatar: coverSrc(c.avatar || ""),
     followers: c.followers || 0,
     likes: c.likes || 0,
     posts: c.videoCount || 0,
@@ -49,7 +50,7 @@ function fromAccount(a: Account): FanItem {
     platform: "tiktok",
     handle: a.handle,
     name: a.nickname || a.handle,
-    avatar: a.avatar || "",
+    avatar: coverSrc(a.avatar || ""),
     followers: a.followers || 0,
     likes: a.likes || 0,
     posts: a.posts || 0,
@@ -83,6 +84,26 @@ const smooth = (v: number) => {
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /**
+ * Spacing from the focus, in pixels. Near the focus each folder gets a full
+ * `step`; further away the spacing saturates, so twenty or two hundred comptes
+ * stack into a deck edge instead of running off both sides of the screen.
+ * `TAIL` keeps a sliver of spread so a distant folder is still its own card.
+ */
+const SPAN = 5.5;
+const TAIL = 0.07;
+
+function spread(d: number, g: Geo) {
+  return g.step * (SPAN * Math.tanh(d / SPAN) + TAIL * d);
+}
+
+/** Largeur totale de l'eventail, mesuree au pire cas (focus au milieu). */
+export function fanExtent(n: number, g: Geo) {
+  if (n <= 1) return g.w * 0.7;
+  const half = (n - 1) / 2;
+  return spread(half, g) - spread(-half, g) + g.w * 0.7;
+}
+
+/**
  * Where an item sits when it is `d` slots away from the (per-item) focus.
  * The focused folder turns towards the viewer, so its projected width grows:
  * everything after it shifts by exactly that extra footprint. No artificial gap.
@@ -90,7 +111,7 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 function layout(d: number, g: Geo) {
   const near = Math.exp(-(d * d) / 1.3); // 1 at the focus, fades over ~1.5 slots
   const opened = g.w * (Math.cos(rad(g.focusRot)) - Math.cos(rad(g.baseRot)));
-  const x = d * g.step + opened * smooth(d);
+  const x = spread(d, g) + opened * smooth(d);
   const y = 14 * (1 - Math.exp(-(d * d) / 10)) - 16 * near; // far ones sink, focus rises: a wave
   const rot = g.baseRot + (g.focusRot - g.baseRot) * near;
   const z = 64 * near;
@@ -112,6 +133,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   const [sort, setSort] = useState<SortKey>("followers");
   const [selected, setSelected] = useState(0);
   const [narrow, setNarrow] = useState(false);
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<"deck" | "grid">("deck");
 
   useEffect(() => {
     fetch("/api/accounts")
@@ -128,7 +151,7 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const items = useMemo(() => {
+  const all = useMemo(() => {
     const list = [...channels.filter((item) => !item.tracked).map(fromChannel), ...clippers.map(fromAccount)];
     const seen = new Set<string>();
     const unique = list.filter((item) => {
@@ -140,7 +163,16 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     return unique.sort((a, b) => b[sort] - a[sort]);
   }, [channels, clippers, sort]);
 
+  // La recherche filtre l'eventail lui-meme : au-dela d'une dizaine de comptes,
+  // faire defiler la pile pour en trouver un ne tient plus.
+  const items = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return all;
+    return all.filter((item) => `${item.handle} ${item.name}`.toLowerCase().includes(needle));
+  }, [all, query]);
+
   const count = items.length;
+  const many = all.length > 6;
 
   /* ---------------- animation state lives in refs: no React work per frame ---------------- */
   const stageRef = useRef<HTMLDivElement>(null);
@@ -175,7 +207,11 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     // the folders never overflow the bar above. The target scale follows the
     // stage instantly; the painted scale eases towards it in tick(), so the
     // folders grow and shrink smoothly instead of jumping with the layout.
-    kTarget.current = clamp((stage.clientHeight - 70) / (narrowRef.current ? 300 : 400), 0.55, 1);
+    // Deux contraintes : la hauteur de la scene (le panneau de compte la reduit)
+    // et sa largeur, qui devient la contrainte des qu'il y a beaucoup de comptes.
+    const fitH = (stage.clientHeight - 70) / (narrowRef.current ? 300 : 400);
+    const fitW = (stage.clientWidth - 36) / fanExtent(n, g);
+    kTarget.current = clamp(Math.min(fitH, fitW), 0.5, 1);
     if (kCur.current == null) kCur.current = kTarget.current;
     const k = kCur.current;
     // Keep the whole fan centred whatever is selected: its horizontal extent
@@ -292,7 +328,7 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     hov.current.length = count;
     settle();
     kick();
-  }, [count, sort, settle, kick]);
+  }, [count, sort, query, settle, kick]);
 
   useLayoutEffect(() => {
     paint();
@@ -456,6 +492,27 @@ export function AccountsFan({ onSelect, onBlankClick }: {
           ))}
         </div>
         <div className="ss-fan__actions">
+          {many ? (
+            <>
+              <label className="ss-fan__search">
+                <span className="ss-sr-only">{t("Chercher un compte", "Search an account", en)}</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t("Chercher un compte", "Search an account", en)}
+                />
+              </label>
+              <div className="ss-fan__view" role="group" aria-label={t("Affichage", "Layout", en)}>
+                <button type="button" className={view === "deck" ? "is-on" : ""} aria-pressed={view === "deck"} onClick={() => setView("deck")}>
+                  {t("Éventail", "Deck", en)}
+                </button>
+                <button type="button" className={view === "grid" ? "is-on" : ""} aria-pressed={view === "grid"} onClick={() => setView("grid")}>
+                  {t("Liste", "List", en)}
+                </button>
+              </div>
+            </>
+          ) : null}
           <button type="button" className="ss-fan__chip ss-fan__connect" onClick={() => setAddOpen(true)}>
             <span aria-hidden>+</span>
             <img src="/assets/platforms/tiktok.png" alt="" width={16} height={16} />
@@ -464,6 +521,38 @@ export function AccountsFan({ onSelect, onBlankClick }: {
         </div>
       </div>
 
+      {view === "grid" ? (
+        <ul className="ss-fan__grid" aria-label={t("Comptes", "Accounts", en)}>
+          {items.map((item, i) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className={`ss-fan-card ${i === selected ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
+                aria-pressed={i === selected}
+                onClick={() => {
+                  clicked.current = true;
+                  goTo(i);
+                  onSelectRef.current?.(items[i] || null, true);
+                  clicked.current = false;
+                }}
+              >
+                {item.avatar ? <img src={item.avatar} alt="" loading="lazy" /> : <span className="ss-fan-card__ph" aria-hidden />}
+                <span className="ss-fan-card__id">
+                  <b>{item.name || `@${item.handle}`}</b>
+                  <span>@{item.handle}</span>
+                </span>
+                <span className="ss-fan-card__stat">
+                  <b>{compact(item[sort])}</b>
+                  <span>{sort === "followers" ? t("abonnés", "followers", en) : sort === "likes" ? "likes" : "posts"}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {!count ? (
+            <li className="ss-fan__none">{t("Aucun compte ne correspond.", "No account matches.", en)}</li>
+          ) : null}
+        </ul>
+      ) : (
       <div
         ref={stageRef}
         className={`ss-fan__stage ${count ? "" : "is-empty"}`}
@@ -532,15 +621,26 @@ export function AccountsFan({ onSelect, onBlankClick }: {
 
         {!count ? (
           <div className="ss-fan__empty">
-            <b>{t("Aucun compte pour l'instant", "No account yet", en)}</b>
-            <span>{t("Connecte un TikTok ou ajoute un compte de ton réseau pour remplir l'éventail.", "Connect a TikTok or add a network account to fill the fan.", en)}</span>
-            <button type="button" className="ss-btn-purple" onClick={() => setAddOpen(true)}>
-              {t("Connecter un compte", "Connect an account", en)}
+            <b>{all.length ? t("Aucun compte ne correspond", "No account matches", en) : t("Aucun compte pour l'instant", "No account yet", en)}</b>
+            <span>
+              {all.length
+                ? t("Essaie un autre nom, ou efface la recherche.", "Try another name, or clear the search.", en)
+                : t("Connecte un TikTok ou ajoute un compte de ton réseau pour remplir l'éventail.", "Connect a TikTok or add a network account to fill the fan.", en)}
+            </span>
+            <button type="button" className="ss-btn-purple" onClick={() => (all.length ? setQuery("") : setAddOpen(true))}>
+              {all.length ? t("Effacer la recherche", "Clear search", en) : t("Connecter un compte", "Connect an account", en)}
             </button>
           </div>
         ) : null}
       </div>
+      )}
 
+      {view === "deck" && count > 1 ? (
+        <p className="ss-fan__pos" role="status">
+          {selected + 1} / {count}
+          {query ? ` · ${t("filtré", "filtered", en)}` : ""}
+        </p>
+      ) : null}
     </section>
   );
 }

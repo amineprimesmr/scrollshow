@@ -1,68 +1,762 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useStudio } from "./StudioContext";
+
 import type { Account } from "@/lib/types";
-import type { researchMetrics } from "@/lib/research/statistics";
-import type { publicJob } from "@/lib/research/jobs";
-import type { getStudy } from "@/lib/research/formats";
 import type { FormatStudy } from "@/lib/research/model";
+import type { getStudy } from "@/lib/research/formats";
+import type { publicJob } from "@/lib/research/jobs";
+import type { researchMetrics } from "@/lib/research/statistics";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { coverSrc } from "./cover";
+import { useStudio } from "./StudioContext";
 import "./research.css";
 
-type Item={account:Account;metrics:ReturnType<typeof researchMetrics>;measuredAt:string|null};
-type Job=ReturnType<typeof publicJob>;
-type Study=Awaited<ReturnType<typeof getStudy>>;
-async function api(url:string,body?:unknown){const r=await fetch(url,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);const j=await r.json();if(!r.ok)throw new Error(j.error||"request_failed");return j;}
-export function ResearchView(){
-  const {english}=useStudio();const tr=(fr:string,en:string)=>english?en:fr;
-  const [items,setItems]=useState<Item[]>([]),[jobs,setJobs]=useState<Job[]>([]),[studies,setStudies]=useState<FormatStudy[]>([]);
-  const [tab,setTab]=useState("library"),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState("");
-  const [kind,setKind]=useState("discover"),[source,setSource]=useState("provider"),[query,setQuery]=useState(""),[filter,setFilter]=useState(""),[sort,setSort]=useState("median");
-  const [days,setDays]=useState(30),[target,setTarget]=useState(10),[minViews,setMinViews]=useState(100000),[minMedian,setMinMedian]=useState(0),[minShare,setMinShare]=useState(50),[minPosts,setMinPosts]=useState(5),[maxPages,setMaxPages]=useState(3),[pivot,setPivot]=useState(false);
-  const [available,setAvailable]=useState(false),[selectedJob,setSelectedJob]=useState<string|null>(null),[study,setStudy]=useState<Study|null>(null),[studying,setStudying]=useState(false);
-  const load=useCallback(async()=>{try{const [r,j,s]=await Promise.all([api(`/api/research?days=${days}`),api("/api/research/jobs"),api("/api/research/studies")]);setItems(r.items);setAvailable(r.discoveryAvailable);setJobs(j.jobs);setStudies(s.studies);}catch(e){setError(e instanceof Error?e.message:"load_failed");}finally{setLoading(false);}},[days]);
-  useEffect(()=>{void load();},[load]);
-  const active=jobs.some(j=>["queued","running"].includes(j.status));
-  useEffect(()=>{if(!active)return;let pending=false;const timer=setInterval(()=>{if(pending)return;pending=true;void load().finally(()=>{pending=false;});},5000);return()=>clearInterval(timer);},[active,load]);
-  useEffect(()=>{if(!active)return;const timer=setInterval(()=>{const queued=jobs.find(j=>j.status==="queued"&&j.input.source==="provider");if(queued)void api(`/api/research/jobs/${queued.id}`,{action:"advance"}).catch(()=>{});},12000);return()=>clearInterval(timer);},[active,jobs]);
-  const num=(n:number|null|undefined)=>n==null?"—":Math.round(n).toLocaleString(english?"en-US":"fr-FR");
-  const percent=(n:number|null|undefined)=>n==null?"—":`${Math.round(n*100)} %`;
-  const status=(s:string)=>({queued:tr("En attente","Queued"),running:tr("Collecte en cours","Collecting"),done:tr("Terminée","Done"),paused:tr("En pause","Paused"),needs_attention:tr("Intervention requise","Needs attention"),stopped:tr("Arrêtée","Stopped"),error:tr("Erreur","Error")}[s]||s);
-  const reason=(s:string)=>({no_posts_in_window:tr("Aucun post dans la période","No posts in period"),insufficient_slideshows:tr("Pas assez de carrousels mesurés","Too few measured carousels"),slideshow_share_below_filter:tr("Part de carrousels trop faible","Slideshow share below filter"),median_views_below_filter:tr("Médiane sous le seuil","Median below threshold"),total_views_below_filter:tr("Total de vues sous le seuil","Total views below threshold"),followers_below_filter:tr("Abonnés sous le seuil","Followers below threshold"),followers_unavailable:tr("Abonnés non mesurés","Followers unavailable")}[s]||s);
-  async function start(e:React.FormEvent){e.preventDefault();setBusy(true);setError("");try{const j=await api("/api/research/jobs",{kind,source,keywords:query.split(/[,\n]/).map(x=>x.trim()).filter(Boolean),target,maxPages,hashtagPivot:pivot,filters:{days,minSlideshowShare:minShare/100,minMedianViews:minMedian,minTotalViews:minViews,minPosts},requestId:crypto.randomUUID()});setSelectedJob(j.id);setTab("runs");await load();}catch(e){setError(e instanceof Error?e.message:"research_failed");}finally{setBusy(false);}}
-  async function control(id:string,action:string,retune=false){try{await api(`/api/research/jobs/${id}`,{action,...retune?{filters:{days,minSlideshowShare:minShare/100,minMedianViews:minMedian,minTotalViews:minViews,minPosts}}:{}});await load();}catch(e){setError(e instanceof Error?e.message:"research_failed");}}
-  async function openStudy(accountId:string,postId:string){setStudying(true);setError("");try{setStudy(await api("/api/research/studies",{accountId,postId}));setTab("formats");await load();}catch(e){setError(e instanceof Error?e.message:"study_failed");}finally{setStudying(false);}}
-  async function continueStudy(){if(!study)return;setStudying(true);try{setStudy(await api(`/api/research/studies/${study.id}`,{}));await load();}catch(e){setError(e instanceof Error?e.message:"study_failed");}finally{setStudying(false);}}
-  const visible=useMemo(()=>items.filter(i=>`${i.account.handle} ${i.account.bio||""} ${i.account.niche} ${i.account.notes}`.toLowerCase().includes(filter.toLowerCase())).sort((a,b)=>sort==="followers"?b.account.followers-a.account.followers:sort==="ratio"?(b.metrics.medianViewsPerFollower??-1)-(a.metrics.medianViewsPerFollower??-1):(b.metrics.medianViews??-1)-(a.metrics.medianViews??-1)),[items,filter,sort]);
-  const selected=jobs.find(j=>j.id===selectedJob);
-  return <div className="ss-research">
-    <section className="ss-panel ss-research-intro"><span className="ss-research-eyebrow">{tr("RECHERCHE · FORMATS · PREUVES","RESEARCH · FORMATS · EVIDENCE")}</span><h2>{tr("Comprendre ce qui mérite d’être reproduit","Understand what is worth repeating")}</h2><p className="ss-lead">{tr("Découvre les comptes de ta niche, mesure leurs carrousels et étudie leurs formats slide par slide. Ton assistant transforme ces preuves en idées originales pour ton activité.","Discover niche accounts, measure photo posts and study their formats slide by slide. Your assistant turns this evidence into original ideas for your business.")}</p>
-    <form onSubmit={start}>
-      <div className="ss-research__form"><label>{tr("Recherche","Research")}<select className="ss-input" value={kind} onChange={e=>setKind(e.target.value)}><option value="discover">{tr("Découvrir des comptes","Discover accounts")}</option><option value="analyze">{tr("Analyser des comptes","Analyze accounts")}</option></select></label>
-      <label className="ss-research-query">{kind==="discover"?tr("Mots-clés séparés par des virgules","Comma-separated keywords"):tr("Comptes séparés par des virgules","Comma-separated accounts")}<input className="ss-input" required minLength={2} maxLength={1500} value={query} onChange={e=>setQuery(e.target.value)} placeholder={kind==="discover"?"study tips, exam routine, study motivation":"@compte, @concurrent"}/></label>
-      <button className="ss-btn-purple" disabled={busy||source==="provider"&&!available}>{busy?tr("Démarrage…","Starting…"):tr("Lancer la recherche","Start research")}</button></div>
-      <details className="ss-research-options"><summary>{tr("Critères et profondeur de recherche","Research filters and depth")}</summary><div className="ss-research__form">
-      <label>{tr("Source","Source")}<select className="ss-input" value={source} onChange={e=>setSource(e.target.value)}><option value="provider" disabled={!available}>{tr("Collecte cloud","Cloud collection")}</option><option value="browser">{tr("Mon navigateur connecté","My connected browser")}</option></select></label>
-      {[{label:tr("Période (jours)","Period (days)"),value:days,set:setDays,min:1,max:365},{label:tr("Comptes recherchés","Target accounts"),value:target,set:setTarget,min:1,max:50},{label:tr("Carrousels minimum (%)","Minimum photos (%)"),value:minShare,set:setMinShare,min:0,max:100},{label:tr("Vues cumulées minimum","Minimum total views"),value:minViews,set:setMinViews,min:0,max:1e12},{label:tr("Vues médianes minimum","Minimum median views"),value:minMedian,set:setMinMedian,min:0,max:1e10},{label:tr("Carrousels mesurés minimum","Minimum measured photos"),value:minPosts,set:setMinPosts,min:1,max:100},{label:tr("Pages maximum par compte","Maximum pages per account"),value:maxPages,set:setMaxPages,min:1,max:10}].map(f=><label key={f.label}>{f.label}<input className="ss-input" type="number" required min={f.min} max={f.max} value={f.value} onChange={e=>f.set(Number(e.target.value))}/></label>)}
-      <label className="ss-research-check"><input type="checkbox" checked={pivot} onChange={e=>setPivot(e.target.checked)}/>{tr("Explorer les hashtags trouvés","Explore discovered hashtags")}</label></div></details>
-    </form>
-    {source==="browser"&&<p className="ss-lead">{tr("Le collecteur local doit être lancé sur ton Mac. Ta session TikTok reste dans son profil Chrome dédié. Aucun like ni publication automatique.","Run the local collector on your Mac. Your TikTok session stays in its dedicated Chrome profile. No automatic likes or publishing.")} <a href="/research-collector.md" target="_blank">{tr("Configurer le collecteur","Set up collector")}</a></p>}
-    {!available&&source==="provider"&&<p role="status">{tr("Le service cloud n’est pas configuré. Utilise ton collecteur navigateur ou connecte le service dans l’environnement serveur.","Cloud collection is not configured. Use the browser collector or configure the server service.")}</p>}
-    <p className="ss-research-footnote">{tr("Les vues sont les compteurs des carrousels publiés pendant la période. Les résultats indiquent leur couverture et leur date ; une moyenne élevée ne suffit pas à prouver un format gagnant.","Views are lifetime counters on photo posts published in the period. Results include coverage and date; a high average alone does not prove a winning format.")}</p></section>
-    {error&&<div className="ss-panel" role="alert">{tr("L’opération n’a pas abouti : ","The operation failed: ")}{error}<button className="ss-btn-ghost" onClick={()=>setError("")}>{tr("Fermer","Dismiss")}</button></div>}
-    <nav className="ss-research-tabs lg lg--flat" aria-label={tr("Vues de recherche","Research views")}>{[["library",tr("Comptes","Accounts"),items.length],["runs",tr("Recherches","Research jobs"),jobs.length],["formats",tr("Formats étudiés","Studied formats"),studies.length]].map(([id,label,n])=><button key={id} className={tab===id?"ss-btn-purple":"ss-btn-ghost"} onClick={()=>setTab(String(id))} aria-pressed={tab===id}>{label} <span>{n}</span></button>)}</nav>
-    {loading&&<p role="status">{tr("Chargement…","Loading…")}</p>}
-    {tab==="library"&&<><div className="ss-research__form"><label>{tr("Filtrer les comptes","Filter accounts")}<input className="ss-input" value={filter} onChange={e=>setFilter(e.target.value)} placeholder={tr("Compte ou niche","Account or niche")}/></label><label>{tr("Classer par","Sort by")}<select className="ss-input" value={sort} onChange={e=>setSort(e.target.value)}><option value="median">{tr("Vues médianes","Median views")}</option><option value="ratio">{tr("Vues / abonné","Views / follower")}</option><option value="followers">{tr("Abonnés","Followers")}</option></select></label><a className="ss-btn-ghost" href="/app/mcp">{tr("Construire ma stratégie avec mon assistant","Build my strategy with my assistant")}</a></div>
-    {!loading&&!visible.length&&<section className="ss-panel"><h3>{tr("Tes premiers formats commencent par une recherche","Your first formats start with research")}</h3><p>{tr("Indique ta niche ou un compte ci-dessus. Les mesures, publications et études seront réunies ici.","Enter a niche or account above. Measurements, posts and studies will appear here.")}</p></section>}
-    <div className="ss-research__grid">{visible.map(({account:a,metrics:m,measuredAt})=><article className="ss-panel" key={a.id}><h3><a href={`https://www.tiktok.com/@${a.handle}`} target="_blank" rel="noreferrer">@{a.handle}</a></h3><p className="ss-lead">{a.niche||a.bio}</p><dl className="ss-research__metrics">{[[tr("Abonnés","Followers"),num(a.followers)],[tr("Vues médianes","Median views"),num(m.medianViews)],[tr("Carrousels","Photos"),percent(m.slideshowShare)],[tr("Photos mesurées","Measured photos"),num(m.measuredSlideshowPosts)],[tr("Enregistrements / vues","Saves / views"),percent(m.saveRate)],[tr("Poids du meilleur post","Top post share"),percent(m.topPostShare)]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><p className="ss-research-footnote">{measuredAt?new Date(measuredAt).toLocaleString():tr("Non mesuré","Not measured")} · {a.researchCoverage?.complete&&a.researchCoverage.windowDays>=days?tr("Période couverte","Period covered"):tr("Échantillon partiel","Partial sample")}</p>
-    {(m.confidence==="insufficient_data"||m.repeatability==="single_post_dominated")&&<p className="ss-research-signal">{m.confidence==="insufficient_data"?tr("Trop peu de carrousels pour conclure.","Too few carousels to draw conclusions."):tr("La majorité des vues provient d’un seul post.","Most views come from one post.")}</p>}
-    <details><summary>{tr("Carrousels à étudier","Carousels to study")} ({m.topPosts.length})</summary><div className="ss-research-posts">{m.topPosts.map(p=><div className="ss-research-post" key={p.id}>{p.cover&&<img src={`/api/studio/tiktok/cover?url=${encodeURIComponent(p.cover)}`} alt="" loading="lazy"/>}<div><a href={p.url} target="_blank" rel="noreferrer">{p.title||p.id}</a><small>{num(p.views)} {tr("vues","views")} · {p.images?.length??"—"} slides</small><button className="ss-btn-ghost" disabled={studying||!p.images?.length} onClick={()=>void openStudy(a.id,p.id)}>{studying?tr("Lecture…","Reading…"):tr("Étudier le format","Study format")}</button></div></div>)}</div></details></article>)}</div></>}
-    {tab==="runs"&&<div className="ss-research-run-layout"><div className="ss-research-run-list">{!jobs.length&&<p>{tr("Aucune recherche lancée.","No research jobs yet.")}</p>}{jobs.map(j=><button key={j.id} className={`ss-panel ss-research-run ${selectedJob===j.id?"is-selected":""}`} onClick={()=>setSelectedJob(j.id)}><strong>{j.input.keywords.slice(0,3).join(", ")}</strong><span>{status(j.status)}</span><small>{j.progress.accepted}/{j.progress.target} {tr("retenus","selected")} · {j.progress.measured} {tr("mesurés","measured")}</small></button>)}</div>{selected&&<section className="ss-panel"><h3>{selected.input.keywords.join(", ")}</h3><p role="status">{status(selected.status)} · {selected.progress.candidates} {tr("candidats","candidates")} · {selected.progress.measured} {tr("comptes mesurés","measured accounts")}</p><progress max={Math.max(selected.progress.target,selected.progress.accepted)} value={selected.progress.accepted}/><div className="ss-research-actions">{["running","queued"].includes(selected.status)&&<button className="ss-btn-ghost" onClick={()=>void control(selected.id,"pause")}>{tr("Pause","Pause")}</button>}{["paused","needs_attention"].includes(selected.status)&&<button className="ss-btn-purple" onClick={()=>void control(selected.id,"resume")}>{tr("Reprendre","Resume")}</button>}{!["done","stopped"].includes(selected.status)&&<button className="ss-btn-ghost" onClick={()=>void control(selected.id,"stop")}>{tr("Arrêter","Stop")}</button>}{selected.status!=="stopped"&&<button className="ss-btn-ghost" onClick={()=>void control(selected.id,"resume",true)}>{tr("Appliquer les critères du formulaire","Apply form filters")}</button>}</div>
-    {selected.input.source==="browser"&&<p>{tr("Identifiant à transmettre au collecteur : ","Collector job ID: ")}<code>{selected.id}</code></p>}{selected.error&&<p role="alert">{selected.error}</p>}{selected.status==="done"&&selected.progress.accepted<selected.progress.target&&<p>{tr("Recherche terminée avec moins de comptes que demandé. Examine les motifs de rejet ou élargis tes mots-clés.","Research finished below the target. Review rejection reasons or broaden keywords.")}</p>}
-    <div className="ss-research-table-wrap"><table className="ss-research-table"><thead><tr><th>{tr("Compte","Account")}</th><th>{tr("Médiane","Median")}</th><th>{tr("Photos","Photos")}</th><th>{tr("Résultat","Result")}</th></tr></thead><tbody>{selected.results.map(r=><tr key={r.handle}><td><a href={`https://www.tiktok.com/@${r.handle}`} target="_blank" rel="noreferrer">@{r.handle}</a><small>{r.coverage.complete?tr("Couvert","Covered"):tr("Partiel","Partial")}</small></td><td>{num(r.metrics.medianViews)}</td><td>{r.metrics.measuredSlideshowPosts}</td><td>{r.accepted?tr("Retenu","Selected"):r.reasons.map(reason).join(" · ")}</td></tr>)}</tbody></table></div>{!!selected.failures.length&&<details><summary>{tr("Erreurs conservées","Saved errors")}</summary>{selected.failures.map((f,i)=><p key={i}>{f.handle||f.keyword} : {f.error}</p>)}</details>}</section>}</div>}
-    {tab==="formats"&&<>{!studies.length&&!study&&<section className="ss-panel"><h3>{tr("Lis un format, pas seulement ses chiffres","Read a format, beyond its numbers")}</h3><p>{tr("Dans Comptes, ouvre les carrousels d’un profil puis choisis Étudier le format. L’étude conserve chaque slide et son texte ; ton assistant peut ajouter son interprétation sourcée.","Under Accounts, open a profile’s carousels and choose Study format. The study keeps every slide and its text; your assistant can add an evidence-backed interpretation.")}</p></section>}
-    {!!studies.length&&<div className="ss-research-study-list">{studies.map(s=><button className="ss-btn-ghost" key={s.id} onClick={()=>{void api(`/api/research/studies/${s.id}`).then(setStudy).catch(e=>setError(e.message));}}>{s.interpretation?.name||s.caption.slice(0,65)||s.postId} · {s.slides.length} slides</button>)}</div>}
-    {study&&<section className="ss-panel"><div className="ss-research-study-head"><div><h3>{study.interpretation?.name||tr("Étude du carrousel","Carousel study")}</h3><a href={study.sourceUrl} target="_blank" rel="noreferrer">{tr("Publication d’origine","Original post")}</a><p>{num(study.post?.views)} {tr("vues","views")} · {tr("Médiane du compte : ","Account median: ")}{num(study.baseline.medianViews)}{study.lift!==null?` · ×${study.lift.toFixed(1)}`:""}</p></div><div className="ss-research-actions"><a className="ss-btn-ghost" href={`/api/research/studies/${study.id}/export`}>{tr("Télécharger l’étude ZIP","Download ZIP study")}</a>{study.status==="pending"&&<button className="ss-btn-purple" disabled={studying} onClick={()=>void continueStudy()}>{studying?tr("Lecture…","Reading…"):tr("Lire les slides suivantes","Read remaining slides")}</button>}</div></div>
-    <div className="ss-research-slides">{study.slides.map(s=><article key={s.index}><img src={`/api/studio/tiktok/cover?url=${encodeURIComponent(s.image)}`} alt={`Slide ${s.index}`} loading="lazy"/><strong>Slide {s.index}</strong><small>{s.status==="pending"?tr("À lire","Pending"):s.status==="unreadable"?tr("Transcription incertaine — inspecter le visuel","Uncertain transcript — inspect image"):`OCR ${num(s.confidence)} %`}</small><p>{s.text}</p></article>)}</div>
-    {study.interpretation?<div className="ss-research-interpretation"><h4>{tr("Interprétation de l’assistant","Assistant interpretation")}</h4>{[[tr("Accroche","Hook"),study.interpretation.hook],[tr("Narration","Narrative"),study.interpretation.narrative],[tr("Motif visuel","Visual pattern"),study.interpretation.visualPattern],[tr("Émotion et audience","Emotion and audience"),`${study.interpretation.emotionalAngle} — ${study.interpretation.audience}`],[tr("Appel à l’action","Call to action"),study.interpretation.cta],[tr("Adaptation à ton activité","Business adaptation"),study.interpretation.adaptation],[tr("Hypothèse à tester","Hypothesis to test"),study.interpretation.hypothesis]].map(([label,text])=><div key={label}><strong>{label}</strong><p>{text}</p></div>)}<p>{tr("Slides citées : ","Cited slides: ")}{study.interpretation.evidenceSlides.join(", ")}</p></div>:<p className="ss-lead">{tr("Les preuves sont prêtes pour ton assistant. Demande-lui d’analyser cette étude et de sauvegarder le format avec ses sources. Le texte OCR seul ne décrit pas toute l’image.","Evidence is available to your assistant. Ask it to analyze this study and save the format with its sources. OCR alone cannot describe the entire image.")} <a href="/app/mcp">{tr("Connecter mon assistant","Connect my assistant")}</a></p>}</section>}</>}
-  </div>;
+type Metrics = ReturnType<typeof researchMetrics>;
+type Item = { account: Account; metrics: Metrics; measuredAt: string | null };
+type Job = ReturnType<typeof publicJob>;
+type Study = Awaited<ReturnType<typeof getStudy>>;
+type Tab = "accounts" | "formats";
+
+const LIVE = new Set(["queued", "running"]);
+
+async function api(url: string, body?: unknown) {
+  const res = await fetch(url, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "request_failed");
+  return json;
+}
+
+export function ResearchView() {
+  const { english } = useStudio();
+  const tr = useCallback((fr: string, en: string) => (english ? en : fr), [english]);
+
+  const [items, setItems] = useState<Item[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [studies, setStudies] = useState<FormatStudy[]>([]);
+  const [available, setAvailable] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState<Tab>("accounts");
+
+  // Une seule zone de saisie : « @compte » analyse ce compte, tout le reste
+  // cherche des comptes. Les reglages fins restent replies.
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState("provider");
+  const [days, setDays] = useState(30);
+  const [target, setTarget] = useState(10);
+  const [minViews, setMinViews] = useState(100000);
+  const [minMedian, setMinMedian] = useState(0);
+  const [minShare, setMinShare] = useState(50);
+  const [minPosts, setMinPosts] = useState(5);
+  const [maxPages, setMaxPages] = useState(3);
+  const [pivot, setPivot] = useState(false);
+
+  const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState("median");
+  const [study, setStudy] = useState<Study | null>(null);
+  const [studying, setStudying] = useState(false);
+  const [openRun, setOpenRun] = useState<string | null>(null);
+  const [history, setHistory] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [library, runs, formats] = await Promise.all([
+        api(`/api/research?days=${days}`),
+        api("/api/research/jobs"),
+        api("/api/research/studies"),
+      ]);
+      setItems(library.items);
+      setAvailable(library.discoveryAvailable);
+      setJobs(runs.jobs);
+      setStudies(formats.studies);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "load_failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [days]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const running = useMemo(() => jobs.filter((job) => LIVE.has(job.status)), [jobs]);
+  const active = running[0] || null;
+  const activeId = active?.id || null;
+
+  // Tant qu'une recherche tourne : on rafraichit vite (les comptes arrivent au
+  // fur et a mesure) et on pousse l'etape suivante des que le bail est libre.
+  // Au repos on rafraichit lentement : une recherche lancee ailleurs (agent,
+  // cron, autre onglet) doit finir par apparaitre ici sans rechargement.
+  useEffect(() => {
+    if (activeId) return;
+    const idle = window.setInterval(() => void load(), 20000);
+    return () => window.clearInterval(idle);
+  }, [activeId, load]);
+
+  const pumping = useRef(false);
+  useEffect(() => {
+    if (!activeId) return;
+    let live = true;
+    const poll = window.setInterval(() => {
+      if (live) void load();
+    }, 2500);
+    const pump = window.setInterval(async () => {
+      if (pumping.current) return;
+      pumping.current = true;
+      try {
+        await api(`/api/research/jobs/${activeId}`, { action: "advance" });
+      } catch {
+        // Un bail encore actif ou une erreur reseau : le prochain tour reessaie.
+      } finally {
+        pumping.current = false;
+      }
+    }, 3000);
+    return () => {
+      live = false;
+      window.clearInterval(poll);
+      window.clearInterval(pump);
+    };
+  }, [activeId, load]);
+
+  const num = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString(english ? "en-US" : "fr-FR"));
+  const compactNum = (n: number | null | undefined) => {
+    if (n == null) return "—";
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k`;
+    return String(Math.round(n));
+  };
+  const percent = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n * 100)} %`);
+
+  const statusName = (s: string) =>
+    ({
+      queued: tr("En attente", "Queued"),
+      running: tr("En cours", "Running"),
+      done: tr("Terminée", "Done"),
+      paused: tr("En pause", "Paused"),
+      needs_attention: tr("Intervention requise", "Needs attention"),
+      stopped: tr("Arrêtée", "Stopped"),
+      error: tr("Erreur", "Error"),
+    })[s] || s;
+
+  const reasonName = (s: string) =>
+    ({
+      no_posts_in_window: tr("Aucun post dans la période", "No posts in period"),
+      insufficient_slideshows: tr("Pas assez de carrousels mesurés", "Too few measured carousels"),
+      slideshow_share_below_filter: tr("Trop peu de carrousels", "Too few carousels"),
+      median_views_below_filter: tr("Médiane sous le seuil", "Median below threshold"),
+      total_views_below_filter: tr("Vues cumulées sous le seuil", "Total views below threshold"),
+      followers_below_filter: tr("Abonnés sous le seuil", "Followers below threshold"),
+      followers_unavailable: tr("Abonnés non mesurés", "Followers unavailable"),
+    })[s] || s;
+
+  const filters = () => ({ days, minSlideshowShare: minShare / 100, minMedianViews: minMedian, minTotalViews: minViews, minPosts });
+
+  async function start(event: React.FormEvent) {
+    event.preventDefault();
+    const words = query.split(/[,\n]/).map((word) => word.trim()).filter(Boolean);
+    if (!words.length) return;
+    const kind = words.every((word) => word.startsWith("@")) ? "analyze" : "discover";
+    setBusy(true);
+    setError("");
+    try {
+      const job = await api("/api/research/jobs", {
+        kind,
+        source,
+        keywords: words,
+        target,
+        maxPages,
+        hashtagPivot: pivot,
+        filters: filters(),
+        requestId: crypto.randomUUID(),
+      });
+      setOpenRun(job.id);
+      setTab("accounts");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "research_failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function control(id: string, action: string, retune = false) {
+    try {
+      await api(`/api/research/jobs/${id}`, { action, ...(retune ? { filters: filters() } : {}) });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "research_failed");
+    }
+  }
+
+  async function openStudy(accountId: string, postId: string) {
+    setStudying(true);
+    setError("");
+    try {
+      setStudy(await api("/api/research/studies", { accountId, postId }));
+      setTab("formats");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "study_failed");
+    } finally {
+      setStudying(false);
+    }
+  }
+
+  async function continueStudy() {
+    if (!study) return;
+    setStudying(true);
+    try {
+      setStudy(await api(`/api/research/studies/${study.id}`, {}));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "study_failed");
+    } finally {
+      setStudying(false);
+    }
+  }
+
+  const visible = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    return items
+      .filter((item) => `${item.account.handle} ${item.account.bio || ""} ${item.account.niche} ${item.account.notes}`.toLowerCase().includes(needle))
+      .sort((a, b) =>
+        sort === "followers"
+          ? b.account.followers - a.account.followers
+          : sort === "ratio"
+            ? (b.metrics.medianViewsPerFollower ?? -1) - (a.metrics.medianViewsPerFollower ?? -1)
+            : (b.metrics.medianViews ?? -1) - (a.metrics.medianViews ?? -1),
+      );
+  }, [items, filter, sort]);
+
+  // Comptes deja mesures par la recherche en cours : ils passent devant, avec
+  // leur verdict, pour qu'on voie le travail arriver plutot qu'un total final.
+  const freshHandles = useMemo(() => new Set((active?.results || []).map((r) => r.handle)), [active]);
+  const pending = useMemo(() => {
+    if (!active) return [];
+    const known = new Set([...freshHandles, ...items.map((item) => item.account.handle)]);
+    return active.pending.filter((candidate) => !known.has(candidate.handle));
+  }, [active, freshHandles, items]);
+
+  const shown = useMemo(() => {
+    if (!active) return visible;
+    return [...visible].sort((a, b) => Number(freshHandles.has(b.account.handle)) - Number(freshHandles.has(a.account.handle)));
+  }, [visible, active, freshHandles]);
+
+  const verdictOf = (handle: string) => (active?.results || []).find((r) => r.handle === handle) || null;
+
+  return (
+    <div className="ss-research">
+      <section className="ss-research-hero">
+        <h1>{tr("Trouve les comptes qui marchent dans ta niche", "Find the accounts that work in your niche")}</h1>
+        <p>{tr("Une recherche mesure les carrousels publics des comptes trouvés, garde ceux qui tiennent la route et te montre leurs meilleurs posts.", "A search measures public carousels of the accounts it finds, keeps the ones that hold up, and shows you their best posts.")}</p>
+        <form onSubmit={start} className="ss-research-search">
+          <input
+            className="ss-research-search__input"
+            required
+            minLength={2}
+            maxLength={1500}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={tr("ta niche : routine sommeil, astuces révision… ou @uncompte", "your niche: sleep routine, study tips… or @anaccount")}
+            aria-label={tr("Niche ou compte", "Niche or account")}
+          />
+          <button className="ss-btn-purple lg-press" disabled={busy || (source === "provider" && !available)}>
+            {busy ? tr("Démarrage…", "Starting…") : tr("Chercher", "Search")}
+          </button>
+        </form>
+        <p className="ss-research-hint">
+          {query.trim().split(/[,\n]/).filter(Boolean).every((word) => word.trim().startsWith("@")) && query.trim()
+            ? tr("Ces comptes seront mesurés directement.", "These accounts will be measured directly.")
+            : tr("Sépare plusieurs idées par des virgules. Commence par @ pour analyser un compte précis.", "Separate ideas with commas. Start with @ to analyse a specific account.")}
+        </p>
+
+        <details className="ss-research-advanced">
+          <summary>{tr("Réglages", "Settings")}</summary>
+          <div className="ss-research-advanced__grid">
+            <label>
+              {tr("Source", "Source")}
+              <select className="ss-input" value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="provider" disabled={!available}>{tr("Collecte cloud", "Cloud collection")}</option>
+                <option value="browser">{tr("Mon navigateur", "My browser")}</option>
+              </select>
+            </label>
+            {[
+              { label: tr("Période (jours)", "Period (days)"), value: days, set: setDays, min: 1, max: 365 },
+              { label: tr("Comptes voulus", "Target accounts"), value: target, set: setTarget, min: 1, max: 50 },
+              { label: tr("Carrousels minimum (%)", "Minimum carousels (%)"), value: minShare, set: setMinShare, min: 0, max: 100 },
+              { label: tr("Vues cumulées minimum", "Minimum total views"), value: minViews, set: setMinViews, min: 0, max: 1e12 },
+              { label: tr("Vues médianes minimum", "Minimum median views"), value: minMedian, set: setMinMedian, min: 0, max: 1e10 },
+              { label: tr("Carrousels mesurés minimum", "Minimum measured carousels"), value: minPosts, set: setMinPosts, min: 1, max: 100 },
+              { label: tr("Pages max par compte", "Max pages per account"), value: maxPages, set: setMaxPages, min: 1, max: 10 },
+            ].map((field) => (
+              <label key={field.label}>
+                {field.label}
+                <input className="ss-input" type="number" required min={field.min} max={field.max} value={field.value} onChange={(event) => field.set(Number(event.target.value))} />
+              </label>
+            ))}
+            <label className="ss-research-advanced__check">
+              <input type="checkbox" checked={pivot} onChange={(event) => setPivot(event.target.checked)} />
+              {tr("Explorer les hashtags trouvés", "Explore discovered hashtags")}
+            </label>
+          </div>
+          {source === "browser" ? (
+            <p className="ss-research-note">
+              {tr("Le collecteur local doit tourner sur ton Mac. Ta session TikTok reste dans son profil Chrome dédié.", "The local collector must run on your Mac. Your TikTok session stays in its dedicated Chrome profile.")}{" "}
+              <a href="/research-collector.md" target="_blank" rel="noreferrer">{tr("Configurer", "Set up")}</a>
+            </p>
+          ) : null}
+        </details>
+
+        {!available && source === "provider" ? (
+          <p className="ss-research-note" role="status">
+            {tr("La collecte cloud n’est pas configurée. Passe sur ton collecteur navigateur dans les réglages.", "Cloud collection is not configured. Switch to your browser collector in the settings.")}
+          </p>
+        ) : null}
+      </section>
+
+      {error ? (
+        <div className="ss-research-error" role="alert">
+          <span>{error}</span>
+          <button className="ss-btn-ghost" type="button" onClick={() => setError("")}>{tr("Fermer", "Dismiss")}</button>
+        </div>
+      ) : null}
+
+      {running.map((job) => (
+        <RunLive
+          key={job.id}
+          job={job}
+          tr={tr}
+          statusName={statusName}
+          onPause={() => void control(job.id, "pause")}
+          onStop={() => void control(job.id, "stop")}
+        />
+      ))}
+
+      {jobs
+        .filter((job) => ["paused", "needs_attention", "error"].includes(job.status))
+        .map((job) => (
+          <div key={job.id} className="ss-research-paused" role="status">
+            <div>
+              <strong>{statusName(job.status)}</strong>
+              <span>{job.input.keywords.slice(0, 3).join(", ")}{job.error ? ` · ${job.error}` : ""}</span>
+            </div>
+            <div className="ss-research-paused__actions">
+              <button className="ss-btn-ghost" type="button" onClick={() => void control(job.id, "resume")}>{tr("Reprendre", "Resume")}</button>
+              <button className="ss-btn-ghost" type="button" onClick={() => void control(job.id, "resume", true)}>{tr("Reprendre avec mes réglages", "Resume with my settings")}</button>
+              <button className="ss-btn-ghost" type="button" onClick={() => void control(job.id, "stop")}>{tr("Arrêter", "Stop")}</button>
+            </div>
+          </div>
+        ))}
+
+      <nav className="ss-research-tabs lg lg--flat" aria-label={tr("Vues", "Views")}>
+        {(
+          [
+            ["accounts", tr("Comptes", "Accounts"), items.length],
+            ["formats", tr("Formats étudiés", "Studied formats"), studies.length],
+          ] as const
+        ).map(([id, label, count]) => (
+          <button key={id} type="button" className={tab === id ? "ss-btn-purple" : "ss-btn-ghost"} aria-pressed={tab === id} onClick={() => setTab(id)}>
+            {label} <span>{count}</span>
+          </button>
+        ))}
+      </nav>
+
+      {tab === "accounts" ? (
+        <>
+          <div className="ss-research-toolbar">
+            <input className="ss-input" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder={tr("Filtrer les comptes", "Filter accounts")} aria-label={tr("Filtrer les comptes", "Filter accounts")} />
+            <select className="ss-input" value={sort} onChange={(event) => setSort(event.target.value)} aria-label={tr("Classer par", "Sort by")}>
+              <option value="median">{tr("Vues médianes", "Median views")}</option>
+              <option value="ratio">{tr("Vues / abonné", "Views / follower")}</option>
+              <option value="followers">{tr("Abonnés", "Followers")}</option>
+            </select>
+            <a className="ss-btn-ghost" href="/app/mcp">{tr("Bâtir ma stratégie", "Build my strategy")}</a>
+          </div>
+
+          {loading ? (
+            <div className="ss-research-grid">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
+          ) : null}
+
+          {!loading && !shown.length && !pending.length ? (
+            <section className="ss-research-empty">
+              <h3>{tr("Rien à montrer pour l’instant", "Nothing to show yet")}</h3>
+              <p>{tr("Lance une recherche ci-dessus : les comptes apparaissent ici dès qu’ils sont trouvés, puis se remplissent avec leurs chiffres.", "Start a search above: accounts appear here as soon as they are found, then fill in with their numbers.")}</p>
+            </section>
+          ) : null}
+
+          <div className="ss-research-grid">
+            {shown.map(({ account, metrics, measuredAt }) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                metrics={metrics}
+                measuredAt={measuredAt}
+                verdict={verdictOf(account.handle)}
+                fresh={freshHandles.has(account.handle)}
+                tr={tr}
+                num={num}
+                compactNum={compactNum}
+                percent={percent}
+                reasonName={reasonName}
+                studying={studying}
+                onStudy={openStudy}
+                english={english}
+              />
+            ))}
+            {pending.map((candidate) => (
+              <article className="ss-research-card is-pending" key={candidate.handle} aria-busy="true">
+                <header>
+                  <span className="ss-research-card__avatar" aria-hidden />
+                  <span className="ss-research-card__id">
+                    <b>@{candidate.handle}</b>
+                    <span>{tr("mesure en attente", "waiting to be measured")}</span>
+                  </span>
+                </header>
+                <div className="ss-research-card__bars" aria-hidden>
+                  <i /><i /><i />
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {jobs.length ? (
+            <details className="ss-research-history" open={history} onToggle={(event) => setHistory(event.currentTarget.open)}>
+              <summary>{tr("Historique des recherches", "Search history")} ({jobs.length})</summary>
+              <ul>
+                {jobs.map((job) => (
+                  <li key={job.id}>
+                    <button type="button" className="ss-btn-ghost" onClick={() => setOpenRun(openRun === job.id ? null : job.id)}>
+                      {job.input.keywords.slice(0, 3).join(", ") || job.id.slice(0, 8)}
+                    </button>
+                    <span>
+                      {statusName(job.status)} · {job.progress.accepted}/{job.progress.target} {tr("retenus", "kept")} · {new Date(job.createdAt).toLocaleDateString(english ? "en-US" : "fr-FR")}
+                    </span>
+                    {openRun === job.id ? (
+                      <div className="ss-research-history__detail">
+                        {job.results.length ? (
+                          <table className="ss-research-table">
+                            <thead>
+                              <tr>
+                                <th>{tr("Compte", "Account")}</th>
+                                <th>{tr("Médiane", "Median")}</th>
+                                <th>{tr("Carrousels", "Carousels")}</th>
+                                <th>{tr("Résultat", "Result")}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {job.results.map((result) => (
+                                <tr key={result.handle}>
+                                  <td>
+                                    <a href={`https://www.tiktok.com/@${result.handle}`} target="_blank" rel="noreferrer">@{result.handle}</a>
+                                    <small>{result.coverage.complete ? tr("Période couverte", "Period covered") : tr("Échantillon partiel", "Partial sample")}</small>
+                                  </td>
+                                  <td>{num(result.metrics.medianViews)}</td>
+                                  <td>{result.metrics.measuredSlideshowPosts}</td>
+                                  <td>{result.accepted ? tr("Retenu", "Kept") : result.reasons.map(reasonName).join(" · ")}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p>{tr("Aucun compte mesuré dans cette recherche.", "No account measured in this search.")}</p>
+                        )}
+                        {job.input.source === "browser" ? (
+                          <p>{tr("Identifiant pour le collecteur : ", "Collector job ID: ")}<code>{job.id}</code></p>
+                        ) : null}
+                        {job.failures.length ? (
+                          <details>
+                            <summary>{tr("Erreurs conservées", "Saved errors")} ({job.failures.length})</summary>
+                            {job.failures.map((failure, index) => (
+                              <p key={index}>{failure.handle || failure.keyword} : {failure.error}</p>
+                            ))}
+                          </details>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "formats" ? (
+        <>
+          {!studies.length && !study ? (
+            <section className="ss-research-empty">
+              <h3>{tr("Lis un format, pas seulement ses chiffres", "Read a format, beyond its numbers")}</h3>
+              <p>{tr("Dans Comptes, ouvre les carrousels d’un profil puis choisis « Étudier ». L’étude garde chaque slide et son texte ; ton assistant peut ajouter son interprétation sourcée.", "Under Accounts, open a profile’s carousels and choose “Study”. The study keeps every slide and its text; your assistant can add an evidence-backed interpretation.")}</p>
+            </section>
+          ) : null}
+
+          {studies.length ? (
+            <div className="ss-research-study-list">
+              {studies.map((row) => (
+                <button
+                  className={`ss-btn-ghost ${study?.id === row.id ? "is-on" : ""}`}
+                  key={row.id}
+                  type="button"
+                  onClick={() => void api(`/api/research/studies/${row.id}`).then(setStudy).catch((err) => setError(err.message))}
+                >
+                  {row.interpretation?.name || row.caption.slice(0, 65) || row.postId} · {row.slides.length} slides
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {study ? (
+            <section className="ss-research-study">
+              <div className="ss-research-study__head">
+                <div>
+                  <h3>{study.interpretation?.name || tr("Étude du carrousel", "Carousel study")}</h3>
+                  <a href={study.sourceUrl} target="_blank" rel="noreferrer">{tr("Publication d’origine", "Original post")}</a>
+                  <p>
+                    {num(study.post?.views)} {tr("vues", "views")} · {tr("médiane du compte ", "account median ")}{num(study.baseline.medianViews)}
+                    {study.lift !== null ? ` · ×${study.lift.toFixed(1)}` : ""}
+                  </p>
+                </div>
+                <div className="ss-research-study__actions">
+                  <a className="ss-btn-ghost" href={`/api/research/studies/${study.id}/export`}>{tr("Télécharger (ZIP)", "Download (ZIP)")}</a>
+                  {study.status === "pending" ? (
+                    <button className="ss-btn-purple" type="button" disabled={studying} onClick={() => void continueStudy()}>
+                      {studying ? tr("Lecture…", "Reading…") : tr("Lire les slides suivantes", "Read remaining slides")}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="ss-research-slides">
+                {study.slides.map((slide) => (
+                  <article key={slide.index}>
+                    <img src={coverSrc(slide.image)} alt={`Slide ${slide.index}`} loading="lazy" />
+                    <strong>Slide {slide.index}</strong>
+                    <small>
+                      {slide.status === "pending"
+                        ? tr("À lire", "Pending")
+                        : slide.status === "unreadable"
+                          ? tr("Transcription incertaine", "Uncertain transcript")
+                          : `OCR ${num(slide.confidence)} %`}
+                    </small>
+                    <p>{slide.text}</p>
+                  </article>
+                ))}
+              </div>
+
+              {study.interpretation ? (
+                <div className="ss-research-interpretation">
+                  <h4>{tr("Interprétation de l’assistant", "Assistant interpretation")}</h4>
+                  {[
+                    [tr("Accroche", "Hook"), study.interpretation.hook],
+                    [tr("Narration", "Narrative"), study.interpretation.narrative],
+                    [tr("Motif visuel", "Visual pattern"), study.interpretation.visualPattern],
+                    [tr("Émotion et audience", "Emotion and audience"), `${study.interpretation.emotionalAngle} — ${study.interpretation.audience}`],
+                    [tr("Appel à l’action", "Call to action"), study.interpretation.cta],
+                    [tr("Adaptation à ton activité", "Business adaptation"), study.interpretation.adaptation],
+                    [tr("Hypothèse à tester", "Hypothesis to test"), study.interpretation.hypothesis],
+                  ].map(([label, text]) => (
+                    <div key={label}>
+                      <strong>{label}</strong>
+                      <p>{text}</p>
+                    </div>
+                  ))}
+                  <p className="ss-research-note">{tr("Slides citées : ", "Cited slides: ")}{study.interpretation.evidenceSlides.join(", ")}</p>
+                </div>
+              ) : (
+                <p className="ss-research-note">
+                  {tr("Les preuves sont prêtes pour ton assistant. Demande-lui d’analyser cette étude et d’enregistrer le format avec ses sources.", "Evidence is ready for your assistant. Ask it to analyse this study and save the format with its sources.")}
+                </p>
+              )}
+            </section>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Bandeau vivant : ce que la recherche fait maintenant, et ou elle en est. */
+function RunLive({
+  job,
+  tr,
+  statusName,
+  onPause,
+  onStop,
+}: {
+  job: Job;
+  tr: (fr: string, en: string) => string;
+  statusName: (s: string) => string;
+  onPause: () => void;
+  onStop: () => void;
+}) {
+  const { progress, current } = job;
+  const done = Math.min(progress.accepted, progress.target);
+  const ratio = progress.target ? done / progress.target : 0;
+  const line = current.label
+    ? current.kind === "search"
+      ? tr(`Recherche de comptes pour « ${current.label} »`, `Searching accounts for “${current.label}”`)
+      : tr(`Mesure de @${current.label}`, `Measuring @${current.label}`)
+    : tr("Préparation…", "Preparing…");
+
+  return (
+    <section className="ss-research-live" aria-live="polite">
+      <div className="ss-research-live__head">
+        <span className="ss-research-live__spinner" aria-hidden />
+        <div>
+          <strong>{line}</strong>
+          <span>
+            {statusName(job.status)} · {job.input.keywords.slice(0, 3).join(", ")}
+          </span>
+        </div>
+        <div className="ss-research-live__actions">
+          <button className="ss-btn-ghost lg-press" type="button" onClick={onPause}>{tr("Pause", "Pause")}</button>
+          <button className="ss-btn-ghost lg-press" type="button" onClick={onStop}>{tr("Arrêter", "Stop")}</button>
+        </div>
+      </div>
+
+      <div className="ss-research-live__bar" role="progressbar" aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={done}>
+        <i style={{ width: `${Math.round(ratio * 100)}%` }} />
+      </div>
+
+      <dl className="ss-research-live__stats">
+        {[
+          [tr("mots-clés", "keywords"), `${progress.keywordsDone}/${progress.keywordsTotal}`],
+          [tr("comptes trouvés", "accounts found"), String(progress.candidates)],
+          [tr("mesurés", "measured"), String(progress.measured)],
+          [tr("retenus", "kept"), `${progress.accepted}/${progress.target}`],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <article className="ss-research-card is-pending" aria-hidden>
+      <header>
+        <span className="ss-research-card__avatar" />
+        <span className="ss-research-card__id">
+          <b />
+          <span />
+        </span>
+      </header>
+      <div className="ss-research-card__bars">
+        <i /><i /><i />
+      </div>
+    </article>
+  );
+}
+
+function AccountCard({
+  account,
+  metrics,
+  measuredAt,
+  verdict,
+  fresh,
+  tr,
+  num,
+  compactNum,
+  percent,
+  reasonName,
+  studying,
+  onStudy,
+  english,
+}: {
+  account: Account;
+  metrics: Metrics;
+  measuredAt: string | null;
+  verdict: { accepted: boolean; reasons: string[] } | null;
+  fresh: boolean;
+  tr: (fr: string, en: string) => string;
+  num: (n: number | null | undefined) => string;
+  compactNum: (n: number | null | undefined) => string;
+  percent: (n: number | null | undefined) => string;
+  reasonName: (s: string) => string;
+  studying: boolean;
+  onStudy: (accountId: string, postId: string) => void;
+  english: boolean;
+}) {
+  const top = metrics.topPosts.slice(0, 4);
+  return (
+    <article className={`ss-research-card ${fresh ? "is-fresh" : ""}`}>
+      <header>
+        {account.avatar ? (
+          <img className="ss-research-card__avatar" src={coverSrc(account.avatar)} alt="" loading="lazy" />
+        ) : (
+          <span className="ss-research-card__avatar" aria-hidden />
+        )}
+        <span className="ss-research-card__id">
+          <b>
+            <a href={`https://www.tiktok.com/@${account.handle}`} target="_blank" rel="noreferrer">@{account.handle}</a>
+          </b>
+          <span>{account.niche || account.bio || tr("Sans description", "No description")}</span>
+        </span>
+        {verdict ? (
+          <span className={`ss-research-card__verdict ${verdict.accepted ? "is-ok" : "is-out"}`}>
+            {verdict.accepted ? tr("Retenu", "Kept") : reasonName(verdict.reasons[0] || "")}
+          </span>
+        ) : null}
+      </header>
+
+      <dl className="ss-research-card__stats">
+        {[
+          [tr("abonnés", "followers"), compactNum(account.followers)],
+          [tr("vues médianes", "median views"), compactNum(metrics.medianViews)],
+          [tr("carrousels", "carousels"), percent(metrics.slideshowShare)],
+          [tr("mesurés", "measured"), String(metrics.measuredSlideshowPosts)],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {metrics.confidence === "insufficient_data" ? (
+        <p className="ss-research-card__signal">{tr("Trop peu de carrousels pour conclure.", "Too few carousels to conclude.")}</p>
+      ) : metrics.repeatability === "single_post_dominated" ? (
+        <p className="ss-research-card__signal">{tr("La majorité des vues vient d’un seul post.", "Most views come from a single post.")}</p>
+      ) : null}
+
+      {top.length ? (
+        <div className="ss-research-card__posts">
+          <h4>{tr("Ses meilleurs carrousels", "Its best carousels")}</h4>
+          <ul>
+            {top.map((post) => (
+              <li key={post.id}>
+                <a href={post.url} target="_blank" rel="noreferrer" title={post.title || post.id}>
+                  {post.cover ? <img src={coverSrc(post.cover)} alt="" loading="lazy" /> : <span className="ss-research-card__nocover" aria-hidden />}
+                  <b>{compactNum(post.views)}</b>
+                </a>
+                <button
+                  className="ss-btn-ghost"
+                  type="button"
+                  disabled={studying || !post.images?.length}
+                  onClick={() => onStudy(account.id, post.id)}
+                  title={post.images?.length ? tr("Étudier le format", "Study format") : tr("Pas de slides à lire", "No slides to read")}
+                >
+                  {tr("Étudier", "Study")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <footer>
+        {measuredAt ? new Date(measuredAt).toLocaleDateString(english ? "en-US" : "fr-FR") : tr("Non mesuré", "Not measured")}
+        {" · "}
+        {account.researchCoverage?.complete ? tr("période couverte", "period covered") : tr("échantillon partiel", "partial sample")}
+        {" · "}
+        {num(metrics.samplePosts)} {tr("posts vus", "posts seen")}
+      </footer>
+    </article>
+  );
 }

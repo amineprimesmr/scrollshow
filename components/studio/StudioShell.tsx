@@ -145,6 +145,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     onMcp ||
     onCalendar ||
     pathname.startsWith("/app/home") ||
+    pathname.startsWith("/app/discover") ||
     pathname.startsWith("/app/unshadowban");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 

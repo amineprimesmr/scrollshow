@@ -22,7 +22,7 @@ export const startResearchSchema = z.object({
 });
 export type ResearchInput = z.infer<typeof startResearchSchema>;
 export type ResearchFilters = z.infer<typeof filtersSchema>;
-export type Candidate = { handle: string; nickname?: string; bio?: string; followers?: number; sourceUrl: string; keyword: string; posts: AccountVideo[]; cursor?: number; pages?: number; measuredPosts?: AccountVideo[] };
+export type Candidate = { handle: string; nickname?: string; bio?: string; avatar?: string; followers?: number; sourceUrl: string; keyword: string; posts: AccountVideo[]; cursor?: number; pages?: number; measuredPosts?: AccountVideo[] };
 export type ResearchResult = { accountId: string; handle: string; measuredAt: string; accepted: boolean; reasons: string[]; coverage: { complete: boolean; pages: number; reason: string }; posts: AccountVideo[]; followers: number };
 export type ResearchJob = {
   id: string; userId: string; projectId?: string; requestId?: string; input: ResearchInput;

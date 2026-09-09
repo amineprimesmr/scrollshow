@@ -131,6 +131,13 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 - Le cron recherche tourne **toutes les cinq minutes via GitHub Actions**
   (`.github/workflows/publish-scheduled.yml`, job `research`), pas via `vercel.json` :
   Vercel Hobby refuse cette fréquence.
+- L'UI (`ResearchView.tsx`) est une page unique : une seule saisie (mots-clés,
+  ou `@compte` pour analyser), réglages repliés, bandeau vivant par recherche en
+  cours (étape courante via `publicJob().current`, compteurs, barre animée), et
+  les comptes arrivent **au fur et à mesure** — candidats trouvés en carte
+  « mesure en attente » (`publicJob().pending`), puis carte mesurée avec ses
+  meilleurs carrousels. Sondage 2,5 s + `advance` toutes les 3 s pendant une
+  recherche, 20 s au repos. Ne pas revenir à un affichage de fin de tâche.
 - Le collecteur Chrome est optionnel et local (`SCROLLSHOW_COLLECTOR_TOKEN`,
   `scripts/research-browser.ts`) ; ce jeton ne doit jamais atteindre le navigateur client.
 
@@ -144,6 +151,13 @@ Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes`
 `npm run typecheck`, `npm test` (84 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
+
+## Overview avec beaucoup de comptes
+`components/studio/AccountsFan.tsx` : l'espacement de l'éventail sature
+(`spread()` = tanh + résidu), et `paint()` met à l'échelle sur la **largeur** de
+la scène autant que sur sa hauteur (`fanExtent`), donc 20 ou 200 comptes tiennent
+toujours dans le cadre. Au-delà de 6 comptes, une recherche, une vue « Liste » et
+un compteur « i / n » apparaissent. Les avatars passent par `coverSrc()`.
 
 ## Projets (multi-business)
 `lib/projects.ts` (logique pure, testée) + `lib/project-context.ts` (cookie

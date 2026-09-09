@@ -14,6 +14,12 @@ export function publicJob(job: ResearchJob) {
   return { id:job.id, input:job.input, status:job.status, phase:job.phase, createdAt:job.createdAt, updatedAt:job.updatedAt, revision:job.revision,
     progress:{ keywordsDone:job.keywordIndex, keywordsTotal:job.input.keywords.length, candidates:job.candidates.length, measured:job.processed.length, accepted:job.results.filter(r=>r.accepted).length, target:job.input.target },
     exhausted:job.exhausted, failures:job.failures, events:job.events, error:job.error,
+    // Ce que la tache fait maintenant, et ce qui attend d'etre mesure : l'UI
+    // affiche les comptes trouves des la phase de recherche, avant leur mesure.
+    current: job.phase==="search"
+      ? { kind:"search" as const, label: job.input.keywords[job.keywordIndex] ?? null }
+      : { kind:"measure" as const, label: job.candidates.find(c=>!job.processed.includes(c.handle))?.handle ?? null },
+    pending: job.candidates.filter(c=>!job.processed.includes(c.handle)).slice(0,30).map(c=>({ handle:c.handle, nickname:c.nickname ?? null, avatar:c.avatar ?? null, followers:c.followers ?? null, keyword:c.keyword })),
     results:job.results.map(({posts,...r})=>({...r, metrics:researchMetrics(posts,r.followers,Date.parse(r.measuredAt),job.input.filters.days)})),
     nextAction:job.status==="needs_attention" ? "resolve_in_collector_then_resume" : job.status==="queued" ? (job.input.source==="browser"?"run_browser_collector":"advance_research") : null,
   };
@@ -62,7 +68,7 @@ export async function claimResearch(user:SessionUser,id:string, source:ResearchI
     return j.phase==="search"?{...base,kind:"search",keyword:j.input.keywords[j.keywordIndex],cursor:j.searchCursor,searchId:j.searchId}:{...base,kind:"measure",candidate:j.candidates.find(c=>!j.processed.includes(c.handle))!};
   });
 }
-export type StepResult = { kind:"search";candidates:Candidate[];hasMore:boolean;cursor:number;searchId?:string } | {kind:"measure";posts:AccountVideo[];followers?:number;nickname?:string;bio?:string;cursor?:number;hasMore:boolean;complete?:boolean} | {kind:"error";error:string;needsAttention?:boolean};
+export type StepResult = { kind:"search";candidates:Candidate[];hasMore:boolean;cursor:number;searchId?:string } | {kind:"measure";posts:AccountVideo[];followers?:number;nickname?:string;bio?:string;avatar?:string;cursor?:number;hasMore:boolean;complete?:boolean} | {kind:"error";error:string;needsAttention?:boolean};
 export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask,result:StepResult) {
   if(j.lease?.token!==task.token||j.lease.until<Date.now()) throw new Error("research_lease_expired");
   j.lease=undefined;
@@ -89,7 +95,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
   if(result.kind==="measure"&&task.kind==="measure") {
     const c=j.candidates.find(c=>c.handle===task.candidate.handle)!;
     const merged=new Map((c.measuredPosts??[]).map(p=>[p.id,p]));result.posts.forEach(p=>merged.set(p.id,p));c.measuredPosts=[...merged.values()].slice(0,1000);c.pages=(c.pages??0)+1;
-    if(result.followers!==undefined)c.followers=result.followers;if(result.nickname)c.nickname=result.nickname;if(result.bio)c.bio=result.bio;
+    if(result.followers!==undefined)c.followers=result.followers;if(result.nickname)c.nickname=result.nickname;if(result.bio)c.bio=result.bio;if(result.avatar)c.avatar=result.avatar;
     const pageOld=result.posts.length>0&&result.posts.every(p=>p.createdAt>0&&p.createdAt*1000<Date.now()-j.input.filters.days*86400000);
     const covered=!result.hasMore||pageOld||result.complete===true;
     const finished=covered||c.pages>=j.input.maxPages||j.input.source==="browser";
@@ -99,7 +105,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     let a=data.accounts.find(a=>a.userId===j.userId&&a.handle===c.handle);
     if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
     const cache=new Map((a.videos??[]).map(p=>[p.id,p]));posts.forEach(p=>cache.set(p.id,p));
-    Object.assign(a,{nickname:c.nickname??a.nickname,bio:c.bio??a.bio,followers:c.followers??a.followers,videos:[...cache.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,2000),videosFetchedAt:now,lastSyncAt:now,
+    Object.assign(a,{nickname:c.nickname??a.nickname,bio:c.bio??a.bio,avatar:c.avatar??a.avatar,followers:c.followers??a.followers,videos:[...cache.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,2000),videosFetchedAt:now,lastSyncAt:now,
       researchCoverage:{complete:covered,pages:c.pages,windowDays:j.input.filters.days,measuredAt:now,reason:covered?"window_or_profile_end":finished?"page_limit":"collecting"}});
     a.avgViews=researchMetrics(posts,a.followers).averageViews??0;
     if(finished) {
@@ -124,7 +130,7 @@ export async function advanceResearch(user:SessionUser,id:string) {
     else {
       if(!await consumeLimit(`research-provider:${new Date().toISOString().slice(0,10)}`,Number(process.env.RESEARCH_PROVIDER_DAILY_LIMIT||1000),86400000))throw new Error("research_provider_daily_limit");
       const [page,profile]=await Promise.all([fetchAccountVideoPage(task.candidate.handle,task.candidate.cursor??0),task.candidate.pages?Promise.resolve(null):fetchTikTokProfile(task.candidate.handle).catch(()=>null)]);
-      result={kind:"measure",posts:page.videos.map(p=>({...p,url:p.url||`https://www.tiktok.com/@${task.candidate.handle}/${p.kind==="photo"?"photo":"video"}/${p.id}`})),hasMore:page.hasMore,cursor:page.cursor,followers:profile?.followers??task.candidate.followers,nickname:profile?.nickname,bio:profile?.bio};
+      result={kind:"measure",posts:page.videos.map(p=>({...p,url:p.url||`https://www.tiktok.com/@${task.candidate.handle}/${p.kind==="photo"?"photo":"video"}/${p.id}`})),hasMore:page.hasMore,cursor:page.cursor,followers:profile?.followers??task.candidate.followers,nickname:profile?.nickname,bio:profile?.bio,avatar:profile?.avatar};
     }
   } catch(e) { result={kind:"error",error:e instanceof Error?e.message:"research_failed"}; }
   try{return await completeResearch(user,task,result);}catch(e){if(e instanceof Error&&e.message==="research_lease_expired")return getResearchJob(user,id);throw e;}

@@ -11,6 +11,6 @@ export const collectedPostSchema=z.object({
 const candidate=z.object({handle:z.string().regex(/^[a-z0-9._]{1,40}$/),nickname:z.string().max(150).optional(),bio:z.string().max(2000).optional(),followers:z.number().finite().min(0).optional(),sourceUrl:z.string().max(200),keyword:z.string().max(100),posts:z.array(collectedPostSchema).max(100)});
 export const collectorResultSchema=z.discriminatedUnion("kind",[
   z.object({kind:z.literal("search"),candidates:z.array(candidate).max(100),hasMore:z.boolean(),cursor:z.number().finite().min(0),searchId:z.string().max(200).optional()}),
-  z.object({kind:z.literal("measure"),posts:z.array(collectedPostSchema).max(1000),followers:z.number().finite().min(0).optional(),nickname:z.string().max(150).optional(),bio:z.string().max(2000).optional(),cursor:z.number().finite().min(0).optional(),hasMore:z.boolean(),complete:z.boolean().optional()}),
+  z.object({kind:z.literal("measure"),posts:z.array(collectedPostSchema).max(1000),followers:z.number().finite().min(0).optional(),nickname:z.string().max(150).optional(),bio:z.string().max(2000).optional(),avatar:z.string().url().max(600).optional(),cursor:z.number().finite().min(0).optional(),hasMore:z.boolean(),complete:z.boolean().optional()}),
   z.object({kind:z.literal("error"),error:z.string().max(200),needsAttention:z.boolean().optional()}),
 ]);
