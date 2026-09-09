@@ -199,6 +199,36 @@ function appStoreProfile(url: URL, html: string): Partial<BusinessProfile> {
   };
 }
 
+/**
+ * Une fiche App Store passe par l'API publique d'Apple plutot que par le HTML :
+ * la page est protegee (404 sur un slug perime, 429 des deux requetes de suite)
+ * alors que l'API repond toujours a partir du seul identifiant de l'app.
+ */
+async function appleLookup(url: URL): Promise<Partial<BusinessProfile> | null> {
+  const id = url.pathname.match(/\/id(\d{6,})/)?.[1];
+  if (!id) return null;
+  const country = url.pathname.match(/^\/([a-z]{2})\//)?.[1] || "us";
+  try {
+    const res = await safeFetchBytes(
+      new URL(`https://itunes.apple.com/lookup?id=${id}&country=${country}`),
+      { maxBytes: 400_000, headers: { Accept: "application/json" } },
+    );
+    const data = JSON.parse(res.bytes.toString("utf8")) as {
+      results?: { trackName?: string; description?: string; artworkUrl512?: string; artworkUrl100?: string; sellerUrl?: string; genres?: string[] }[];
+    };
+    const app = data.results?.[0];
+    if (!app?.trackName) return null;
+    return {
+      name: app.trackName,
+      tagline: (app.description || "").split("\n").find((line) => line.trim().length > 20)?.trim() || "",
+      logo: app.artworkUrl512 || app.artworkUrl100,
+      keywords: (app.genres || []).slice(0, 8),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ── main ─────────────────────────────────────────────────────────────── */
 
 export async function analyzeBusiness(rawUrl: string): Promise<BusinessProfile> {
@@ -224,10 +254,24 @@ export async function analyzeBusiness(rawUrl: string): Promise<BusinessProfile> 
     };
   }
 
-  const { html, finalUrl } = await fetchHtml(url);
+  // Apple sert des 404/429 aux robots : on interroge son API avant la page, et
+  // la fiche reste analysable meme quand le HTML est refuse.
+  const apple = host === "apps.apple.com" ? await appleLookup(url) : null;
+  let page: { html: string; finalUrl: URL };
+  try {
+    page = await fetchHtml(url);
+  } catch (error) {
+    if (!apple) throw error;
+    page = { html: "", finalUrl: url };
+  }
+  const { html, finalUrl } = page;
   const signals: string[] = [];
   const kind = detectKind(finalUrl, html, signals);
-  const store = kind === "mobile_app" && /apps\.apple\.com|play\.google\.com/.test(finalUrl.hostname) ? appStoreProfile(finalUrl, html) : {};
+  const store = apple
+    ? { ...appStoreProfile(finalUrl, html), ...Object.fromEntries(Object.entries(apple).filter(([, value]) => (Array.isArray(value) ? value.length : value))) }
+    : kind === "mobile_app" && /apps\.apple\.com|play\.google\.com/.test(finalUrl.hostname)
+      ? appStoreProfile(finalUrl, html)
+      : {};
 
   const siteName = meta(html, "og:site_name") || meta(html, "application-name");
   const title = meta(html, "og:title") || tag(html, "title");
@@ -242,7 +286,9 @@ export async function analyzeBusiness(rawUrl: string): Promise<BusinessProfile> 
   const language = (html.match(/<html[^>]+lang=["']([a-z]{2})/i)?.[1] || meta(html, "og:locale").slice(0, 2) || "").toLowerCase();
   const brandColor = meta(html, "theme-color").match(/#[0-9a-f]{3,8}/i)?.[0] || "";
   const headings = [...allTags(html, "h1", 3), ...allTags(html, "h2", 6)];
-  const keywords = meta(html, "keywords")
+  const keywords = store.keywords?.length
+    ? store.keywords
+    : meta(html, "keywords")
     ? meta(html, "keywords").split(/\s*,\s*/).filter(Boolean).slice(0, 8)
     : keywordsFrom([tagline, ...headings].join(" "));
   const socials = findSocials(html);
