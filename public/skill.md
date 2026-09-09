@@ -7,6 +7,8 @@ description: Research TikTok accounts, compare measured slideshow performance, p
 
 Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, not a local Chrome automation app. Call `whoami` first for the business, plan, capabilities and quotas. Do not claim unavailable capabilities: discovery needs a configured search provider, detailed public-post metrics need a data provider, and live publication needs an authorized TikTok account.
 
+**Language.** These instructions are in English; your answers are not. Always write to the user in the language they use, and keep it for the whole session. Most ScrollShow users write French. Carousel copy, hooks and captions follow the audience of the business in `whoami`, not the language of this document.
+
 
 ## Install and activate
 
