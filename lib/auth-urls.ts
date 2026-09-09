@@ -35,6 +35,13 @@ export function signupUrl(opts?: {
   return query ? `/signup?${query}` : "/signup";
 }
 
+export function githubStartUrl(opts?: {
+  next?: string | null;
+  mode?: "signin" | "signup" | null;
+}) {
+  return googleStartUrl(opts).replace("/api/auth/google", "/api/auth/github");
+}
+
 export function googleStartUrl(opts?: {
   next?: string | null;
   mode?: "signin" | "signup" | null;

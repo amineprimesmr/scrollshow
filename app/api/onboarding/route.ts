@@ -53,7 +53,7 @@ const businessSchema = z.object({
         videos: z.number(),
         avgViews: z.number(),
         photoShare: z.number(),
-        source: z.enum(["tiktok", "monid"]),
+        source: z.enum(["tiktok", "api"]),
       })
       .nullable()
       .optional(),
@@ -95,7 +95,6 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!session.emailVerified) return NextResponse.json({ error: "email_verification_required" }, { status: 403 });
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const body = parsed.data;
   if (body.action === "progress") {

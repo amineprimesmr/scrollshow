@@ -66,6 +66,7 @@ export type User = {
   name: string;
   passwordHash?: string;
   googleId?: string;
+  githubId?: string;
   plan: Plan;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
@@ -339,6 +340,7 @@ export type PublicUser = SessionUser & {
   createdAt: string;
   hasPassword: boolean;
   hasGoogle: boolean;
+  hasGithub: boolean;
   settings: UserSettings;
   business: BusinessProfile | null;
   onboarded: boolean;

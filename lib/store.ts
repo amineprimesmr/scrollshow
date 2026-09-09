@@ -151,6 +151,7 @@ export function publicUser(user: User) {
     createdAt: user.createdAt,
     hasPassword: Boolean(user.passwordHash),
     hasGoogle: Boolean(user.googleId),
+    hasGithub: Boolean(user.githubId),
     settings: resolveSettings(user),
     business: user.business || null,
     onboarded: Boolean(user.onboarding?.completedAt),

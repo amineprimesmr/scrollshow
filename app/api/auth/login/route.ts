@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "credentials" }, { status: 401 });
   }
   if (!user.passwordHash) {
-    return NextResponse.json({ error: "google" }, { status: 401 });
+    return NextResponse.json({ error: user.githubId && !user.googleId ? "github" : "google" }, { status: 401 });
   }
   if (!(await verifyPassword(parsed.data.password, user.passwordHash))) {
     return NextResponse.json({ error: "credentials" }, { status: 401 });

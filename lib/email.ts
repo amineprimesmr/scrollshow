@@ -4,8 +4,16 @@ import { accountEmailHtml } from "./email-template";
 
 export function emailConfigured() { return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM); }
 
+/** En dev sans cle Resend, les emails de compte sont ecrits dans la console du serveur au lieu d'etre envoyes. */
+export function emailDevFallback() { return !emailConfigured() && process.env.NODE_ENV !== "production"; }
+export function emailAvailable() { return emailConfigured() || emailDevFallback(); }
+
 export async function sendAccountEmail(to: string, subject: string, text: string, buttonLabel?: string) {
-  if (!emailConfigured()) throw new Error("email_not_configured");
+  if (!emailConfigured()) {
+    if (!emailDevFallback()) throw new Error("email_not_configured");
+    console.info(`\n[email dev] a: ${to}\n[email dev] sujet: ${subject}\n${text}\n`);
+    return { id: "dev-console" };
+  }
   const day = new Date().toISOString().slice(0,10);
   if (!(await consumeLimit(`email-global-day:${day}`, 90, 86400000)) || !(await consumeLimit(`email-global-month:${day.slice(0,7)}`, 2700, 32*86400000))) throw new Error("free_email_capacity_reached");
   const body = JSON.stringify({ from: process.env.EMAIL_FROM, to: [to], subject, text, html: accountEmailHtml(subject, text, buttonLabel) });

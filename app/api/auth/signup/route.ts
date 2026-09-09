@@ -1,7 +1,7 @@
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
 import { deliverVerification } from "@/lib/email-verification";
-import { emailConfigured } from "@/lib/email";
+import { emailAvailable } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { consumeLimit } from "@/lib/rate-limit";
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   const email = parsed.data.email.toLowerCase();
-  if (!emailConfigured()) return NextResponse.json({ error: "email_not_configured" }, { status: 503 });
+  if (!emailAvailable()) return NextResponse.json({ error: "email_not_configured" }, { status: 503 });
   if (!(await consumeLimit(`signup:${email}`, 5, 3600000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
   const passwordHash = await hashPassword(parsed.data.password);
   const user = await updateStore((data) => {

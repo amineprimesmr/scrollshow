@@ -61,6 +61,7 @@ export async function GET() {
               createdAt: new Date().toISOString(),
               hasPassword: false,
               hasGoogle: false,
+              hasGithub: false,
               settings: resolveSettings(null),
             },
       };

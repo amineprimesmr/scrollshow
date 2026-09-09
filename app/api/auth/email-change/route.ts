@@ -1,5 +1,5 @@
 import { readSession, verifyPassword } from "@/lib/auth";
-import { accountLink, emailConfigured, sendAccountEmail } from "@/lib/email";
+import { accountLink, emailAvailable, sendAccountEmail } from "@/lib/email";
 import { issueEmailChange, redeemEmailChange } from "@/lib/email-verification";
 import { consumeLimit } from "@/lib/rate-limit";
 import { readStore } from "@/lib/store";
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
   const session = await readSession();
   if (!session?.emailVerified) return Response.json({ error: "verified_login_required" }, { status: 401 });
-  if (!emailConfigured()) return Response.json({ error: "email_not_configured" }, { status: 503 });
+  if (!emailAvailable()) return Response.json({ error: "email_not_configured" }, { status: 503 });
   if (!(await consumeLimit(`email-change:${session.id}`, 3, 3600000))) return Response.json({ error: "rate_limited" }, { status: 429 });
   const user = (await readStore()).users.find(u => u.id === session.id);
   // Retain an independent login method after unlinking the old Google identity.

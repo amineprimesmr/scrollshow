@@ -1,5 +1,5 @@
 import { readSession, setSessionCookie } from "@/lib/auth";
-import { emailConfigured } from "@/lib/email";
+import { emailAvailable } from "@/lib/email";
 import { deliverVerification, redeemVerification } from "@/lib/email-verification";
 import { consumeLimit } from "@/lib/rate-limit";
 import { publicUser } from "@/lib/store";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   }
   const user = await readSession();
   if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
-  if (!emailConfigured()) return Response.json({ error: "email_not_configured" }, { status: 503 });
+  if (!emailAvailable()) return Response.json({ error: "email_not_configured" }, { status: 503 });
   if (!(await consumeLimit(`verification:${user.id}`, 3, 3600000))) return Response.json({ error: "rate_limited" }, { status: 429 });
   try { await deliverVerification(user.id); return Response.json({ ok: true }); }
   catch { return Response.json({ error: "email_delivery_failed" }, { status: 503 }); }

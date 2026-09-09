@@ -24,6 +24,10 @@ const unlinkSchema = z.object({
   action: z.literal("unlink_google"),
 });
 
+const unlinkGithubSchema = z.object({
+  action: z.literal("unlink_github"),
+});
+
 const preferencesSchema = z.object({
   action: z.literal("preferences"),
   locale: z.enum(["fr", "en"]),
@@ -37,7 +41,7 @@ const preferencesSchema = z.object({
   notifyPublishFailure: z.boolean(),
 });
 
-const schema = z.discriminatedUnion("action", [profileSchema, passwordSchema, unlinkSchema, preferencesSchema]);
+const schema = z.discriminatedUnion("action", [profileSchema, passwordSchema, unlinkSchema, unlinkGithubSchema, preferencesSchema]);
 
 export async function PATCH(request: Request) {
   const session = await readSession();
@@ -86,12 +90,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ user: publicUser(updated) });
   }
 
-  if (body.action === "unlink_google") {
+  if (body.action === "unlink_google" || body.action === "unlink_github") {
+    const unlinkGoogle = body.action === "unlink_google";
     const updated = await updateStore((data) => {
       const user = data.users.find((item) => item.id === session.id);
       if (!user) return null;
-      if (!user.passwordHash) return "need_password" as const;
-      user.googleId = undefined;
+      // Never leave an account with no way back in.
+      const remaining = unlinkGoogle ? user.githubId : user.googleId;
+      if (!user.passwordHash && !remaining) return "need_password" as const;
+      if (unlinkGoogle) user.googleId = undefined;
+      else user.githubId = undefined;
       return user;
     });
     if (updated === "need_password") return NextResponse.json({ error: "need_password" }, { status: 400 });

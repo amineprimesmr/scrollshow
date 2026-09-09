@@ -1,7 +1,7 @@
 import { setSessionCookie } from "@/lib/auth";
 import { afterAuthPath, signupUrl } from "@/lib/auth-urls";
-import { exchangeGoogleCode, fetchGoogleProfile } from "@/lib/google-auth";
-import { findUserByEmail, publicUser, seedAccounts, updateStore } from "@/lib/store";
+import { exchangeGithubCode, fetchGithubProfile } from "@/lib/github-auth";
+import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { User } from "@/lib/types";
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state") || "";
 
-  const raw = (await cookies()).get("ss_google_oauth")?.value;
-  (await cookies()).delete("ss_google_oauth");
+  const raw = (await cookies()).get("ss_github_oauth")?.value;
+  (await cookies()).delete("ss_github_oauth");
   let stored: OAuthState = {};
   try {
     stored = raw ? (JSON.parse(raw) as OAuthState) : {};
@@ -29,23 +29,25 @@ export async function GET(request: Request) {
       new URL(signupUrl({ next: stored.next, mode: stored.mode === "signin" ? "signin" : null, error }), origin),
     );
 
-  if (err) return fail(err === "access_denied" ? "google_denied" : "google");
-  if (!code || !stored.state || stored.state !== state) return fail("google");
+  if (err) return fail(err === "access_denied" ? "github_denied" : "github");
+  if (!code || !stored.state || stored.state !== state) return fail("github");
 
   try {
-    const tokens = await exchangeGoogleCode(origin, code);
-    const profile = await fetchGoogleProfile(tokens.access_token);
+    const tokens = await exchangeGithubCode(origin, code);
+    const profile = await fetchGithubProfile(tokens.access_token);
     const user = await updateStore((data) => {
       const existing =
-        data.users.find((item) => item.googleId === profile.googleId) ||
+        data.users.find((item) => item.githubId === profile.githubId) ||
         findUserByEmail(data, profile.email);
       if (existing) {
+        // An unconfirmed password account proves nothing: drop the password rather
+        // than hand the session to whoever registered the address first.
         if (!existing.emailVerifiedAt && !existing.googleId && !existing.githubId) {
           existing.passwordHash = undefined;
           existing.sessionVersion = (existing.sessionVersion || 0) + 1;
         }
         existing.emailVerifiedAt = new Date().toISOString();
-        existing.googleId = profile.googleId;
+        existing.githubId = profile.githubId;
         if (profile.name && !existing.name) existing.name = profile.name;
         return existing;
       }
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
         id: crypto.randomUUID(),
         email: profile.email,
         name: profile.name,
-        googleId: profile.googleId,
+        githubId: profile.githubId,
         emailVerifiedAt: new Date().toISOString(),
         plan: "free" as const,
         createdAt: new Date().toISOString(),
@@ -65,6 +67,6 @@ export async function GET(request: Request) {
     await setSessionCookie(publicUser(user));
     return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));
   } catch {
-    return fail("google");
+    return fail("github");
   }
 }

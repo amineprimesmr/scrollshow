@@ -2,23 +2,29 @@
 
 import { BrandMark } from "@/components/BrandMark";
 import { SignupVerification } from "@/components/SignupVerification";
-import { afterAuthPath, googleStartUrl, signupUrl } from "@/lib/auth-urls";
+import { afterAuthPath, githubStartUrl, googleStartUrl, signupUrl } from "@/lib/auth-urls";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import "./signup.css";
 
-const SETUP_STEPS = [
-  { title: "1. Crée ton compte", text: "Avec Google ou ton adresse email. Aucune carte demandée à cette étape." },
-  { title: "2. Prépare ton espace", text: "Présente ton activité et personnalise ton profil. Le branchement de ton assistant peut attendre." },
-  { title: "3. Active ton accès", text: "Choisis ton offre à la fin de l’onboarding. Paiement sécurisé sur Stripe, puis accès au studio." },
-];
 
-const GOOGLE_ERRORS: Record<string, string> = {
+const OAUTH_ERRORS: Record<string, string> = {
   google_not_configured: "La connexion Google est momentanément indisponible.",
   google_denied: "La connexion Google a été annulée.",
   google: "Connexion Google interrompue. Réessaie.",
+  github_not_configured: "La connexion GitHub est momentanément indisponible.",
+  github_denied: "La connexion GitHub a été annulée.",
+  github: "Connexion GitHub interrompue. Vérifie qu’une adresse email vérifiée est associée à ton compte GitHub.",
 };
+
+function GithubMark() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  );
+}
 
 function GoogleMark() {
   return (
@@ -44,9 +50,10 @@ function SignupForm() {
   const params = useSearchParams();
   const signin = params.get("mode") === "signin";
   const next = params.get("next");
-  const queryError = GOOGLE_ERRORS[params.get("error") || ""] || "";
+  const queryError = OAUTH_ERRORS[params.get("error") || ""] || "";
   const [step, setStep] = useState<"email" | "password" | "verification">("email");
   const [verificationToken, setVerificationToken] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
   const capturedToken = useRef<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -65,17 +72,19 @@ function SignupForm() {
     }
     fetch("/api/auth/me").then(r => r.json()).then(json => {
       if (!active) return;
-      if (json.user?.emailVerified) router.replace(afterAuthPath(json.user.plan, next, json.user.onboarded));
+      if (json.user && !(params.get("verify") === "1" && !json.user.emailVerified)) router.replace(afterAuthPath(json.user.plan, next, json.user.onboarded));
       else if (json.user) { setEmail(json.user.email); setStep("verification"); }
       else if (params.get("verify") === "1") setStep("verification");
     }).catch(() => {}).finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
   }, [router, next, params]);
 
-  const googleHref = useMemo(
-    () => googleStartUrl({ next: next || "/app", mode: signin ? "signin" : null }),
+  const oauthOptions = useMemo(
+    () => ({ next: next || "/app", mode: signin ? ("signin" as const) : null }),
     [next, signin],
   );
+  const googleHref = useMemo(() => googleStartUrl(oauthOptions), [oauthOptions]);
+  const githubHref = useMemo(() => githubStartUrl(oauthOptions), [oauthOptions]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,8 +111,10 @@ function SignupForm() {
       if (res.status === 401) {
         setError(
           json.error === "google"
-            ? "Utilise « Continuer avec Google » pour ce compte."
-            : "Adresse email ou mot de passe incorrect.",
+            ? "Ce compte utilise Google. Continue avec Google."
+            : json.error === "github"
+              ? "Ce compte utilise GitHub. Continue avec GitHub."
+              : "Adresse email ou mot de passe incorrect.",
         );
         return;
       }
@@ -111,8 +122,7 @@ function SignupForm() {
         setError("Connexion impossible. Réessaie dans un instant.");
         return;
       }
-      if (json.user?.emailVerified) router.replace(afterAuthPath(json.user.plan, next, json.user.onboarded !== false));
-      else { setPassword(""); setStep("verification"); }
+      router.replace(afterAuthPath(json.user?.plan, next, json.user?.onboarded !== false));
       return;
     }
     if (res.status === 409) {
@@ -123,110 +133,134 @@ function SignupForm() {
       setError(res.status === 503 ? "L’envoi d’emails est momentanément indisponible. Réessaie plus tard." : "Utilise une adresse valide et un mot de passe d’au moins 8 caractères.");
       return;
     }
-    setPassword(""); setStep("verification");
+    setPassword(""); setVerificationSent(true); setStep("verification");
   }
 
   return (
     <main className="ss-signup">
-      <section className="ss-signup__form-col">
-        <div className="ss-signup__form">
-          <Link href="/" className="ss-signup__brand">
-            <BrandMark size={28} />
-            ScrollShow
-          </Link>
-          {checking ? <div className="ss-signup__stage" role="status"><p className="ss-signup__sub">Préparation de ton espace…</p></div> : step === "verification" ? <SignupVerification email={email} token={verificationToken} next={next} onSignIn={async () => { const response = await fetch("/api/auth/logout", { method: "POST" }); if (!response.ok) throw new Error("Déconnexion indisponible. Réessaie."); capturedToken.current = ""; setVerificationToken(""); setStep("email"); setError(""); router.replace(signupUrl({ next, mode: "signin" })); }} /> : <form className="ss-signup__stage" key={`${signin}-${step}`} onSubmit={onSubmit} aria-busy={pending}>
-          <h1 className="ss-signup__title">
-            {signin ? "Ravi de te retrouver" : step === "password" ? "Sécurise ton compte" : "Crée ton espace ScrollShow"}
-          </h1>
-          <p className="ss-signup__sub">
-            {signin ? "Connecte-toi pour reprendre là où tu en étais." : step === "password" ? "Un mot de passe, puis on prépare ton espace ensemble." : "Ton compte d’abord. Ton espace personnalisé ensuite."}
-          </p>
+      <div className="ss-signup__form">
+        {checking ? (
+          <div className="ss-signup__stage" role="status">
+            <p className="ss-signup__sub">Préparation de ton espace…</p>
+          </div>
+        ) : step === "verification" ? (
+          <SignupVerification
+            email={email}
+            token={verificationToken}
+            next={next}
+            sent={verificationSent}
+            onSignIn={async () => {
+              const response = await fetch("/api/auth/logout", { method: "POST" });
+              if (!response.ok) throw new Error("Déconnexion indisponible. Réessaie.");
+              capturedToken.current = "";
+              setVerificationToken("");
+              setStep("email");
+              setError("");
+              router.replace(signupUrl({ next, mode: "signin" }));
+            }}
+          />
+        ) : (
+          <form className="ss-signup__stage" key={`${signin}-${step}`} onSubmit={onSubmit} aria-busy={pending}>
+            <Link href="/" className="ss-signup__brand" aria-label="ScrollShow, accueil">
+              <BrandMark size={26} />
+            </Link>
 
-          {!signin && step === "password" ? (
-            <div className="ss-signup__or" style={{ marginTop: 28 }}>
-              {email}
-              <button type="button" className="ss-signup__text-button" disabled={pending} onClick={() => { setStep("email"); setError(""); }}>Modifier</button>
-            </div>
-          ) : (
-            <>
-              <a className="ss-signup__google" href={googleHref}>
-                <GoogleMark />
-                Continuer avec Google
-              </a>
-              <div className="ss-signup__or">ou</div>
-            </>
-          )}
+            <h1 className="ss-signup__title">
+              {signin ? "Ravi de te retrouver" : step === "password" ? "Sécurise ton compte" : "Crée ton espace ScrollShow"}
+            </h1>
 
-          {signin || step === "email" ? (
-            <>
-              <label htmlFor="signup-email">Email</label>
-              <input
-                id="signup-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="toi@exemple.fr"
-                disabled={pending}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </>
-          ) : null}
+            <p className="ss-signup__sub">
+              {signin ? (
+                <>Pas encore de compte ? <Link href={signupUrl({ next })}>Créer mon espace</Link>.</>
+              ) : step === "password" ? (
+                "Un mot de passe, puis on prépare ton espace ensemble."
+              ) : (
+                <>Déjà un compte ? <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>.</>
+              )}
+            </p>
 
-          {signin || step === "password" ? (
-            <>
-              <label htmlFor="signup-password" style={signin ? { marginTop: 16 } : undefined}>
-                Mot de passe
-              </label>
-              <input
-                id="signup-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                minLength={signin ? 1 : 8}
-                autoComplete={signin ? "current-password" : "new-password"}
-                placeholder={signin ? "Ton mot de passe" : "8 caractères minimum"}
-                disabled={pending}
-                autoFocus={!signin}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-              <button type="button" className="ss-signup__text-button" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? "Masquer" : "Afficher"} le mot de passe</button>
-            </>
-          ) : null}
-
-          {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
-          {signin && <p><Link href="/recover">Mot de passe oublié ?</Link></p>}
-          <button className="ss-signup__submit" type="submit" disabled={pending}>
-            {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer avec mon email" : "Créer mon compte"}
-          </button>
-          <p className="ss-signup__foot">
-            {signin ? (
-              <>
-                Pas encore de compte ? <Link href={signupUrl({ next })}>Créer mon espace</Link>
-              </>
+            {!signin && step === "password" ? (
+              <div className="ss-signup__identity">
+                <span>{email}</span>
+                <button type="button" className="ss-signup__text-button" disabled={pending} onClick={() => { setStep("email"); setError(""); }}>
+                  Modifier
+                </button>
+              </div>
             ) : (
               <>
-                Déjà un compte ?{" "}
-                <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>
+                <div className="ss-signup__providers">
+                  <a className="ss-signup__google" href={googleHref}>
+                    <GoogleMark />
+                    Google
+                  </a>
+                  <a className="ss-signup__google" href={githubHref}>
+                    <GithubMark />
+                    GitHub
+                  </a>
+                </div>
+                <div className="ss-signup__or">ou</div>
               </>
             )}
-          </p>
-        </form>}
-        </div>
-      </section>
 
-      <aside className="ss-signup__proof" aria-hidden>
-        <div className="ss-signup__panel">
-          <h2>Ton espace, étape par étape.</h2>
-          <div className="ss-signup__quotes">
-            {SETUP_STEPS.map(step => <article key={step.title} className="ss-quote">
-              <h3>{step.title}</h3><p>{step.text}</p>
-            </article>)}
-          </div>
-        </div>
-      </aside>
+            {signin || step === "email" ? (
+              <div className="ss-signup__field">
+                <label htmlFor="signup-email">Email</label>
+                <input
+                  id="signup-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="toi@exemple.fr"
+                  disabled={pending}
+                  autoFocus
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </div>
+            ) : null}
+
+            {signin || step === "password" ? (
+              <div className="ss-signup__field">
+                <div className="ss-signup__field-head">
+                  <label htmlFor="signup-password">Mot de passe</label>
+                  {signin ? (
+                    <Link href="/recover">Mot de passe oublié ?</Link>
+                  ) : (
+                    <button type="button" className="ss-signup__text-button" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>
+                      {showPassword ? "Masquer" : "Afficher"}
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="signup-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={signin ? 1 : 8}
+                  autoComplete={signin ? "current-password" : "new-password"}
+                  placeholder={signin ? "Ton mot de passe" : "8 caractères minimum"}
+                  disabled={pending}
+                  autoFocus={!signin}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
+            ) : null}
+
+            {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
+
+            <button className="ss-signup__submit" type="submit" disabled={pending}>
+              {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer" : "Créer mon compte"}
+            </button>
+
+            <p className="ss-signup__foot">
+              {signin ? "En te connectant, tu acceptes nos " : "En créant ton compte, tu acceptes nos "}
+              <Link href="/cgu">conditions</Link> et notre <Link href="/confidentialite">politique de confidentialité</Link>.
+            </p>
+          </form>
+        )}
+      </div>
     </main>
   );
 }

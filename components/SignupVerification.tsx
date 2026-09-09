@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { afterAuthPath } from "@/lib/auth-urls";
 import { useRouter } from "next/navigation";
 
-export function SignupVerification({ email, token, next, onSignIn }: { email: string; token: string; next: string | null; onSignIn: () => Promise<void> }) {
+export function SignupVerification({ email, token, next, sent, onSignIn }: { email: string; token: string; next: string | null; sent: boolean; onSignIn: () => Promise<void> }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -53,15 +53,15 @@ export function SignupVerification({ email, token, next, onSignIn }: { email: st
       <svg width="42" height="42" viewBox="0 0 48 48" fill="none"><rect x="6" y="11" width="36" height="26" rx="6" stroke="currentColor" strokeWidth="2"/><path d="m8 14 13 10a5 5 0 0 0 6 0l13-10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
       <span className="ss-signup__mail-badge">{token && !expired ? "✓" : "↗"}</span>
     </div>
-    <p className="ss-signup__eyebrow">{token && !expired ? "Une dernière étape" : "Direction ta boîte mail"}</p>
-    <h1 ref={heading} className="ss-signup__title" tabIndex={-1}>{expired ? "Un nouveau lien ?" : token ? "Tu y es presque." : "Ton invitation t’attend."}</h1>
-    <p className="ss-signup__sub">{expired ? "Renvoie un lien pour reprendre là où tu en étais." : token ? "Confirme ton adresse pour ouvrir ton espace." : "Clique sur le bouton de confirmation dans l’email."}</p>
+    <p className="ss-signup__eyebrow">{token && !expired ? "Une dernière étape" : sent ? "Direction ta boîte mail" : "Compte à confirmer"}</p>
+    <h1 ref={heading} className="ss-signup__title" tabIndex={-1}>{expired ? "Un nouveau lien ?" : token ? "Tu y es presque." : sent ? "Ton invitation t’attend." : "Confirme ton adresse."}</h1>
+    <p className="ss-signup__sub">{expired ? "Renvoie un lien pour reprendre là où tu en étais." : token ? "Confirme ton adresse pour ouvrir ton espace." : sent ? "Clique sur le bouton de confirmation dans l’email." : "Ton compte existe déjà, il lui manque juste la confirmation. Ouvre le lien reçu à la création, ou demande-en un nouveau — aucun email ne vient d’être envoyé."}</p>
     {!token && email && <div className="ss-signup__email-tag">{email}</div>}
-    {!token && !message && <p className="ss-signup__waiting"><span aria-hidden="true" />En attente de confirmation</p>}
+    {!token && !message && sent && <p className="ss-signup__waiting"><span aria-hidden="true" />En attente de confirmation</p>}
     <div role="status" aria-live="polite">{message && <p className="ss-signup__verify-status">{message}</p>}</div>
     {error && <p className="ss-signup__error" role="alert">{error}</p>}
     <button type="button" className={`ss-signup__submit ${!token || expired ? "ss-signup__resend" : ""}`} disabled={busy || ((!token || expired) && cooldown > 0)} onClick={() => void submit(Boolean(token) && !expired)}>
-      {busy ? "Un instant…" : token && !expired ? "Confirmer et continuer" : cooldown ? `Renvoyer dans ${cooldown} s` : "Renvoyer le lien"}
+      {busy ? "Un instant…" : token && !expired ? "Confirmer et continuer" : cooldown ? `Renvoyer dans ${cooldown} s` : sent ? "Renvoyer le lien" : "M’envoyer un lien"}
     </button>
     <details className="ss-signup__verify-help"><summary>Besoin d’aide ?</summary>
       <p>Vérifie les indésirables. Le lien reste valable 24 heures. Cette page reprend automatiquement après confirmation dans ce navigateur.</p>

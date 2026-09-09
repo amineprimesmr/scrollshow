@@ -273,6 +273,10 @@ export function SettingsView() {
     await patch({ action: "unlink_google" });
   }
 
+  async function unlinkGithub() {
+    await patch({ action: "unlink_github" });
+  }
+
   async function disconnect(id: string, platform: string) {
     setBusy(id);
     // /api/tiktok/disconnect both revokes the token and removes the channel —
@@ -384,6 +388,7 @@ export function SettingsView() {
             <div className="ss-settings-hero__meta">
               <span className="ss-pill">{user.plan === "free" ? "Free" : user.plan}</span>
               {user.hasGoogle ? <span className="ss-pill">Google</span> : null}
+              {user.hasGithub ? <span className="ss-pill">GitHub</span> : null}
               {user.hasPassword ? <span className="ss-pill">{t("Mot de passe", "Password", english)}</span> : null}
               <span className="ss-pill is-mute">
                 {t("Créé le", "Created", english)}{" "}
@@ -507,8 +512,31 @@ export function SettingsView() {
                   </a>
                 )}
               </div>
-              {user.hasGoogle && !user.hasPassword ? (
+              {user.hasGoogle && !user.hasPassword && !user.hasGithub ? (
                 <p className="ss-muted">{t("Crée un mot de passe avant de délier Google.", "Create a password before unlinking Google.", english)}</p>
+              ) : null}
+            </div>
+
+            <div className="ss-set-card">
+              <h2>GitHub</h2>
+              <p className="ss-lead">
+                {user.hasGithub
+                  ? t("Connexion GitHub active sur ce compte.", "GitHub sign-in is linked to this account.", english)
+                  : t("Lie GitHub pour te connecter en un clic. L’email GitHub vérifié doit être le même.", "Link GitHub for one-click sign-in. The verified GitHub email must match.", english)}
+              </p>
+              <div className="ss-form-actions">
+                {user.hasGithub ? (
+                  <button className="ss-btn-ghost" type="button" disabled={busy === "unlink_github" || (!user.hasPassword && !user.hasGoogle)} onClick={() => void unlinkGithub()}>
+                    {t("Délier GitHub", "Unlink GitHub", english)}
+                  </button>
+                ) : (
+                  <a className="ss-btn-purple" href="/api/auth/github?next=/app/settings">
+                    {t("Lier GitHub", "Link GitHub", english)}
+                  </a>
+                )}
+              </div>
+              {user.hasGithub && !user.hasPassword && !user.hasGoogle ? (
+                <p className="ss-muted">{t("Crée un mot de passe avant de délier GitHub.", "Create a password before unlinking GitHub.", english)}</p>
               ) : null}
             </div>
           </div>
@@ -1103,10 +1131,37 @@ function NotificationsTab({
   useEffect(() => {
     const ok = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     setSupported(ok);
-    if (ok) setPermission(Notification.permission);
     void loadConfig();
     void loadDevices();
-    if (ok) void checkSubscribed();
+    if (!ok) return;
+
+    setPermission(Notification.permission);
+    void checkSubscribed();
+
+    // La permission peut changer hors de la page (réglages du site dans le
+    // navigateur). On la resuit en direct plutôt que d'exiger un rechargement.
+    const sync = () => {
+      setPermission(Notification.permission);
+      void checkSubscribed();
+    };
+    let status: PermissionStatus | null = null;
+    navigator.permissions
+      ?.query({ name: "notifications" as PermissionName })
+      .then((result) => {
+        status = result;
+        result.onchange = sync;
+      })
+      .catch(() => {});
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sync);
+      if (status) status.onchange = null;
+    };
   }, []);
 
   async function loadConfig() {
@@ -1254,7 +1309,11 @@ function NotificationsTab({
             </div>
             {permission === "denied" ? (
               <p className="ss-muted">
-                {t("Débloque les notifications dans les réglages du site de ton navigateur, puis recharge la page.", "Unblock notifications in your browser's site settings, then reload this page.", english)}
+                {t(
+                  "Ton navigateur bloque les notifications pour ce site. Clique sur l’icône à gauche de l’adresse, passe « Notifications » sur « Autoriser » : le bouton se réactive tout seul.",
+                  "Your browser is blocking notifications for this site. Click the icon on the left of the address bar and set “Notifications” to “Allow” — the button re-enables itself.",
+                  english,
+                )}
               </p>
             ) : null}
 

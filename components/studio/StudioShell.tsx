@@ -40,6 +40,26 @@ function TrialBanner() {
   );
 }
 
+function VerifyBanner() {
+  const { user, english } = useStudio();
+  const [state, setState] = useState<"idle" | "busy" | "sent" | "failed">("idle");
+  if (!user || user.emailVerified) return null;
+  const label = state === "busy" ? t("Envoi…", "Sending…", english)
+    : state === "sent" ? t("Lien envoyé", "Link sent", english)
+    : state === "failed" ? t("Réessayer", "Retry", english)
+    : t("Envoyer le lien", "Send the link", english);
+  return (
+    <div className="ss-trial">
+      <span>{t("Confirme ton adresse email pour publier et activer ton accès", "Confirm your email address to publish and activate your access", english)}</span>
+      <button type="button" className="ss-trial__btn" disabled={state === "busy" || state === "sent"} onClick={async () => {
+        setState("busy");
+        const response = await fetch("/api/auth/verification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "request" }) }).catch(() => null);
+        setState(response?.ok ? "sent" : "failed");
+      }}>{label}</button>
+    </div>
+  );
+}
+
 function SidebarProfile() {
   const { user, english } = useStudio();
   const router = useRouter();
@@ -223,6 +243,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <section className="ss-main">
+        <VerifyBanner />
         <TrialBanner />
         <div className="ss-main__body ss-page-enter" key={pathname}>
           {!hideHeader ? (
