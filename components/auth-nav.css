@@ -1,0 +1,216 @@
+/* Rail flottant repris du menu de la landing (.sn-rail), mais son contenu
+   montre les trois etapes qui menent au studio. Les tokens --lg-* sont poses
+   localement : ces pages sont sombres en dur, elles ne suivent pas le theme. */
+
+.ss-anav {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 110;
+  display: flex;
+  justify-content: center;
+  padding: 12px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.ss-anav__rail {
+  --lg-rgb: 16 17 21;
+  --lg-alpha: 0.62;
+  --lg-hi: 255 255 255;
+  --lg-hi-a: 0.2;
+  --lg-shade: 0 0 0;
+  --lg-shade-a: 0.55;
+  --lg-blur: 22px;
+  --lg-sat: 1.4;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  width: min(46rem, 100%);
+  min-height: 54px;
+  padding: 6px 14px 6px 16px;
+  border-radius: 999px;
+  color: #fff;
+  animation: ss-anav-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ss-anav-in {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ss-anav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.ss-anav__brand:hover { opacity: 0.8; }
+
+/* Les etapes */
+.ss-anav__steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-anav__step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ss-anav__pill {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 1.5px;
+  background: transparent;
+}
+
+/* L'etape en cours porte la bordure conique tournante de la page d'inscription. */
+.ss-anav__step[data-state="current"] .ss-anav__pill {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.ss-anav__spin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 300%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 250deg,
+    rgb(255 255 255 / 0.2) 285deg,
+    #ffffff 318deg,
+    rgb(255 255 255 / 0.55) 340deg,
+    transparent 360deg
+  );
+  animation: ss-anav-spin 2.8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes ss-anav-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.ss-anav__label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: #6a6a6a;
+  transition: color 0.3s ease;
+}
+
+.ss-anav__step[data-state="current"] .ss-anav__label {
+  background: #080808;
+  color: #fff;
+}
+
+.ss-anav__step[data-state="done"] .ss-anav__label { color: #b4b4b4; }
+
+/* Pastille de rang : chiffre, puis coche une fois l'etape passee. */
+.ss-anav__mark {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ss-anav__step[data-state="done"] .ss-anav__mark {
+  border-color: transparent;
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.ss-anav__step[data-state="current"] .ss-anav__mark {
+  border-color: rgb(255 255 255 / 0.55);
+}
+
+.ss-anav__sep {
+  width: 14px;
+  height: 1px;
+  flex: none;
+  background: rgb(255 255 255 / 0.16);
+}
+
+.ss-anav__step[data-state="done"] + .ss-anav__step .ss-anav__sep { background: rgb(255 255 255 / 0.4); }
+
+.ss-anav__end {
+  justify-self: end;
+  font-size: 12.5px;
+  color: #6a6a6a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ss-anav__end a { color: #b4b4b4; text-decoration: none; }
+.ss-anav__end a:hover { color: #fff; }
+
+.ss-anav__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ss-anav :focus-visible { outline: 2px solid rgb(255 255 255 / 0.7); outline-offset: 3px; }
+
+/* Sous 720px le rail ne garde que l'etape en cours et son rang. */
+@media (max-width: 720px) {
+  .ss-anav__rail {
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding: 6px 14px;
+  }
+
+  .ss-anav__brand span { display: none; }
+  .ss-anav__steps { justify-self: end; }
+  .ss-anav__end { display: none; }
+
+  .ss-anav__step[data-state="done"],
+  .ss-anav__step[data-state="todo"] { display: none; }
+
+  .ss-anav__step[data-state="current"] .ss-anav__sep { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-anav__rail,
+  .ss-anav__spin { animation: none !important; }
+}

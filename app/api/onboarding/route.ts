@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     const user = await updateStore((data) => {
       const item = data.users.find((entry) => entry.id === session.id);
       if (!item) return null;
-      // The user's own logo (uploaded at step 1) wins over the one found on the site.
+      // Un logo deja televerse par l'utilisateur l'emporte sur celui trouve sur le site.
       const uploaded = item.business?.logo && item.business.logo.startsWith("/api/i/") ? item.business.logo : "";
       item.business = { ...body.business, tiktok: body.business.tiktok ?? null, logo: uploaded || body.business.logo };
       return item;

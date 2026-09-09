@@ -44,7 +44,7 @@ html:has(.ss-signup) body.grain { background-image: none; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 56px 20px 24px;
+  padding: 104px 20px 24px;
 }
 
 /* Pastille a bordure conique tournante */
@@ -487,8 +487,8 @@ html:has(.ss-signup) body.grain { background-image: none; }
 
 .ss-signup__mail-art {
   position: relative;
-  width: 68px;
-  height: 68px;
+  width: 64px;
+  height: 64px;
   display: grid;
   place-items: center;
   margin: 0 auto 22px;
@@ -500,14 +500,6 @@ html:has(.ss-signup) body.grain { background-image: none; }
 }
 
 .ss-signup__mail-art svg { width: 32px; height: 32px; }
-
-.ss-signup__mail-orbit {
-  position: absolute;
-  inset: -8px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 29px;
-  animation: ss-wl-pulse 3s ease-out 2;
-}
 
 .ss-signup__mail-badge {
   position: absolute;
@@ -524,55 +516,20 @@ html:has(.ss-signup) body.grain { background-image: none; }
   font-size: 13px;
 }
 
-.ss-signup__eyebrow {
-  margin: 0 0 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #6a6a6a;
-}
+.ss-signup__verify-status { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: #d4d4d4; }
 
-.ss-signup__email-tag {
-  display: inline-block;
-  width: auto;
-  max-width: 100%;
-  margin-top: 4px;
-  padding: 9px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 14px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.ss-signup__waiting {
+/* Une seule ligne d'aide, deux actions separees par un point median. */
+.ss-signup__verify-help {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin: 20px 0 0;
-  font-size: 12px;
-  color: #8d8d8d;
+  gap: 10px;
+  margin: 14px 0 0;
+  color: #4d4d4d;
+  font-size: 12.5px;
 }
 
-.ss-signup__waiting span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: ss-wl-pulse 2s ease-in-out infinite;
-}
-
-.ss-signup__verify-status { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: #d4d4d4; }
-
-.ss-signup__verify-help { margin-top: 20px; font-size: 12.5px; line-height: 1.65; color: #6a6a6a; }
-.ss-signup__verify-help summary { cursor: pointer; width: fit-content; margin: 0 auto; list-style: none; }
-.ss-signup__verify-help summary::-webkit-details-marker { display: none; }
-.ss-signup__verify-help summary:hover,
-.ss-signup__verify-help[open] summary { color: #fff; }
-.ss-signup__verify-help p { margin: 12px 0 6px; }
+.ss-signup__verify-help .ss-signup__text-button { margin: 0; padding: 0; font-size: 12.5px; }
 
 .ss-signup :is(input, button, a, summary):focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 3px; }
 .ss-signup :is(button, a) { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -618,7 +575,7 @@ html:has(.ss-signup) body.grain { background-image: none; }
 }
 
 @media (max-width: 560px) {
-  .ss-signup__hero { padding: 40px 16px 20px; }
+  .ss-signup__hero { padding: 88px 16px 20px; }
   .ss-signup__card { padding: 32px 20px 22px; border-radius: 34px; }
   .ss-signup__shell { border-radius: 36px; }
   .ss-signup input { font-size: 16px; }

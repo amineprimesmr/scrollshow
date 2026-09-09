@@ -1,7 +1,7 @@
 "use client";
 
 import { Atmosphere } from "@/components/Atmosphere";
-import { BrandMark } from "@/components/BrandMark";
+import { AuthNav } from "@/components/AuthNav";
 import { AssistantStarter } from "@/components/AssistantStarter";
 import { OnboardingPayment } from "@/components/OnboardingPayment";
 import { hasStudioAccess } from "@/lib/plans";
@@ -41,6 +41,23 @@ const KIND_ICON: Record<BusinessKind, string> = {
   media: "📰",
   other: "✨",
 };
+
+const GENERIC_MAILBOX = new Set([
+  "contact", "hello", "info", "bonjour", "team", "admin", "sales", "support",
+  "service", "commercial", "noreply", "no-reply", "mail", "email", "office", "help",
+]);
+
+function firstNameFromEmail(email: string) {
+  const local = (email.split("@")[0] || "").toLowerCase();
+  const first = local.split(/[._+\-0-9]+/).filter(Boolean)[0] || "";
+  if (first.length < 2 || GENERIC_MAILBOX.has(first)) return "";
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+/** Un prenom deja stocke qui n'est que le nom de boite generique ne vaut rien. */
+function usableName(stored: string) {
+  return GENERIC_MAILBOX.has(stored.trim().toLowerCase()) ? "" : stored.trim();
+}
 
 function fmt(n: number) {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
@@ -129,7 +146,7 @@ function OnboardingInner() {
         else {
           if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 3) setStep(json.step as Step);
         }
-        setName(me.name || "");
+        setName(usableName(me.name || "") || firstNameFromEmail(me.email));
         setCompany(json.company || "");
         setLogo(json.logo || "");
         if (me.business?.url) {
@@ -175,7 +192,7 @@ function OnboardingInner() {
       const json = await post({ action: "profile", name, company, logo: logo.startsWith("data:") ? logo : null });
       setUser(json.user);
       if (json.user?.business?.logo) setLogo(json.user.business.logo);
-      go(1);
+      go(2);
     } catch {
       setError(t("Impossible d’enregistrer. Réessaie.", "Could not save. Try again."));
     } finally {
@@ -207,6 +224,9 @@ function OnboardingInner() {
       const [json] = await Promise.all([post({ action: "analyze", url }), new Promise((r) => window.setTimeout(r, 3200))]);
       const found: BusinessProfile = json.business;
       const merged: BusinessProfile = { ...found, name: found.name || company, logo: logo || found.logo };
+      // Ce que l'analyse trouve alimente l'etape suivante plutot que d'etre ressaisi.
+      if (!company.trim() && merged.name) setCompany(merged.name);
+      if (!logo && merged.logo) setLogo(merged.logo);
       setStage(stages.length);
       setBusiness(merged);
       setManual(false);
@@ -228,6 +248,12 @@ function OnboardingInner() {
 
   function startManual() {
     setManual(true);
+    if (!company.trim() && url.trim()) {
+      // « boutique-machin.fr » donne « Boutique Machin » : mieux que rien a corriger.
+      const host = url.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "";
+      const guess = host.split(".")[0].replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      if (guess) setCompany(guess.slice(0, 60));
+    }
     setBusiness({
       name: company,
       url: url.trim(),
@@ -274,7 +300,10 @@ function OnboardingInner() {
     try {
       const json = await post({ action: "business", business: { ...business, name: business.name || company } });
       setUser(json.user);
-      go(2);
+      // Le profil reprend ce que l'analyse a trouve : plus rien a retaper.
+      if (!company.trim() && business.name) setCompany(business.name);
+      if (!logo && business.logo) setLogo(business.logo);
+      go(1);
     } catch {
       setError(t("Impossible d’enregistrer. Réessaie.", "Could not save. Try again."));
     } finally {
@@ -328,8 +357,8 @@ function OnboardingInner() {
 
   /* ── render ─────────────────────────────────────────────────────────── */
   const titles: Record<Step, [string, string]> = {
-    0: [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Deux infos, et on s’occupe du reste.", "Two details, and we take it from there.")],
-    1: [t("Ton business", "Your business"), t("Colle le lien de ton site, ta boutique, ton app ou ton TikTok. On l’analyse.", "Paste your site, store, app or TikTok link. We analyze it.")],
+    0: [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
+    1: [t("On a rempli ce qu’on a trouvé", "We filled in what we found"), t("Vérifie, corrige si besoin. C’est tout ce qu’on te demande.", "Check it, fix anything that is off. That is all we ask.")],
     2: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
     3: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
     4: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
@@ -341,81 +370,15 @@ function OnboardingInner() {
     <main className="ss-onb">
       <LiquidGlassDefs />
       <Atmosphere />
-      <header className="ss-onb__top">
-        <span className="ss-onb__brand">
-          <span className="ss-onb__brand-spin" aria-hidden />
-          <span className="ss-onb__brand-label">
-            <BrandMark size={15} />
-            ScrollShow
-          </span>
-        </span>
-        {user ? <span className="ss-onb__who">{user.email}</span> : null}
-      </header>
+      <AuthNav current={step >= 4 ? "access" : "workspace"} end={user ? user.email : null} />
 
       <section className="ss-onb__stage" key={step}>
         <h1 className={`ss-onb__title ${stepClass}`}>{titles[step][0]}</h1>
         <p className={`ss-onb__sub ${stepClass}`}>{titles[step][1]}</p>
 
         <div className={`ss-onb__card ${stepClass}`}>
-          {/* ── 0 · profile ── */}
+          {/* ── 0 · lien du business + analyse ── */}
           {step === 0 ? (
-            <form
-              className="ss-onb-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveProfile();
-              }}
-            >
-              <div className="ss-onb-row">
-                <label className="ss-onb-field">
-                  <span>{t("Ton prénom", "Your first name")}</span>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Amine" maxLength={40} autoFocus required />
-                </label>
-                <label className="ss-onb-field">
-                  <span>{t("Ton entreprise ou ta marque", "Your company or brand")}</span>
-                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ScrollShow" maxLength={60} required />
-                </label>
-              </div>
-              <div
-                className={`ss-onb-drop ${logo ? "has-logo" : ""}`}
-                onClick={() => fileRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  onLogoFile(e.dataTransfer.files?.[0]);
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " " ? fileRef.current?.click() : null)}
-              >
-                {logo ? <img src={logo} alt="" /> : <span className="ss-onb-drop__icon">＋</span>}
-                <div>
-                  <b>{logo ? t("Logo ajouté", "Logo added") : t("Logo (optionnel)", "Logo (optional)")}</b>
-                  <span>{t("PNG, JPG ou WebP · 5 Mo max", "PNG, JPG or WebP · 5 MB max")}</span>
-                </div>
-                {logo ? (
-                  <button
-                    type="button"
-                    className="ss-onb-link"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLogo("");
-                    }}
-                  >
-                    {t("Retirer", "Remove")}
-                  </button>
-                ) : null}
-                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogoFile(e.target.files?.[0])} />
-              </div>
-              {error ? <p className="ss-onb-error">{error}</p> : null}
-              <button className="ss-onb-cta" type="submit" disabled={busy || !name.trim() || !company.trim()}>
-                {busy ? <span className="ss-onb-spin" /> : t("Continuer", "Continue")}
-              </button>
-            </form>
-          ) : null}
-
-          {/* ── 1 · business link + analysis ── */}
-          {step === 1 ? (
             <div className="ss-onb-form">
               {!analyzing && !revealed ? (
                 <>
@@ -425,7 +388,7 @@ function OnboardingInner() {
                       <input
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
-                        placeholder={t("monsite.com · apps.apple.com/… · play.google.com/… · @tiktok", "mysite.com · apps.apple.com/… · play.google.com/… · @tiktok")}
+                        placeholder={t("monsite.com", "mysite.com")}
                         inputMode="url"
                         autoFocus
                         onKeyDown={(e) => (e.key === "Enter" ? void analyze() : null)}
@@ -436,10 +399,9 @@ function OnboardingInner() {
                     </div>
                   </label>
                   <ul className="ss-onb-hints">
-                    <li>🧩 {t("Site ou SaaS", "Website or SaaS")}</li>
-                    <li>🛒 {t("Boutique Shopify, Woo…", "Shopify, Woo store…")}</li>
-                    <li>📱 {t("Fiche App Store / Play Store", "App Store / Play Store listing")}</li>
-                    <li>🎥 {t("Profil TikTok", "TikTok profile")}</li>
+                    <li><img src="/assets/platforms/website.svg" alt="" width="18" height="18" />SaaS</li>
+                    <li><img src="/assets/platforms/shopify.svg" alt="" width="18" height="18" />{t("E-commerce", "E-commerce")}</li>
+                    <li><img src="/assets/platforms/app-store.svg" alt="" width="18" height="18" />{t("App mobile", "Mobile app")}</li>
                   </ul>
                   {error ? <p className="ss-onb-error">{error}</p> : null}
                   <button type="button" className="ss-onb-link ss-onb-link--center" onClick={startManual}>
@@ -566,6 +528,63 @@ function OnboardingInner() {
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {/* ── 1 · profil, pre-rempli par l'analyse ── */}
+          {step === 1 ? (
+            <form
+              className="ss-onb-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveProfile();
+              }}
+            >
+              <div className="ss-onb-row">
+                <label className="ss-onb-field">
+                  <span>{t("Ton prénom", "Your first name")}</span>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Amine" maxLength={40} autoFocus required />
+                </label>
+                <label className="ss-onb-field">
+                  <span>{t("Ton entreprise ou ta marque", "Your company or brand")}</span>
+                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ScrollShow" maxLength={60} required />
+                </label>
+              </div>
+              <div
+                className={`ss-onb-drop ${logo ? "has-logo" : ""}`}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  onLogoFile(e.dataTransfer.files?.[0]);
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " " ? fileRef.current?.click() : null)}
+              >
+                {logo ? <img src={logo} alt="" /> : <span className="ss-onb-drop__icon">＋</span>}
+                <div>
+                  <b>{logo ? t("Logo ajouté", "Logo added") : t("Logo (optionnel)", "Logo (optional)")}</b>
+                  <span>{t("PNG, JPG ou WebP · 5 Mo max", "PNG, JPG or WebP · 5 MB max")}</span>
+                </div>
+                {logo ? (
+                  <button
+                    type="button"
+                    className="ss-onb-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLogo("");
+                    }}
+                  >
+                    {t("Retirer", "Remove")}
+                  </button>
+                ) : null}
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogoFile(e.target.files?.[0])} />
+              </div>
+              {error ? <p className="ss-onb-error">{error}</p> : null}
+              <button className="ss-onb-cta" type="submit" disabled={busy || !name.trim() || !company.trim()}>
+                {busy ? <span className="ss-onb-spin" /> : t("Continuer", "Continue")}
+              </button>
+            </form>
           ) : null}
 
           {/* ── 2 · connect Claude ── */}

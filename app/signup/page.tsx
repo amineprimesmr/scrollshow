@@ -1,13 +1,14 @@
 "use client";
 
 import { Atmosphere } from "@/components/Atmosphere";
-import { BrandMark } from "@/components/BrandMark";
+import { AuthNav } from "@/components/AuthNav";
 import { SignupVerification } from "@/components/SignupVerification";
 import { afterAuthPath, githubStartUrl, googleStartUrl, signupUrl } from "@/lib/auth-urls";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import "./signup.css";
+import "../liquid-glass.css";
 
 
 const OAUTH_ERRORS: Record<string, string> = {
@@ -62,6 +63,7 @@ function SignupForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [accountExists, setAccountExists] = useState(false);
   useEffect(() => {
     let active = true;
     const token = capturedToken.current ?? (new URLSearchParams(window.location.hash.slice(1)).get("token") || "");
@@ -90,6 +92,7 @@ function SignupForm() {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setAccountExists(false);
     if (!signin && step === "email") {
       setStep("password");
       return;
@@ -127,7 +130,8 @@ function SignupForm() {
       return;
     }
     if (res.status === 409) {
-      setError("Un compte existe déjà avec cette adresse. Connecte-toi pour reprendre.");
+      setAccountExists(true);
+      setError("Un compte existe déjà avec cette adresse.");
       return;
     }
     if (!res.ok) {
@@ -137,7 +141,6 @@ function SignupForm() {
     setPassword(""); setVerificationSent(true); setStep("verification");
   }
 
-  const badge = step === "verification" ? "Confirmation" : signin ? "Connexion" : "Création de compte";
   const title = step === "verification"
     ? "Plus qu'une étape"
     : signin
@@ -150,19 +153,12 @@ function SignupForm() {
     <main className="ss-signup">
       <Atmosphere />
       <div className="ss-signup__noise" aria-hidden />
+      <AuthNav
+        current="account"
+        end={signin ? <Link href={signupUrl({ next })}>Créer un compte</Link> : <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>}
+      />
 
       <section className="ss-signup__hero">
-        <Link href="/" className="ss-signup__badge-wrap" aria-label="ScrollShow, accueil">
-          <span className="ss-signup__badge-glow" aria-hidden />
-          <span className="ss-signup__badge">
-            <span className="ss-signup__badge-spin" aria-hidden />
-            <span className="ss-signup__badge-label">
-              <BrandMark size={15} />
-              {badge}
-            </span>
-          </span>
-        </Link>
-
         <h1 className="ss-signup__title">{title}</h1>
 
         <div className="ss-signup__shell">
@@ -280,6 +276,17 @@ function SignupForm() {
                 ) : null}
 
                 {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
+
+                {accountExists ? (
+                  <button
+                    type="button"
+                    className="ss-signup__submit ss-signup__resend"
+                    disabled={pending}
+                    onClick={() => { setAccountExists(false); setError(""); setPassword(""); router.push(signupUrl({ next, mode: "signin" })); }}
+                  >
+                    Me connecter avec cette adresse
+                  </button>
+                ) : null}
 
                 <button className="ss-signup__submit" type="submit" disabled={pending}>
                   {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer" : "Créer mon compte"}
