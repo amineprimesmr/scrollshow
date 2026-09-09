@@ -145,7 +145,6 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   /* ---------------- animation state lives in refs: no React work per frame ---------------- */
   const stageRef = useRef<HTMLDivElement>(null);
   const nodes = useRef<(HTMLDivElement | null)[]>([]);
-  const handleRef = useRef<HTMLDivElement>(null);
   const target = useRef(0); // where the fan is heading (fractional while dragging)
   const cur = useRef<number[]>([]); // each folder's own lagging focus → wave
   const vel = useRef<number[]>([]); // slots per second, used to lean the folders
@@ -205,14 +204,6 @@ export function AccountsFan({ onSelect, onBlankClick }: {
       el.style.opacity = String(clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1));
       const shade = el.lastElementChild as HTMLElement | null;
       if (shade) shade.style.opacity = String(clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h));
-    }
-    const handle = handleRef.current;
-    if (handle && n > 1) {
-      const p = clamp(f / (n - 1), 0, 1);
-      const w = stage.clientWidth;
-      const hx = w * 0.18 + p * w * 0.64;
-      const hy = 46 - Math.sin(p * Math.PI) * 26;
-      handle.style.transform = `translate3d(${hx - 18}px, ${hy - 18}px, 0)`;
     }
   }, []);
 
@@ -349,7 +340,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
       d.v = (ev.clientX - d.lastX) / Math.max(1, now - d.lastT);
       d.lastX = ev.clientX;
       d.lastT = now;
-      target.current = clamp(d.start - dx / g.step, -0.35, countRef.current - 0.65);
+      // Drag right = show the folder on the right: the pile follows the hand.
+      target.current = clamp(d.start + dx / g.step, -0.35, countRef.current - 0.65);
       settle(); // the green highlight follows the scrub live
       kick();
     };
@@ -374,7 +366,7 @@ export function AccountsFan({ onSelect, onBlankClick }: {
         return;
       }
       // Project the fling, then settle on the nearest folder.
-      goToRef.current(Math.round(target.current - (d.v * 90) / g.step));
+      goToRef.current(Math.round(target.current + (d.v * 90) / g.step));
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -437,16 +429,6 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     }
   }
 
-  function onArcPointer(e: React.PointerEvent) {
-    const stage = stageRef.current;
-    if (!stage || count < 2) return;
-    e.stopPropagation();
-    const rect = stage.getBoundingClientRect();
-    const p = clamp((e.clientX - rect.left - rect.width * 0.18) / (rect.width * 0.64), 0, 1);
-    target.current = p * (count - 1);
-    kick();
-    if (e.type === "pointerup") goTo(Math.round(target.current));
-  }
 
   const current = items[selected] || null;
   const onSelectRef = useRef(onSelect);
@@ -493,18 +475,6 @@ export function AccountsFan({ onSelect, onBlankClick }: {
         onMouseLeave={() => setHover(null)}
         onKeyDown={onKeyDown}
       >
-        {count > 1 ? (
-          <div className="ss-fan__arc" onPointerDown={onArcPointer} onPointerMove={(e) => e.buttons === 1 && onArcPointer(e)} onPointerUp={onArcPointer}>
-            <svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden>
-              <path d="M 18 46 Q 50 -6 82 46" fill="none" stroke="currentColor" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-            </svg>
-            <div ref={handleRef} className="ss-fan__handle" aria-hidden>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 7l-4 5 4 5M16 7l4 5-4 5" />
-              </svg>
-            </div>
-          </div>
-        ) : null}
 
         {items.map((item, i) => {
           const isSel = i === selected;

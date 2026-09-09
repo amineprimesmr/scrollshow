@@ -5804,39 +5804,8 @@ a.ss-btn-ghost {
 }
 
 /* Arc + handle */
-.ss-fan__arc {
-  position: absolute;
-  left: 0;
-  top: 8px;
-  width: 100%;
-  height: 64px;
-  color: rgb(255 255 255 / 0.28);
-  z-index: 3;
-  cursor: ew-resize;
-}
 
-.ss-fan__arc svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
 
-.ss-fan__handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #d4d4d8;
-  background: rgb(20 20 22 / 0.85);
-  border: 1px solid rgb(255 255 255 / 0.16);
-  box-shadow: 0 0 0 6px rgb(34 197 94 / 0.1), 0 10px 24px rgb(0 0 0 / 0.5);
-  will-change: transform;
-}
 
 /* ---------- Folder: back panel, tab, sheets peeking out, opaque front pocket ---------- */
 .ss-folder {
