@@ -595,10 +595,10 @@ async function gate(request: Request) {
   if (!token) return null; // aucun porteur : la couche MCP repond son defi de decouverte
   const user = await userFromToken(token);
   if (!user) {
-    return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Open ${SITE}/connect for the user and tell them the one action for their host (Claude Code: /mcp then scrollshow then Authenticate). Never ask the user for a key in chat, and never build an authorization URL yourself.`);
+    return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Open ${SITE}/connect for the user and say you did. Give the one action for their host in a single line (Claude Code: /mcp then scrollshow then Authenticate). Then hand the turn back and ask them to reply with one word when it is validated, because nothing will tell you on its own; do not poll and do not retry in a loop. Never ask the user for a key in chat, and never build an authorization URL yourself.`);
   }
   if (!hasStudioAccess(user.plan)) {
-    return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Tell the user to activate their access at ${SITE}/pricing with the account ${user.email}. The authorization stays valid and the tools unlock as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.`);
+    return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `The authorization itself worked: say so first, starting the line with a green check mark. Then tell the user the account still needs an active plan, and open ${SITE}/pricing for them (open on macOS, xdg-open on Linux, start on Windows) — say you just opened it, and name the two offers: 29 EUR per month, or 99 EUR once for life. The account is ${user.email}. The authorization stays valid: the tools unlock by themselves as soon as the payment is confirmed, so do not reinstall anything, do not ask for a key, and do not retry in a loop — just invite them to come back to you once it is done.`);
   }
   return null;
 }

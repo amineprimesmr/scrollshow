@@ -18,17 +18,25 @@ Installing this skill is free. The tools only answer for a ScrollShow account wi
 
 **There is no key to ask for.** The server is an OAuth 2.1 protected resource. On the first call it answers `401` with a `WWW-Authenticate` header pointing at its Protected Resource Metadata; the host registers itself, opens a browser, and the user approves the access on scrollshow.io. Never ask the user for a key, a token or a URL containing one, and never build an authorization URL yourself: only the host can, because it holds the client id and the PKCE verifier.
 
-**When you cannot finish the authorization here** — a non-interactive session, or a host that shows the server as "needs authentication" — do not stop at that statement. It leaves the user with nothing to do. Instead:
+### The first-run conversation
 
-1. Open <https://scrollshow.io/connect> for them (`open` on macOS, `xdg-open` on Linux, `start` on Windows), and say you just opened it. If you cannot open a browser, print the link on its own line.
-2. Tell them the single action for their host, in one sentence: Claude Code, `/mcp` then *scrollshow* then *Authenticate*; Claude app or web, Settings, Connectors, *scrollshow*, *Connect*; Cursor and Codex, reopen the conversation.
-3. Say what it unlocks, concretely and briefly: reading their business to write hooks for their audience, building an editable five-slide carousel, scheduling it — publishing only on request.
+Nothing tells you when the user finishes the authorization. You cannot watch for it, and retrying in a loop only burns turns. So hand the turn back and ask for one word. Play it in four beats, two or three lines each — warm, concrete, no recap of what is already done.
 
-Keep it to a few lines, warm and concrete. The user is one click away, not stuck.
+**Beat 1 — what you did, and the one thing left.** One line for the install. Then the single action for their host: Claude Code, `/mcp` then *scrollshow* then *Authenticate*; Claude app or web, Settings, Connectors, *scrollshow*, *Connect*; Cursor and Codex, reopen the conversation. Open <https://scrollshow.io/connect> for them (`open` on macOS, `xdg-open` on Linux, `start` on Windows) and say you just did; if you cannot open a browser, print the link on its own line.
+
+**Beat 2 — hand back the turn.** End with an explicit ask, in their language: *"Dis-moi **ok** quand c'est validé et je reprends."* Then stop. Do not poll, do not call a tool again, do not fill the silence.
+
+**Beat 3 — they answer.** Call `whoami` once, and answer from what comes back:
+- It succeeds: a green check mark, one line saying you are connected, the business name it returned, and an offer to build the first carousel. Nothing else.
+- `payment_required`: follow the payment step below.
+- Still `invalid_token`: say plainly that the authorization did not go through, repeat the one action, ask for the word again. Never suggest they did it wrong.
+
+**Beat 4 — never fabricate.** Do not claim the connection works before a tool call actually returns. A user who reads "connected" and then sees an error stops trusting everything you say afterwards.
 
 Then read the server's answer instead of guessing:
 
-- `payment_required` (HTTP 402): the account exists but has no active access. Tell the user to activate it at https://scrollshow.io/pricing, with the email the refusal names. The authorization stays valid and the tools unlock as soon as the payment is confirmed; do not reinstall anything and do not retry in a loop.
+- **First successful call:** open with a green check mark and one short line — the agent is connected to their ScrollShow workspace — then name the business `whoami` returned and offer to build the first carousel. Do not recap the installation steps; they are over.
+- `payment_required` (HTTP 402): the authorization worked, the account has no active plan. Say the authorization succeeded (green check mark), then that the access still needs to be activated. Open https://scrollshow.io/pricing for them and say you just did, naming the two offers: 29 EUR per month, or 99 EUR once for life. Use the email the refusal names. The authorization stays valid and the tools unlock by themselves once the payment is confirmed: do not reinstall anything, do not ask for a key, do not retry in a loop — invite them back to you when it is done.
 - `invalid_token` (HTTP 401): the authorization is unknown, expired or was revoked. Let the host redo its browser authorization. Do not ask the user to paste anything.
 - No tool at all: the connector is not installed in this host. Help them add it; a pasted URL does not install anything.
 

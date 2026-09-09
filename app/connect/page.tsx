@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 };
 
 const HOSTS = [
-  { name: "Claude Code", step: "Tape /mcp, choisis scrollshow, puis Authenticate.", hint: "Un onglet s’ouvre, tu valides, c’est fini." },
-  { name: "Claude (app ou web)", step: "Réglages → Connecteurs → scrollshow → Se connecter.", hint: "Le bouton lance la même autorisation." },
-  { name: "Cursor · Codex", step: "Rouvre la conversation après avoir ajouté le serveur.", hint: "L’autorisation se déclenche au premier appel d’outil." },
+  { name: "Claude Code", step: "/mcp → scrollshow → Authenticate" },
+  { name: "Claude app ou web", step: "Réglages → Connecteurs → Se connecter" },
+  { name: "Cursor · Codex", step: "Rouvre la conversation" },
 ];
 
 /**
@@ -37,8 +37,7 @@ export default async function ConnectPage() {
 
         <h1>Il te reste un clic</h1>
         <p className="ss-connect__sub">
-          Ton agent a installé ScrollShow. Il attend juste que tu autorises l’accès à ton espace —
-          <strong> aucune clé à copier</strong>, tout se passe dans ton navigateur.
+          Autorise ton agent depuis chez lui. <strong>Aucune clé à copier.</strong>
         </p>
 
         <div className="ss-connect__card">
@@ -48,8 +47,8 @@ export default async function ConnectPage() {
             <li className={user ? "is-done" : ""}>
               <span className="ss-connect__mark" aria-hidden>{user ? "✓" : "1"}</span>
               <div>
-                <b>{user ? "Compte connecté" : "Connecte-toi à ScrollShow"}</b>
-                <p>{user ? user.email : "L’autorisation a besoin de savoir à quel espace rattacher ton agent."}</p>
+                <b>{user ? "Compte connecté" : "Connecte-toi"}</b>
+                <p>{user ? user.email : "Pour savoir à quel espace rattacher ton agent."}</p>
                 {user ? null : <Link className="ss-connect__cta" href="/signup?mode=signin&next=/connect">Me connecter</Link>}
               </div>
             </li>
@@ -58,12 +57,8 @@ export default async function ConnectPage() {
               <span className="ss-connect__mark" aria-hidden>{ready ? "✓" : "2"}</span>
               <div>
                 <b>{ready ? "Accès actif" : "Active ton accès"}</b>
-                <p>
-                  {ready
-                    ? "Tes outils sont débloqués."
-                    : "Tu peux autoriser ton agent dès maintenant : les outils se débloqueront tout seuls à l’activation."}
-                </p>
-                {ready ? null : <Link className="ss-connect__cta" href="/pricing">Voir les offres</Link>}
+                <p>{ready ? "Tes outils sont débloqués." : "29 € / mois ou 99 € à vie. Sans accès actif, les outils restent verrouillés."}</p>
+                {ready ? null : <Link className="ss-connect__cta" href="/pricing">Choisir mon offre</Link>}
               </div>
             </li>
 
@@ -71,13 +66,12 @@ export default async function ConnectPage() {
               <span className="ss-connect__mark" aria-hidden>3</span>
               <div>
                 <b>Autorise depuis ton agent</b>
-                <p>Cette dernière étape se fait chez lui, pas ici. Selon celui que tu utilises :</p>
+                <p>Cette étape se fait chez lui, pas ici.</p>
                 <ul className="ss-connect__hosts">
                   {HOSTS.map((host) => (
                     <li key={host.name}>
                       <strong>{host.name}</strong>
                       <span>{host.step}</span>
-                      <em>{host.hint}</em>
                     </li>
                   ))}
                 </ul>
@@ -86,17 +80,8 @@ export default async function ConnectPage() {
           </ol>
         </div>
 
-        <div className="ss-connect__after">
-          <h2>Ce qu’il pourra faire juste après</h2>
-          <ul>
-            <li>Lire ton business et te proposer des accroches écrites pour ton audience</li>
-            <li>Créer un carrousel de cinq slides, modifiable, sans quitter la conversation</li>
-            <li>Le planifier dans ton calendrier — et ne publier que si tu le demandes</li>
-          </ul>
-        </div>
-
         <p className="ss-connect__foot">
-          Déjà autorisé ? Retrouve et retire tes agents dans <Link href="/app/settings">Réglages → Compte</Link>.
+          Tu peux retirer un agent à tout moment dans <Link href="/app/settings">Réglages</Link>.
         </p>
       </section>
     </main>
