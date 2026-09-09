@@ -136,131 +136,163 @@ function SignupForm() {
     setPassword(""); setVerificationSent(true); setStep("verification");
   }
 
+  const badge = step === "verification" ? "Confirmation" : signin ? "Connexion" : "Création de compte";
+  const title = step === "verification"
+    ? "Plus qu'une étape"
+    : signin
+      ? "Ravi de te retrouver"
+      : step === "password"
+        ? "Sécurise ton compte"
+        : "Créer ton espace";
+
   return (
     <main className="ss-signup">
-      <div className="ss-signup__form">
-        {checking ? (
-          <div className="ss-signup__stage" role="status">
-            <p className="ss-signup__sub">Préparation de ton espace…</p>
-          </div>
-        ) : step === "verification" ? (
-          <SignupVerification
-            email={email}
-            token={verificationToken}
-            next={next}
-            sent={verificationSent}
-            onSignIn={async () => {
-              const response = await fetch("/api/auth/logout", { method: "POST" });
-              if (!response.ok) throw new Error("Déconnexion indisponible. Réessaie.");
-              capturedToken.current = "";
-              setVerificationToken("");
-              setStep("email");
-              setError("");
-              router.replace(signupUrl({ next, mode: "signin" }));
-            }}
-          />
-        ) : (
-          <form className="ss-signup__stage" key={`${signin}-${step}`} onSubmit={onSubmit} aria-busy={pending}>
-            <Link href="/" className="ss-signup__brand" aria-label="ScrollShow, accueil">
-              <BrandMark size={26} />
-            </Link>
+      <div className="ss-signup__bg" aria-hidden />
+      <div className="ss-signup__noise" aria-hidden />
 
-            <h1 className="ss-signup__title">
-              {signin ? "Ravi de te retrouver" : step === "password" ? "Sécurise ton compte" : "Crée ton espace ScrollShow"}
-            </h1>
+      <section className="ss-signup__hero">
+        <Link href="/" className="ss-signup__badge-wrap" aria-label="ScrollShow, accueil">
+          <span className="ss-signup__badge-glow" aria-hidden />
+          <span className="ss-signup__badge">
+            <span className="ss-signup__badge-spin" aria-hidden />
+            <span className="ss-signup__badge-label">
+              <BrandMark size={15} />
+              {badge}
+            </span>
+          </span>
+        </Link>
 
-            <p className="ss-signup__sub">
-              {signin ? (
-                <>Pas encore de compte ? <Link href={signupUrl({ next })}>Créer mon espace</Link>.</>
-              ) : step === "password" ? (
-                "Un mot de passe, puis on prépare ton espace ensemble."
-              ) : (
-                <>Déjà un compte ? <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>.</>
-              )}
-            </p>
+        <h1 className="ss-signup__title">{title}</h1>
 
-            {!signin && step === "password" ? (
-              <div className="ss-signup__identity">
-                <span>{email}</span>
-                <button type="button" className="ss-signup__text-button" disabled={pending} onClick={() => { setStep("email"); setError(""); }}>
-                  Modifier
-                </button>
+        <div className="ss-signup__shell">
+          <div className="ss-signup__card">
+            <span className="ss-signup__card-edge" aria-hidden />
+            <span className="ss-signup__card-glow" aria-hidden />
+
+            {checking ? (
+              <div className="ss-signup__stage" role="status">
+                <p className="ss-signup__sub">Préparation de ton espace…</p>
               </div>
+            ) : step === "verification" ? (
+              <SignupVerification
+                email={email}
+                token={verificationToken}
+                next={next}
+                sent={verificationSent}
+                onSignIn={async () => {
+                  const response = await fetch("/api/auth/logout", { method: "POST" });
+                  if (!response.ok) throw new Error("Déconnexion indisponible. Réessaie.");
+                  capturedToken.current = "";
+                  setVerificationToken("");
+                  setStep("email");
+                  setError("");
+                  router.replace(signupUrl({ next, mode: "signin" }));
+                }}
+              />
             ) : (
-              <>
-                <div className="ss-signup__providers">
-                  <a className="ss-signup__google" href={googleHref}>
-                    <GoogleMark />
-                    Google
-                  </a>
-                  <a className="ss-signup__google" href={githubHref}>
-                    <GithubMark />
-                    GitHub
-                  </a>
-                </div>
-                <div className="ss-signup__or">ou</div>
-              </>
-            )}
-
-            {signin || step === "email" ? (
-              <div className="ss-signup__field">
-                <label htmlFor="signup-email">Email</label>
-                <input
-                  id="signup-email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="toi@exemple.fr"
-                  disabled={pending}
-                  autoFocus
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </div>
-            ) : null}
-
-            {signin || step === "password" ? (
-              <div className="ss-signup__field">
-                <div className="ss-signup__field-head">
-                  <label htmlFor="signup-password">Mot de passe</label>
+              <form className="ss-signup__stage" key={`${signin}-${step}`} onSubmit={onSubmit} aria-busy={pending}>
+                <p className="ss-signup__sub">
                   {signin ? (
-                    <Link href="/recover">Mot de passe oublié ?</Link>
+                    <>Pas encore de compte ? <Link href={signupUrl({ next })}>Créer mon espace</Link>.</>
+                  ) : step === "password" ? (
+                    "Un mot de passe, puis on prépare ton espace ensemble."
                   ) : (
-                    <button type="button" className="ss-signup__text-button" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>
-                      {showPassword ? "Masquer" : "Afficher"}
-                    </button>
+                    <>Déjà un compte ? <Link href={signupUrl({ next, mode: "signin" })}>Me connecter</Link>.</>
                   )}
-                </div>
-                <input
-                  id="signup-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={signin ? 1 : 8}
-                  autoComplete={signin ? "current-password" : "new-password"}
-                  placeholder={signin ? "Ton mot de passe" : "8 caractères minimum"}
-                  disabled={pending}
-                  autoFocus={!signin}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </div>
-            ) : null}
+                </p>
 
-            {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
+                {!signin && step === "password" ? (
+                  <div className="ss-signup__identity">
+                    <span>{email}</span>
+                    <button type="button" className="ss-signup__text-button" disabled={pending} onClick={() => { setStep("email"); setError(""); }}>
+                      Modifier
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="ss-signup__providers">
+                      <a className="ss-signup__google" href={googleHref}>
+                        <GoogleMark />
+                        Google
+                      </a>
+                      <a className="ss-signup__google" href={githubHref}>
+                        <GithubMark />
+                        GitHub
+                      </a>
+                    </div>
+                    <div className="ss-signup__or">ou</div>
+                  </>
+                )}
 
-            <button className="ss-signup__submit" type="submit" disabled={pending}>
-              {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer" : "Créer mon compte"}
-            </button>
+                {signin || step === "email" ? (
+                  <div className="ss-signup__field">
+                    <div className="ss-signup__field-head">
+                      <label htmlFor="signup-email">Email</label>
+                    </div>
+                    <div className="ss-signup__ring">
+                      <span className="ss-signup__ring-spin" aria-hidden />
+                      <input
+                        id="signup-email"
+                        name="email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        placeholder="toi@exemple.fr"
+                        disabled={pending}
+                        autoFocus
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
 
-            <p className="ss-signup__foot">
-              {signin ? "En te connectant, tu acceptes nos " : "En créant ton compte, tu acceptes nos "}
-              <Link href="/cgu">conditions</Link> et notre <Link href="/confidentialite">politique de confidentialité</Link>.
-            </p>
-          </form>
-        )}
-      </div>
+                {signin || step === "password" ? (
+                  <div className="ss-signup__field">
+                    <div className="ss-signup__field-head">
+                      <label htmlFor="signup-password">Mot de passe</label>
+                      {signin ? (
+                        <Link href="/recover" className="ss-signup__text-button">Mot de passe oublié ?</Link>
+                      ) : (
+                        <button type="button" className="ss-signup__text-button" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>
+                          {showPassword ? "Masquer" : "Afficher"}
+                        </button>
+                      )}
+                    </div>
+                    <div className="ss-signup__ring">
+                      <span className="ss-signup__ring-spin" aria-hidden />
+                      <input
+                        id="signup-password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        minLength={signin ? 1 : 8}
+                        autoComplete={signin ? "current-password" : "new-password"}
+                        placeholder={signin ? "Ton mot de passe" : "8 caractères minimum"}
+                        disabled={pending}
+                        autoFocus={!signin}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {error || queryError ? <p className="ss-signup__error" role="alert">{error || queryError}</p> : null}
+
+                <button className="ss-signup__submit" type="submit" disabled={pending}>
+                  {pending ? "Un instant…" : signin ? "Me connecter" : step === "email" ? "Continuer" : "Créer mon compte"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <p className="ss-signup__foot">
+        {signin ? "En te connectant, tu acceptes nos " : "En créant ton compte, tu acceptes nos "}
+        <Link href="/cgu">conditions</Link> et notre <Link href="/confidentialite">politique de confidentialité</Link>.
+      </p>
     </main>
   );
 }
