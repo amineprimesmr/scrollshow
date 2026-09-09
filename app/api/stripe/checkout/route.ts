@@ -47,7 +47,16 @@ export async function POST(request: Request) {
       cancel_url: `${siteUrl()}/onboarding?step=payment&canceled=1&offer=${offer}`, client_reference_id: user.id,
       subscription_data: offer === "monthly" ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
       metadata: { userId: user.id, offer, plan: offer === "lifetime" ? "lifetime" : "pro", termsVersion: LEGAL.version, termsAccepted: "true" },
+      // Stripe a active « Managed Payments » par defaut sur le compte, ce qui
+      // exige un code fiscal sur chaque produit et refusait toute session.
+      // On reste vendeur : activer Managed Payments est une decision fiscale,
+      // elle se prend dans le tableau de bord, pas ici.
+      ...({ managed_payments: { enabled: false } } as object),
     }, { idempotencyKey: `checkout-${user.id}-${offer}-${Math.floor(Date.now() / 1800000)}` });
     return NextResponse.json({ url: session.url });
-  } catch { return NextResponse.json({ error: "checkout_unavailable" }, { status: 502 }); }
+  } catch (error) {
+    // Sans cette trace, une panne de paiement est invisible cote serveur.
+    console.error("stripe_checkout_failed", { userId: user.id, offer, message: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "checkout_unavailable" }, { status: 502 });
+  }
 }
