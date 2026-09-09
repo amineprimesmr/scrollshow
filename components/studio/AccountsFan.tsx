@@ -173,8 +173,12 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     const pivot = Math.round(clamp(target.current, 0, Math.max(0, n - 1)));
     const f = cur.current[pivot] ?? target.current;
     // The stage shrinks when the account panel opens: scale the whole fan so
-    // the folders never overflow the bar above.
-    const k = clamp((stage.clientHeight - 70) / (narrowRef.current ? 300 : 400), 0.55, 1);
+    // the folders never overflow the bar above. The target scale follows the
+    // stage instantly; the painted scale eases towards it in tick(), so the
+    // folders grow and shrink smoothly instead of jumping with the layout.
+    kTarget.current = clamp((stage.clientHeight - 70) / (narrowRef.current ? 300 : 400), 0.55, 1);
+    if (kCur.current == null) kCur.current = kTarget.current;
+    const k = kCur.current;
     // Keep the whole fan centred whatever is selected: its horizontal extent
     // depends on where the opened folder sits, so recentre from that.
     const first = layout(0 - f, g).x * k;
@@ -212,6 +216,9 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     }
   }, []);
 
+  const kTarget = useRef(1);
+  const kCur = useRef<number | null>(null);
+
   const settle = useCallback(() => {
     const idx = clamp(Math.round(target.current), 0, Math.max(0, countRef.current - 1));
     setSelected((prev) => (prev === idx ? prev : idx));
@@ -248,6 +255,12 @@ export function AccountsFan({ onSelect, onBlankClick }: {
         hov.current[i] = Math.abs(ht - hn) < 0.002 ? ht : hn;
         if (cur.current[i] !== tgt || hov.current[i] !== ht) active = true;
       }
+      // Ease the fan scale towards the size the stage allows (see paint()).
+      const kt = kTarget.current;
+      const kc = kCur.current ?? kt;
+      const kn = snap ? kt : kc + (kt - kc) * (1 - Math.exp(-11 * dt));
+      kCur.current = Math.abs(kt - kn) < 0.0015 ? kt : kn;
+      if (kCur.current !== kt) active = true;
       paint();
       if (!active) {
         for (let i = 0; i < n; i += 1) vel.current[i] = 0;
@@ -297,10 +310,12 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    const ro = new ResizeObserver(() => paint());
+    // A resized stage changes the target scale: paint it, then let the loop
+    // ease the folders to their new size.
+    const ro = new ResizeObserver(() => { paint(); kick(); });
     ro.observe(stage);
     return () => ro.disconnect();
-  }, [paint]);
+  }, [paint, kick]);
 
   useEffect(
     () => () => {

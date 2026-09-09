@@ -6271,7 +6271,7 @@ a.ss-btn-ghost {
   background: #000;
 }
 
-.ss-overview__fan { display: flex; flex-direction: column; flex: 0 0 auto; }
+.ss-overview__fan { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
 .ss-overview .ss-fan {
   flex: 1 1 auto;
@@ -7452,23 +7452,13 @@ a.ss-btn-ghost {
 /* Panneau replie : l'eventail remplit la page, les dossiers sont grands.
    Panneau ouvert : la scene se compacte pour garder les publications a portee,
    y compris sur un petit ecran de portable. */
-.ss-overview { height: auto; min-height: 100%; background: var(--ss-bg); }
-/* Hauteur de scene explicite dans les deux etats, donc animable : replie elle
-   prend toute la place libre (mesuree par HomeView dans --ss-stage-max), ouverte
-   elle se compacte. L'eventail recalcule son echelle a chaque changement de
-   taille, les dossiers grossissent et retrecissent en continu. */
-.ss-overview .ss-fan__stage {
-  flex: 0 0 auto;
-  height: var(--ss-stage-max, 60vh);
-  min-height: 210px;
-  transition: height 0.55s cubic-bezier(0.2, 1, 0.4, 1);
-}
-.ss-overview.is-open .ss-fan__stage { height: 210px; }
-@media (max-width: 700px) {
-  .ss-overview .ss-fan__stage { min-height: 180px; }
-  .ss-overview.is-open .ss-fan__stage { height: 180px; }
-}
-@media (prefers-reduced-motion: reduce) { .ss-overview .ss-fan__stage { transition: none; } }
+.ss-overview { background: var(--ss-bg); }
+.ss-overview.is-open { height: auto; min-height: 100%; }
+.ss-overview.is-open .ss-overview__fan,
+.ss-overview.is-open .ss-fan,
+.ss-overview.is-open .ss-fan__stage { flex: 0 0 auto; }
+.ss-overview.is-open .ss-fan__stage { height: 210px; min-height: 210px; }
+@media (max-width: 700px) { .ss-overview.is-open .ss-fan__stage { height: 180px; min-height: 180px; } }
 .ss-overview .ss-acc.is-open { height: auto; min-height: 520px; overflow: visible; }
 .ss-overview .ss-acc.is-open .ss-acc__body { overflow: visible; }
 .ss-overview .ss-acc:not(.is-open) .ss-acc__body { visibility: hidden; }
