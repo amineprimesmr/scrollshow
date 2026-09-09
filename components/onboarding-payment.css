@@ -1,5 +1,18 @@
-/* Derniere etape de l'onboarding : les cartes de /pricing, posees dans la
-   carte sombre de l'onboarding. Le fond et le rail ne changent pas. */
+/* Derniere etape de l'onboarding : les cartes de /pricing seules sur le fond,
+   sans la carte sombre des autres etapes. Le fond et le rail ne changent pas. */
+
+.ss-onb__card:has(.ss-onb-pay) {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+
+.ss-onb__card:has(.ss-onb-pay)::before,
+.ss-onb__card:has(.ss-onb-pay)::after { content: none; }
 
 .ss-onb-pay {
   display: grid;
@@ -20,24 +33,6 @@
 
 .ss-onb-pay__notice a { color: #fff; }
 
-.ss-onb-pay__terms {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: #d4d4d4;
-}
-
-.ss-onb-pay__terms input {
-  width: auto;
-  flex-shrink: 0;
-  margin-top: 3px;
-  accent-color: #fff;
-}
-
-.ss-onb-pay__terms a { color: #fff; text-underline-offset: 3px; }
-
 /* Le fieldset ne doit rien peindre : il ne sert qu'a desactiver les boutons. */
 .ss-onb-pay__offers {
   border: 0;
@@ -57,12 +52,4 @@
 
 @media (max-width: 720px) {
   .ss-onb-pay .sc-prices { grid-template-columns: minmax(0, 1fr); }
-}
-
-.ss-onb-pay__hint,
-.ss-onb-pay__foot {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: #6a6a6a;
 }

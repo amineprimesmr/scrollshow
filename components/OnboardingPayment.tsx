@@ -1,13 +1,12 @@
 "use client";
-import { useState } from "react";
 import { PricingCards } from "@/components/PricingCards";
 import "./onboarding-payment.css";
 
 /**
  * Derniere etape de l'onboarding. Elle reprend les cartes de /pricing plutot
  * que sa propre liste d'offres : meme design, meme appel a Stripe, un seul
- * endroit a maintenir. L'acceptation explicite des conditions reste, elle
- * n'existe pas sur /pricing et c'est un garde-fou qu'on ne retire pas.
+ * endroit a maintenir. Payer vaut acceptation des conditions de vente :
+ * pas de case a cocher ici, Stripe les rappelle a l'ecran de paiement.
  */
 export function OnboardingPayment({ english, canceled = false, pendingPayment = false }: {
   english: boolean;
@@ -15,7 +14,6 @@ export function OnboardingPayment({ english, canceled = false, pendingPayment = 
   canceled?: boolean;
   pendingPayment?: boolean;
 }) {
-  const [accepted, setAccepted] = useState(false);
   const t = (fr: string, en: string) => (english ? en : fr);
 
   return (
@@ -33,28 +31,10 @@ export function OnboardingPayment({ english, canceled = false, pendingPayment = 
         </p>
       )}
 
-      <label className="ss-onb-pay__terms">
-        <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} disabled={pendingPayment} />
-        <span>
-          {t("J’accepte les", "I accept the")}{" "}
-          <a href="/terms" target="_blank" rel="noreferrer">{t("conditions de vente et d’utilisation", "terms of sale and use")}</a>.
-        </span>
-      </label>
-
-      {/* Le fieldset desactive les deux boutons tant que les conditions ne sont pas acceptees. */}
-      <fieldset className="ss-onb-pay__offers" disabled={!accepted || pendingPayment}>
+      {/* Le fieldset ne bloque plus que pendant un paiement en attente. */}
+      <fieldset className="ss-onb-pay__offers" disabled={pendingPayment}>
         <PricingCards english={english} destination="/signup" />
       </fieldset>
-
-      {!accepted && (
-        <p className="ss-onb-pay__hint">
-          {t("Coche la case ci-dessus pour choisir ton offre.", "Tick the box above to choose your plan.")}
-        </p>
-      )}
-
-      <p className="ss-onb-pay__foot">
-        {t("Paiement sécurisé sur Stripe. Le studio s’ouvre après confirmation du paiement. Aucun essai gratuit.", "Secure payment on Stripe. The studio opens after payment confirmation. No free trial.")}
-      </p>
 
       {pendingPayment && (
         <a className="ss-onb-link" href="/app">{t("Vérifier mon accès", "Check my access")}</a>
