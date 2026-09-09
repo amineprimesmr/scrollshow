@@ -48,6 +48,9 @@
    on elargit la scene pour elle, sans toucher aux autres etapes. */
 .ss-onb__stage:has(.ss-onb-pay) { width: min(100%, 1180px); }
 
+/* Deux cartes seulement : on garde la scene compacte tant que l'annuel dort. */
+.ss-onb__stage:has(.ss-onb-pay:not(:has(.sc-price:nth-child(3)))) { width: min(100%, 900px); }
+
 .ss-onb-pay .sc-prices { width: 100%; }
 
 @media (max-width: 720px) {

@@ -8,7 +8,7 @@ import { isPublicAddress, safeFetchBytes } from "../lib/safe-fetch";
 import { researchMetrics } from "../lib/research";
 import { assertEditable, validatePost } from "../lib/post-validation";
 import { signedMediaUrl, validMediaSignature } from "../lib/media-access";
-import { hasStudioAccess, PLAN, planFromPriceId } from "../lib/plans";
+import { hasStudioAccess, PLAN, planFromPriceId, visibleOffers, YEARLY_ENABLED } from "../lib/plans";
 import { applyLifetime, applySubscription } from "../lib/billing";
 import { loadTikTokChannel } from "../lib/tiktok-account";
 import { consumeLimit } from "../lib/rate-limit";
@@ -263,6 +263,11 @@ test("a yearly subscription unlocks the studio and is billed as yearly", () => {
     if(previousMonthly===undefined) delete process.env.STRIPE_PRICE_PRO_MONTHLY; else process.env.STRIPE_PRICE_PRO_MONTHLY=previousMonthly;
     if(previousYearly===undefined) delete process.env.STRIPE_PRICE_YEARLY; else process.env.STRIPE_PRICE_YEARLY=previousYearly;
   }
+});
+test("a hidden offer stays out of the cards", () => {
+  const offers=visibleOffers();
+  assert.deepEqual(offers,YEARLY_ENABLED?["monthly","yearly","lifetime"]:["monthly","lifetime"]);
+  assert.equal(offers.includes("yearly"),YEARLY_ENABLED);
 });
 test("subscription cancellation never erases lifetime access", () => {
   const data=emptyStore(); data.users.push({...user,plan:"lifetime",stripeCustomerId:"cus"});

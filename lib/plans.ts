@@ -43,6 +43,18 @@ export function parsePlan(value: unknown): Plan {
 
 export type Offer = "monthly" | "yearly" | "lifetime";
 
+/**
+ * L'offre annuelle est prete de bout en bout — prix Stripe live a 199 €/an,
+ * verification du prix, cadence retenue sur le compte — mais volontairement
+ * masquee. Passer ce drapeau a true la remet dans les cartes et rouvre son
+ * checkout : rien d'autre a faire.
+ */
+export const YEARLY_ENABLED = false;
+
+export function visibleOffers(): Offer[] {
+  return YEARLY_ENABLED ? ["monthly", "yearly", "lifetime"] : ["monthly", "lifetime"];
+}
+
 /** Montant attendu et forme du prix Stripe, par offre : la source unique. */
 export const OFFERS: Record<Offer, { cents: number; interval: "month" | "year" | null; priceId: () => string }> = {
   monthly: { cents: PLAN.monthly, interval: "month", priceId: () => PLAN.monthlyPriceId },

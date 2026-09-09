@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { OFFERS, PLAN, type Offer } from "@/lib/plans";
+import { PLAN, visibleOffers, type Offer } from "@/lib/plans";
 import { t } from "@/lib/i18n";
 import "./pricing-cards.css";
 
@@ -103,7 +103,7 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
     },
   };
   return <div className="sc-prices">
-    {(Object.keys(OFFERS) as Offer[]).map(offer => {
+    {visibleOffers().map(offer => {
       const lifetime = offer === "lifetime";
       const text = copy[offer];
       return <article key={offer} className={`sc-price${lifetime ? " sc-price--lifetime" : ""}${text.ribbon ? " sc-price--ribboned" : ""}`} aria-label={text.aria}>

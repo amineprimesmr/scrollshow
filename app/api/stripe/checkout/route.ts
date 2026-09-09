@@ -1,5 +1,5 @@
 import { readSession } from "@/lib/auth";
-import { hasStudioAccess, OFFERS } from "@/lib/plans";
+import { hasStudioAccess, OFFERS, visibleOffers } from "@/lib/plans";
 import { readStore, updateStore } from "@/lib/store";
 import { siteUrl, stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
@@ -25,6 +25,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "invalid_offer" }, { status: 400 });
   if (hasStudioAccess(user.plan)) return NextResponse.json({ error: "already_subscribed", portal: "/app/settings?tab=plan" }, { status: 409 });
   const offer = parsed.data.offer;
+  // Une offre masquee dans les cartes ne doit pas rester payable par l'API.
+  if (!visibleOffers().includes(offer)) return NextResponse.json({ error: "invalid_offer" }, { status: 400 });
   const expected = OFFERS[offer];
   const priceId = expected.priceId();
   if (!priceId || !process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "billing_not_configured" }, { status: 503 });

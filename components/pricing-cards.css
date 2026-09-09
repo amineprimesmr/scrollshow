@@ -2,7 +2,9 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Deux offres aujourd'hui, trois quand l'annuel sera rallume : la grille
+     suit le nombre de cartes plutot qu'un compte fige. */
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: clamp(14px, 1.2vw, 20px);
   width: min(100%, 1140px);
   margin: 0 auto;
