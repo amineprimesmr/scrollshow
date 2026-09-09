@@ -1,5 +1,5 @@
 import { readSession } from "@/lib/auth";
-import { hasStudioAccess, PLAN } from "@/lib/plans";
+import { hasStudioAccess, OFFERS } from "@/lib/plans";
 import { readStore, updateStore } from "@/lib/store";
 import { siteUrl, stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
@@ -12,7 +12,7 @@ import { applySubscription } from "@/lib/billing";
  * la nouvelle requete pendant 30 minutes : une cle d'idempotence ne peut pas
  * etre reutilisee avec des parametres differents.
  */
-const CHECKOUT_SHAPE = "v2";
+const CHECKOUT_SHAPE = "v3";
 
 export async function POST(request: Request) {
   const user = await readSession();
@@ -21,17 +21,20 @@ export async function POST(request: Request) {
   if (!user.onboarded) return NextResponse.json({ error: "onboarding_required", portal: "/onboarding" }, { status: 403 });
   if (process.env.VERCEL_ENV === "preview" && !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) return NextResponse.json({ error: "preview_requires_test_stripe" }, { status: 503 });
   if (!salesReady()) return NextResponse.json({ error: "sales_not_open" }, { status: 503 });
-  const parsed = z.object({ offer: z.enum(["monthly", "lifetime"]), termsAccepted: z.literal(true) }).safeParse(await request.json().catch(() => null));
+  const parsed = z.object({ offer: z.enum(["monthly", "yearly", "lifetime"]), termsAccepted: z.literal(true) }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid_offer" }, { status: 400 });
   if (hasStudioAccess(user.plan)) return NextResponse.json({ error: "already_subscribed", portal: "/app/settings?tab=plan" }, { status: 409 });
   const offer = parsed.data.offer;
-  const priceId = offer === "lifetime" ? PLAN.lifetimePriceId : PLAN.monthlyPriceId;
+  const expected = OFFERS[offer];
+  const priceId = expected.priceId();
   if (!priceId || !process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "billing_not_configured" }, { status: 503 });
   try {
     const client = stripe();
     const price = await client.prices.retrieve(priceId);
-    if (!price.active || price.currency !== "eur" || price.unit_amount !== (offer === "monthly" ? PLAN.monthly : PLAN.lifetime) ||
-      (offer === "monthly" ? price.recurring?.interval !== "month" || price.recurring.interval_count !== 1 : !!price.recurring)) {
+    if (!price.active || price.currency !== "eur" || price.unit_amount !== expected.cents ||
+      (expected.interval
+        ? price.recurring?.interval !== expected.interval || price.recurring.interval_count !== 1
+        : !!price.recurring)) {
       return NextResponse.json({ error: "billing_price_mismatch" }, { status: 503 });
     }
     let stored = (await readStore()).users.find(u => u.id === user.id)!;
@@ -48,11 +51,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "subscription_exists" }, { status: 409 });
     }
     const session = await client.checkout.sessions.create({
-      mode: offer === "lifetime" ? "payment" : "subscription", customer: stored.stripeCustomerId,
+      mode: expected.interval ? "subscription" : "payment", customer: stored.stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${siteUrl()}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl()}/onboarding?step=payment&canceled=1&offer=${offer}`, client_reference_id: user.id,
-      subscription_data: offer === "monthly" ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
+      subscription_data: expected.interval ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
       metadata: { userId: user.id, offer, plan: offer === "lifetime" ? "lifetime" : "pro", termsVersion: LEGAL.version, termsAccepted: "true" },
       // Stripe a active « Managed Payments » par defaut sur le compte, ce qui
       // exige un code fiscal sur chaque produit et refusait toute session.

@@ -10,7 +10,9 @@ export function applySubscription(data: StoreData, subscription: Stripe.Subscrip
   user.stripeSubscriptionId = subscription.id;
   user.billingEventAt = eventAt;
   const paid = subscription.status === "active" || subscription.status === "trialing";
-  user.plan = paid && planFromPriceId(subscription.items.data[0]?.price.id || "") === "pro" ? "pro" : "free";
+  const price = subscription.items.data[0]?.price;
+  user.plan = paid && planFromPriceId(price?.id || "") === "pro" ? "pro" : "free";
+  user.billingInterval = user.plan === "pro" && price?.recurring?.interval === "year" ? "year" : user.plan === "pro" ? "month" : undefined;
 }
 
 export function applyLifetime(data: StoreData, session: Stripe.Checkout.Session) {

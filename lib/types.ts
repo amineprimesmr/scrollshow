@@ -70,6 +70,8 @@ export type User = {
   plan: Plan;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  /** Cadence de l'abonnement en cours : l'ecran Plan affiche 29 €/mois ou 199 €/an. */
+  billingInterval?: "month" | "year";
   sessionVersion?: number;
   recoveryHash?: string;
   recoveryExpiresAt?: number;
@@ -379,6 +381,7 @@ export type SessionUser = {
 
 export type PublicUser = SessionUser & {
   createdAt: string;
+  billingInterval?: "month" | "year";
   hasPassword: boolean;
   hasGoogle: boolean;
   hasGithub: boolean;

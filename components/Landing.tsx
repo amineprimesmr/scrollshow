@@ -224,7 +224,7 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
             </div>
           </header>
           <PricingCards english={english} />
-          <p className="af-ld-pricing__note">{t("L’accès à vie couvre la durée d’exploitation du service. Mêmes quotas de traitement pour les deux offres. Abonnements aux assistants IA non inclus.", "Lifetime access covers the operating lifetime of the service. Both plans have the same processing quotas. AI assistant subscriptions are not included.", english)} <Link href="/pricing">{t("Détails des offres", "Plan details", english)}</Link></p>
+          <p className="af-ld-pricing__note">{t("L’accès à vie couvre la durée d’exploitation du service. Mêmes quotas de traitement pour toutes les offres. Abonnements aux assistants IA non inclus.", "Lifetime access covers the operating lifetime of the service. Every plan has the same processing quotas. AI assistant subscriptions are not included.", english)} <Link href="/pricing">{t("Détails des offres", "Plan details", english)}</Link></p>
         </section>
 
         <LandingTestimonials english={english} />

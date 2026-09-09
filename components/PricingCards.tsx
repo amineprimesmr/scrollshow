@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PLAN } from "@/lib/plans";
+import { OFFERS, PLAN, type Offer } from "@/lib/plans";
 import { t } from "@/lib/i18n";
 import "./pricing-cards.css";
 
@@ -21,9 +21,9 @@ function FeatureIcon({ index }: { index: number }) {
 export function PricingCards({ english = false, destination = "/signup", hasAccess = false }: {
   english?: boolean; destination?: string; hasAccess?: boolean;
 }) {
-  const [busy, setBusy] = useState<"monthly" | "lifetime" | null>(null);
-  const [error, setError] = useState<{ offer: "monthly" | "lifetime"; message: string } | null>(null);
-  async function checkout(offer: "monthly" | "lifetime") {
+  const [busy, setBusy] = useState<Offer | null>(null);
+  const [error, setError] = useState<{ offer: Offer; message: string } | null>(null);
+  async function checkout(offer: Offer) {
     if (busy) return;
     setBusy(offer); setError(null);
     try {
@@ -66,18 +66,56 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
     t("Claude, Codex et Cursor via MCP", "Claude, Codex and Cursor via MCP", english),
     t("Sans renouvellement", "No renewal", english),
   ];
+  /** Libelles par offre : un seul endroit ou lire ce que la carte annonce. */
+  const copy: Record<Offer, {
+    aria: string; title: string; amount: string; unit: string; billed: string; commitment: string;
+    badge?: string; ribbon?: string; cta: string;
+  }> = {
+    monthly: {
+      aria: t("Offre mensuelle", "Monthly plan", english),
+      title: t("Accès mensuel", "Monthly access", english),
+      amount: `${PLAN.monthly / 100} €`,
+      unit: t("/ mois", "/ month", english),
+      billed: t("Facturé 29 € chaque mois", "Billed €29 every month", english),
+      commitment: t("Sans engagement", "Cancel anytime", english),
+      cta: t("Choisir l’accès mensuel à 29 €", "Choose monthly access for €29", english),
+    },
+    yearly: {
+      aria: t("Offre annuelle", "Yearly plan", english),
+      title: t("Accès annuel", "Yearly access", english),
+      amount: `${PLAN.yearly / 100} €`,
+      unit: t("/ an", "/ year", english),
+      billed: t("Facturé 199 € chaque année", "Billed €199 every year", english),
+      commitment: t("Soit 16,58 € par mois", "That is €16.58 per month", english),
+      badge: t("Économise 149 €", "Save €149", english),
+      cta: t("Choisir l’accès annuel à 199 €", "Choose yearly access for €199", english),
+    },
+    lifetime: {
+      aria: t("Offre à vie", "Lifetime plan", english),
+      title: t("Accès à vie", "Lifetime access", english),
+      amount: `${PLAN.lifetime / 100} €`,
+      unit: t("à vie", "lifetime", english),
+      billed: t("Facturé 99 € une seule fois", "Billed €99 one time", english),
+      commitment: t("Sans renouvellement", "No renewal", english),
+      badge: t("Paiement unique", "One payment", english),
+      ribbon: t("Offre de lancement", "Launch offer", english),
+      cta: t("Choisir l’accès à vie à 99 €", "Choose lifetime access for €99", english),
+    },
+  };
   return <div className="sc-prices">
-    {(["monthly", "lifetime"] as const).map(offer => {
+    {(Object.keys(OFFERS) as Offer[]).map(offer => {
       const lifetime = offer === "lifetime";
-      return <article key={offer} className={`sc-price${lifetime ? " sc-price--lifetime" : ""}`} aria-label={t(lifetime ? "Offre à vie" : "Offre mensuelle", lifetime ? "Lifetime plan" : "Monthly plan", english)}>
+      const text = copy[offer];
+      return <article key={offer} className={`sc-price${lifetime ? " sc-price--lifetime" : ""}${text.ribbon ? " sc-price--ribboned" : ""}`} aria-label={text.aria}>
+        {text.ribbon && <p className="sc-price__ribbon">{text.ribbon}</p>}
         <header className="sc-price__head">
           <div className="sc-price__top">
-            <h3>{t(lifetime ? "Accès à vie" : "Accès mensuel", lifetime ? "Lifetime access" : "Monthly access", english)}</h3>
-            {lifetime && <span className="sc-price__badge">{t("Paiement unique", "One payment", english)}</span>}
+            <h3>{text.title}</h3>
+            {text.badge && <span className="sc-price__badge">{text.badge}</span>}
           </div>
           <div className="sc-price__pricing">
-            <p className="sc-price__amount">{PLAN[offer] / 100} € <span>{t(lifetime ? "à vie" : "/ mois", lifetime ? "lifetime" : "/ month", english)}</span></p>
-            <p className="sc-price__billing">{t(lifetime ? "Facturé 99 € une seule fois" : "Facturé 29 € chaque mois", lifetime ? "Billed €99 one time" : "Billed €29 every month", english)}<br />{t(lifetime ? "Sans renouvellement" : "Sans engagement", lifetime ? "No renewal" : "Cancel anytime", english)}</p>
+            <p className="sc-price__amount">{text.amount} <span>{text.unit}</span></p>
+            <p className="sc-price__billing">{text.billed}<br />{text.commitment}</p>
           </div>
         </header>
         <ul className="sc-price__features">
@@ -95,7 +133,7 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
         </ul>
         {hasAccess
           ? <a className="sc-price__cta" href="/app">{t("Ouvrir mon studio", "Open my studio", english)}</a>
-          : <button type="button" className="sc-price__cta" disabled={busy !== null} onClick={() => void checkout(offer)} aria-label={t(lifetime ? "Choisir l\u2019acc\u00e8s \u00e0 vie \u00e0 99 \u20ac" : "Choisir l\u2019acc\u00e8s mensuel \u00e0 29 \u20ac", lifetime ? "Choose lifetime access for \u20ac99" : "Choose monthly access for \u20ac29", english)}>
+          : <button type="button" className="sc-price__cta" disabled={busy !== null} onClick={() => void checkout(offer)} aria-label={text.cta}>
               {busy === offer ? t("Ouverture de Stripe\u2026", "Opening Stripe\u2026", english) : t("Commencer", "Get started", english)}
             </button>}
         {error?.offer === offer && <p className="sc-price__error" role="alert">{error.message}</p>}

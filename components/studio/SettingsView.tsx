@@ -796,7 +796,13 @@ export function SettingsView() {
               <h2>{t("Abonnement & facturation", "Plan & billing", english)}</h2>
               <p className="ss-lead">
                 {t("Plan actuel", "Current plan", english)} : <b>{planMeta ? "ScrollShow" : "Free"}</b>
-                {user.plan === "lifetime" ? t(" · Accès à vie — 99 €", " · Lifetime access — €99", english) : planMeta ? ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}` : ""}
+                {user.plan === "lifetime"
+                  ? t(" · Accès à vie — 99 €", " · Lifetime access — €99", english)
+                  : planMeta
+                    ? user.billingInterval === "year"
+                      ? ` · ${formatEuro(planMeta.yearly)} € / ${t("an", "year", english)}`
+                      : ` · ${formatEuro(planMeta.monthly)} € / ${t("mois", "month", english)}`
+                    : ""}
               </p>
               <ul className="ss-feat">
                 {(planMeta ? (english ? planMeta.featuresEn : planMeta.featuresFr) : english

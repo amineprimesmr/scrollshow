@@ -46,7 +46,7 @@
 
 /* L'etape de paiement est la seule a avoir besoin de deux colonnes :
    on elargit la scene pour elle, sans toucher aux autres etapes. */
-.ss-onb__stage:has(.ss-onb-pay) { width: min(100%, 900px); }
+.ss-onb__stage:has(.ss-onb-pay) { width: min(100%, 1180px); }
 
 .ss-onb-pay .sc-prices { width: 100%; }
 

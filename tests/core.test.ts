@@ -243,6 +243,27 @@ test("lifetime access requires completed paid checkout at exact amount", () => {
   assert.equal(applyLifetime(data,session as never),true);
   assert.equal(data.users[0].plan,"lifetime");
 });
+test("a yearly subscription unlocks the studio and is billed as yearly", () => {
+  const previousMonthly=process.env.STRIPE_PRICE_PRO_MONTHLY, previousYearly=process.env.STRIPE_PRICE_YEARLY;
+  try {
+    process.env.STRIPE_PRICE_PRO_MONTHLY="price_monthly"; process.env.STRIPE_PRICE_YEARLY="price_yearly";
+    assert.equal(planFromPriceId("price_yearly"),"pro");
+    const yearly=(interval:string,id:string)=>({customer:"cus",id:"sub",status:"active",items:{data:[{price:{id,recurring:{interval}}}]}});
+    const data=emptyStore(); data.users.push({...user,plan:"free",stripeCustomerId:"cus"});
+    applySubscription(data,yearly("year","price_yearly") as never,100);
+    assert.equal(data.users[0].plan,"pro");
+    assert.equal(data.users[0].billingInterval,"year");
+    applySubscription(data,yearly("month","price_monthly") as never,200);
+    assert.equal(data.users[0].billingInterval,"month");
+    const unknown=emptyStore(); unknown.users.push({...user,plan:"free",stripeCustomerId:"cus"});
+    applySubscription(unknown,yearly("year","price_someone_elses") as never,100);
+    assert.equal(unknown.users[0].plan,"free");
+    assert.equal(unknown.users[0].billingInterval,undefined);
+  } finally {
+    if(previousMonthly===undefined) delete process.env.STRIPE_PRICE_PRO_MONTHLY; else process.env.STRIPE_PRICE_PRO_MONTHLY=previousMonthly;
+    if(previousYearly===undefined) delete process.env.STRIPE_PRICE_YEARLY; else process.env.STRIPE_PRICE_YEARLY=previousYearly;
+  }
+});
 test("subscription cancellation never erases lifetime access", () => {
   const data=emptyStore(); data.users.push({...user,plan:"lifetime",stripeCustomerId:"cus"});
   applySubscription(data,{customer:"cus",id:"sub",status:"canceled",items:{data:[]}} as never,100);

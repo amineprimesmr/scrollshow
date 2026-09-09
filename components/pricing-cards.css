@@ -2,9 +2,9 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(16px, 1.4vw, 22px);
-  width: min(100%, 800px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 1.2vw, 20px);
+  width: min(100%, 1140px);
   margin: 0 auto;
   color: #fafafa;
   text-align: left;
@@ -69,6 +69,23 @@
 }
 .sc-price__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 27px; }
 .sc-price__top h3 { margin: 0; color: #c6c6cc; font-size: clamp(14px, 1.1vw, 17px); line-height: 1.25; font-weight: 500; letter-spacing: .035em; text-transform: uppercase; }
+/* Bandeau au-dessus de la carte a vie : l'offre de lancement se lit avant le prix. */
+.sc-price--ribboned { padding-top: clamp(44px, 3.4vw, 52px); }
+.sc-price__ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 9px 12px;
+  background: linear-gradient(180deg, #ffffff, #e7e7ec);
+  color: #050505;
+  font-size: clamp(11px, .9vw, 12.5px);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  text-align: center;
+  text-transform: uppercase;
+}
 .sc-price__badge { flex-shrink: 0; padding: 3px 7px; background: #fff; color: #090909; border-radius: 6px; font-size: clamp(10px, .85vw, 12px); font-weight: 550; line-height: 1.1; letter-spacing: -.04em; }
 .sc-price__pricing { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; min-height: 42px; }
 .sc-price__amount { margin: 0; font-size: clamp(23px, 1.85vw, 28px); line-height: 1.12; letter-spacing: -.035em; font-weight: 500; white-space: nowrap; }
@@ -136,6 +153,7 @@
   .sc-price--lifetime .sc-price__cta:hover { background: #ededf0; box-shadow: 0 0 28px #ffffff10; }
 }
 @media (max-width: 1050px) and (min-width: 761px) {
+  .sc-prices { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 800px; }
   .sc-price__pricing { align-items: flex-start; flex-direction: column; }
   .sc-price__billing { text-align: left; }
   .sc-price__features li { grid-template-columns: 40px minmax(0,1fr) 19px; gap: 12px; }

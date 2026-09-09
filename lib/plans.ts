@@ -6,8 +6,10 @@ export const PLAN = {
   name: "ScrollShow",
   nameEn: "ScrollShow",
   monthly: 2900,
+  yearly: 19900,
   lifetime: 9900,
   monthlyPriceId: process.env.STRIPE_PRICE_PRO_MONTHLY || "",
+  yearlyPriceId: process.env.STRIPE_PRICE_YEARLY || "",
   lifetimePriceId: process.env.STRIPE_PRICE_LIFETIME || "",
   featuresFr: [
     "Accès complet",
@@ -39,15 +41,28 @@ export function parsePlan(value: unknown): Plan {
   return isPaidPlan(String(value)) ? (String(value) as PaidPlan) : "free";
 }
 
+export type Offer = "monthly" | "yearly" | "lifetime";
+
+/** Montant attendu et forme du prix Stripe, par offre : la source unique. */
+export const OFFERS: Record<Offer, { cents: number; interval: "month" | "year" | null; priceId: () => string }> = {
+  monthly: { cents: PLAN.monthly, interval: "month", priceId: () => PLAN.monthlyPriceId },
+  yearly: { cents: PLAN.yearly, interval: "year", priceId: () => PLAN.yearlyPriceId },
+  lifetime: { cents: PLAN.lifetime, interval: null, priceId: () => PLAN.lifetimePriceId },
+};
+
 export function priceIdFor() {
   return PLAN.monthlyPriceId;
 }
 
 export function planFromPriceId(priceId: string): PaidPlan | null {
   if (!priceId) return null;
-  if (priceId === PLAN.lifetimePriceId) return "lifetime";
+  // Les identifiants sont relus dans l'environnement : un prix ajoute apres le
+  // demarrage du module (ou pose par un test) doit compter tout de suite.
+  const monthly = process.env.STRIPE_PRICE_PRO_MONTHLY?.trim() || PLAN.monthlyPriceId;
+  const yearly = process.env.STRIPE_PRICE_YEARLY?.trim() || PLAN.yearlyPriceId;
+  if (priceId === (process.env.STRIPE_PRICE_LIFETIME?.trim() || PLAN.lifetimePriceId)) return "lifetime";
   const legacyMonthly = (process.env.STRIPE_LEGACY_MONTHLY_PRICE_IDS || "").split(",").map(id => id.trim()).filter(id => /^price_[A-Za-z0-9]+$/.test(id));
-  return priceId === PLAN.monthlyPriceId || legacyMonthly.includes(priceId) ? PLAN.id : null;
+  return priceId === monthly || priceId === yearly || legacyMonthly.includes(priceId) ? PLAN.id : null;
 }
 
 export function formatEuro(cents: number) {

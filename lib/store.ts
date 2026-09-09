@@ -148,6 +148,7 @@ export function publicUser(user: User) {
     email: user.email,
     name: user.name,
     plan: user.plan,
+    billingInterval: user.billingInterval,
     createdAt: user.createdAt,
     hasPassword: Boolean(user.passwordHash),
     hasGoogle: Boolean(user.googleId),

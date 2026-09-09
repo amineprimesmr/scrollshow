@@ -26,6 +26,6 @@ export default function PricingPage() {
       <PricingCards english={english} destination={destination} hasAccess={hasStudioAccess(plan)} />
     </section>
     <p className="ss-pricing__foot">{t("Inclus par jour : 30 analyses de comptes, 10 découvertes par mots-clés, 30 rendus et 20 exports. La recherche et la publication dépendent de la disponibilité des services et des autorisations TikTok.", "Daily allowance: 30 account analyses, 10 keyword discoveries, 30 renders and 20 exports. Research and publishing depend on service availability and TikTok permissions.", english)}</p>
-    <p className="ss-pricing__foot">{t("Les limites des plateformes et les quotas de traitement s’appliquent aux deux offres. Les abonnements aux assistants IA ne sont pas inclus. Aucun résultat d’audience garanti.", "Platform limits and processing quotas apply to both offers. AI assistant subscriptions are not included. Audience results are not guaranteed.", english)} <a href="/terms">{t("Conditions", "Terms", english)}</a></p>
+    <p className="ss-pricing__foot">{t("Les limites des plateformes et les quotas de traitement s’appliquent à toutes les offres. Les abonnements aux assistants IA ne sont pas inclus. Aucun résultat d’audience garanti.", "Platform limits and processing quotas apply to every plan. AI assistant subscriptions are not included. Audience results are not guaranteed.", english)} <a href="/terms">{t("Conditions", "Terms", english)}</a></p>
   </main>;
 }
