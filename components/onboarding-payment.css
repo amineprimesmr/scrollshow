@@ -44,12 +44,11 @@
 
 .ss-onb-pay__offers:disabled { opacity: 0.5; }
 
-/* L'etape de paiement est la seule a avoir besoin de deux colonnes :
-   on elargit la scene pour elle, sans toucher aux autres etapes. */
-.ss-onb__stage:has(.ss-onb-pay) { width: min(100%, 1180px); }
-
-/* Deux cartes seulement : on garde la scene compacte tant que l'annuel dort. */
-.ss-onb__stage:has(.ss-onb-pay:not(:has(.sc-price:nth-child(3)))) { width: min(100%, 800px); }
+/* L'etape de paiement est la seule a avoir besoin de plusieurs colonnes : on
+   elargit la scene pour elle, sans toucher aux autres etapes. Largeur calee sur
+   les deux cartes affichees ; passer a 1180px le jour ou YEARLY_ENABLED
+   (lib/plans.ts) remet la carte annuelle au milieu. */
+.ss-onb__stage:has(.ss-onb-pay) { width: min(100%, 800px); }
 
 .ss-onb-pay .sc-prices { width: 100%; }
 
