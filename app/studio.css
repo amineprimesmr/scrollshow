@@ -6271,6 +6271,8 @@ a.ss-btn-ghost {
   background: #000;
 }
 
+.ss-overview__fan { display: flex; flex-direction: column; flex: 0 0 auto; min-height: 0; }
+
 .ss-overview .ss-fan {
   flex: 1 1 auto;
   display: flex;
@@ -7642,3 +7644,89 @@ a.ss-btn-ghost {
 .ss-project-row__text b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-project-row__text span { font-size: 12px; color: var(--ss-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-form-error { margin: 4px 0; font-size: 13px; color: var(--ss-err-fg); }
+
+/* ── Overview : statut, barre d'outils et résumé ───────────────────────── */
+.ss-acc__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ss-muted);
+}
+.ss-acc__status-text b { color: var(--ss-ink); font-weight: 700; }
+.ss-acc__status-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ss-muted); flex: 0 0 auto; }
+.ss-acc__status.is-ok .ss-acc__status-dot { background: var(--ss-ok-fg); }
+.ss-acc__status.is-partial .ss-acc__status-dot { background: var(--ss-warn-fg); }
+.ss-acc__status.is-busy .ss-acc__status-dot { background: var(--ss-purple); animation: ss-pulse 1.2s ease-in-out infinite; }
+.ss-acc__status .ss-fan__chip { margin-left: auto; }
+@keyframes ss-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.ss-acc__group { display: flex; flex-direction: column; gap: 5px; }
+.ss-acc__group--inline { flex-direction: row; align-items: center; gap: 8px; }
+.ss-acc__group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ss-muted);
+  padding-left: 2px;
+}
+
+.ss-acc__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--ss-line);
+  border-radius: 18px;
+  background: var(--ss-card);
+}
+.ss-acc__toolbar-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; }
+.ss-acc__toolbar .ss-acc__sort { gap: 0; }
+.ss-acc__toolbar .ss-acc__sort select { min-height: 36px; padding: 0 32px 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+
+.ss-acc__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.ss-acc__summary div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ss-line);
+  background: var(--ss-card);
+}
+.ss-acc__summary dd { margin: 0; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--ss-ink); }
+.ss-acc__summary dt { font-size: 12px; color: var(--ss-muted); }
+
+.ss-acc__empty { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 14px; font-size: 14px; color: var(--ss-muted); }
+.ss-acc__footnote { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--ss-muted); }
+
+@media (max-width: 600px) {
+  .ss-acc__toolbar { padding: 12px; }
+  .ss-acc__toolbar-row { gap: 10px 12px; }
+  .ss-acc__group--inline .ss-acc__group-label { display: none; }
+}
+
+/* Étapes numérotées (Réglages > API > Raccourci iPhone). */
+.ss-steps {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ss-steps li .ss-btn-ghost {
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+}

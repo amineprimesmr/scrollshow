@@ -260,12 +260,15 @@ export function AccountPanel({
               </button>
             ))}
           </div>
-          <div className="ss-acc__range">
-            {([30, 90, "all"] as const).map((r) => (
-              <button key={String(r)} type="button" className={range === r ? "is-on" : ""} onClick={() => setRange(r)}>
-                {r === "all" ? t("Tout", "All", en) : `${r}j`}
-              </button>
-            ))}
+          <div className="ss-acc__group ss-acc__group--inline">
+            <span className="ss-acc__group-label">{t("Période", "Period", en)}</span>
+            <div className="ss-acc__range" role="group" aria-label={t("Période", "Period", en)}>
+              {([30, 90, "all"] as const).map((r) => (
+                <button key={String(r)} type="button" className={range === r ? "is-on" : ""} onClick={() => setRange(r)}>
+                  {r === "all" ? t("Tout", "All", en) : `${r}j`}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="ss-acc__actions">
             {item.kind === "channel" ? (
@@ -279,10 +282,17 @@ export function AccountPanel({
           </div>
         </div>
 
-        {data ? <div className="ss-acc__sync" role="status">
-          <span>{fetching ? t("Synchronisation en cours…", "Syncing…", en) : data.sync?.complete ? t("Lecture terminée des publications accessibles", "Accessible posts loaded", en) : t("Historique partiel — synchronisation nécessaire", "Partial history — sync needed", en)} · {data.sync?.loaded ?? data.videos.length} {t("posts chargés", "loaded posts", en)}</span>
-          <small>{t("Les compteurs sont les totaux des posts publiés pendant la période choisie. Les ventes ne sont pas mesurées.", "Counters are lifetime totals for posts published in the selected period. Sales are not tracked.", en)}</small>
-          {data.canFetch ? <button type="button" className="ss-fan__chip" disabled={fetching} onClick={() => void fetchVideos()}>{fetching ? t("Chargement…", "Loading…", en) : data.sync?.complete ? t("Actualiser", "Refresh", en) : t("Reprendre la synchronisation", "Resume sync", en)}</button> : null}
+        {data ? <div className={`ss-acc__status${fetching ? " is-busy" : data.sync?.complete ? " is-ok" : " is-partial"}`} role="status">
+          <span className="ss-acc__status-dot" aria-hidden />
+          <span className="ss-acc__status-text">
+            <b>{fetching ? t("Synchronisation…", "Syncing…", en) : data.sync?.complete ? t("À jour", "Up to date", en) : t("Historique partiel", "Partial history", en)}</b>
+            {" · "}{data.sync?.loaded ?? data.videos.length} {t("posts", "posts", en)}
+            {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}` : ""}
+          </span>
+          {data.canFetch ? <button type="button" className="ss-fan__chip lg-press" disabled={fetching} onClick={() => void fetchVideos()}>
+            {fetching ? <Orb size={20} state="searching" /> : null}
+            {fetching ? t("Chargement…", "Loading…", en) : data.sync?.complete ? t("Actualiser", "Refresh", en) : t("Reprendre", "Resume", en)}
+          </button> : null}
         </div> : null}
         {error ? <p className="ss-acc__error">{error}</p> : null}
 
@@ -325,6 +335,7 @@ export function AccountPanel({
                 )}
               </div>
             )}
+            <p className="ss-acc__footnote">{t("Totaux des posts publiés sur la période choisie. Les ventes ne sont pas mesurées.", "Totals for posts published in the selected period. Sales are not tracked.", en)}</p>
             {data.studio.posts ? (
               <div className="ss-acc__studio">
                 <small>ScrollShow</small>
@@ -341,58 +352,73 @@ export function AccountPanel({
 
         {data && tab === "videos" ? (
           <div className="ss-acc__videos">
-            <div className="ss-acc__filters">
+            <div className="ss-acc__toolbar">
               <PublicationTextSearch key={`${key}:${range}`} accountKey={key!} range={range} videos={data.videos} query={query} onQuery={setQuery}
                 hookOnly={hookOnly} onScope={setHookOnly} priorityPostId={openPost || undefined} en={en} onUpdate={(updates, hooks) => setData(previous => {
                   if (!previous || previous.key !== key) return previous;
                   const indexed = new Map(updates.map(v => [v.id, v.slideTexts]));
                   return { ...previous, hooks, videos: previous.videos.map(v => indexed.has(v.id) ? { ...v, slideTexts: indexed.get(v.id) } : v) };
                 })} />
-              <div className="ss-acc__range" role="group" aria-label={t("Type de post", "Post type", en)}>
-                {(["all", "photo", "video"] as const).map((k) => (
-                  <button key={k} type="button" className={kind === k ? "is-on" : ""} onClick={() => setKind(k)}>
-                    {k === "all" ? t("Tout", "All", en) : k === "photo" ? t("Carrousels", "Carousels", en) : t("Vidéos", "Videos", en)}
-                  </button>
-                ))}
+              <div className="ss-acc__toolbar-row">
+                <div className="ss-acc__group">
+                  <span className="ss-acc__group-label">{t("Type", "Type", en)}</span>
+                  <div className="ss-acc__range" role="group" aria-label={t("Type de post", "Post type", en)}>
+                    {(["all", "photo", "video"] as const).map((k) => (
+                      <button key={k} type="button" className={kind === k ? "is-on" : ""} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                        {k === "all" ? t("Tout", "All", en) : k === "photo" ? t("Carrousels", "Carousels", en) : t("Vidéos", "Videos", en)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="ss-acc__group">
+                  <span className="ss-acc__group-label">{t("Tri", "Sort", en)}</span>
+                  <label className="ss-acc__sort">
+                    <select className="ss-input" value={sort} aria-label={t("Trier par", "Sort by", en)} onChange={(e) => setSort(e.target.value as Sort)}>
+                      <option value="views">{t("Vues", "Views", en)}</option>
+                      <option value="likes">Likes</option>
+                      <option value="comments">{t("Commentaires", "Comments", en)}</option>
+                      <option value="shares">{t("Partages", "Shares", en)}</option>
+                      <option value="engagement">{t("Engagement", "Engagement", en)}</option>
+                      <option value="recent">{t("Plus récents", "Most recent", en)}</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="ss-acc__group">
+                  <span className="ss-acc__group-label">{t("Affichage", "Layout", en)}</span>
+                  <div className="ss-acc__range" role="group" aria-label={t("Affichage", "Layout", en)}>
+                    {(["grid", "list"] as const).map((l) => (
+                      <button key={l} type="button" className={layout === l ? "is-on" : ""} aria-pressed={layout === l} onClick={() => setLayout(l)}>
+                        {l === "grid" ? t("Galerie", "Gallery", en) : t("Liste", "List", en)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <label className="ss-acc__sort">
-                <span>{t("Trier par", "Sort by", en)}</span>
-                <select className="ss-input" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                  <option value="views">{t("Vues", "Views", en)}</option>
-                  <option value="likes">Likes</option>
-                  <option value="comments">{t("Commentaires", "Comments", en)}</option>
-                  <option value="shares">{t("Partages", "Shares", en)}</option>
-                  <option value="engagement">{t("Engagement", "Engagement", en)}</option>
-                  <option value="recent">{t("Plus récents", "Most recent", en)}</option>
-                </select>
-              </label>
-              <div className="ss-acc__range" role="group" aria-label={t("Affichage", "Layout", en)}>
-                {(["grid", "list"] as const).map((l) => (
-                  <button key={l} type="button" className={layout === l ? "is-on" : ""} onClick={() => setLayout(l)}>
-                    {l === "grid" ? t("Galerie", "Gallery", en) : t("Liste", "List", en)}
-                  </button>
-                ))}
-              </div>
-              {data.canFetch ? (
-                <button type="button" className="ss-fan__chip" disabled={fetching} onClick={() => void fetchVideos()}>
-                  {fetching ? <Orb size={20} state="searching" /> : null}
-                  {fetching ? t("Analyse…", "Analysing…", en) : data.videos.length ? t("Actualiser", "Refresh", en) : t("Analyser les posts", "Analyse the posts", en)}
-                </button>
-              ) : null}
             </div>
 
-            <div className="ss-acc__videos-head">
-              <span className="ss-acc__muted">
-                {videos.length
-                  ? `${videos.length} ${t("posts", "posts", en)} · ${compact(filteredTotals.views)} ${t("vues", "views", en)} · ${compact(filteredTotals.avgViews)} ${t("vues moy.", "avg views", en)} · ${filteredTotals.engagement}% ${t("engagement", "engagement", en)} · ${rangeLabel}`
-                  : data.videos.length
-                    ? query && publicationTextProgress(data.videos).pending
-                      ? t("Aucun résultat dans les images déjà lues. La recherche se complétera au fil de la lecture.", "No matches in the images read so far. More results may appear as reading continues.", en)
-                      : t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
-                    : t("Aucun post sur cette période.", "No post in this range.", en)}
-                {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR")}` : ""}
-              </span>
-            </div>
+            {videos.length ? (
+              <dl className="ss-acc__summary">
+                <div><dd>{videos.length}</dd><dt>{t("posts", "posts", en)}</dt></div>
+                <div><dd>{compact(filteredTotals.views)}</dd><dt>{t("vues", "views", en)}</dt></div>
+                <div><dd>{compact(filteredTotals.avgViews)}</dd><dt>{t("vues moy.", "avg views", en)}</dt></div>
+                <div><dd>{filteredTotals.engagement}%</dd><dt>{t("engagement", "engagement", en)}</dt></div>
+                <div><dd>{rangeLabel}</dd><dt>{t("période", "period", en)}</dt></div>
+              </dl>
+            ) : (
+              <p className="ss-acc__empty">
+                {data.videos.length
+                  ? query && publicationTextProgress(data.videos).pending
+                    ? t("Aucun résultat dans les images déjà lues. La recherche se complétera au fil de la lecture.", "No matches in the images read so far. More results may appear as reading continues.", en)
+                    : t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
+                  : t("Aucun post sur cette période.", "No post in this range.", en)}
+                {!data.videos.length && data.canFetch ? (
+                  <button type="button" className="ss-fan__chip is-on lg-press" disabled={fetching} onClick={() => void fetchVideos()}>
+                    {fetching ? <Orb size={20} state="searching" invert /> : null}
+                    {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les posts", "Analyse the posts", en)}
+                  </button>
+                ) : null}
+              </p>
+            )}
 
             {!data.videos.length && !data.canFetch ? (
               <p className="ss-acc__muted">

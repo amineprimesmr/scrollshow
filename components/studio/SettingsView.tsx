@@ -315,12 +315,12 @@ export function SettingsView() {
     await reload();
   }
 
-  async function createKey() {
+  async function createKey(name = keyName) {
     setBusy("key");
     const res = await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: keyName }),
+      body: JSON.stringify({ name }),
     });
     const json = await res.json().catch(() => ({}));
     setBusy("");
@@ -734,7 +734,7 @@ export function SettingsView() {
               keyName={keyName}
               setKeyName={setKeyName}
               busy={busy}
-              createKey={() => void createKey()}
+              createKey={(name) => void createKey(name)}
               revokeKey={(id) => void revokeKey(id)}
               copied={copied}
               copy={copy}
@@ -910,13 +910,14 @@ function ApiTab({
   keyName: string;
   setKeyName: (value: string) => void;
   busy: string;
-  createKey: () => void;
+  createKey: (name?: string) => void;
   revokeKey: (id: string) => void;
   copied: string;
   copy: (id: string, value: string) => void;
   revealed: string;
 }) {
   return (
+    <>
     <div className="ss-set-card">
       <h2>
         <IconKey size={16} /> {t("Clés API", "API keys", english)}
@@ -945,7 +946,7 @@ function ApiTab({
           {t("Nom de la clé", "Key name", english)}
           <input value={keyName} onChange={(event) => setKeyName(event.target.value)} maxLength={40} />
         </label>
-        <button className="ss-btn-purple" type="button" disabled={busy === "key"} onClick={createKey}>
+        <button className="ss-btn-purple" type="button" disabled={busy === "key"} onClick={() => createKey()}>
           {busy === "key" ? <span className="ss-spin" /> : t("Créer une clé", "Create key", english)}
         </button>
       </div>
@@ -976,6 +977,37 @@ function ApiTab({
         {t("Gérer les agents", "Manage agents", english)}
       </a>
     </div>
+    <div className="ss-set-card">
+      <h2>
+        <IconPlug size={16} /> {t("Raccourci iPhone", "iPhone shortcut", english)}
+      </h2>
+      <p className="ss-lead">
+        {t(
+          "Dans TikTok, Partager → ScrollShow ajoute le compte (profil ou vidéo) à ta bibliothèque. Sans partage, le raccourci lit le lien copié dans le presse-papiers.",
+          "In TikTok, Share → ScrollShow adds the account (profile or video) to your library. Run it without input and it reads the link from your clipboard.",
+          english,
+        )}
+      </p>
+      <ol className="ss-steps">
+        <li>
+          {t("Crée une clé pour ton iPhone et copie-la.", "Create a key for your iPhone and copy it.", english)}{" "}
+          <button className="ss-btn-ghost" type="button" disabled={busy === "key"} onClick={() => createKey("iPhone")}>
+            {busy === "key" ? <span className="ss-spin" /> : t("Créer la clé iPhone", "Create iPhone key", english)}
+          </button>
+        </li>
+        <li>
+          {t("Ouvre ce lien sur l’iPhone et touche « Ajouter ». Colle la clé quand elle est demandée.", "Open this link on the iPhone and tap “Add”. Paste the key when asked.", english)}{" "}
+          <a className="ss-btn-ghost" href="/ScrollShow.shortcut" download="ScrollShow.shortcut">
+            {t("Installer le raccourci", "Install the shortcut", english)}
+          </a>
+        </li>
+        <li>{t("Dans TikTok : Partager → ScrollShow. Une notification confirme l’ajout.", "In TikTok: Share → ScrollShow. A notification confirms it.", english)}</li>
+      </ol>
+      <p className="ss-muted">
+        {t("Le raccourci est signé et partageable tel quel : chaque personne colle sa propre clé à l’installation.", "The shortcut is signed and shareable as is: each person pastes their own key on install.", english)}
+      </p>
+    </div>
+    </>
   );
 }
 

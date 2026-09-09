@@ -102,7 +102,11 @@ function layout(d: number, g: Geo) {
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
 
-export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, viaClick: boolean) => void }) {
+export function AccountsFan({ onSelect, onBlankClick }: {
+  onSelect?: (item: FanItem | null, viaClick: boolean) => void;
+  /** Clic sur la scene hors dossier, sans glisser : le parent peut replier le panneau. */
+  onBlankClick?: () => void;
+}) {
   const { channels, english: en, setAddOpen } = useStudio();
   const [clippers, setClippers] = useState<Account[]>([]);
   const [sort, setSort] = useState<SortKey>("followers");
@@ -349,6 +353,8 @@ export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, vi
           // Same folder pressed again: still open its details.
           onSelectRef.current?.(items[d.index] || null, true);
           clicked.current = false;
+        } else {
+          onBlankClickRef.current?.();
         }
         return;
       }
@@ -430,6 +436,8 @@ export function AccountsFan({ onSelect }: { onSelect?: (item: FanItem | null, vi
   const current = items[selected] || null;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onBlankClickRef = useRef(onBlankClick);
+  onBlankClickRef.current = onBlankClick;
   const clicked = useRef(false);
   useEffect(() => {
     onSelectRef.current?.(current, clicked.current);

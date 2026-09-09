@@ -12,7 +12,7 @@ export type NavItem = {
 };
 
 export const STUDIO_NAV: NavItem[] = [
-  { href: "/app/home", fr: "Publications et stats", en: "Overview", icon: "home", section: "main" },
+  { href: "/app/home", fr: "Overview", en: "Overview", icon: "home", section: "main" },
   { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
   { href: "/app/discover", fr: "Recherche", en: "Research", icon: "globe", section: "main" },
   { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },

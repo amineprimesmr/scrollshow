@@ -23,6 +23,7 @@ import { discoverResearchAccounts, researchLibrary, contentBrief, researchSchema
 import { startResearch, workResearch, listResearchJobs, getResearchJob, advanceResearch, controlResearch } from "@/lib/research/jobs";
 import { prepareStudy, advanceStudy, getStudy, saveInterpretation, formatLibrary, exportStudy } from "@/lib/research/formats";
 import { filtersSchema } from "@/lib/research/model";
+import { addLibraryAccount, resolveTikTokHandle } from "@/lib/library-add";
 export const maxDuration = 300;
 
 export function OPTIONS() {
@@ -72,6 +73,25 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
     const { slug = [] } = await context.params;
     const [head, id] = slug;
     const body = await request.json().catch(() => ({}));
+    if (head === "library" && !id) {
+      // Raccourci iOS / partage TikTok : accepte une URL de profil, de video,
+      // un lien court vm.tiktok.com ou un simple @handle.
+      const raw = String(body.url || body.handle || body.text || "").slice(0, 2000);
+      const handle = await resolveTikTokHandle(raw);
+      const english = String(request.headers.get("accept-language") || "").toLowerCase().startsWith("en");
+      if (!handle) return agentResponse({ error: "invalid", message: english ? "No TikTok account found in what was shared." : "Aucun compte TikTok trouve dans ce qui a ete partage." }, 400);
+      const result = await addLibraryAccount(user, handle, { verdict: body.verdict, niche: body.niche, notes: body.notes });
+      if ("error" in result) {
+        const messages = {
+          exists: english ? `@${handle} is already in your library.` : `@${handle} est deja dans ta bibliotheque.`,
+          limit: english ? "Your plan does not allow adding accounts." : "Ton offre ne permet pas d'ajouter des comptes.",
+          invalid: english ? "Invalid account." : "Compte invalide.",
+        };
+        return agentResponse({ ...result, message: messages[result.error] }, result.error === "exists" ? 409 : result.error === "limit" ? 402 : 400);
+      }
+      const name = String(result.account.nickname || `@${result.account.handle}`);
+      return agentResponse({ ...result, message: english ? `${name} added to ScrollShow.` : `${name} ajoute a ScrollShow.` }, 201);
+    }
     if (head === "research" && !id) {
       const parsed = researchSchema.safeParse(body);
       if (!parsed.success) return agentResponse({ error: "invalid" }, 400);

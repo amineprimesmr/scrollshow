@@ -43,27 +43,33 @@ export function PublicationTextSearch({ accountKey, range, videos, query, onQuer
     })();
     return () => { active = false; };
   }, [accountKey, range, paused, hasWork, attempt, priorityPostId, en]);
+  const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  const showStatus = Boolean(error) || progress.pending > 0 || progress.failed > 0;
   return <div className="ss-text-search">
     <div className="ss-text-search__field">
+      <svg className="ss-text-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
       <input className="ss-input ss-acc__search" type="search" value={query} onChange={e => onQuery(e.target.value)}
-        aria-label={tr("Chercher dans le texte des slides", "Search slide text")} placeholder={tr("Chercher un hook ou du texte dans les slides…", "Search hooks or text on slides…")} />
+        aria-label={tr("Chercher dans le texte des slides", "Search slide text")}
+        title={tr("Texte visible sur les slides et couvertures. Les légendes ne sont pas recherchées.", "Visible text on slides and covers. Captions are not searched.")}
+        placeholder={tr("Chercher un hook ou un texte de slide…", "Search a hook or slide text…")} />
       <div className="ss-acc__range" role="group" aria-label={tr("Où chercher", "Search scope")}>
         <button type="button" className={!hookOnly ? "is-on" : ""} aria-pressed={!hookOnly} onClick={() => onScope(false)}>{tr("Toutes les slides", "All slides")}</button>
-        <button type="button" className={hookOnly ? "is-on" : ""} aria-pressed={hookOnly} onClick={() => onScope(true)}>{tr("Hook · slide 1", "Hook · slide 1")}</button>
+        <button type="button" className={hookOnly ? "is-on" : ""} aria-pressed={hookOnly} onClick={() => onScope(true)}>{tr("Hook seul", "Hook only")}</button>
       </div>
     </div>
-    <div className="ss-text-search__status">
-      <span role="status">{error || (!progress.total ? tr("Aucune image disponible à lire.", "No images available to read.") : running && !paused
-        ? tr(`Lecture des images · ${progress.done}/${progress.total}`, `Reading images · ${progress.done}/${progress.total}`)
-        : progress.pending ? tr(`Recherche partielle · ${progress.done}/${progress.total} images lues`, `Partial search · ${progress.done}/${progress.total} images read`)
-        : tr(`Texte des images prêt · ${progress.total - progress.failed}/${progress.total}`, `Image text ready · ${progress.total - progress.failed}/${progress.total}`))}
-        {!error && progress.uncertain > 0 ? tr(` · ${progress.uncertain} lectures incertaines`, ` · ${progress.uncertain} uncertain readings`) : ""}
-        {!error && progress.failed > 0 ? tr(` · ${progress.failed} images indisponibles`, ` · ${progress.failed} unavailable images`) : ""}
+    {showStatus ? <div className={`ss-text-search__status${error ? " is-error" : ""}`}>
+      <span className="ss-text-search__bar" aria-hidden><i style={{ width: `${pct}%` }} /></span>
+      <span role="status">{error || (running && !paused
+        ? tr(`Lecture des slides ${progress.done}/${progress.total}`, `Reading slides ${progress.done}/${progress.total}`)
+        : progress.pending ? tr(`Lecture en pause · ${progress.done}/${progress.total}`, `Reading paused · ${progress.done}/${progress.total}`)
+        : tr(`${progress.failed} images indisponibles`, `${progress.failed} unavailable images`))}
+        {!error && progress.uncertain > 0 && progress.pending > 0 ? tr(` · ${progress.uncertain} incertaines`, ` · ${progress.uncertain} uncertain`) : ""}
       </span>
       {progress.pending > 0 ? <button type="button" className="ss-text-search__action" onClick={() => { if (error) { setAttempt(n => n + 1); setPaused(false); } else setPaused(v => !v); }}>
-        {tr(error ? "Réessayer" : paused ? "Continuer la lecture" : "Pause", error ? "Retry" : paused ? "Continue reading" : "Pause")}</button> : null}
-      {!progress.pending && progress.failed > 0 ? <button type="button" className="ss-text-search__action" onClick={() => { retryFailed.current = true; setPaused(false); setAttempt(n => n + 1); }}>{tr("Relire les images indisponibles", "Retry unavailable images")}</button> : null}
-      <small>{tr("Texte visible sur les slides et couvertures. Les légendes ne sont pas recherchées.", "Visible text on slides and covers. Captions are not searched.")}</small>
-    </div>
+        {tr(error ? "Réessayer" : paused ? "Reprendre" : "Pause", error ? "Retry" : paused ? "Resume" : "Pause")}</button> : null}
+      {!progress.pending && progress.failed > 0 ? <button type="button" className="ss-text-search__action" onClick={() => { retryFailed.current = true; setPaused(false); setAttempt(n => n + 1); }}>{tr("Relire", "Retry")}</button> : null}
+    </div> : null}
   </div>;
 }
