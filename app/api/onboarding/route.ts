@@ -64,7 +64,7 @@ const businessSchema = z.object({
 });
 
 const keySchema = z.object({ action: z.literal("key") });
-const progressSchema = z.object({ action: z.literal("progress"), step: z.number().int().min(0).max(3) });
+const progressSchema = z.object({ action: z.literal("progress"), step: z.number().int().min(0).max(4) });
 
 const finishSchema = z.object({
   action: z.literal("finish"),

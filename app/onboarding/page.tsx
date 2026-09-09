@@ -17,8 +17,8 @@ import "../liquid-glass.css";
 import "./onboarding.css";
 import "@/components/atmosphere.css";
 
-type Step = 0 | 1 | 2 | 3 | 4;
-const STEPS: Step[] = [0, 1, 2, 3, 4];
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
+const STEPS: Step[] = [0, 1, 2, 3, 4, 5];
 
 const SOURCES = [
   { id: "tiktok", fr: "TikTok", en: "TikTok", logo: "/assets/platforms/tiktok.png" },
@@ -118,7 +118,6 @@ function OnboardingInner() {
   // Step 1
   const [url, setUrl] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [stage, setStage] = useState(0);
   const [business, setBusiness] = useState<BusinessProfile | null>(null);
   const [manual, setManual] = useState(false);
   const [tiktokInput, setTiktokInput] = useState("");
@@ -141,10 +140,10 @@ function OnboardingInner() {
         const me: PublicUser = json.user;
         setUser(me);
         setHeard(json.heardFrom || []);
-        if (me.onboarded && !hasStudioAccess(me.plan)) setStep(4);
+        if (me.onboarded && !hasStudioAccess(me.plan)) setStep(5);
         else if (me.onboarded && hasStudioAccess(me.plan) && !params.get("next")) { router.replace("/app"); return; }
         else {
-          if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 3) setStep(json.step as Step);
+          if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 4) setStep(json.step as Step);
         }
         setName(usableName(me.name || "") || firstNameFromEmail(me.email));
         setCompany(json.company || "");
@@ -162,7 +161,7 @@ function OnboardingInner() {
     setDir(target > step ? 1 : -1);
     setError("");
     setStep(target);
-    if (user && target < 4) void post({ action: "progress", step: target }).catch(() => {});
+    if (user && target < 5) void post({ action: "progress", step: target }).catch(() => {});
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -200,37 +199,25 @@ function OnboardingInner() {
     }
   }
 
-  /* ── step 1 ─────────────────────────────────────────────────────────── */
-  const stages = useMemo(
-    () => [
-      t("Connexion au site", "Reaching the site"),
-      t("Lecture de la page", "Reading the page"),
-      t("Détection du modèle", "Detecting the business model"),
-      t("Recherche des réseaux", "Finding social accounts"),
-      t("Analyse TikTok", "Analyzing TikTok"),
-    ],
-    [t],
-  );
-
+  /* ── step 0 · lien du business ──────────────────────────────────────── */
   async function analyze() {
     if (!url.trim()) return;
     setAnalyzing(true);
     setRevealed(false);
     setError("");
-    setStage(0);
-    const timer = window.setInterval(() => setStage((s) => Math.min(s + 1, stages.length - 1)), 700);
     try {
-      // Fast sites answer in 300ms; the scan still plays long enough to be read.
-      const [json] = await Promise.all([post({ action: "analyze", url }), new Promise((r) => window.setTimeout(r, 3200))]);
+      // Aucune attente ajoutee : la plupart des sites repondent en moins d'une seconde.
+      const json = await post({ action: "analyze", url });
       const found: BusinessProfile = json.business;
       const merged: BusinessProfile = { ...found, name: found.name || company, logo: logo || found.logo };
-      // Ce que l'analyse trouve alimente l'etape suivante plutot que d'etre ressaisi.
-      if (!company.trim() && merged.name) setCompany(merged.name);
-      if (!logo && merged.logo) setLogo(merged.logo);
-      setStage(stages.length);
+      // Ce que l'analyse vient de trouver l'emporte : c'est le signal le plus frais,
+      // et l'ecran suivant existe precisement pour le corriger. Seul un logo
+      // televerse par l'utilisateur resiste.
+      if (merged.name) setCompany(merged.name);
+      if (merged.logo && !logo.startsWith("/api/i/") && !logo.startsWith("data:")) setLogo(merged.logo);
       setBusiness(merged);
       setManual(false);
-      window.setTimeout(() => setRevealed(true), 250);
+      setRevealed(true);
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
       setError(
@@ -241,7 +228,6 @@ function OnboardingInner() {
             : t("Site injoignable. Vérifie le lien ou décris ton business à la main.", "Site unreachable. Check the link or describe your business manually."),
       );
     } finally {
-      window.clearInterval(timer);
       setAnalyzing(false);
     }
   }
@@ -300,7 +286,7 @@ function OnboardingInner() {
     try {
       const json = await post({ action: "business", business: { ...business, name: business.name || company } });
       setUser(json.user);
-      // Le profil reprend ce que l'analyse a trouve : plus rien a retaper.
+      // Filet de securite si l'analyse vient d'une session precedente.
       if (!company.trim() && business.name) setCompany(business.name);
       if (!logo && business.logo) setLogo(business.logo);
       go(1);
@@ -348,7 +334,7 @@ function OnboardingInner() {
       const json = await post({ action: "finish", heardFrom: heard });
       setUser(json.user);
       if (hasStudioAccess(json.user?.plan)) router.replace(next);
-      else { go(4); setBusy(false); }
+      else { go(5); setBusy(false); }
     } catch {
       setError(t("Impossible de terminer. Réessaie.", "Could not finish. Try again."));
       setBusy(false);
@@ -359,9 +345,10 @@ function OnboardingInner() {
   const titles: Record<Step, [string, string]> = {
     0: [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
     1: [t("On a rempli ce qu’on a trouvé", "We filled in what we found"), t("Vérifie, corrige si besoin. C’est tout ce qu’on te demande.", "Check it, fix anything that is off. That is all we ask.")],
-    2: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
-    3: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
-    4: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
+    2: [t("Ton compte TikTok", "Your TikTok account"), t("On lit tes stats publiques pour caler le ton et le rythme. Facultatif.", "We read your public stats to set the tone and rhythm. Optional.")],
+    3: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
+    4: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
+    5: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
   };
 
   const stepClass = `ss-onb-step ${dir === 1 ? "from-right" : "from-left"}`;
@@ -370,7 +357,7 @@ function OnboardingInner() {
     <main className="ss-onb">
       <LiquidGlassDefs />
       <Atmosphere />
-      <AuthNav current={step >= 4 ? "access" : "workspace"} end={user ? user.email : null} />
+      <AuthNav current={step >= 5 ? "access" : "workspace"} end={user ? user.email : null} />
 
       <section className="ss-onb__stage" key={step}>
         <h1 className={`ss-onb__title ${stepClass}`}>{titles[step][0]}</h1>
@@ -380,7 +367,7 @@ function OnboardingInner() {
           {/* ── 0 · lien du business + analyse ── */}
           {step === 0 ? (
             <div className="ss-onb-form">
-              {!analyzing && !revealed ? (
+              {!revealed ? (
                 <>
                   <label className="ss-onb-field">
                     <div className="ss-onb-url">
@@ -393,8 +380,8 @@ function OnboardingInner() {
                         autoFocus
                         onKeyDown={(e) => (e.key === "Enter" ? void analyze() : null)}
                       />
-                      <button type="button" className="ss-onb-cta ss-onb-cta--inline" disabled={!url.trim()} onClick={() => void analyze()}>
-                        {t("Analyser", "Analyze")}
+                      <button type="button" className="ss-onb-cta ss-onb-cta--inline" disabled={!url.trim() || analyzing} onClick={() => void analyze()}>
+                        {analyzing ? <span className="ss-onb-spin" /> : t("Analyser", "Analyze")}
                       </button>
                     </div>
                   </label>
@@ -410,23 +397,6 @@ function OnboardingInner() {
                 </>
               ) : null}
 
-              {analyzing ? (
-                <div className="ss-onb-scan" aria-live="polite">
-                  <div className="ss-onb-scan__orb">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                  <ol className="ss-onb-scan__list">
-                    {stages.map((label, index) => (
-                      <li key={label} className={index < stage ? "is-done" : index === stage ? "is-now" : ""}>
-                        <i />
-                        {label}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ) : null}
 
               {revealed && business ? (
                 <div className={`ss-onb-result ${revealed ? "is-in" : ""}`}>
@@ -473,41 +443,6 @@ function OnboardingInner() {
                       </button>
                     ))}
                   </div>
-
-                  {business.tiktok ? (
-                    <div className="ss-onb-tt">
-                      <div className="ss-onb-tt__who">
-                        {business.tiktok.avatar ? <img src={business.tiktok.avatar} alt="" /> : null}
-                        <div>
-                          <b>{business.tiktok.nickname || `@${business.tiktok.handle}`}</b>
-                          <span>@{business.tiktok.handle}</span>
-                        </div>
-                      </div>
-                      <div className="ss-onb-stats">
-                        <Stat label={t("abonnés", "followers")} value={business.tiktok.followers} active={revealed} />
-                        <Stat label={t("likes", "likes")} value={business.tiktok.likes} active={revealed} />
-                        <Stat label={t("posts", "posts")} value={business.tiktok.videos} active={revealed} />
-                        {business.tiktok.avgViews ? <Stat label={t("vues / post", "views / post")} value={business.tiktok.avgViews} active={revealed} /> : null}
-                      </div>
-                      {business.tiktok.source === "api" ? (
-                        <p className="ss-onb-tt__note">
-                          {business.tiktok.photoShare >= 50
-                            ? t(`${business.tiktok.photoShare} % de tes derniers posts sont déjà des carrousels. On va les faire décoller.`, `${business.tiktok.photoShare}% of your recent posts are already carousels. We will make them fly.`)
-                            : t(`Seulement ${business.tiktok.photoShare} % de carrousels dans tes derniers posts. C’est là que ScrollShow change tout.`, `Only ${business.tiktok.photoShare}% carousels in your recent posts. That is where ScrollShow changes everything.`)}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="ss-onb-tt ss-onb-tt--empty">
-                      <span>{t("Tu as déjà un compte TikTok pour cette marque ?", "Already have a TikTok account for this brand?")}</span>
-                      <div className="ss-onb-url">
-                        <input value={tiktokInput} onChange={(e) => setTiktokInput(e.target.value)} placeholder="@handle" onKeyDown={(e) => (e.key === "Enter" ? void addTikTok() : null)} />
-                        <button type="button" className="ss-onb-cta ss-onb-cta--inline ss-onb-cta--ghost" disabled={tiktokBusy || !tiktokInput.trim()} onClick={() => void addTikTok()}>
-                          {tiktokBusy ? <span className="ss-onb-spin" /> : t("Ajouter", "Add")}
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   {business.socials.filter((s) => s.platform !== "tiktok").length ? (
                     <div className="ss-onb-socials">
@@ -587,8 +522,59 @@ function OnboardingInner() {
             </form>
           ) : null}
 
-          {/* ── 2 · connect Claude ── */}
+          {/* ── 2 · compte TikTok, etape a part entiere ── */}
           {step === 2 ? (
+            <div className="ss-onb-form">
+              <div className="ss-onb-tt__head">
+                <img src="/assets/platforms/tiktok.png" alt="" width="44" height="44" />
+              </div>
+
+              {business?.tiktok ? (
+                <div className="ss-onb-tt">
+                  <div className="ss-onb-tt__who">
+                    {business.tiktok.avatar ? <img src={business.tiktok.avatar} alt="" /> : null}
+                    <div>
+                      <b>{business.tiktok.nickname || `@${business.tiktok.handle}`}</b>
+                      <span>@{business.tiktok.handle}</span>
+                    </div>
+                  </div>
+                  <div className="ss-onb-stats">
+                    <Stat label={t("abonnés", "followers")} value={business.tiktok.followers} active={revealed} />
+                    <Stat label={t("likes", "likes")} value={business.tiktok.likes} active={revealed} />
+                    <Stat label={t("posts", "posts")} value={business.tiktok.videos} active={revealed} />
+                    {business.tiktok.avgViews ? <Stat label={t("vues / post", "views / post")} value={business.tiktok.avgViews} active={revealed} /> : null}
+                  </div>
+                  {business.tiktok.source === "api" ? (
+                    <p className="ss-onb-tt__note">
+                      {business.tiktok.photoShare >= 50
+                        ? t(`${business.tiktok.photoShare} % de tes derniers posts sont déjà des carrousels. On va les faire décoller.`, `${business.tiktok.photoShare}% of your recent posts are already carousels. We will make them fly.`)
+                        : t(`Seulement ${business.tiktok.photoShare} % de carrousels dans tes derniers posts. C’est là que ScrollShow change tout.`, `Only ${business.tiktok.photoShare}% carousels in your recent posts. That is where ScrollShow changes everything.`)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="ss-onb-tt ss-onb-tt--empty">
+                  <span>{t("Renseigne ton @ pour qu’on lise tes stats. Tu pourras le faire plus tard.", "Enter your @ so we can read your stats. You can also do this later.")}</span>
+                  <div className="ss-onb-url">
+                    <input value={tiktokInput} onChange={(e) => setTiktokInput(e.target.value)} placeholder="@handle" onKeyDown={(e) => (e.key === "Enter" ? void addTikTok() : null)} />
+                    <button type="button" className="ss-onb-cta ss-onb-cta--inline ss-onb-cta--ghost" disabled={tiktokBusy || !tiktokInput.trim() || !business} onClick={() => void addTikTok()}>
+                      {tiktokBusy ? <span className="ss-onb-spin" /> : t("Ajouter", "Add")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
+              {error ? <p className="ss-onb-error">{error}</p> : null}
+
+              <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => go(3)}>
+                {business?.tiktok ? t("Continuer", "Continue") : t("Passer cette étape", "Skip this step")}
+              </button>
+            </div>
+          ) : null}
+
+          {/* ── 3 · brancher l'agent ── */}
+          {step === 3 ? (
             <div className="ss-onb-form">
               <p className="ss-onb-help">{t("Cette étape est facultative. L’utilisation des outils sera activée après paiement. Si tu as déjà branché ton assistant, continue sans recréer de clé.", "This step is optional. Tools become available after payment. If your assistant is already connected, continue without replacing its key.")}</p>
               <h3>{t("1 · Connecter ScrollShow", "1 · Connect ScrollShow")}</h3>
@@ -648,22 +634,22 @@ function OnboardingInner() {
               ) : null}
 
               <AssistantStarter english={english} pending />
-              <button type="button" className="ss-onb-cta" onClick={() => go(3)}>
+              <button type="button" className="ss-onb-cta" onClick={() => go(4)}>
                 {t("Continuer l’onboarding", "Continue onboarding")}
               </button>
               <div className="ss-onb-actions">
-                <button type="button" className="ss-onb-link" onClick={() => go(1)}>
+                <button type="button" className="ss-onb-link" onClick={() => go(2)}>
                   ← {t("Retour", "Back")}
                 </button>
-                <button type="button" className="ss-onb-link" onClick={() => go(3)}>
+                <button type="button" className="ss-onb-link" onClick={() => go(4)}>
                   {t("Plus tard, depuis le studio", "Later, from the studio")}
                 </button>
               </div>
             </div>
           ) : null}
 
-          {/* ── 3 · heard from ── */}
-          {step === 3 ? (
+          {/* ── 4 · comment nous as-tu connus ── */}
+          {step === 4 ? (
             <div className="ss-onb-form">
               <div className="ss-onb-grid ss-onb-grid--4">
                 {SOURCES.map((item) => {
@@ -680,12 +666,12 @@ function OnboardingInner() {
               <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => void finish()}>
                 {busy ? <span className="ss-onb-spin" /> : hasStudioAccess(user?.plan) ? t("Ouvrir ScrollShow", "Open ScrollShow") : t("Continuer vers mon offre", "Continue to my plan")}
               </button>
-              <button type="button" className="ss-onb-link ss-onb-link--center" onClick={() => go(2)}>
+              <button type="button" className="ss-onb-link ss-onb-link--center" onClick={() => go(3)}>
                 ← {t("Retour", "Back")}
               </button>
             </div>
           ) : null}
-          {step === 4 && user?.onboarded ? <OnboardingPayment english={english} initialOffer={params.get("offer") === "lifetime" ? "lifetime" : "monthly"} canceled={params.get("canceled") === "1"} pendingPayment={params.get("error") === "payment_pending"} /> : null}
+          {step === 5 && user?.onboarded ? <OnboardingPayment english={english} initialOffer={params.get("offer") === "lifetime" ? "lifetime" : "monthly"} canceled={params.get("canceled") === "1"} pendingPayment={params.get("error") === "payment_pending"} /> : null}
         </div>
 
         <ol className="ss-onb__dots" aria-label={t("Progression", "Progress")}>

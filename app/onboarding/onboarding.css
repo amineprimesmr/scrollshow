@@ -77,7 +77,7 @@ html:has(.ss-onb) body.grain {
     rgb(255 255 255 / 0.55) 340deg,
     transparent 360deg
   );
-  animation: ss-onb-spin 2.8s linear infinite;
+  animation: ss-onb-conic 2.8s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
@@ -98,7 +98,7 @@ html:has(.ss-onb) body.grain {
   white-space: nowrap;
 }
 
-@keyframes ss-onb-spin {
+@keyframes ss-onb-conic {
   from { transform: translate(-50%, -50%) rotate(0deg); }
   to { transform: translate(-50%, -50%) rotate(360deg); }
 }
@@ -555,119 +555,6 @@ html:has(.ss-onb) body.grain {
 }
 
 /* ── analysis animation ── */
-.ss-onb-scan {
-  display: grid;
-  gap: 22px;
-  justify-items: center;
-  padding: 10px 0 6px;
-}
-
-.ss-onb-scan__orb {
-  position: relative;
-  width: 96px;
-  height: 96px;
-}
-
-.ss-onb-scan__orb span {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  border: 1.5px solid rgb(255 255 255 / 0.55);
-  animation: ss-onb-ring 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-}
-
-.ss-onb-scan__orb span:nth-child(2) {
-  animation-delay: 0.7s;
-}
-
-.ss-onb-scan__orb span:nth-child(3) {
-  animation-delay: 1.4s;
-}
-
-.ss-onb-scan__orb::after {
-  content: "";
-  position: absolute;
-  inset: 32px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 35% 30%, #fff, #c4b5fd 55%, #7c3aed);
-  box-shadow: 0 0 40px rgb(167 139 250 / 0.7);
-  animation: ss-onb-core 1.6s ease-in-out infinite alternate;
-}
-
-@keyframes ss-onb-ring {
-  from {
-    transform: scale(0.35);
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(1.15);
-    opacity: 0;
-  }
-}
-
-@keyframes ss-onb-core {
-  from {
-    transform: scale(0.92);
-  }
-  to {
-    transform: scale(1.06);
-  }
-}
-
-.ss-onb-scan__list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.ss-onb-scan__list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: color 0.2s ease;
-}
-
-.ss-onb-scan__list li i {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 1.5px solid rgb(255 255 255 / 0.25);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.ss-onb-scan__list li.is-now {
-  color: var(--ink);
-}
-
-.ss-onb-scan__list li.is-now i {
-  border-color: #fff;
-  animation: ss-onb-blink 0.9s ease-in-out infinite alternate;
-}
-
-.ss-onb-scan__list li.is-done {
-  color: var(--ink);
-}
-
-.ss-onb-scan__list li.is-done i {
-  background: #4ade80;
-  border-color: #4ade80;
-}
-
-@keyframes ss-onb-blink {
-  from {
-    box-shadow: 0 0 0 0 rgb(255 255 255 / 0.5);
-  }
-  to {
-    box-shadow: 0 0 0 6px rgb(255 255 255 / 0);
-  }
-}
-
-/* ── result card ── */
 .ss-onb-result {
   display: grid;
   gap: 14px;
@@ -1150,9 +1037,7 @@ html:has(.ss-onb) body.grain {
 
 @media (prefers-reduced-motion: reduce) {
   .ss-onb-step,
-  .ss-onb-result.is-in,
-  .ss-onb-scan__orb span,
-  .ss-onb-scan__orb::after {
+  .ss-onb-result.is-in {
     animation: none;
   }
 
@@ -1180,3 +1065,16 @@ html:has(.ss-onb) body.grain {
 .ss-onb-offer small { margin-top: 8px; line-height: 1.5; }
 .ss-onb-terms { display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
 .ss-onb-terms input, .ss-onb-offer input { width: auto; flex-shrink: 0; margin-top: 4px; }
+
+/* Etape TikTok : le logo de la plateforme ouvre la carte. */
+.ss-onb-tt__head {
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+
+.ss-onb-tt__head img {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
