@@ -42,6 +42,7 @@ import { loadCreator } from "@/lib/tiktok-publish";
 import { readStore } from "@/lib/store";
 import { consumeLimit } from "@/lib/rate-limit";
 import { scrollshowStarterPrompt } from "@/lib/assistant-prompts";
+import { inScope } from "@/lib/projects";
 
 export const maxDuration = 300;
 
@@ -117,13 +118,13 @@ const handler = createMcpHandler(
     server.registerTool("list_runs", {
       title: "Read discovery history", inputSchema: z.object({}), annotations: { readOnlyHint: true },
       description: "Read saved discovery runs, verified account IDs and failures.",
-    }, async (_args, ctx) => { try { const user = userFrom(ctx); return text({ jobs: await listResearchJobs(user), runs: (await readStore()).runs.filter(r => r.userId === user.id) }); } catch (e) { return fail(e); } });
+    }, async (_args, ctx) => { try { const user = userFrom(ctx); return text({ jobs: await listResearchJobs(user), runs: (await readStore()).runs.filter(r => inScope(r, user)) }); } catch (e) { return fail(e); } });
 
     server.registerTool("get_creator_options", {
       title: "Read TikTok publishing options for a chosen account",
       description: "Read fresh allowed privacy and comment settings before asking the user to choose. channelId is required when multiple accounts are connected.",
       inputSchema: z.object({ channelId: z.string().optional() }), annotations: { readOnlyHint: true },
-    }, async (args, ctx) => { try { const channel = await loadTikTokChannel(userFrom(ctx).id, args.channelId); if (!channel?.accessToken) throw new Error("tiktok_not_connected"); return text({ channelId: channel.id, handle: channel.handle, ...await loadCreator(channel.accessToken) }); } catch (e) { return fail(e); } });
+    }, async (args, ctx) => { try { const channel = await loadTikTokChannel(userFrom(ctx).id, args.channelId, userFrom(ctx).projectId); if (!channel?.accessToken) throw new Error("tiktok_not_connected"); return text({ channelId: channel.id, handle: channel.handle, ...await loadCreator(channel.accessToken) }); } catch (e) { return fail(e); } });
 
     server.registerTool("publish_status", {
       title: "Reconcile a TikTok publication",
@@ -136,7 +137,7 @@ const handler = createMcpHandler(
       description: "Return the editable recipe and an authenticated browser download URL for a ZIP of slides and source. The user must be logged into ScrollShow to download. Requires ownership, including after cloning a public template.",
       inputSchema: z.object({ id: z.string().min(1) }), annotations: { readOnlyHint: true },
     }, async (args, ctx) => { try {
-      const user = userFrom(ctx); const post = (await readStore()).posts.find(p => p.id === args.id && p.userId === user.id);
+      const user = userFrom(ctx); const post = (await readStore()).posts.find(p => p.id === args.id && inScope(p, user));
       if (!post) throw new Error("post_missing");
       return text({ recipe: await agentGetRecipe(user, args.id), downloadUrl: `${process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"}/api/studio/posts/${encodeURIComponent(args.id)}/export` });
     } catch (e) { return fail(e); } });

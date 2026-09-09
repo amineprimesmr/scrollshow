@@ -15,6 +15,7 @@ import {
   IconCard,
   IconDatabase,
   IconGlobe,
+  IconHome,
   IconKey,
   IconLock,
   IconLogout,
@@ -23,8 +24,10 @@ import {
   IconUser,
 } from "./icons";
 import { useStudio } from "./StudioContext";
+import { ProjectSettings } from "./ProjectSettings";
 
 type Tab =
+  | "project"
   | "account"
   | "security"
   | "notifications"
@@ -67,6 +70,7 @@ type StorageTotals = {
 };
 
 const TABS: { id: Tab; fr: string; en: string; icon: ReactNode }[] = [
+  { id: "project", fr: "Projet", en: "Project", icon: <IconHome size={16} /> },
   { id: "account", fr: "Compte", en: "Account", icon: <IconUser size={16} /> },
   { id: "security", fr: "Sécurité", en: "Security", icon: <IconLock size={16} /> },
   { id: "notifications", fr: "Notifications", en: "Notifications", icon: <IconBell size={16} /> },
@@ -437,6 +441,8 @@ export function SettingsView() {
         {notice ? <p className="ss-flash">{notice}</p> : null}
         {error ? <p className="ss-flash is-error">{error}</p> : null}
 
+        {tab === "project" ? <ProjectSettings /> : null}
+
         {tab === "account" ? (
           <form key="account" className="ss-set-card ss-form ss-tabpanel" onSubmit={saveProfile}>
             <h2>{t("Compte", "Account", english)}</h2>
@@ -455,26 +461,18 @@ export function SettingsView() {
               </label>
             </div>
             <p className="ss-muted">ID · {user.id}</p>
-            {user.business ? (
+            {user.project ? (
               <div className="ss-biz">
-                <div className="ss-biz__logo">{user.business.logo ? <img src={user.business.logo} alt="" /> : null}</div>
+                <div className="ss-biz__logo">{user.project.logo ? <img src={user.project.logo} alt="" /> : null}</div>
                 <div className="ss-biz__text">
-                  <b>{user.business.name}</b>
-                  <span>
-                    {BUSINESS_KINDS.find((kind) => kind.id === user.business?.kind)?.[english ? "en" : "fr"]}
-                    {user.business.url ? ` · ${user.business.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}` : ""}
-                    {user.business.tiktok ? ` · @${user.business.tiktok.handle}` : ""}
-                  </span>
+                  <b>{user.project.name}</b>
+                  <span>{t("Projet actif · business, comptes et calendrier se règlent dans l’onglet Projet.", "Active project · business, accounts and calendar live in the Project tab.", english)}</span>
                 </div>
-                <a className="ss-btn-ghost" href="/onboarding?next=/app/settings">
-                  {t("Ré-analyser", "Re-analyze", english)}
-                </a>
+                <button type="button" className="ss-btn-ghost" onClick={() => setTab("project")}>
+                  {t("Ouvrir l’onglet Projet", "Open the Project tab", english)}
+                </button>
               </div>
-            ) : (
-              <a className="ss-btn-ghost" href="/onboarding?next=/app/settings">
-                {t("Ajouter mon business", "Add my business", english)}
-              </a>
-            )}
+            ) : null}
             <div className="ss-form-actions">
               <button className="ss-btn-purple" type="submit" disabled={busy === "profile"}>
                 {busy === "profile" ? <span className="ss-spin" /> : t("Enregistrer", "Save", english)}

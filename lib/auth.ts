@@ -2,6 +2,7 @@ import { compare, hash } from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { isPaidPlan, type Plan } from "./plans";
+import { PROJECT_COOKIE, resolveProject, withProject } from "./projects";
 import { publicUser, readStore } from "./store";
 import type { SessionUser } from "./types";
 
@@ -46,7 +47,8 @@ export async function readSession(): Promise<SessionUser | null> {
     if (data.restoreReviewRequired) return null;
     const stored = data.users.find(item => item.id === payload.sub);
     if (!stored || stored.deletionPendingAt || (stored.sessionVersion || 0) !== (payload.sv || 0)) return null;
-    return publicUser(stored);
+    const requested = (await cookies()).get(PROJECT_COOKIE)?.value || null;
+    return withProject(publicUser(stored), resolveProject(data, stored.id, requested));
   } catch {
     return null;
   }

@@ -2,6 +2,7 @@ import { readStudioSession as readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { inScope } from "@/lib/projects";
 
 const schema = z.object({
   niche: z.string().trim().max(60).optional(),
@@ -23,7 +24,7 @@ export async function PATCH(
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const account = await updateStore((data) => {
-    const found = data.accounts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.accounts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     Object.assign(found, parsed.data);
     return found;
@@ -42,7 +43,7 @@ export async function DELETE(
   const { id } = await params;
   const ok = await updateStore((data) => {
     const before = data.accounts.length;
-    data.accounts = data.accounts.filter((item) => !(item.id === id && item.userId === user.id));
+    data.accounts = data.accounts.filter((item) => !(item.id === id && inScope(item, user)));
     return data.accounts.length < before;
   });
   if (!ok) return NextResponse.json({ error: "missing" }, { status: 404 });

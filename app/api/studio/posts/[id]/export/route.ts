@@ -6,12 +6,13 @@ import { rasterizeRecipe } from "@/lib/render-slide";
 import { consumeLimit } from "@/lib/rate-limit";
 import { zipSync, strToU8 } from "fflate";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 export const maxDuration = 120;
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await readStudioSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
-  const post = (await readStore()).posts.find(p => p.id === id && p.userId === user.id);
+  const post = (await readStore()).posts.find(p => p.id === id && inScope(p, user));
   if (!post) return NextResponse.json({ error: "missing" }, { status: 404 });
   if (!(await consumeLimit(`export:${user.id}`, 20, 86400000))) return NextResponse.json({ error: "daily_export_limit" }, { status: 429 });
   try {

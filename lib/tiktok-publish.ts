@@ -34,14 +34,14 @@ export async function loadCreator(accessToken: string): Promise<{ creator: Creat
 
 export async function directPostPhotos(
   userId: string,
-  input: { photos: string[]; description: string; options: TikTokPostOptions; channelId?: string },
+  input: { photos: string[]; description: string; options: TikTokPostOptions; channelId?: string; projectId?: string },
 ) {
   const data = await readStore(true);
   if (data.restoreReviewRequired) throw new PublishError("restoration_review_required", 503);
   if (process.env.VERCEL_ENV === "preview" && process.env.ALLOW_PREVIEW_PUBLISH !== "1") throw new PublishError("preview_publishing_disabled", 403);
   const user = data.users.find(u => u.id === userId);
   if (!user || user.deletionPendingAt || !user.emailVerifiedAt || !hasStudioAccess(user.plan)) throw new PublishError("verified_paid_account_required", 403);
-  const channel = await loadTikTokChannel(userId, input.channelId);
+  const channel = await loadTikTokChannel(userId, input.channelId, input.projectId);
   if (!channel?.accessToken) throw new PublishError("tiktok_not_connected", 401);
   if (!input.photos.length) throw new PublishError("photos_required");
 

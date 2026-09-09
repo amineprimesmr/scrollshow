@@ -3,6 +3,7 @@ import { exchangeMetaCode, fetchMetaPages } from "@/lib/meta";
 import { updateStore } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 type OAuthState = { state?: string; next?: string; platform?: "instagram" | "facebook" };
 
@@ -37,11 +38,11 @@ export async function GET(request: Request) {
       for (const page of pages) {
         if (want !== "instagram") {
           const existing = data.channels.find(
-            (item) => item.userId === user.id && item.platform === "facebook" && item.openId === page.id,
+            (item) => inScope(item, user) && item.platform === "facebook" && item.openId === page.id,
           );
           const nextChannel = {
             id: existing?.id || crypto.randomUUID(),
-            userId: user.id,
+            userId: user.id, projectId: user.projectId,
             platform: "facebook",
             name: page.name || "Facebook",
             handle: page.name?.replace(/\s+/g, "").toLowerCase() || "facebook",
@@ -59,11 +60,11 @@ export async function GET(request: Request) {
         const ig = page.instagram_business_account;
         if (ig && want !== "facebook") {
           const existing = data.channels.find(
-            (item) => item.userId === user.id && item.platform === "instagram" && item.openId === ig.id,
+            (item) => inScope(item, user) && item.platform === "instagram" && item.openId === ig.id,
           );
           const nextChannel = {
             id: existing?.id || crypto.randomUUID(),
-            userId: user.id,
+            userId: user.id, projectId: user.projectId,
             platform: "instagram",
             name: ig.username || page.name || "Instagram",
             handle: ig.username || "instagram",

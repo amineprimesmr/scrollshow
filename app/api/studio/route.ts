@@ -8,6 +8,7 @@ import { publicUser, readStore, updateStore } from "@/lib/store";
 import { publicChannel } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
+import { inScope, resolveProject, withProject } from "@/lib/projects";
 
 const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie" };
 
@@ -19,21 +20,21 @@ export async function GET(request: Request) {
     let data = await readStore();
     // Demo initialization is local only, and runs once when actually needed.
     // Normal studio reads must never lock and rewrite the whole database.
-    if (localAutoSeedEnabled() && (needsDemoWorkspace(data, user.id) || !data.media.some(item => item.userId === user.id))) {
+    if (localAutoSeedEnabled() && (needsDemoWorkspace(data, user.id, user.projectId) || !data.media.some(item => inScope(item, user)))) {
       data = await updateStore(current => {
         const stored = resolveStoreUser(current, user);
-        if (stored) ensureDemoWorkspace(current, stored);
-        if (!current.media.some(item => item.userId === user.id)) current.media.push(...seedStudio(user.id).media);
+        if (stored) ensureDemoWorkspace(current, stored, user.projectId);
+        if (!current.media.some(item => inScope(item, user))) current.media.push(...seedStudio(user.id, user.projectId).media);
         return current;
       });
     }
     const stored = resolveStoreUser(data, user);
     if (!stored) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
     const payload = {
-      channels: data.channels.filter(item => item.userId === user.id).map(publicChannel),
-      posts: data.posts.filter(item => item.userId === user.id),
-      media: data.media.filter(item => item.userId === user.id),
-      user: publicUser(stored),
+      channels: data.channels.filter(item => inScope(item, user)).map(publicChannel),
+      posts: data.posts.filter(item => inScope(item, user)),
+      media: data.media.filter(item => inScope(item, user)),
+      user: withProject(publicUser(stored), resolveProject(data, user.id, user.projectId)),
       availability: platformAvailability(),
     };
     // Hash only this workspace's visible data, before legacy normalization.

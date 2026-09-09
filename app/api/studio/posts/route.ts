@@ -5,6 +5,7 @@ import type { StudioPost } from "@/lib/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { validatePost, postErrorResponse } from "@/lib/post-validation";
+import { inScope } from "@/lib/projects";
 
 const schema = z.object({
   channelIds: z.array(z.string()).optional(),
@@ -45,10 +46,10 @@ export async function POST(request: Request) {
   const post = await updateStore((data) => {
     const created: StudioPost = {
       id: crypto.randomUUID(),
-      userId: user.id,
+      userId: user.id, projectId: user.projectId,
       channelIds: parsed.data.channelIds?.length
         ? parsed.data.channelIds
-        : data.channels.filter((item) => item.userId === user.id).slice(0, 1).map((item) => item.id),
+        : data.channels.filter((item) => inScope(item, user)).slice(0, 1).map((item) => item.id),
       body: parsed.data.body,
       date: parsed.data.date,
       time: parsed.data.time,

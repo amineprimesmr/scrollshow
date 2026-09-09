@@ -110,6 +110,10 @@ function OnboardingInner() {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNextPath(params.get("next"), "/app");
+  // Mode projet : "new" cree un business supplementaire, un id reprend un brouillon.
+  const projectParam = params.get("project");
+  const projectMode = Boolean(projectParam);
+  const [projectId, setProjectId] = useState<string | null>(projectParam && projectParam !== "new" ? projectParam : null);
   const [english, setEnglish] = useState(false);
   const t = useCallback((fr: string, en: string) => (english ? en : fr), [english]);
 
@@ -141,13 +145,18 @@ function OnboardingInner() {
 
   useEffect(() => {
     setEnglish(prefersEnglish());
-    fetch("/api/onboarding")
+    fetch(projectParam ? `/api/onboarding?project=${encodeURIComponent(projectParam)}` : "/api/onboarding")
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((json) => {
         const me: PublicUser = json.user;
         setUser(me);
         setHeard(json.heardFrom || []);
-        if (me.onboarded && !hasStudioAccess(me.plan)) setStep(5);
+        if (projectParam) {
+          // Un compte pas encore onboarde termine d'abord son propre parcours.
+          if (!me.onboarded || !hasStudioAccess(me.plan)) { router.replace("/onboarding"); return; }
+          if (json.project?.completed) { router.replace("/app"); return; }
+          if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 2) setStep(json.step as Step);
+        } else if (me.onboarded && !hasStudioAccess(me.plan)) setStep(5);
         else if (me.onboarded && hasStudioAccess(me.plan) && !params.get("next")) { router.replace("/app"); return; }
         else {
           if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 4) setStep(json.step as Step);
@@ -155,20 +164,24 @@ function OnboardingInner() {
         setName(usableName(me.name || "") || firstNameFromEmail(me.email));
         setCompany(json.company || "");
         setLogo(json.logo || "");
-        if (me.business?.url) {
-          setBusiness(me.business);
-          setUrl(me.business.url);
+        const found: BusinessProfile | null = json.business || (projectParam ? null : me.business);
+        if (found?.url) {
+          setBusiness(found);
+          setUrl(found.url);
           setRevealed(true);
         }
       })
-      .catch(() => router.replace("/signup?mode=signin&next=/onboarding"));
-  }, [router, params]);
+      .catch((res: Response | Error) => {
+        if (projectParam && res instanceof Response && res.status === 404) { router.replace("/app"); return; }
+        router.replace("/signup?mode=signin&next=/onboarding");
+      });
+  }, [router, params, projectParam]);
 
   function go(target: Step) {
     setDir(target > step ? 1 : -1);
     setError("");
     setStep(target);
-    if (user && target < 5) void post({ action: "progress", step: target }).catch(() => {});
+    if (user && target < 5) void post({ action: "progress", step: target, ...projectRef() }).catch(() => {});
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -191,13 +204,20 @@ function OnboardingInner() {
     reader.readAsDataURL(file);
   }
 
+  /** Reference du projet cible pour l'API : id du brouillon, ou "new" avant sa creation. */
+  function projectRef() {
+    if (!projectMode) return {};
+    return { project: projectId || "new" };
+  }
+
   async function saveProfile() {
-    if (!name.trim() || !company.trim()) return;
+    if ((!projectMode && !name.trim()) || !company.trim()) return;
     setBusy(true);
     try {
-      const json = await post({ action: "profile", name, company, logo: logo.startsWith("data:") ? logo : null });
+      const json = await post({ action: "profile", name: name.trim() || company.trim(), company, logo: logo.startsWith("data:") ? logo : null, ...projectRef() });
       setUser(json.user);
-      if (json.user?.business?.logo) setLogo(json.user.business.logo);
+      const savedLogo = json.project?.logo || json.user?.business?.logo;
+      if (savedLogo) setLogo(savedLogo);
       go(2);
     } catch {
       setError(t("Impossible d’enregistrer. Réessaie.", "Could not save. Try again."));
@@ -291,8 +311,13 @@ function OnboardingInner() {
     if (!business) return;
     setBusy(true);
     try {
-      const json = await post({ action: "business", business: { ...business, name: business.name || company } });
+      const json = await post({ action: "business", business: { ...business, name: business.name || company }, ...projectRef() });
       setUser(json.user);
+      if (projectMode && json.project?.id && json.project.id !== projectId) {
+        // Le brouillon existe : l'URL le porte pour pouvoir reprendre apres un rechargement.
+        setProjectId(json.project.id);
+        window.history.replaceState(null, "", `/onboarding?project=${encodeURIComponent(json.project.id)}`);
+      }
       // Filet de securite si l'analyse vient d'une session precedente.
       if (!company.trim() && business.name) setCompany(business.name);
       if (!logo && business.logo) setLogo(business.logo);
@@ -310,6 +335,11 @@ function OnboardingInner() {
   async function finish() {
     setBusy(true);
     try {
+      if (projectMode) {
+        await post({ action: "finish", ...projectRef() });
+        router.replace(next);
+        return;
+      }
       const json = await post({ action: "finish", heardFrom: heard });
       setUser(json.user);
       if (hasStudioAccess(json.user?.plan)) router.replace(next);
@@ -322,7 +352,9 @@ function OnboardingInner() {
 
   /* ── render ─────────────────────────────────────────────────────────── */
   const titles: Record<Step, [string, string]> = {
-    0: [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
+    0: projectMode
+      ? [t("Nouveau projet", "New project"), t("Colle le lien de ce business. On remplit le reste pour toi.", "Paste this business link. We fill in the rest for you.")]
+      : [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
     1: [t("On a rempli ce qu’on a trouvé", "We filled in what we found"), t("Vérifie, corrige si besoin. C’est tout ce qu’on te demande.", "Check it, fix anything that is off. That is all we ask.")],
     2: [t("Ton compte TikTok", "Your TikTok account"), t("On lit tes stats publiques pour caler le ton et le rythme. Facultatif.", "We read your public stats to set the tone and rhythm. Optional.")],
     3: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
@@ -446,13 +478,15 @@ function OnboardingInner() {
               }}
             >
               <div className="ss-onb-row">
+                {projectMode ? null : (
+                  <label className="ss-onb-field">
+                    <span>{t("Ton prénom", "Your first name")}</span>
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Amine" maxLength={40} autoFocus required />
+                  </label>
+                )}
                 <label className="ss-onb-field">
-                  <span>{t("Ton prénom", "Your first name")}</span>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Amine" maxLength={40} autoFocus required />
-                </label>
-                <label className="ss-onb-field">
-                  <span>{t("Ton entreprise ou ta marque", "Your company or brand")}</span>
-                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ScrollShow" maxLength={60} required />
+                  <span>{projectMode ? t("Nom du projet", "Project name") : t("Ton entreprise ou ta marque", "Your company or brand")}</span>
+                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ScrollShow" maxLength={60} autoFocus={projectMode} required />
                 </label>
               </div>
               <div
@@ -487,7 +521,7 @@ function OnboardingInner() {
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogoFile(e.target.files?.[0])} />
               </div>
               {error ? <p className="ss-onb-error">{error}</p> : null}
-              <button className="ss-onb-cta" type="submit" disabled={busy || !name.trim() || !company.trim()}>
+              <button className="ss-onb-cta" type="submit" disabled={busy || (!projectMode && !name.trim()) || !company.trim()}>
                 {busy ? <span className="ss-onb-spin" /> : t("Continuer", "Continue")}
               </button>
             </form>
@@ -538,8 +572,10 @@ function OnboardingInner() {
 
               {error ? <p className="ss-onb-error">{error}</p> : null}
 
-              <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => go(3)}>
-                {business?.tiktok ? t("Continuer", "Continue") : t("Passer cette étape", "Skip this step")}
+              <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => (projectMode ? void finish() : go(3))}>
+                {busy ? <span className="ss-onb-spin" /> : projectMode
+                  ? t("Ouvrir le projet", "Open the project")
+                  : business?.tiktok ? t("Continuer", "Continue") : t("Passer cette étape", "Skip this step")}
               </button>
             </div>
           ) : null}
@@ -596,11 +632,16 @@ function OnboardingInner() {
               </button>
             </div>
           ) : null}
+          {projectMode && step < 5 ? (
+            <button type="button" className="ss-onb-link ss-onb-link--center" onClick={() => router.push("/app")}>
+              ← {t("Revenir au studio", "Back to the studio")}
+            </button>
+          ) : null}
           {step === 5 && user?.onboarded ? <OnboardingPayment english={english} initialOffer={params.get("offer") === "lifetime" ? "lifetime" : "monthly"} canceled={params.get("canceled") === "1"} pendingPayment={params.get("error") === "payment_pending"} /> : null}
         </div>
 
         <ol className="ss-onb__dots" aria-label={t("Progression", "Progress")}>
-          {STEPS.map((item) => (
+          {(projectMode ? STEPS.slice(0, 3) : STEPS).map((item) => (
             <li key={item} className={item === step ? "is-now" : item < step ? "is-done" : ""} />
           ))}
         </ol>

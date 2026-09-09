@@ -10,14 +10,14 @@ const schema = z.object({
 export async function GET() {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  return NextResponse.json({ keys: await listApiKeys(user.id) });
+  return NextResponse.json({ keys: await listApiKeys(user.id, user.projectId) });
 }
 
 export async function POST(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
-  const created = await createApiKey(user.id, parsed.success ? parsed.data.name || "Agent" : "Agent");
+  const created = await createApiKey(user.id, parsed.success ? parsed.data.name || "Agent" : "Agent", user.projectId);
   if (!created) return NextResponse.json({ error: "limit" }, { status: 400 });
   return NextResponse.json(created, { status: 201 });
 }

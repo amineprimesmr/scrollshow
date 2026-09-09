@@ -9,12 +9,13 @@ const IMAGES = [
   "/assets/tiktoks/04-marlon-65k.png",
 ];
 
-export function seedStudio(userId: string) {
+export function seedStudio(userId: string, projectId?: string) {
   const channels: Channel[] = [];
   const posts: StudioPost[] = [];
   const media: MediaItem[] = IMAGES.map((url, index) => ({
     id: crypto.randomUUID(),
     userId,
+    projectId,
     url,
     name: url.split("/").pop() || `media-${index}`,
     createdAt: new Date().toISOString(),

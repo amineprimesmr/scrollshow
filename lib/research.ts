@@ -15,6 +15,7 @@ export { researchMetrics } from "./research/statistics";
 import { researchMetrics } from "./research/statistics";
 import { startResearch } from "./research/jobs";
 import { formatLibrary } from "./research/formats";
+import { inScope, resolveProject } from "./projects";
 
 export async function analyzeResearchAccount(user: SessionUser, query: string, niche = "") {
   const handle = normalizeHandle(query);
@@ -29,9 +30,9 @@ export async function analyzeResearchAccount(user: SessionUser, query: string, n
   }
   const now = new Date().toISOString();
   const account = await updateStore(data => {
-    let a = data.accounts.find(a => a.userId === user.id && a.handle.toLowerCase() === profile.handle.toLowerCase());
+    let a = data.accounts.find(a => inScope(a, user) && a.handle.toLowerCase() === profile.handle.toLowerCase());
     if (!a) {
-      a = { id: crypto.randomUUID(), userId: user.id, handle: profile.handle, niche, followers: 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now };
+      a = { id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, handle: profile.handle, niche, followers: 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now };
       data.accounts.unshift(a);
     }
     Object.assign(a, { nickname: profile.nickname, avatar: profile.avatar, bio: profile.bio, followers: profile.followers, likes: profile.likes, posts: profile.videos, verified: profile.verified, lastSyncAt: now, syncError: undefined });
@@ -54,17 +55,17 @@ export async function discoverResearchAccounts(user: SessionUser, keywords: stri
 
 export async function researchLibrary(user: SessionUser, query = "", days = 30) {
   const data = await readStore();
-  return data.accounts.filter(a => a.userId === user.id && `${a.handle} ${a.nickname || ""} ${a.bio || ""} ${a.niche} ${a.notes} ${(a.videos || []).flatMap(p => p.hashtags || []).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
+  return data.accounts.filter(a => inScope(a, user) && `${a.handle} ${a.nickname || ""} ${a.bio || ""} ${a.niche} ${a.notes} ${(a.videos || []).flatMap(p => p.hashtags || []).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
     .map(account => ({ account, metrics: researchMetrics(account.videos || [], account.followers, Date.now(), days), measuredAt: account.videosFetchedAt || null }));
 }
 
 export async function contentBrief(user: SessionUser) {
   const data = await readStore();
   return {
-    business: data.users.find(u => u.id === user.id)?.business || null,
+    business: resolveProject(data, user.id, user.projectId)?.business || data.users.find(u => u.id === user.id)?.business || null,
     evidence: (await researchLibrary(user)).sort((a,b) => (b.metrics.medianViews ?? -1) - (a.metrics.medianViews ?? -1)).slice(0,30),
     formats: await formatLibrary(user),
-    existingPosts: data.posts.filter(p => p.userId === user.id).map(p => ({ id: p.id, caption: p.body, date: p.date, status: p.status })),
+    existingPosts: data.posts.filter(p => inScope(p, user)).map(p => ({ id: p.id, caption: p.body, date: p.date, status: p.status })),
     instructions: "Build original carousel ideas for this business using measured patterns and saved format studies. Inspect study_carousel before explaining visual formats; compare several posts and accounts. Cite the source post, distinguish evidence from hypothesis, propose a hook, slide outline and CTA. Create complete original slides with create_post and overlays. For requested deliverables, use the calendar date, local time and channel from whoami/calendar context so the finished post appears in the calendar; respect the approved publishing intent. Never promise reach or copy third-party assets without rights.",
   };
 }

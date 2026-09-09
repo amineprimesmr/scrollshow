@@ -3,14 +3,15 @@ import { sizesOf } from "@/lib/media-size";
 import { usedMediaUrls } from "@/lib/media-usage";
 import { readStore } from "@/lib/store";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 export async function GET() {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const data = await readStore();
-  const posts = data.posts.filter((item) => item.userId === session.id);
-  const media = data.media.filter((item) => item.userId === session.id);
+  const posts = data.posts.filter((item) => inScope(item, session));
+  const media = data.media.filter((item) => inScope(item, session));
   const used = usedMediaUrls(posts);
   const sizes = await sizesOf(media.map((item) => item.url));
 
@@ -42,7 +43,7 @@ export async function GET() {
       unusedCount,
       unusedBytes,
       posts: posts.length,
-      apiKeys: data.apiKeys.filter((item) => item.userId === session.id).length,
+      apiKeys: data.apiKeys.filter((item) => inScope(item, session)).length,
     },
   });
 }

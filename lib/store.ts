@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import lockfile from "proper-lockfile";
 import { database, databaseEnabled } from "./database";
+import { backfillProjects } from "./projects";
 import { resolveSettings } from "./settings";
 import type { Account, Run, StoreData, User } from "./types";
 
@@ -29,6 +30,7 @@ function normalize(data: StoreData): StoreData {
   data.warmedOrders ||= [];
   data.billingEvents ||= [];
   data.rateLimits ||= {};
+  backfillProjects(data);
   return data;
 }
 

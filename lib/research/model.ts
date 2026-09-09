@@ -25,7 +25,7 @@ export type ResearchFilters = z.infer<typeof filtersSchema>;
 export type Candidate = { handle: string; nickname?: string; bio?: string; followers?: number; sourceUrl: string; keyword: string; posts: AccountVideo[]; cursor?: number; pages?: number; measuredPosts?: AccountVideo[] };
 export type ResearchResult = { accountId: string; handle: string; measuredAt: string; accepted: boolean; reasons: string[]; coverage: { complete: boolean; pages: number; reason: string }; posts: AccountVideo[]; followers: number };
 export type ResearchJob = {
-  id: string; userId: string; requestId?: string; input: ResearchInput;
+  id: string; userId: string; projectId?: string; requestId?: string; input: ResearchInput;
   status: "queued" | "running" | "paused" | "needs_attention" | "done" | "stopped" | "error";
   phase: "search" | "measure"; createdAt: string; updatedAt: string; revision: number;
   keywordIndex: number; searchPage: number; searchCursor: number; searchId?: string;
@@ -45,7 +45,7 @@ export const interpretationSchema = z.object({
   family: z.enum(["list", "tutorial", "story", "comparison", "myth", "quote", "other"]),
 });
 export type FormatStudy = {
-  id: string; userId: string; accountId: string; postId: string; sourceUrl: string;
+  id: string; userId: string; projectId?: string; accountId: string; postId: string; sourceUrl: string;
   caption: string; createdAt: string; updatedAt: string; measuredAt: string | null;
   status: "pending" | "partial" | "ready"; slides: StudySlide[];
   interpretation?: z.infer<typeof interpretationSchema>;

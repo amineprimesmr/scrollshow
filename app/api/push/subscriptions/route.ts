@@ -3,6 +3,7 @@ import { labelUserAgent } from "@/lib/user-agent";
 import { readStore, updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { inScope } from "@/lib/projects";
 
 const schema = z.object({
   endpoint: z.string().url(),
@@ -17,7 +18,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const data = await readStore();
   const subs = (data.pushSubscriptions || [])
-    .filter((item) => item.userId === session.id)
+    .filter((item) => inScope(item, session))
     .map((item) => ({ id: item.id, label: item.label, createdAt: item.createdAt }));
   return NextResponse.json({ subscriptions: subs });
 }
@@ -64,7 +65,7 @@ export async function DELETE(request: Request) {
 
   await updateStore((data) => {
     data.pushSubscriptions = (data.pushSubscriptions || []).filter(
-      (item) => !(item.userId === session.id && item.endpoint === parsed.data.endpoint),
+      (item) => !(inScope(item, session) && item.endpoint === parsed.data.endpoint),
     );
   });
   return NextResponse.json({ ok: true });

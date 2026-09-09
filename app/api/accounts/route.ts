@@ -3,6 +3,7 @@ import { updateStore } from "@/lib/store";
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "@/lib/tiktok-profile";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { inScope } from "@/lib/projects";
 
 const schema = z.object({
   handle: z.string().trim().min(2).max(40),
@@ -20,7 +21,7 @@ export async function GET() {
   const { readStore } = await import("@/lib/store");
   const data = await readStore();
   return NextResponse.json({
-    accounts: data.accounts.filter((item) => item.userId === user.id),
+    accounts: data.accounts.filter((item) => inScope(item, user)),
   });
 }
 
@@ -47,11 +48,11 @@ export async function POST(request: Request) {
 
   const account = await updateStore((data) => {
     if (!canAddAccount(user.plan)) return { error: "limit" as const };
-    const existing = data.accounts.find((item) => item.userId === user.id && item.handle === (profile?.handle || handle));
+    const existing = data.accounts.find((item) => inScope(item, user) && item.handle === (profile?.handle || handle));
     if (existing) return { error: "exists" as const, account: existing };
     const created = {
       id: crypto.randomUUID(),
-      userId: user.id,
+      userId: user.id, projectId: user.projectId,
       handle: profile?.handle || handle,
       niche: parsed.data.niche || "",
       followers: profile?.followers ?? parsed.data.followers ?? 0,

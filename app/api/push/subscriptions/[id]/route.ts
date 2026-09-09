@@ -1,6 +1,7 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await readSession();
@@ -9,7 +10,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   await updateStore((data) => {
     data.pushSubscriptions = (data.pushSubscriptions || []).filter(
-      (item) => !(item.id === id && item.userId === session.id),
+      (item) => !(item.id === id && inScope(item, session)),
     );
   });
   return NextResponse.json({ ok: true });

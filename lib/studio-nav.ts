@@ -8,18 +8,17 @@ export type NavItem = {
   locked?: boolean;
   badge?: boolean;
   highlight?: boolean;
-  group?: "content" | "growth";
   section?: "main" | "bottom" | "menu";
 };
 
 export const STUDIO_NAV: NavItem[] = [
-  { href: "/app/home", fr: "Publications et stats", en: "Overview", icon: "home", section: "main", group: "content" },
-  { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main", group: "content" },
-  { href: "/app/discover", fr: "Recherche", en: "Research", icon: "globe", section: "main", group: "content" },
-  { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main", group: "growth" },
-  { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main", group: "content" },
-  { href: "/app/post-us", fr: "Poster aux US", en: "Post to the US", icon: "globe", section: "main", group: "growth" },
-  { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main", group: "growth" },
+  { href: "/app/home", fr: "Publications et stats", en: "Overview", icon: "home", section: "main" },
+  { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
+  { href: "/app/discover", fr: "Recherche", en: "Research", icon: "globe", section: "main" },
+  { href: "/app/unshadowban", fr: "Shadowban", en: "Shadowban", icon: "unshadowban", section: "main" },
+  { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
+  { href: "/app/post-us", fr: "Poster aux US", en: "Post to the US", icon: "globe", section: "main" },
+  { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", section: "main" },
   { href: "/app/integrations", fr: "Comptes", en: "Accounts", icon: "tiktok", section: "bottom" },
   { href: "/app/mcp", fr: "Agents", en: "Agents", icon: "mcp", section: "bottom" },
   { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "menu" },

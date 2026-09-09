@@ -15,6 +15,7 @@ import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
 import { StudioProvider, useStudio } from "./StudioContext";
+import ProjectSwitcher from "./ProjectSwitcher";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import { NavPill } from "@/components/fx/NavPill";
 import { Metal } from "@/components/fx/Metal";
@@ -173,10 +174,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       {mobileNavOpen ? <div className="ss-mobile-backdrop" onClick={() => setMobileNavOpen(false)} /> : null}
       <aside className={`ss-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}>
         <div className="ss-sidebar__head">
-          <Link href="/app/home" className="ss-sidebar__brand">
-            <BrandMark size={28} className="ss-sidebar__logo" />
-            <span>ScrollShow</span>
-          </Link>
+          <ProjectSwitcher />
           <button
             type="button"
             className="ss-sidebar__close"
@@ -187,10 +185,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <NavPill className="ss-sidebar__nav" activeKey={pathname}>
-          {(["content", "growth"] as const).map(group => <div key={group}>
-            <p className="ss-sidebar__group">{group === "content" ? t("Contenu", "Content", english) : t("Outils de croissance", "Growth tools", english)}</p>
-            {mainNav.filter(entry => entry.group === group).map(entry => <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />)}
-          </div>)}
+          {mainNav.map((entry) => (
+            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
+          ))}
         </NavPill>
         <nav className="ss-sidebar__bottom">
           {bottomNav.map((entry) => (

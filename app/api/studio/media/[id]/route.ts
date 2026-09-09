@@ -3,6 +3,7 @@ import { usedMediaUrls } from "@/lib/media-usage";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
+import { inScope } from "@/lib/projects";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await readSession();
@@ -10,9 +11,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
 
   const outcome = await updateStore((data) => {
-    const item = data.media.find((entry) => entry.id === id && entry.userId === session.id);
+    const item = data.media.find((entry) => entry.id === id && inScope(entry, session));
     if (!item) return "missing" as const;
-    const used = usedMediaUrls(data.posts.filter((post) => post.userId === session.id));
+    const used = usedMediaUrls(data.posts.filter((post) => inScope(post, session)));
     if (used.has(item.url)) return "in_use" as const;
     data.media = data.media.filter((entry) => entry.id !== id);
     queueDeletedMedia(data, item);

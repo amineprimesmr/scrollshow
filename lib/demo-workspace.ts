@@ -2,6 +2,7 @@ import { LOCAL_DEMO_TOKEN } from "./local-demo";
 import { coverOf, defaultOverlay, defaultSlide, ensureRecipe, newShareId, normalizeRecipe } from "./recipe";
 import { localStoreEnabled } from "./store";
 import type { CarouselRecipe, StoreData, StudioPost, User } from "./types";
+import { inScope } from "./projects";
 
 const ASSETS = [
   "/assets/tiktoks/01-glowup-188k.png",
@@ -22,19 +23,19 @@ function dateOffset(days: number) {
  * Only a workspace with nothing in it gets the demo. A user who removed the
  * demo channel but kept real library accounts must never be wiped back to it.
  */
-export function needsDemoWorkspace(data: StoreData, userId: string) {
-  const owns = (items: Array<{ userId: string }>) => items.some((item) => item.userId === userId);
+export function needsDemoWorkspace(data: StoreData, userId: string, projectId?: string) {
+  const owns = (items: Array<{ userId: string; projectId?: string }>) => items.some((item) => inScope(item, { id: userId, projectId }));
   return !owns(data.channels) && !owns(data.posts) && !owns(data.accounts);
 }
 
-export function ensureDemoWorkspace(data: StoreData, user: User) {
-  if (!needsDemoWorkspace(data, user.id)) return false;
+export function ensureDemoWorkspace(data: StoreData, user: User, projectId?: string) {
+  if (!needsDemoWorkspace(data, user.id, projectId)) return false;
 
-  data.channels = data.channels.filter((item) => item.userId !== user.id);
-  data.posts = data.posts.filter((item) => item.userId !== user.id);
-  data.media = data.media.filter((item) => item.userId !== user.id);
-  data.accounts = data.accounts.filter((item) => item.userId !== user.id);
-  data.runs = data.runs.filter((item) => item.userId !== user.id);
+  data.channels = data.channels.filter((item) => !inScope(item, { id: user.id, projectId }));
+  data.posts = data.posts.filter((item) => !inScope(item, { id: user.id, projectId }));
+  data.media = data.media.filter((item) => !inScope(item, { id: user.id, projectId }));
+  data.accounts = data.accounts.filter((item) => !inScope(item, { id: user.id, projectId }));
+  data.runs = data.runs.filter((item) => !inScope(item, { id: user.id, projectId }));
 
   const now = new Date().toISOString();
   const today = dateOffset(0);
@@ -45,6 +46,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     {
       id: channelId,
       userId: user.id,
+      projectId,
       platform: "tiktok",
       name: user.name ? `${user.name} TikTok` : "ScrollShow Demo",
       handle,
@@ -59,6 +61,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     {
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       platform: "instagram",
       name: `${user.name || "Demo"} IG`,
       handle: `${handle}.ig`,
@@ -70,6 +73,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     ...ASSETS.map((url) => ({
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       url,
       name: url.split("/").pop() || "media",
       createdAt: now,
@@ -80,6 +84,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     {
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       handle: "definition.mann",
       niche: "Glow-up / breakup",
       followers: 966600,
@@ -92,6 +97,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     {
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       handle: "foods.debloat",
       niche: "Food / debloat",
       followers: 107200,
@@ -104,6 +110,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     {
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       handle: "debloat.daily",
       niche: "Wellness",
       followers: 512000,
@@ -118,6 +125,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
   data.runs.push({
     id: crypto.randomUUID(),
     userId: user.id,
+      projectId,
     keywords: "glow up routine debloat",
     status: "done",
     found: 6,
@@ -243,6 +251,7 @@ export function ensureDemoWorkspace(data: StoreData, user: User) {
     const post: StudioPost = {
       id: crypto.randomUUID(),
       userId: user.id,
+      projectId,
       channelIds: [channelId],
       body: String(partial.body),
       date: String(partial.date || today),

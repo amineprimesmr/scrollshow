@@ -3,6 +3,7 @@ import { exchangeXCode, fetchXProfile } from "@/lib/x";
 import { updateStore } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 type OAuthState = { state?: string; next?: string; verifier?: string };
 
@@ -33,11 +34,11 @@ export async function GET(request: Request) {
     const profile = await fetchXProfile(tokens.accessToken);
     await updateStore((data) => {
       const existing = data.channels.find(
-        (item) => item.userId === user.id && item.platform === "x" && item.openId === profile.id,
+        (item) => inScope(item, user) && item.platform === "x" && item.openId === profile.id,
       );
       const nextChannel = {
         id: existing?.id || crypto.randomUUID(),
-        userId: user.id,
+        userId: user.id, projectId: user.projectId,
         platform: "x",
         name: profile.name || "X",
         handle: profile.username || "x",

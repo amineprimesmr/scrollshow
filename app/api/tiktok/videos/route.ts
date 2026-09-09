@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const cursor = rawCursor === null ? undefined : Number(rawCursor);
   if (cursor !== undefined && (!Number.isSafeInteger(cursor) || cursor <= 0)) return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   let channel;
-  try { channel = await loadTikTokChannel(userId, channelId); }
+  try { channel = await loadTikTokChannel(userId, channelId, user.projectId); }
   catch { return NextResponse.json({ error: "channel_required" }, { status: 400 }); }
   if (!channel?.accessToken) return NextResponse.json({ videos: [], scopes: ["video.list"] });
   if (localDemoEnabled() && isLocalDemoToken(channel.accessToken)) {

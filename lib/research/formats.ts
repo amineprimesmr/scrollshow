@@ -6,25 +6,26 @@ import { consumeLimit } from "../rate-limit";
 import { interpretationSchema, type FormatStudy } from "./model";
 import { known, researchMetrics } from "./statistics";
 import type { AccountVideo, SessionUser } from "../types";
+import { inScope } from "../projects";
 
 const now=()=>new Date().toISOString();
 export async function prepareStudy(user:SessionUser,accountId:string,postId:string) {
   return updateStore(data=>{
-    const a=data.accounts.find(a=>a.userId===user.id&&(a.id===accountId||a.handle===accountId.replace(/^@/,"")));
+    const a=data.accounts.find(a=>inScope(a, user)&&(a.id===accountId||a.handle===accountId.replace(/^@/,"")));
     const p=a?.videos?.find(p=>p.id===postId);if(!a||!p)throw new Error("research_post_not_found");
     if(p.kind!=="photo")throw new Error("research_requires_carousel");
     if(!p.images?.length)throw new Error("research_slides_unavailable_refresh_account");
     const studies=data.formatStudies ||= [];
-    const existing=studies.find(s=>s.userId===user.id&&s.postId===postId);if(existing) {
+    const existing=studies.find(s=>inScope(s, user)&&s.postId===postId);if(existing) {
       // Refresh expiring CDN URLs without throwing away the dated transcript.
       existing.slides.forEach((s,i)=>{if(p.images?.[i])s.image=p.images[i];});return existing;
     }
-    const s:FormatStudy={id:crypto.randomUUID(),userId:user.id,accountId:a.id,postId:p.id,sourceUrl:p.url,caption:p.caption||p.title,createdAt:now(),updatedAt:now(),measuredAt:p.measuredAt||a.videosFetchedAt||null,status:"pending",slides:p.images.slice(0,35).map((image,index)=>({index:index+1,image,text:"",confidence:null,status:"pending",words:0}))};studies.unshift(s);return s;
+    const s:FormatStudy={id:crypto.randomUUID(),userId:user.id,projectId:user.projectId,accountId:a.id,postId:p.id,sourceUrl:p.url,caption:p.caption||p.title,createdAt:now(),updatedAt:now(),measuredAt:p.measuredAt||a.videosFetchedAt||null,status:"pending",slides:p.images.slice(0,35).map((image,index)=>({index:index+1,image,text:"",confidence:null,status:"pending",words:0}))};studies.unshift(s);return s;
   });
 }
 export async function getStudy(user:SessionUser,id:string) {
-  const data=await readStore();const study=data.formatStudies?.find(s=>s.id===id&&s.userId===user.id);if(!study)throw new Error("study_not_found");
-  const account=data.accounts.find(a=>a.id===study.accountId&&a.userId===user.id);
+  const data=await readStore();const study=data.formatStudies?.find(s=>s.id===id&&inScope(s, user));if(!study)throw new Error("study_not_found");
+  const account=data.accounts.find(a=>a.id===study.accountId&&inScope(a, user));
   const post=account?.videos?.find(p=>p.id===study.postId);
   const baseline=researchMetrics(account?.videos??[],account?.followers??0);
   const comparable=(account?.videos??[]).filter(p=>p.kind==="photo"&&known(p,"views")&&p.id!==study.postId).sort((a,b)=>a.views-b.views);
@@ -47,25 +48,25 @@ export async function advanceStudy(user:SessionUser,id:string,limit=3) {
       const result=await readResearchText(file.bytes);
       patch={text:result.text,confidence:result.confidence,words:result.text.split(/\s+/).filter(Boolean).length,status:result.text&&result.confidence>=70?"read":"unreadable",layout:{width:result.width,height:result.height,textBlocks:result.textBlocks}};
     } catch {patch={status:"unreadable",text:"",confidence:null};}
-    await updateStore(data=>{const s=data.formatStudies?.find(s=>s.userId===user.id&&s.id===id);if(!s)return;Object.assign(s.slides[slide.index-1],patch);s.status=s.slides.some(s=>s.status==="pending")?"pending":s.slides.some(s=>s.status==="unreadable")?"partial":"ready";s.updatedAt=now();});
+    await updateStore(data=>{const s=data.formatStudies?.find(s=>inScope(s, user)&&s.id===id);if(!s)return;Object.assign(s.slides[slide.index-1],patch);s.status=s.slides.some(s=>s.status==="pending")?"pending":s.slides.some(s=>s.status==="unreadable")?"partial":"ready";s.updatedAt=now();});
   }
   return getStudy(user,id);
 }
 export async function saveInterpretation(user:SessionUser,id:string,raw:unknown) {
   const interpretation=interpretationSchema.parse(raw);
   return updateStore(data=>{
-    const s=data.formatStudies?.find(s=>s.id===id&&s.userId===user.id);if(!s)throw new Error("study_not_found");
+    const s=data.formatStudies?.find(s=>s.id===id&&inScope(s, user));if(!s)throw new Error("study_not_found");
     if(interpretation.evidenceSlides.some(index=>!s.slides.some(s=>s.index===index)))throw new Error("invalid_evidence_slide");
     s.interpretation=interpretation;s.interpretationSource="assistant";s.interpretationAt=now();s.updatedAt=now();return s;
   });
 }
 export async function formatLibrary(user:SessionUser) {
   const data=await readStore();
-  const studies=(data.formatStudies??[]).filter(s=>s.userId===user.id).slice(0,100);
+  const studies=(data.formatStudies??[]).filter(s=>inScope(s, user)).slice(0,100);
   const families=Object.entries(Object.groupBy(studies.filter(s=>s.interpretation),s=>s.interpretation!.family)).map(([family,items])=>{
     const found=items??[];
     const evidence=found.map(s=>{
-      const a=data.accounts.find(a=>a.userId===user.id&&a.id===s.accountId);
+      const a=data.accounts.find(a=>inScope(a, user)&&a.id===s.accountId);
       const p=a?.videos?.find(p=>p.id===s.postId);
       const baseline=researchMetrics(a?.videos??[],a?.followers??0);
       return {id:s.id,source:s.sourceUrl,name:s.interpretation!.name,accountId:s.accountId,views:p&&known(p,"views")?p.views:null,measuredAt:p?.measuredAt??s.measuredAt,baselineSample:baseline.measuredSlideshowPosts,lift:p&&known(p,"views")&&baseline.medianViews&&baseline.measuredSlideshowPosts>=5?p.views/baseline.medianViews:null};

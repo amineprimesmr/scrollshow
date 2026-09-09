@@ -2,6 +2,7 @@ import { readStudioSession as readSession } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
 import { fetchTikTokProfile, ProfileError } from "@/lib/tiktok-profile";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await readSession();
@@ -9,7 +10,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
 
   const account = await updateStore(async (data) => {
-    const found = data.accounts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.accounts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     try {
       const profile = await fetchTikTokProfile(found.handle);

@@ -6,6 +6,7 @@ import { researchCapabilities, searchPhotos } from "./provider";
 import { startResearchSchema, filtersSchema, type Candidate, type ResearchJob, type ResearchInput, type ResearchFilters } from "./model";
 import { evaluateResearch, researchMetrics } from "./statistics";
 import type { AccountVideo, SessionUser, StoreData } from "../types";
+import { inScope } from "../projects";
 
 const stamp=()=>new Date().toISOString();
 const terminal=new Set(["done","stopped","error"]);
@@ -18,25 +19,25 @@ export function publicJob(job: ResearchJob) {
   };
 }
 export async function getResearchJob(user: SessionUser,id:string) {
-  const job=(await readStore()).researchJobs?.find(j=>j.userId===user.id&&j.id===id);
+  const job=(await readStore()).researchJobs?.find(j=>inScope(j, user)&&j.id===id);
   if(!job) throw new Error("research_not_found");
   return publicJob(job);
 }
 export async function listResearchJobs(user: SessionUser) {
-  return (await readStore()).researchJobs?.filter(j=>j.userId===user.id).slice(0,50).map(publicJob) ?? [];
+  return (await readStore()).researchJobs?.filter(j=>inScope(j, user)).slice(0,50).map(publicJob) ?? [];
 }
 export async function startResearch(user: SessionUser,raw: unknown) {
   const input=startResearchSchema.parse(raw);
   if(input.kind==="analyze") { input.keywords=input.keywords.map(normalizeHandle); if(input.keywords.some(h=>! /^[a-z0-9._]{1,40}$/.test(h))) throw new Error("invalid_handle"); }
   if(input.source==="provider"&&!researchCapabilities().detailedMetrics) throw new Error("research_provider_not_configured");
-  if(input.requestId) { const existing=(await readStore()).researchJobs?.find(j=>j.userId===user.id&&j.requestId===input.requestId); if(existing)return publicJob(existing); }
+  if(input.requestId) { const existing=(await readStore()).researchJobs?.find(j=>inScope(j, user)&&j.requestId===input.requestId); if(existing)return publicJob(existing); }
   if(!await consumeLimit(`research-start:${user.id}`,30,86400000)) throw new Error("daily_research_limit");
   return updateStore(data=>{
     const jobs=data.researchJobs ||= [];
-    const existing=input.requestId&&jobs.find(j=>j.userId===user.id&&j.requestId===input.requestId); if(existing)return publicJob(existing);
-    if(jobs.filter(j=>j.userId===user.id&&!terminal.has(j.status)&&j.status!=="paused").length>=3) throw new Error("active_research_limit");
+    const existing=input.requestId&&jobs.find(j=>inScope(j, user)&&j.requestId===input.requestId); if(existing)return publicJob(existing);
+    if(jobs.filter(j=>inScope(j, user)&&!terminal.has(j.status)&&j.status!=="paused").length>=3) throw new Error("active_research_limit");
     const now=stamp();
-    const job: ResearchJob={ id:crypto.randomUUID(), userId:user.id, requestId:input.requestId, input, status:"queued", phase:input.kind==="analyze"?"measure":"search",createdAt:now,updatedAt:now,revision:1,
+    const job: ResearchJob={ id:crypto.randomUUID(), userId:user.id,projectId:user.projectId, requestId:input.requestId, input, status:"queued", phase:input.kind==="analyze"?"measure":"search",createdAt:now,updatedAt:now,revision:1,
       keywordIndex:0,searchPage:0,searchCursor:0,candidates:input.kind==="analyze"?input.keywords.map(handle=>({handle,keyword:handle,sourceUrl:`https://www.tiktok.com/@${handle}`,posts:[]})):[],processed:[],results:[],failures:[],events:[],exhausted:input.kind==="analyze" };
     jobs.unshift(job); return publicJob(job);
   });
@@ -52,7 +53,7 @@ function choosePhase(j:ResearchJob) {
 export type ResearchTask = { jobId:string; token:string; source:ResearchInput["source"]; filters:ResearchFilters; maxPages:number } & ({kind:"search";keyword:string;cursor:number;searchId?:string}|{kind:"measure";candidate:Candidate});
 export async function claimResearch(user:SessionUser,id:string, source:ResearchInput["source"]):Promise<ResearchTask|null> {
   return updateStore(data=>{
-    const j=data.researchJobs?.find(j=>j.id===id&&j.userId===user.id);if(!j)throw new Error("research_not_found");
+    const j=data.researchJobs?.find(j=>j.id===id&&inScope(j, user));if(!j)throw new Error("research_not_found");
     if(j.input.source!==source)throw new Error("research_source_mismatch");
     if(!["queued","running"].includes(j.status)||j.lease&&j.lease.until>Date.now())return null;
     choosePhase(j);if(j.status==="done")return null;
@@ -96,7 +97,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     c.cursor=result.cursor;
     const now=stamp(),posts=c.measuredPosts;
     let a=data.accounts.find(a=>a.userId===j.userId&&a.handle===c.handle);
-    if(!a) { a={id:crypto.randomUUID(),userId:j.userId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
+    if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
     const cache=new Map((a.videos??[]).map(p=>[p.id,p]));posts.forEach(p=>cache.set(p.id,p));
     Object.assign(a,{nickname:c.nickname??a.nickname,bio:c.bio??a.bio,followers:c.followers??a.followers,videos:[...cache.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,2000),videosFetchedAt:now,lastSyncAt:now,
       researchCoverage:{complete:covered,pages:c.pages,windowDays:j.input.filters.days,measuredAt:now,reason:covered?"window_or_profile_end":finished?"page_limit":"collecting"}});
@@ -109,11 +110,11 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     }
   }
   j.error=undefined;choosePhase(j);event(j,j.status==="done"?"research_finished":"step_saved");
-  let legacy=data.runs.find(r=>r.id===j.id);if(!legacy){legacy={id:j.id,userId:j.userId,keywords:j.input.keywords.join(", "),status:"queued",found:0,createdAt:j.createdAt,accountIds:[]};data.runs.unshift(legacy);}
+  let legacy=data.runs.find(r=>r.id===j.id);if(!legacy){legacy={id:j.id,userId:j.userId,projectId:j.projectId,keywords:j.input.keywords.join(", "),status:"queued",found:0,createdAt:j.createdAt,accountIds:[]};data.runs.unshift(legacy);}
   legacy.accountIds=j.results.filter(r=>r.accepted).map(r=>r.accountId);legacy.found=legacy.accountIds.length;legacy.status=j.status==="done"?"done":"queued";
 }
 export async function completeResearch(user:SessionUser,task:ResearchTask,result:StepResult) {
-  return updateStore(data=>{const j=data.researchJobs?.find(j=>j.id===task.jobId&&j.userId===user.id);if(!j)throw new Error("research_not_found");applyResearchStep(data,j,task,result);return publicJob(j);});
+  return updateStore(data=>{const j=data.researchJobs?.find(j=>j.id===task.jobId&&inScope(j, user));if(!j)throw new Error("research_not_found");applyResearchStep(data,j,task,result);return publicJob(j);});
 }
 export async function advanceResearch(user:SessionUser,id:string) {
   const task=await claimResearch(user,id,"provider");if(!task)return getResearchJob(user,id);
@@ -135,7 +136,7 @@ export async function workResearch(user:SessionUser,id:string,budgetMs=180000) {
 }
 export async function controlResearch(user:SessionUser,id:string,action:"pause"|"resume"|"stop",filters?:Partial<ResearchFilters>) {
   return updateStore(data=>{
-    const j=data.researchJobs?.find(j=>j.id===id&&j.userId===user.id);if(!j)throw new Error("research_not_found");
+    const j=data.researchJobs?.find(j=>j.id===id&&inScope(j, user));if(!j)throw new Error("research_not_found");
     if(j.status==="stopped")throw new Error("research_stopped");
     if(filters) {
       const previousDays=j.input.filters.days;

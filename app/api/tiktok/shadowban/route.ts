@@ -3,6 +3,7 @@ import { checkConnectedAccount, checkLibraryAccount, checkPublicAccount, Shadowb
 import { readStore } from "@/lib/store";
 import { loadTikTokChannels } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 function errorCode(error: unknown) {
   if (error instanceof ShadowbanLookupError) return error.code;
@@ -22,9 +23,9 @@ export async function GET(request: Request) {
   const key = new URL(request.url).searchParams.get("key") || "";
   const [kind, id] = key.includes(":") ? key.split(":", 2) : ["", ""];
 
-  const channels = kind === "ac" ? [] : (await loadTikTokChannels(user.id)).filter((c) => !id || c.id === id);
+  const channels = kind === "ac" ? [] : (await loadTikTokChannels(user.id, user.projectId)).filter((c) => !id || c.id === id);
   const store = await readStore();
-  const accounts = kind === "ch" ? [] : store.accounts.filter((a) => a.userId === user.id && (!id || a.id === id));
+  const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (!id || a.id === id));
   if (key && !channels.length && !accounts.length) return NextResponse.json({ error: "missing" }, { status: 404 });
 
   const results = await Promise.all([

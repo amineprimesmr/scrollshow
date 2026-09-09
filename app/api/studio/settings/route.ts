@@ -171,6 +171,7 @@ export async function DELETE() {
     data.videoStats = data.videoStats?.filter(s => !channelIds.has(s.channelId));
     data.channelStats = data.channelStats?.filter(s => !channelIds.has(s.channelId));
     data.users = data.users.filter((item) => item.id !== session.id);
+    data.projects = (data.projects || []).filter((item) => item.userId !== session.id);
     data.tiktokQrAttempts = (data.tiktokQrAttempts || []).filter((item) => item.userId !== session.id);
     data.channels = data.channels.filter((item) => item.userId !== session.id);
     data.posts = data.posts.filter((item) => item.userId !== session.id);

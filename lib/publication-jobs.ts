@@ -36,7 +36,7 @@ export async function dispatchPost(userId: string, id: string) {
       p.publishChannelId = post.channelIds[0];
     });
     initiated = true;
-    const { publishId } = await directPostPhotos(userId, { photos, description: post.body, options: coerceOptions(post.tiktok), channelId: post.channelIds[0] });
+    const { publishId } = await directPostPhotos(userId, { photos, description: post.body, options: coerceOptions(post.tiktok), channelId: post.channelIds[0], projectId: post.projectId });
     await updateStore(data => {
       const p = data.posts.find(p => p.id === id && p.publishClaim === claim);
       if (!p) throw new Error("publication_claim_lost");

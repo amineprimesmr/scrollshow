@@ -2,6 +2,7 @@ import { exchangeCode, fetchUserInfo, profileFieldsForScopes } from "./tiktok";
 import { resolveStoreUserId } from "./local-user";
 import { updateStore } from "./store";
 import type { Channel, SessionUser, StoreData } from "./types";
+import { resolveProject } from "./projects";
 
 export type TikTokTokens = Awaited<ReturnType<typeof exchangeCode>>;
 
@@ -30,12 +31,15 @@ export async function saveTikTokAccount(user: SessionUser, tokens: TikTokTokens,
     const userId = resolveStoreUserId(data, user);
     const openId = tokens.open_id || profile.open_id || "";
     if (!openId) throw new Error("missing_open_id");
+    // Un meme compte TikTok peut servir deux business : la deduplication est par projet.
+    const projectId = user.projectId || resolveProject(data, userId, null)?.id;
     const existing = data.channels.find(
-      (item) => item.userId === userId && item.platform === "tiktok" && item.openId === openId,
+      (item) => item.userId === userId && item.platform === "tiktok" && item.openId === openId && (item.projectId || projectId) === projectId,
     );
     const next = {
       id: existing?.id || crypto.randomUUID(),
       userId,
+      projectId,
       platform: "tiktok",
       name: profile.display_name || profile.username || existing?.name || "TikTok",
       handle: profile.username || existing?.handle || "",

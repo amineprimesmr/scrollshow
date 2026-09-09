@@ -58,6 +58,10 @@ async function publishPost(user: User, post: StudioPost) {
     photos,
     description: (post.body || "").slice(0, 2200),
     options,
+    // Le compte cible est celui du post, dans son projet : jamais « le premier
+    // compte » de l'utilisateur, qui peut appartenir a un autre business.
+    channelId: post.publishChannelId || post.channelIds[0],
+    projectId: post.projectId,
   });
   return publishId;
 }
@@ -157,7 +161,7 @@ export async function reconcilePublishId(userId: string, publishId: string): Pro
   if (TERMINAL.has(post.publishState || "")) {
     return { id: post.id, publishId, status: post.publishState as string, failReason: post.publishError, tiktokId: post.tiktokId };
   }
-  const channel = await loadTikTokChannel(userId, post.publishChannelId || post.channelIds[0]);
+  const channel = await loadTikTokChannel(userId, post.publishChannelId || post.channelIds[0], post.projectId);
   if (!channel?.accessToken) throw new Error("tiktok_not_connected");
   return settlePost(user, post, channel.accessToken);
 }
@@ -175,7 +179,7 @@ export async function reconcilePendingPublishes() {
     const user = data.users.find((item) => item.id === post.userId);
     if (!user) continue;
     try {
-      const channel = await loadTikTokChannel(user.id, post.publishChannelId || post.channelIds[0]);
+      const channel = await loadTikTokChannel(user.id, post.publishChannelId || post.channelIds[0], post.projectId);
       if (!channel?.accessToken) continue;
       const settled = await settlePost(user, post, channel.accessToken);
       results.push({ id: post.id, status: settled.status });

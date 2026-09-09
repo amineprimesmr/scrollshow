@@ -38,7 +38,7 @@ async function syncPage(userId: string, key: string, restart: boolean) {
   if (!target) throw new Error("missing");
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;
-  const channel = key.startsWith("ch:") ? await loadTikTokChannel(userId, key.slice(3)) : null;
+  const channel = key.startsWith("ch:") ? await loadTikTokChannel(userId, key.slice(3), target.projectId) : null;
   const source = previous?.source || (metricsEnabled() && target.handle && target.handle !== "tiktok" ? "api" : "tiktok");
   const cursor = previous?.cursor;
   try {

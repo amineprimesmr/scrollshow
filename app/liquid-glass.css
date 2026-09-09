@@ -337,7 +337,8 @@ html.lg-refract .ss-segment button.is-active {
 
 /* ── Menus and popovers ────────────────────────────────────────────────── */
 .ss-sidebar-menu,
-.ss-rail-menu {
+.ss-rail-menu,
+.ss-project__menu {
   border: 0;
   background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.32));
   -webkit-backdrop-filter: blur(28px) saturate(var(--lg-sat));
@@ -351,6 +352,7 @@ html.lg-refract .ss-segment button.is-active {
   animation: lg-pop 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   transform-origin: bottom left;
 }
+.ss-project__menu { transform-origin: top left; }
 
 /* ── Sheets and scrims ─────────────────────────────────────────────────── */
 .ss-modal,
@@ -469,6 +471,7 @@ html.lg-refract .ss-setup__pill {
   .ss-segment button.is-active,
   .ss-sidebar-menu,
   .ss-rail-menu,
+  .ss-project__menu,
   .ss-dialog {
     animation: none;
   }

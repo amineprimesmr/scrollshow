@@ -5,6 +5,7 @@ import type { WarmedOrder } from "@/lib/types";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { inScope } from "@/lib/projects";
 
 const createSchema = z.object({
   listingId: z.string().min(1).max(60),
@@ -65,7 +66,7 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const result = await updateStore((data) => {
-    const order = (data.warmedOrders || []).find((item) => item.id === parsed.data.id && item.userId === session.id);
+    const order = (data.warmedOrders || []).find((item) => item.id === parsed.data.id && inScope(item, session));
     if (!order) return null;
     if (order.status === "delivered") return "delivered" as const;
     order.status = "cancelled";

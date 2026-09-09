@@ -11,7 +11,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const data = await readStore();
   const userId = resolveStoreUserId(data, user);
-  const channel = await loadTikTokChannel(userId);
+  const channel = await loadTikTokChannel(userId, undefined, user.projectId);
   if (!channel?.accessToken) return NextResponse.json({ user: null, scopes: ["user.info.basic", "user.info.profile", "user.info.stats"] });
   if (localDemoEnabled() && isLocalDemoToken(channel.accessToken)) {
     return NextResponse.json({ user: await localDemoProfile(userId, channel), scopes: ["user.info.basic", "user.info.profile", "user.info.stats"], demo: true });

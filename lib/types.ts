@@ -60,6 +60,24 @@ export type OnboardingState = {
   heardFrom?: string[];
 };
 
+/** Un projet = un business. Il possede ses comptes connectes, son calendrier,
+ * ses posts, sa bibliotheque et ses recherches. Le compte utilisateur ne garde
+ * que la facturation, les reglages generaux et les projets eux-memes. */
+export type Project = {
+  id: string;
+  userId: string;
+  name: string;
+  logo?: string;
+  business: BusinessProfile | null;
+  /** Absent tant que l'onboarding du projet n'est pas termine : le projet est
+   * alors un brouillon reprenable, jamais un espace de travail complet. */
+  completedAt?: string;
+  /** Etape atteinte dans l'onboarding du projet, pour reprendre un brouillon. */
+  onboardingStep?: number;
+  archivedAt?: string;
+  createdAt: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -87,6 +105,8 @@ export type User = {
   /** Ids of completed "Post to the US" checklist items. */
   usChecklist?: string[];
   business?: BusinessProfile;
+  /** Dernier projet ouvert : sert de repli quand aucun projet n'est demande. */
+  lastProjectId?: string;
   onboarding?: OnboardingState;
 };
 
@@ -146,6 +166,8 @@ export type VideoSync = {
 export type Account = {
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   handle: string;
   niche: string;
   followers: number;
@@ -172,6 +194,8 @@ export type Account = {
 export type Run = {
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   keywords: string;
   status: "queued" | "done" | "error";
   accountIds?: string[];
@@ -183,6 +207,8 @@ export type Run = {
 export type Channel = {
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   platform: string;
   name: string;
   handle: string;
@@ -247,6 +273,8 @@ export type CarouselRecipe = {
 export type StudioPost = {
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   channelIds: string[];
   body: string;
   date: string;
@@ -289,6 +317,8 @@ export type StudioPost = {
 export type MediaItem = {
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   url: string;
   name: string;
   createdAt: string;
@@ -298,6 +328,8 @@ export type ApiKey = {
   expiresAt?: string;
   id: string;
   userId: string;
+  /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
+  projectId?: string;
   name: string;
   prefix: string;
   hash: string;
@@ -380,6 +412,7 @@ export type StoreData = {
   refundedLifetimePayments?: string[];
   rateLimits?: Record<string, { count: number; resetAt: number }>;
   users: User[];
+  projects?: Project[];
   accounts: Account[];
   runs: Run[];
   channels: Channel[];
@@ -406,6 +439,8 @@ export type SessionUser = {
   plan: Plan;
   /** True once the onboarding wizard was completed (carried in the session so layouts can gate without a store read). */
   onboarded?: boolean;
+  /** Projet actif de la requete : resolu depuis le cookie (studio) ou la cle API (agents). */
+  projectId?: string;
 };
 
 export type PublicUser = SessionUser & {
@@ -417,4 +452,14 @@ export type PublicUser = SessionUser & {
   settings: UserSettings;
   business: BusinessProfile | null;
   onboarded: boolean;
+  project?: PublicProject | null;
+};
+
+export type PublicProject = {
+  id: string;
+  name: string;
+  logo: string;
+  business: BusinessProfile | null;
+  completed: boolean;
+  createdAt: string;
 };

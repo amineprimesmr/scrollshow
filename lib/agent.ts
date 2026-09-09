@@ -30,6 +30,8 @@ import { assertEditable, validatePost } from "./post-validation";
 import { consumeLimit } from "./rate-limit";
 import { queueDeletedMedia } from "./media-cleanup";
 import { dateInTimeZone, resolveSettings } from "./settings";
+import { inScope } from "./projects";
+import { resolveProject } from "./projects";
 
 export class AgentError extends Error {
   constructor(
@@ -41,10 +43,11 @@ export class AgentError extends Error {
 }
 
 export async function agentWhoami(user: SessionUser) {
-  const channel = (await loadTikTokChannels(user.id))[0];
+  const channel = (await loadTikTokChannels(user.id, user.projectId))[0];
   const data = await readStore();
   const owner = data.users.find((item) => item.id === user.id);
-  const business = owner?.business || null;
+  const project = resolveProject(data, user.id, user.projectId);
+  const business = project?.business || owner?.business || null;
   const settings = resolveSettings(owner);
   return {
     capabilities: { research: true, ...researchCapabilities(), export: true, publishing: "tiktok", htmlExport: false },
@@ -78,12 +81,12 @@ export async function agentWhoami(user: SessionUser) {
 
 export async function agentChannels(user: SessionUser) {
   const data = await readStore();
-  return data.channels.filter((item) => item.userId === user.id).map(publicChannel);
+  return data.channels.filter((item) => inScope(item, user)).map(publicChannel);
 }
 
 export async function agentMedia(user: SessionUser) {
   return updateStore((data) => {
-    let media = data.media.filter((item) => item.userId === user.id);
+    let media = data.media.filter((item) => inScope(item, user));
     if (!media.length && process.env.NODE_ENV !== "production" && localStoreEnabled()) {
       const seeded = seedStudio(user.id);
       data.media.push(...seeded.media);
@@ -96,7 +99,7 @@ export async function agentMedia(user: SessionUser) {
 export async function agentListPosts(user: SessionUser, status?: StudioPost["status"]) {
   const data = await readStore();
   return data.posts
-    .filter((item) => item.userId === user.id && (!status || item.status === status))
+    .filter((item) => inScope(item, user) && (!status || item.status === status))
     .map(publicPost);
 }
 
@@ -134,7 +137,7 @@ export async function agentCreatePost(
   const post = await updateStore((data) => {
     const created: StudioPost = {
       id: crypto.randomUUID(),
-      userId: user.id,
+      userId: user.id, projectId: user.projectId,
       channelIds: channelId ? [channelId] : [],
       body: caption.slice(0, 2200),
       date: input.date || now.toISOString().slice(0, 10),
@@ -177,7 +180,7 @@ export async function agentUpdatePost(
   }>,
 ) {
   const post = await updateStore((data) => {
-    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     assertEditable(found);
     if (input.caption) found.body = input.caption.slice(0, 2200);
@@ -230,7 +233,7 @@ export async function agentUpdateRecipe(
   const post = await updateStore((data) => {
     const found = data.posts.find(
       (item) =>
-        item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+        inScope(item, user) && (item.id === idOrShare || item.shareId === idOrShare),
     );
     if (!found) return null;
     assertEditable(found);
@@ -249,14 +252,14 @@ export async function agentReconstructPost(user: SessionUser, idOrShare: string)
   if (!(await consumeLimit(`reconstruct:${user.id}`, 20, 86400000))) throw new AgentError("daily_reconstruction_limit", 429);
   const data = await readStore();
   const found = data.posts.find(
-    (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+    (item) => inScope(item, user) && (item.id === idOrShare || item.shareId === idOrShare),
   );
   if (!found) throw new AgentError("post_missing", 404);
   try {
     assertEditable(found);
     const recipe = await reconstructRecipe(ensureRecipe(found));
     const post = await updateStore((store) => {
-      const item = store.posts.find((entry) => entry.id === found.id && entry.userId === user.id);
+      const item = store.posts.find((entry) => entry.id === found.id && inScope(entry, user));
       if (!item) return null;
       assertEditable(item);
       item.recipe = recipe;
@@ -274,20 +277,20 @@ export async function agentReconstructPost(user: SessionUser, idOrShare: string)
 export async function agentRasterizePost(user: SessionUser, idOrShare: string, recipePatch?: CarouselRecipe) {
   const data = await readStore();
   const found = data.posts.find(
-    (item) => item.userId === user.id && (item.id === idOrShare || item.shareId === idOrShare),
+    (item) => inScope(item, user) && (item.id === idOrShare || item.shareId === idOrShare),
   );
   if (!found) throw new AgentError("post_missing", 404);
   if (!(await consumeLimit(`render:${user.id}`, 30, 86400000))) throw new AgentError("daily_render_limit", 429);
   const recipe = recipePatch || ensureRecipe(found!);
   const photo_images = await rasterizeRecipe(recipe);
   if (!photo_images.length) throw new AgentError("photos_required");
-  await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => m.userId === user.id && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, url, name: `Slide ${index+1}`, createdAt: new Date().toISOString() }); }));
+  await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => inScope(m, user) && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, url, name: `Slide ${index+1}`, createdAt: new Date().toISOString() }); }));
   return { photo_images, recipe };
 }
 
 export async function agentEnsureShare(user: SessionUser, id: string) {
   const post = await updateStore((data) => {
-    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     found.shareEnabled = true;
     found.recipe = ensureRecipe(found);
@@ -309,7 +312,7 @@ export async function agentEnsureShare(user: SessionUser, id: string) {
 export async function agentForkPost(user: SessionUser, id: string) {
   const created = await updateStore((data) => {
     const found = data.posts.find(
-      (item) => item.id === id && (item.userId === user.id || item.visibility === "public"),
+      (item) => item.id === id && (inScope(item, user) || item.visibility === "public"),
     );
     if (!found) return null;
     if (found.userId !== user.id) found.clones = (found.clones || 0) + 1;
@@ -319,8 +322,8 @@ export async function agentForkPost(user: SessionUser, id: string) {
     const copy: StudioPost = {
       ...found,
       id: crypto.randomUUID(),
-      userId: user.id,
-      channelIds: data.channels.filter((item) => item.userId === user.id).slice(0, 1).map((item) => item.id),
+      userId: user.id, projectId: user.projectId,
+      channelIds: data.channels.filter((item) => inScope(item, user)).slice(0, 1).map((item) => item.id),
       body: found.body,
       date: now.toISOString().slice(0, 10),
       time: found.time || "18:00",
@@ -353,7 +356,7 @@ export async function agentImportTikTok(
   const imported = await importTikTokFromUrl(input.url);
   const current = await readStore();
   const existing = current.posts.find(
-    (item) => item.userId === user.id && imported.tiktokId && item.tiktokId === imported.tiktokId,
+    (item) => inScope(item, user) && imported.tiktokId && item.tiktokId === imported.tiktokId,
   );
   if (existing) return publicPost(existing);
   const now = new Date();
@@ -365,16 +368,16 @@ export async function agentImportTikTok(
     imported.images.forEach((url, index) => {
       data.media.unshift({
         id: crypto.randomUUID(),
-        userId: user.id,
+        userId: user.id, projectId: user.projectId,
         url,
         name: `${imported.authorHandle || "tiktok"}-${imported.tiktokId || "slide"}-${index + 1}`,
         createdAt: now.toISOString(),
       });
     });
-    const channelId = data.channels.find((item) => item.userId === user.id)?.id;
+    const channelId = data.channels.find((item) => inScope(item, user))?.id;
     const created: StudioPost = {
       id: crypto.randomUUID(),
-      userId: user.id,
+      userId: user.id, projectId: user.projectId,
       channelIds: channelId ? [channelId] : [],
       body: imported.caption || `TikTok @${imported.authorHandle}`.trim(),
       date: now.toISOString().slice(0, 10),
@@ -426,13 +429,13 @@ export async function agentListMarketplace(user: SessionUser, tab: "private" | "
       .map((item) => marketplaceCard(item, user.id));
   }
   return data.posts
-    .filter((item) => item.userId === user.id)
+    .filter((item) => inScope(item, user))
     .map((item) => marketplaceCard(item, user.id));
 }
 
 export async function agentSetVisibility(user: SessionUser, id: string, visibility: "private" | "public") {
   const post = await updateStore((data) => {
-    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     found.visibility = visibility;
     if (visibility === "private") { found.shareEnabled = false; found.shareId = newShareId(); }
@@ -446,7 +449,7 @@ export async function agentSetVisibility(user: SessionUser, id: string, visibili
 
 export async function agentSetCalendar(user: SessionUser, id: string, inCalendar: boolean) {
   const post = await updateStore((data) => {
-    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     assertEditable(found);
     found.inCalendar = inCalendar;
@@ -465,11 +468,11 @@ export async function findPostByShareId(shareId: string) {
 
 export async function agentDeletePost(user: SessionUser, id: string) {
   const removed = await updateStore((data) => {
-    const post = data.posts.find(p => p.id === id && p.userId === user.id);
+    const post = data.posts.find(p => p.id === id && inScope(p, user));
     if (post) assertEditable(post);
     if (post) queueDeletedMedia(data, post);
     const before = data.posts.length;
-    data.posts = data.posts.filter((item) => !(item.id === id && item.userId === user.id));
+    data.posts = data.posts.filter((item) => !(item.id === id && inScope(item, user)));
     return before !== data.posts.length;
   });
   if (!removed) throw new AgentError("post_missing", 404);
@@ -484,7 +487,7 @@ export async function agentPublish(user: SessionUser, input: {
     commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption);
   let id: string;
   if (input.id) {
-    const found = (await readStore()).posts.find(p => p.userId === user.id && (p.id === input.id || p.shareId === input.id));
+    const found = (await readStore()).posts.find(p => inScope(p, user) && (p.id === input.id || p.shareId === input.id));
     if (!found) throw new AgentError("post_missing", 404);
     await updateStore(data => {
       const p = data.posts.find(p => p.id === found.id)!;
@@ -657,7 +660,7 @@ function channelGrowth(
 
 export async function agentAnalytics(user: SessionUser, options: { days?: number } = {}) {
   const rangeDays = options.days && options.days > 0 ? options.days : null; // null = all-time
-  const channels = await loadTikTokChannels(user.id);
+  const channels = await loadTikTokChannels(user.id, user.projectId);
   const posts = (await agentListPosts(user)).filter((post) => post.inCalendar !== false);
   const calendar = {
     views: posts.reduce((sum, post) => sum + post.views, 0),
@@ -763,7 +766,7 @@ export async function agentLibrary(user: SessionUser, query?: string, verdict?: 
   const data = await readStore();
   const needle = (query || "").trim().toLowerCase();
   return data.accounts
-    .filter((item) => item.userId === user.id)
+    .filter((item) => inScope(item, user))
     .filter((item) => !verdict || item.verdict === verdict)
     .filter((item) => {
       if (!needle) return true;
@@ -776,7 +779,7 @@ export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
   const data = await readStore();
   const value = idOrHandle.replace(/^@/, "").toLowerCase();
   const account = data.accounts.find(
-    (item) => item.userId === user.id && (item.id === idOrHandle || item.handle.toLowerCase() === value),
+    (item) => inScope(item, user) && (item.id === idOrHandle || item.handle.toLowerCase() === value),
   );
   if (!account) throw new AgentError("account_missing", 404);
   return account;
@@ -789,7 +792,7 @@ export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
  * list. Reads the creator's own last <=30 posts through video.list.
  */
 export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
-  const channels = handle ? [] : await loadTikTokChannels(user.id);
+  const channels = handle ? [] : await loadTikTokChannels(user.id, user.projectId);
   if (!handle && !channels.length) throw new AgentError("tiktok_not_connected", 401);
   const accounts: Array<Record<string, unknown>> = [];
   const targets: Array<{ handle: string; name: string; videos: () => Promise<ShadowbanReport> }> = handle

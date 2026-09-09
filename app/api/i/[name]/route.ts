@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
     const references = (value: unknown) => JSON.stringify(value).includes(mediaPath);
     const visiblePost = data.posts.some(p => (p.userId === user?.id || p.visibility === "public" || p.shareEnabled) && references(p));
     const ownedMedia = user && data.media.some(m => m.userId === user.id && m.url === mediaPath);
-    const logo = user && data.users.some(u => u.id === user.id && u.business?.logo === mediaPath);
+    const logo = user && (data.users.some(u => u.id === user.id && u.business?.logo === mediaPath) || (data.projects || []).some(p => p.userId === user.id && (p.logo === mediaPath || p.business?.logo === mediaPath)));
     if (!visiblePost && !ownedMedia && !logo) return NextResponse.json({ error: "missing" }, { status: 404 });
   }
   const file = await readImportedFile(name);

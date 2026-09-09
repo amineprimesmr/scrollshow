@@ -4,11 +4,12 @@ import { discoverResearchAccounts } from "@/lib/research";
 import { workResearch, listResearchJobs } from "@/lib/research/jobs";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
+import { inScope } from "@/lib/projects";
 export const maxDuration = 300;
 export async function GET() {
   const user = await readStudioSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  return NextResponse.json({ runs: (await readStore()).runs.filter(r => r.userId === user.id), research: await listResearchJobs(user) });
+  return NextResponse.json({ runs: (await readStore()).runs.filter(r => inScope(r, user)), research: await listResearchJobs(user) });
 }
 export async function POST(request: Request) {
   const user = await readStudioSession();

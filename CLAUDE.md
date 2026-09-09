@@ -134,3 +134,34 @@ Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes`
 `npm run typecheck`, `npm test` (84 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
+
+## Projets (multi-business)
+`lib/projects.ts` (logique pure, testée) + `lib/project-context.ts` (cookie
+`ss_project`) + `app/api/projects` + `components/studio/ProjectSwitcher.tsx`
+(haut de la sidebar, menu en portal) + `components/studio/ProjectSettings.tsx`
+(Réglages > Projet).
+- **Un projet = un business** : il possède `channels`, `posts`, `media`, `runs`,
+  `accounts`, `apiKeys`, `researchJobs`, `formatStudies`. Le compte garde
+  facturation, réglages, clippers, notifications push, commandes warmées.
+- **Scope** : toute lecture d'une collection possédée passe par
+  `inScope(row, user)` (jamais `row.userId === user.id` seul) ; toute création
+  stampe `projectId: user.projectId`. `user.projectId` vient de la session
+  (cookie validé en base) ou de la clé API (une clé = un projet).
+- **Migration paresseuse** dans `normalize()` du store : `backfillProjects`
+  crée `prj_<userId>_1` (id déterministe, donc stable entre une lecture sans
+  écriture et l'écriture suivante) et y rattache tout le contenu sans
+  `projectId`. Une ligne sans `projectId` reste visible dans tous les projets
+  plutôt que de disparaître.
+- **Nouveau projet = onboarding dédié** `/onboarding?project=new` (lien →
+  analyse → nom/logo → TikTok facultatif → fin). Le brouillon est créé à
+  l'étape business, **n'est pas actif** tant que `completedAt` manque, et se
+  reprend via `/onboarding?project=<id>` (sélecteur : « Configuration à
+  terminer »). Les étapes IA et « comment tu nous as connu » sont au niveau
+  du compte et ne se rejouent pas.
+- **Business lu depuis le projet** (`withProject` → `user.business`,
+  `agentWhoami`, `contentBrief`). `User.business` n'est plus qu'une copie
+  historique : ne pas y ajouter de lecteur.
+- « Premier compte TikTok » (`loadTikTokChannel` sans id) = premier compte
+  **du projet** : toujours passer `projectId`. Un même compte TikTok peut être
+  lié dans deux projets (dédup par projet).
+- Archiver ne supprime rien ; le dernier projet ne s'archive pas.

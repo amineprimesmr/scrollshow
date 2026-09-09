@@ -2,6 +2,7 @@ import { metricsEnabled } from "./metrics";
 import { readStore } from "./store";
 import { withPublicationText } from "./publication-text";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
+import { inScope } from "./projects";
 
 export type InsightFormat = { id: string; label: string; count: number; views: number; avgViews: number; bestViews: number };
 export type InsightHook = { hook: string; count: number; avgViews: number };
@@ -198,8 +199,8 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
   const parsed = parseKey(key);
   if (!parsed) return null;
   const store = await readStore();
-  const channels = store.channels.filter((c) => c.userId === user.id);
-  const accounts = store.accounts.filter((a) => a.userId === user.id);
+  const channels = store.channels.filter((c) => inScope(c, user));
+  const accounts = store.accounts.filter((a) => inScope(a, user));
   const networkFollowers =
     channels.reduce((n, c) => n + (c.followers || 0), 0) + accounts.reduce((n, a) => n + (a.followers || 0), 0);
 
@@ -211,7 +212,7 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
 
   const channel = channels.find((c) => c.id === parsed.id);
   if (!channel) return null;
-  const result = await channelInsights(user, channel, store.posts.filter((p) => p.userId === user.id), networkFollowers, days);
+  const result = await channelInsights(user, channel, store.posts.filter((p) => inScope(p, user)), networkFollowers, days);
   result.videos = result.videos.map(v => withPublicationText(v, user.id, store));
   result.hooks = buildHooks(result.videos);
   return result;

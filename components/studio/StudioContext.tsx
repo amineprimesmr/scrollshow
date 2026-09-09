@@ -99,9 +99,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
     const active = () => !stopped && !document.hidden && navigator.onLine;
+    // Un onglet ouvert en arriere-plan doit quand meme recevoir sa premiere
+    // lecture : seule la boucle de rafraichissement attend d'etre visible.
+    let initial = true;
     async function refresh() {
       clearTimeout(timer);
-      if (!active()) return;
+      if (stopped || (!initial && !active())) return;
+      initial = false;
       try { await sync.refresh(); failures = 0; } catch { failures += 1; }
       clearTimeout(timer);
       if (active()) timer = setTimeout(refresh, Math.min(5_000 * 2 ** failures, 30_000));

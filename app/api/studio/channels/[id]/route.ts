@@ -3,6 +3,7 @@ import { revokeMetaToken } from "@/lib/meta";
 import { updateStore } from "@/lib/store";
 import { revokeXToken } from "@/lib/x";
 import { NextResponse } from "next/server";
+import { inScope } from "@/lib/projects";
 
 export async function DELETE(
   _request: Request,
@@ -13,8 +14,8 @@ export async function DELETE(
   const { id } = await params;
 
   const channel = await updateStore((data) => {
-    const found = data.channels.find((item) => item.id === id && item.userId === user.id);
-    data.channels = data.channels.filter((item) => !(item.id === id && item.userId === user.id));
+    const found = data.channels.find((item) => item.id === id && inScope(item, user));
+    data.channels = data.channels.filter((item) => !(item.id === id && inScope(item, user)));
     return found || null;
   });
 

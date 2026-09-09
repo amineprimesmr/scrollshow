@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
 import { assertEditable, validatePost, postErrorResponse } from "@/lib/post-validation";
+import { inScope } from "@/lib/projects";
 
 const schema = z.object({
   body: z.string().trim().min(1).max(2200).optional(),
@@ -39,7 +40,7 @@ export async function PATCH(
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const post = await updateStore((data) => {
-    const found = data.posts.find((item) => item.id === id && item.userId === user.id);
+    const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     assertEditable(found);
     const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
@@ -82,9 +83,9 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
   const result = await updateStore((data) => {
-    const post = data.posts.find(item => item.id === id && item.userId === user.id);
+    const post = data.posts.find(item => item.id === id && inScope(item, user));
     if (post) assertEditable(post);
-    data.posts = data.posts.filter((item) => !(item.id === id && item.userId === user.id));
+    data.posts = data.posts.filter((item) => !(item.id === id && inScope(item, user)));
     if (post) queueDeletedMedia(data, post);
   }).catch(postErrorResponse);
   if (result instanceof Response) return result;
