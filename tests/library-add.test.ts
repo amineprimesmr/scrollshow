@@ -10,7 +10,8 @@ test("extracts handle from profile and video share links", () => {
 
 test("accepts bare handles and rejects noise", () => {
   assert.equal(extractTikTokHandle("@chef.marie"), "chef.marie");
-  assert.equal(extractTikTokHandle("chef.marie"), "chef.marie");
+  assert.equal(extractTikTokHandle("chef.marie"), "", "a bare word from the clipboard is not a handle");
+  assert.equal(extractTikTokHandle("chef.marie", false), "chef.marie", "explicit handle field");
   assert.equal(extractTikTokHandle("https://www.youtube.com/@someone"), "");
   assert.equal(extractTikTokHandle("just some text here"), "");
 });

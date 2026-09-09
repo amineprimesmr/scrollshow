@@ -9,14 +9,18 @@ const SHORT_LINK = /https?:\/\/(?:vm|vt|m)\.tiktok\.com\/[A-Za-z0-9_-]+\/?|https
 const PROFILE_LINK = /tiktok\.com\/@([A-Za-z0-9_.]{2,40})/i;
 const BARE_HANDLE = /(?:^|\s)@([A-Za-z0-9_.]{2,40})/;
 
-/** Pure part: pulls a handle out of anything the share sheet may hand over. */
-export function extractTikTokHandle(text: string): string {
+/**
+ * Pure part: pulls a handle out of anything the share sheet may hand over.
+ * `strict` (the shortcut path, which may fall back to the clipboard) requires a
+ * tiktok.com link or an explicit @handle so a stray copied word is never added.
+ */
+export function extractTikTokHandle(text: string, strict = true): string {
   const value = (text || "").trim();
   const link = value.match(PROFILE_LINK);
   if (link) return normalizeHandle(link[1]);
   const bare = value.match(BARE_HANDLE);
   if (bare) return normalizeHandle(bare[1]);
-  if (/^[A-Za-z0-9_.]{2,40}$/.test(value)) return normalizeHandle(value);
+  if (!strict && /^[A-Za-z0-9_.]{2,40}$/.test(value)) return normalizeHandle(value);
   return "";
 }
 
@@ -26,8 +30,8 @@ export function findShortLink(text: string): string | null {
 }
 
 /** Follows a vm.tiktok.com / tiktok.com/t/ link (one hop, no body) to its @handle URL. */
-export async function resolveTikTokHandle(text: string): Promise<string> {
-  const direct = extractTikTokHandle(text);
+export async function resolveTikTokHandle(text: string, strict = true): Promise<string> {
+  const direct = extractTikTokHandle(text, strict);
   if (direct) return direct;
   const short = findShortLink(text);
   if (!short) return "";

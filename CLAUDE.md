@@ -165,3 +165,10 @@ pendant qu'un `next dev` tourne, il écrase `.next`.
   **du projet** : toujours passer `projectId`. Un même compte TikTok peut être
   lié dans deux projets (dédup par projet).
 - Archiver ne supprime rien ; le dernier projet ne s'archive pas.
+
+## Raccourci iOS (Partager → ScrollShow)
+`scripts/build-ios-shortcut.py` génère et signe (`shortcuts sign --mode anyone`,
+macOS) `public/ScrollShow.shortcut` : question d'import = clé API, puis
+`POST /api/v1/library { url }` (lien profil, vidéo, lien court ou @handle),
+notification avec `message`. Logique partagée avec `/api/accounts` dans
+`lib/library-add.ts` (testé). Tout changement d'endpoint = regénérer le fichier.

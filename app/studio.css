@@ -7717,6 +7717,7 @@ a.ss-btn-ghost {
 
 /* Étapes numérotées (Réglages > API > Raccourci iPhone). */
 .ss-steps {
+  list-style: decimal;
   margin: 0 0 12px;
   padding-left: 22px;
   display: grid;

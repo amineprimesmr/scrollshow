@@ -77,7 +77,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug?:
       // Raccourci iOS / partage TikTok : accepte une URL de profil, de video,
       // un lien court vm.tiktok.com ou un simple @handle.
       const raw = String(body.url || body.handle || body.text || "").slice(0, 2000);
-      const handle = await resolveTikTokHandle(raw);
+      const handle = await resolveTikTokHandle(raw, !body.handle);
       const english = String(request.headers.get("accept-language") || "").toLowerCase().startsWith("en");
       if (!handle) return agentResponse({ error: "invalid", message: english ? "No TikTok account found in what was shared." : "Aucun compte TikTok trouve dans ce qui a ete partage." }, 400);
       const result = await addLibraryAccount(user, handle, { verdict: body.verdict, niche: body.niche, notes: body.notes });
