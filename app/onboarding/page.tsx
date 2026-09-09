@@ -34,6 +34,13 @@ const SOURCES = [
 const SHOWN_KIND_IDS: BusinessKind[] = ["saas", "mobile_app", "ecommerce"];
 const SHOWN_KINDS = BUSINESS_KINDS.filter((kind) => SHOWN_KIND_IDS.includes(kind.id));
 
+/** Les trois modeles montres a l'onboarding portent leur vrai logo, pas un emoji. */
+const KIND_LOGO: Partial<Record<BusinessKind, string>> = {
+  saas: "/assets/platforms/website.svg",
+  ecommerce: "/assets/platforms/shopify.svg",
+  mobile_app: "/assets/platforms/app-store.svg",
+};
+
 const KIND_ICON: Record<BusinessKind, string> = {
   saas: "🧩",
   ecommerce: "🛒",
@@ -407,10 +414,14 @@ function OnboardingInner() {
                         type="button"
                         role="radio"
                         aria-checked={business.kind === kind.id}
-                        className={`ss-onb-chip ${business.kind === kind.id ? "is-on" : ""}`}
+                        className={`ss-onb-chip ss-onb-chip--logo ${business.kind === kind.id ? "is-on" : ""}`}
                         onClick={() => setBusiness({ ...business, kind: kind.id })}
                       >
-                        <span>{KIND_ICON[kind.id]}</span>
+                        {KIND_LOGO[kind.id] ? (
+                          <img src={KIND_LOGO[kind.id]} alt="" width="18" height="18" />
+                        ) : (
+                          <span>{KIND_ICON[kind.id]}</span>
+                        )}
                         {english ? kind.en : kind.fr}
                       </button>
                     ))}
