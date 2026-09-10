@@ -6783,7 +6783,7 @@ a.ss-btn-ghost {
 .ss-postview__head small {
   display: block;
   font-size: 11px;
-  color: #a1a1aa;
+  color: var(--ss-muted);
 }
 
 .ss-postview__head b {
@@ -6794,23 +6794,23 @@ a.ss-btn-ghost {
 
 .ss-postview__body {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 16px;
 }
 
 .ss-postview__player {
   position: relative;
-  min-height: 540px;
+  max-height: 70vh;
   border-radius: 16px;
   overflow: hidden;
-  background: #0d0d0f;
+  background: var(--ss-soft);
 }
 
 .ss-postview__player iframe,
 .ss-postview__player img {
   width: 100%;
   height: 100%;
-  min-height: 540px;
+  max-height: 70vh;
   border: 0;
   display: block;
   object-fit: contain;
@@ -6832,15 +6832,15 @@ a.ss-btn-ghost {
 .ss-postview__stats div {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgb(255 255 255 / 0.04);
-  border: 1px solid rgb(255 255 255 / 0.07);
+  background: var(--ss-card);
+  border: 1px solid var(--ss-line);
 }
 
 .ss-postview__stats dt {
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #71717a;
+  color: var(--ss-muted-2);
 }
 
 .ss-postview__stats dd {
@@ -6853,7 +6853,7 @@ a.ss-btn-ghost {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #d4d4d8;
+  color: var(--ss-ink);
   white-space: pre-wrap;
 }
 
@@ -6898,7 +6898,7 @@ a.ss-btn-ghost {
 .ss-acc__rank {
   font-size: 12px;
   font-weight: 800;
-  color: #71717a;
+  color: var(--ss-muted-2);
   text-align: center;
 }
 
@@ -6929,12 +6929,12 @@ a.ss-btn-ghost {
 
 .ss-acc__vtitle span {
   font-size: 11px;
-  color: #71717a;
+  color: var(--ss-muted-2);
 }
 
 .ss-acc__num {
   font-size: 12px;
-  color: #a1a1aa;
+  color: var(--ss-muted);
   white-space: nowrap;
 }
 
@@ -6955,8 +6955,8 @@ a.ss-btn-ghost {
   gap: 4px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.04);
-  border: 1px solid rgb(255 255 255 / 0.07);
+  background: var(--ss-card);
+  border: 1px solid var(--ss-line);
 }
 
 .ss-acc__format.is-best {
@@ -6969,7 +6969,7 @@ a.ss-btn-ghost {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #71717a;
+  color: var(--ss-muted-2);
 }
 
 .ss-acc__format b {
@@ -6979,7 +6979,7 @@ a.ss-btn-ghost {
 
 .ss-acc__format span {
   font-size: 12px;
-  color: #a1a1aa;
+  color: var(--ss-muted);
 }
 
 .ss-acc__hooks ul {
@@ -7001,7 +7001,7 @@ a.ss-btn-ghost {
 }
 
 .ss-acc__hooks li span {
-  color: #a1a1aa;
+  color: var(--ss-muted);
   white-space: nowrap;
 }
 
@@ -7108,7 +7108,7 @@ a.ss-btn-ghost {
 
 .ss-setup__head span {
   font-size: 12px;
-  color: #a1a1aa;
+  color: var(--ss-muted);
 }
 
 .ss-setup__close {
@@ -7191,13 +7191,13 @@ a.ss-btn-ghost {
 }
 
 .ss-setup__steps li.is-done a {
-  color: #a1a1aa;
+  color: var(--ss-muted);
   text-decoration: line-through;
 }
 
 .ss-setup__arrow {
   margin-left: auto;
-  color: #71717a;
+  color: var(--ss-muted-2);
 }
 
 @media (max-width: 900px) {
@@ -7359,13 +7359,6 @@ a.ss-btn-ghost {
     animation: none;
   }
 }
-.ss-research { display: grid; gap: 24px; padding: 0 24px 40px; }
-.ss-research__form { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 20px 0; }
-.ss-research__form label { display: grid; gap: 8px; flex: 1 1 220px; }
-.ss-research__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; }
-.ss-research__metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
-.ss-research__metrics dt { color: var(--ss-muted); font-size: 12px; }
-.ss-research__metrics dd { margin: 4px 0 0; font-size: 22px; font-weight: 700; }
 
 /* metal-fx hides its own content until the shader's first copy lands. When the
    shared WebGL context never paints (StrictMode remount, low-end GPU, a

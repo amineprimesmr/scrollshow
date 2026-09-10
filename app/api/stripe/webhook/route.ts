@@ -1,4 +1,5 @@
 import { applyLifetime, applySubscription } from "@/lib/billing";
+import { declareStripePurchase, purchaseToDeclare } from "@/lib/revenuecat";
 import { stripe } from "@/lib/stripe";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
@@ -20,9 +21,11 @@ export async function POST(request: Request) {
       if (id) subscription = await stripe().subscriptions.retrieve(id);
     }
     if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") subscription = await stripe().subscriptions.retrieve(event.data.object.id);
-    await updateStore(data => {
+    const declare = await updateStore(data => {
       data.billingEvents ||= [];
-      if (data.billingEvents.includes(event.id)) return;
+      // Un evenement deja traite ne redeclare rien : RevenueCat suit ensuite
+      // l'abonnement tout seul, le rejeu de Stripe n'a rien a lui reapprendre.
+      if (data.billingEvents.includes(event.id)) return null;
       if (checkout) applyLifetime(data, checkout);
       if (subscription) applySubscription(data, subscription, event.created);
       if (event.type === "charge.refunded") {
@@ -35,7 +38,16 @@ export async function POST(request: Request) {
         }
       }
       data.billingEvents.push(event.id);
+      // Le compte ScrollShow est resolu ici, pendant qu'on tient la base : c'est
+      // lui, et non le client Stripe, que RevenueCat doit voir comme client.
+      return purchaseToDeclare({
+        subscription, checkout,
+        userIdFor: customer => data.users.find(u => u.stripeCustomerId === customer)?.id,
+      });
     });
+    // Hors verrou, et sans pouvoir faire echouer le webhook : Stripe le
+    // rejouerait, ce qui refait le travail deja fait sans reparer RevenueCat.
+    await declareStripePurchase(declare);
     return NextResponse.json({ received: true });
   } catch { return NextResponse.json({ error: "webhook_processing_failed" }, { status: 500 }); }
 }

@@ -44,9 +44,9 @@
 .ss-text-search__bar { flex: 0 0 96px; height: 4px; border-radius: 999px; background: var(--ss-soft); overflow: hidden; }
 .ss-text-search__bar i { display: block; height: 100%; border-radius: inherit; background: var(--ss-purple); transition: width 0.4s ease; }
 .ss-text-search__action { border: 0; padding: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--ss-ink); text-decoration: underline; cursor: pointer; }
-.ss-posttile__match { width: 100%; padding: 10px; border-top: 1px solid var(--ss-border); color: var(--ss-ink); background: var(--ss-panel); font-size: 12px; cursor: pointer; }
+.ss-posttile__match { width: 100%; padding: 10px; border-top: 1px solid var(--ss-line); color: var(--ss-ink); background: var(--ss-soft); font-size: 12px; cursor: pointer; }
 .ss-posttile__match:focus-visible { outline: 2px solid var(--ss-ink); outline-offset: -3px; }
 @media (max-width: 600px) { .ss-text-search__field { flex-direction: column; } .ss-text-search__field .ss-acc__range { align-self: flex-start; } }
-.ss-postview__transcript { padding: 14px; border: 1px solid var(--ss-border); border-radius: 14px; }
+.ss-postview__transcript { padding: 14px; border: 1px solid var(--ss-line); border-radius: 14px; }
 .ss-postview__transcript p { margin: 8px 0 0; white-space: pre-wrap; font-size: 14px; }
 .ss-postview__transcript small { color: var(--ss-muted); }

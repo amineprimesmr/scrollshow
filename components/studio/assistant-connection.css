@@ -16,7 +16,7 @@
 .ss-agent-setup__technical { margin-top: 20px; }
 .ss-agent-setup__technical code { overflow-wrap: anywhere; }
 .ss-agent-connections { list-style: none; padding: 0; margin: 0; }
-.ss-agent-connections li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-top: 1px solid var(--ss-border); }
+.ss-agent-connections li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-top: 1px solid var(--ss-line); }
 .ss-agent-connections li > span { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .ss-agent-connections li > span > span { color: var(--ss-muted); font-size: 13px; }
 .ss-agent-connections button { flex-shrink: 0; }

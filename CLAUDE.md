@@ -169,7 +169,7 @@ Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes`
 `next.config.ts`, sinon le binaire manque en production.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (84 tests), puis build isolé
+`npm run typecheck`, `npm test` (111 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
@@ -217,3 +217,31 @@ macOS) `public/ScrollShow.shortcut` : question d'import = clé API, puis
 `POST /api/v1/library { url }` (lien profil, vidéo, lien court ou @handle),
 notification avec `message`. Logique partagée avec `/api/accounts` dans
 `lib/library-add.ts` (testé). Tout changement d'endpoint = regénérer le fichier.
+
+## RevenueCat (revenus ScrollShow)
+`lib/revenuecat.ts` + branchement dans `app/api/stripe/webhook/route.ts` +
+`scripts/revenuecat-backfill.ts` (testé dans `tests/revenuecat.test.ts`).
+ScrollShow encaisse avec son **propre** Stripe Checkout, donc hors des flux
+d'achat RevenueCat : un abonnement n'existe pour RevenueCat que s'il lui est
+déclaré une fois (`POST /v1/receipts`, `X-Platform: stripe`,
+`{ app_user_id, fetch_token }`). Ensuite RevenueCat le suit seul —
+renouvellements, résiliations, remboursements — sans appel par événement.
+- La clé est `REVENUECAT_STRIPE_PUBLIC_KEY`, la clé **publique** de l'app Stripe
+  du projet RevenueCat, pas une clé secrète v2. Elle reste côté serveur. Sans
+  elle l'intégration est inactive et la facturation Stripe marche normalement :
+  ne jamais faire dépendre un encaissement de RevenueCat.
+- `app_user_id` = l'identifiant du compte **ScrollShow**, jamais l'identifiant
+  client Stripe (qui change si le client est recréé, et donnerait deux clients
+  RevenueCat pour une personne). Sans compte identifiable on ne déclare rien :
+  un achat rattaché au mauvais compte lui donnerait des droits.
+- `fetch_token` = l'identifiant d'abonnement (`sub_…`) ou, pour l'offre à vie,
+  celui de la session de paiement (`cs_…`) — jamais celui d'une session
+  d'abonnement.
+- On re-déclare à **chaque** événement d'abonnement, pas seulement à la
+  création : re-déclarer rafraîchit sans dupliquer, et c'est le seul moyen de ne
+  pas attendre les deux heures que met une résiliation Stripe à remonter.
+- La déclaration se fait hors du verrou du store et ne peut pas faire échouer le
+  webhook : un 500 serait rejoué par Stripe et refera le travail déjà fait sans
+  réparer RevenueCat. La trace `revenuecat_declare_failed` est le rattrapage.
+- Les abonnés antérieurs au branchement ne remontent pas seuls :
+  `npm run revenuecat:backfill` (à blanc) puis `-- --apply`.
