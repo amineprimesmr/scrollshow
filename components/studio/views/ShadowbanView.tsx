@@ -27,24 +27,57 @@ export const LEVEL_COPY: Record<ShadowbanLevel, { fr: string; en: string }> = {
   insufficient: { fr: "Pas assez de posts", en: "Not enough posts" },
 };
 
-/** One line under the indicator: the evidence behind it, never a number out of 100. */
+/** How many views a post needs before it can be called "not distributed". */
+export function fmtFloor(n: number, en: boolean) {
+  return Math.round(n).toLocaleString(en ? "en-US" : "fr-FR");
+}
+
+/** The account's own swing, read as a multiple: "varies by x5.5 between posts". */
+export function fmtSwing(n: number, en: boolean) {
+  return `×${n.toFixed(1).replace(".", en ? "." : ",")}`;
+}
+
+/** One decimal, with the decimal separator of the reader's language. */
+export function fmtPct1(ratio: number, en: boolean) {
+  return `${(ratio * 100).toFixed(1).replace(".", en ? "." : ",")} %`;
+}
+
+export function fmtSigma(z: number, en: boolean) {
+  const value = Math.abs(z).toFixed(1).replace(".", en ? "." : ",");
+  return `${z < 0 ? "−" : "+"}${value} σ`;
+}
+
+/**
+ * One line under the indicator: the measured fact behind it. Never a
+ * percentage drop on its own — that was the whole bug: an account that swings
+ * by a factor of five between two posts was told it was banned every time a
+ * post landed low.
+ */
 export function reasonOf(account: ShadowbanAccount, en: boolean) {
   const r = account.report;
-  const drop = Math.round(r.dropPct * 100);
-  switch (account.level) {
-    case "likely":
-      if (r.rounds.zeroViewPosts >= 2) return t(`${r.rounds.zeroViewPosts} posts à 0 vue, jamais diffusés.`, `${r.rounds.zeroViewPosts} posts at 0 views, never seeded.`, en);
-      if (r.consecutiveLowCount >= 3) return t(`${r.consecutiveLowCount} posts d'affilée effondrés (−${drop} %).`, `${r.consecutiveLowCount} posts in a row collapsed (−${drop}%).`, en);
-      return t("Portée bridée : les gens qui voient les posts les aiment, TikTok ne diffuse pas.", "Throttled reach: viewers engage, TikTok won't distribute.", en);
-    case "mild":
-      if (r.consecutiveLowCount >= 2) return t(`${r.consecutiveLowCount} derniers posts sous la médiane (−${drop} %).`, `Last ${r.consecutiveLowCount} posts below average (−${drop}%).`, en);
-      if (r.rounds.trend.changePct != null && r.rounds.trend.changePct <= -0.6) return t(`Médiane en baisse de ${Math.round(-r.rounds.trend.changePct * 100)} % sur les 10 derniers.`, `Median down ${Math.round(-r.rounds.trend.changePct * 100)}% over the last 10.`, en);
-      return t(`${Math.round(r.rounds.r0Share * 100)} % des posts restent sous 200 vues.`, `${Math.round(r.rounds.r0Share * 100)}% of posts stay under 200 views.`, en);
-    case "insufficient":
-      return t(`${r.videoCount} post(s) exploitable(s), il en faut 5.`, `${r.videoCount} usable post(s), 5 needed.`, en);
-    default:
-      return t(`Portée stable sur les ${r.videoCount} derniers posts.`, `Reach steady over the last ${r.videoCount} posts.`, en);
+  const has = (id: string) => r.signals.find((s) => s.id === id);
+  if (account.level === "insufficient") return t(`${r.videoCount} post(s) exploitable(s), il en faut 5.`, `${r.videoCount} usable post(s), 5 needed.`, en);
+
+  const zero = has("never_seeded");
+  if (zero) return t(`${zero.value} posts à 0 vue, jamais diffusés.`, `${zero.value} posts at 0 views, never seeded.`, en);
+  const seed = has("stuck_in_seed");
+  if (seed) return t(`${seed.value} posts récents sous ${fmtFloor(r.reachFloor, en)} vues : jamais sortis du lot de test.`, `${seed.value} recent posts under ${fmtFloor(r.reachFloor, en)} views: never left the seed batch.`, en);
+  const starved = has("below_follower_reach");
+  if (starved) return t(`Portée à ${fmtPct1(starved.value, en)} des abonnés seulement.`, `Reach at just ${fmtPct1(starved.value, en)} of the follower base.`, en);
+  const collapse = has("reach_collapse");
+  if (collapse) return t(`Chute de ${fmtSigma(collapse.value, en)} sous la normale du compte, sous tout ce qu'il avait fait.`, `Down ${fmtSigma(collapse.value, en)} from this account's own normal, below anything it had done.`, en);
+  if (account.level === "mild") {
+    if (r.rounds.r0Share >= 0.4) return t(`${Math.round(r.rounds.r0Share * 100)} % des posts restent sous 200 vues.`, `${Math.round(r.rounds.r0Share * 100)}% of posts stay under 200 views.`, en);
+    return t(`Baisse de ${fmtSigma(r.zScore, en)}, à surveiller sans conclure.`, `Down ${fmtSigma(r.zScore, en)}, worth watching, not a conclusion.`, en);
   }
+  if (r.volatility === "erratic") {
+    return t(
+      `Portée normale pour ce compte : il varie de ${fmtSwing(r.swingFactor, en)} d'un post à l'autre.`,
+      `Normal reach for this account: it swings ${fmtSwing(r.swingFactor, en)} between posts.`,
+      en,
+    );
+  }
+  return t(`Portée stable sur les ${r.videoCount} derniers posts.`, `Reach steady over the last ${r.videoCount} posts.`, en);
 }
 
 export function compact(n: number, en: boolean) {
@@ -91,16 +124,19 @@ function Indicator({ level, pending }: { level: ShadowbanLevel | null; pending: 
   );
 }
 
+/** Log scale, like the model: otherwise one viral post flattens the other thirteen. */
 function Sparkline({ account }: { account: ShadowbanAccount }) {
   const points = useMemo(() => [...account.report.points].reverse().slice(-14), [account]);
-  const max = Math.max(1, ...points.map((p) => p.views));
+  const max = Math.max(10, ...points.map((p) => p.views));
+  const floor = Math.max(1, Math.min(account.report.reachFloor, ...points.map((p) => p.views || Infinity)) / 2);
+  const span = Math.log(max) - Math.log(floor) || 1;
   return (
     <div className="ss-sb-spark" aria-hidden>
       {points.map((p, i) => (
         <i
           key={p.id}
-          className={p.isLow ? "is-low" : ""}
-          style={{ height: `${Math.max(8, Math.sqrt(p.views / max) * 100)}%`, "--d": `${i * 28}ms` } as React.CSSProperties}
+          className={p.state === "suppressed" ? "is-low" : p.state === "unusual" ? "is-unusual" : ""}
+          style={{ height: `${Math.max(8, ((Math.log(Math.max(floor, p.views)) - Math.log(floor)) / span) * 100)}%`, "--d": `${i * 28}ms` } as React.CSSProperties}
         />
       ))}
     </div>
@@ -128,7 +164,6 @@ function AccountCard({
   const identity: { name: string; handle: string; avatar: string; followers: number } = card.status === "done" ? card.account : card;
   const level = done ? done.level : null;
   const median = done ? done.report.rounds.medianViews : 0;
-  const drop = done ? Math.round(done.report.dropPct * 100) : 0;
   const source = card.status === "done" ? card.account.source : card.source;
   const lookup = source === "lookup";
   const errorCopy =
@@ -199,12 +234,12 @@ function AccountCard({
                 <dd>{compact(median, en)}</dd>
               </div>
               <div>
-                <dt>{t("Chute", "Drop", en)}</dt>
-                <dd>{drop}%</dd>
+                <dt>{t("Variation normale", "Normal swing", en)}</dt>
+                <dd>{fmtSwing(done.report.swingFactor, en)}</dd>
               </div>
               <div>
-                <dt>{t("En chute", "Collapsed", en)}</dt>
-                <dd>{done.report.consecutiveLowCount}</dd>
+                <dt>{t("Écart à sa normale", "Gap to its normal", en)}</dt>
+                <dd>{fmtSigma(done.report.zScore, en)}</dd>
               </div>
             </dl>
           </>

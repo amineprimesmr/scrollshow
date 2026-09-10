@@ -787,10 +787,11 @@ export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
 }
 
 /**
- * Shadowban / throttling check on the connected TikTok account(s): a 0-100
- * probability per account, the distribution-round histogram behind it, the
- * spam/automation signals found, the throttled-vs-content split, and a fix
- * list. Reads the creator's own last <=30 posts through video.list.
+ * Shadowban / throttling check on the connected TikTok account(s): the verdict
+ * and the named evidence behind it, the distribution-round histogram, the
+ * account's own volatility, the spam/automation signals found, the
+ * throttled-vs-content split, and a fix list. Reads the creator's own last
+ * <=30 posts through video.list.
  */
 export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
   const channels = handle ? [] : await loadTikTokChannels(user.id, user.projectId);
@@ -801,7 +802,7 @@ export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
     : channels.map((channel) => ({
         handle: channel.handle,
         name: channel.name,
-        videos: async () => analyzeShadowban(await listRecentVideos(channel.accessToken as string, 30)),
+        videos: async () => analyzeShadowban(await listRecentVideos(channel.accessToken as string, 30), { followers: channel.followers }),
       }));
   for (const channel of targets) {
     try {
@@ -822,9 +823,16 @@ export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
         trend: r.trend,
         signals: r.signals,
         scoreBreakdown: r.scoreBreakdown,
-        recentAvgViews: report.recentAvgViews,
-        baselineAvgViews: report.baselineAvgViews,
+        evidence: report.signals,
+        recentMedianViews: report.recentMedianViews,
+        baselineMedianViews: report.baselineMedianViews,
         dropPct: report.dropPct,
+        zScore: report.zScore,
+        volatility: report.volatility,
+        swingFactor: report.swingFactor,
+        reachFloor: report.reachFloor,
+        reachRatio: report.reachRatio,
+        suppressedCount: report.suppressedCount,
         estimatedOnset: report.estimatedOnset,
         fixes: r.fixes.map((id) => FIX_TEXT[id]),
       });
@@ -835,7 +843,7 @@ export async function agentShadowbanCheck(user: SessionUser, handle?: string) {
   return {
     accounts,
     model:
-      "TikTok distributes in rounds (R0 <200 views: never left the seed batch; R1 200-500: seeded, no expansion; R2 500-2k; R3 2k-20k FYP traction; R4 >20k viral). Probability = R0 share (<=40) + median<300 (20) + zero-view posts (<=20) + burst posting (10) + duplicate captions (10). At a low median, engagement >=1% = throttled (change how you post), <1% = content fails the seed test (fix slide 1 / first 1.5s). This is an estimate; TikTok publishes no shadowban status.",
+      "TikTok distributes in rounds (R0 <200 views: never left the seed batch; R1 200-500: seeded, no expansion; R2 500-2k; R3 2k-20k FYP traction; R4 >20k viral). A shadowban verdict needs ABSOLUTE evidence, never a percentage drop: posts at 0 views (never seeded), most recent posts under the account's reach floor (200 views, or 2% of followers), or reach under 3% of the follower base. A drop is only evidence when it is large in the account's OWN standard deviations (zScore, log space): views are lognormal and an ordinary account swings by swingFactor between two posts, so -80% on an erratic account is noise while -80% on a steady one is a collapse. At a low median, engagement >=1% = throttled (change how you post), <1% = content fails the seed test (fix slide 1 / first 1.5s). This is an estimate; TikTok publishes no shadowban status.",
   };
 }
 

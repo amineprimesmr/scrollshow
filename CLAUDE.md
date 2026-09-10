@@ -149,6 +149,38 @@ Un compteur affiché doit avoir été **mesuré**, jamais reçu d'un appelant.
   (`authorAvatar` dans `research/normalize.ts`), pas du scrape de profil qui
   échoue souvent. Ne pas refaire dépendre l'affichage de ce scrape.
 
+## Shadowban — une baisse n'est jamais une preuve
+`lib/shadowban.ts` (verdict) + `lib/shadowban-rounds.ts` (histogramme R0–R4) +
+`lib/shadowban-check.ts` + `components/studio/views/Shadowban*.tsx`.
+Tests : `tests/shadowban.test.ts`, dont un fixture réel (@ladyycinnamon, 33 posts,
+de 1 040 à 1 360 142 vues) qui doit rester « Aucun risque ».
+- Les vues TikTok sont **log-normales** et un compte ordinaire varie d'un facteur
+  5 à 7 d'un post à l'autre. Comparer la médiane récente à la médiane globale en
+  pourcentage ne veut donc rien dire : l'ancien moteur criait « Shadowban » à
+  −70 %, et annonçait un bridage à une créatrice dont les 4 derniers posts
+  faisaient 1 400 vues après un post à 1,3 M.
+- Toute comparaison se fait **en log, à l'échelle du compte** : `zScore` =
+  (ln médiane récente − ln médiane de référence) / écart-type robuste (MAD × 1,4826)
+  mesuré sur la fenêtre de référence. Plancher `MIN_LOG_SPREAD` à 0,35 pour qu'un
+  compte anormalement régulier ne transforme pas ±40 % en z infini.
+- **Une baisse relative seule ne peut jamais donner « Shadowban »**. Il faut deux
+  signaux durs, dont au moins un absolu : posts à 0 vue (`never_seeded`), posts
+  récents sous le plancher de diffusion (`stuck_in_seed`), portée sous 3 % des
+  abonnés (`below_follower_reach`), effondrement de ≥ 2,5 σ **et** sous le
+  10ᵉ centile historique (`reach_collapse`). Un seul signal = « À surveiller ».
+- Plancher de diffusion = `max(200, min(1000, 2 % des abonnés))` : 200 vues est le
+  lot de test dont un post n'est jamais sorti, un fait absolu et non une comparaison.
+  Abonnés inconnus (0/`null`) = plancher à 200 et signaux « abonnés » désactivés,
+  jamais un ratio calculé sur zéro.
+- Les posts de moins de 48 h sont **exclus** du verdict (`freshCount`) : les vues
+  montent encore. Minimum 5 posts mûrs, référence d'au moins 5 posts.
+- Aucun panneau ne doit contredire le verdict : `ShadowbanRounds` reçoit `verdict`
+  et ne dit plus « Distribution saine / rien n'indique un bridage » sous un
+  verdict Shadowban. C'est cette contradiction qui a fait perdre confiance dans la page.
+- Les graphes (détail et sparkline) sont en **échelle log** : sur une échelle
+  linéaire un seul post viral écrase les trente autres. La bande grise est la zone
+  normale du compte (médiane ± 1 σ) — une barre dedans n'est pas un signal.
+
 ## Moteur de recherche
 `lib/research/` (modèle, jobs, provider, normalisation, statistiques, OCR, formats,
 schéma collecteur) + routes `app/api/research/{route,jobs,studies,collector}` et

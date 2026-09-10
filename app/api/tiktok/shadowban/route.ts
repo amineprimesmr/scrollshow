@@ -1,6 +1,6 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { checkConnectedAccount, checkLibraryAccount, checkPublicAccount, ShadowbanLookupError } from "@/lib/shadowban-check";
-import { readStore } from "@/lib/store";
+import { readStoreSlice } from "@/lib/store";
 import { loadTikTokChannels } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";
 import { inScope } from "@/lib/projects";
@@ -24,7 +24,9 @@ export async function GET(request: Request) {
   const [kind, id] = key.includes(":") ? key.split(":", 2) : ["", ""];
 
   const channels = kind === "ac" ? [] : (await loadTikTokChannels(user.id, user.projectId)).filter((c) => !id || c.id === id);
-  const store = await readStore();
+  // Cette page lance une requete par compte : lire le document entier a chaque
+  // fois ferait passer des centaines de Mo pour analyser 46 comptes.
+  const store = await readStoreSlice(["accounts"], { videos: true });
   const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (!id || a.id === id));
   if (key && !channels.length && !accounts.length) return NextResponse.json({ error: "missing" }, { status: 404 });
 

@@ -1,12 +1,12 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import type { VideoPoint } from "@/lib/shadowban";
+import type { ShadowbanReport, VideoPoint } from "@/lib/shadowban";
 import type { ShadowbanAccount } from "@/lib/shadowban-check";
 import { useEffect, useState } from "react";
 import { IconX } from "../icons";
 import { ShadowbanRounds } from "./ShadowbanRounds";
-import { compact, LEVEL_COPY } from "./ShadowbanView";
+import { compact, fmtPct1, fmtSigma, fmtSwing, LEVEL_COPY } from "./ShadowbanView";
 
 function pct(n: number) {
   return `${Math.round(n * 100)}%`;
@@ -27,20 +27,45 @@ function randomTag() {
   return `sstest${out}`;
 }
 
-function ViewsChart({ points, baseline, en }: { points: VideoPoint[]; baseline: number; en: boolean }) {
+/**
+ * Views per post, with the account's OWN normal band drawn behind them: the
+ * range one ordinary post of this account lands in (baseline median, one
+ * standard deviation each way, in log space). A post inside the band is not a
+ * signal, however far below the median it looks in percent.
+ */
+function ViewsChart({ points, report, en }: { points: VideoPoint[]; report: ShadowbanReport; en: boolean }) {
   const chrono = [...points].reverse();
-  const max = Math.max(1, ...chrono.map((p) => p.views), baseline);
-  const baselinePct = baseline > 0 ? Math.sqrt(baseline / max) * 100 : null;
+  const baseline = report.baselineMedianViews;
+  const max = Math.max(10, ...chrono.map((p) => p.views), baseline);
+  // Échelle logarithmique : un seul post à 1,4 M écrase tout le reste sur une
+  // échelle linéaire, et c'est en log que le modèle raisonne de toute façon.
+  const floor = Math.max(1, Math.min(report.reachFloor, ...chrono.map((p) => p.views || Infinity)) / 2);
+  const span = Math.log(max) - Math.log(floor) || 1;
+  const scale = (v: number) => Math.max(0, Math.min(100, ((Math.log(Math.max(floor, v)) - Math.log(floor)) / span) * 100));
+  const bandLow = baseline > 0 ? baseline / report.swingFactor : 0;
+  const bandHigh = baseline > 0 ? baseline * report.swingFactor : 0;
   return (
     <div className="ss-sb-chart">
       <div className="ss-sb-chart__bars" role="img" aria-label={t("Vues par vidéo dans le temps", "Views per video over time", en)}>
-        {baselinePct != null ? <span className="ss-sb-chart__baseline" style={{ bottom: `${baselinePct}%` }} /> : null}
+        {baseline > 0 ? (
+          <span className="ss-sb-chart__band" style={{ bottom: `${scale(bandLow)}%`, height: `${Math.max(1, scale(bandHigh) - scale(bandLow))}%` }} />
+        ) : null}
+        {baseline > 0 ? <span className="ss-sb-chart__baseline" style={{ bottom: `${scale(baseline)}%` }} /> : null}
+        {report.reachFloor > 0 ? <span className="ss-sb-chart__floor" style={{ bottom: `${scale(report.reachFloor)}%` }} /> : null}
         {chrono.map((p, i) => (
           <i
             key={p.id}
-            className={p.isLow ? "is-low" : p.bucket === "excluded" ? "is-out" : ""}
-            style={{ height: `${Math.max(2, Math.sqrt(p.views / max) * 100)}%`, "--d": `${i * 22}ms` } as React.CSSProperties}
-            title={`${fmtDate(p.createdAt, en)} — ${fmtNum(p.views, en)} ${t("vues", "views", en)}${p.isLow ? ` (${t("chute", "collapsed", en)})` : ""}`}
+            className={p.state === "suppressed" ? "is-low" : p.state === "unusual" ? "is-unusual" : p.state === "fresh" ? "is-out" : ""}
+            style={{ height: `${Math.max(2, scale(p.views))}%`, "--d": `${i * 22}ms` } as React.CSSProperties}
+            title={`${fmtDate(p.createdAt, en)} — ${fmtNum(p.views, en)} ${t("vues", "views", en)}${
+              p.state === "suppressed"
+                ? ` (${t("non diffusé", "not distributed", en)})`
+                : p.state === "unusual"
+                  ? ` (${t("inhabituel pour ce compte", "unusual for this account", en)})`
+                  : p.state === "fresh"
+                    ? ` (${t("trop récent", "too recent", en)})`
+                    : ""
+            }`}
           />
         ))}
       </div>
@@ -49,41 +74,80 @@ function ViewsChart({ points, baseline, en }: { points: VideoPoint[]; baseline: 
           <i style={{ background: "var(--ss-ink)" }} /> {t("Normal", "Normal", en)}
         </span>
         <span>
-          <i style={{ background: "var(--ss-err-fg)" }} /> {t("En chute (< 30 % de la médiane)", "Collapsed (< 30% of the median)", en)}
+          <i style={{ background: "var(--ss-warn-fg)" }} /> {t("Inhabituel pour ce compte", "Unusual for this account", en)}
         </span>
-        {baselinePct != null ? (
+        <span>
+          <i style={{ background: "var(--ss-err-fg)" }} /> {t(`Non diffusé (< ${fmtNum(report.reachFloor, en)} vues)`, `Not distributed (< ${fmtNum(report.reachFloor, en)} views)`, en)}
+        </span>
+        {baseline > 0 ? (
           <span>
-            <i className="ss-shadow-legend__line" /> {t("Médiane de référence", "Baseline median", en)}
+            <i className="ss-shadow-legend__band" /> {t("Zone normale du compte", "This account's normal range", en)}
           </span>
         ) : null}
+        <span>{t("Échelle logarithmique", "Logarithmic scale", en)}</span>
       </div>
     </div>
   );
 }
 
+/**
+ * Says what was measured, and — when nothing is wrong — why the drop the
+ * creator can see on their own profile is not evidence of anything.
+ */
 function verdictCopy(account: ShadowbanAccount, en: boolean) {
   const r = account.report;
+  const has = (id: string) => r.signals.find((s) => s.id === id);
   switch (account.level) {
-    case "likely":
+    case "likely": {
+      const zero = has("never_seeded");
+      if (zero) {
+        return t(
+          `${zero.value} posts sont à 0 vue : TikTok ne les a jamais montrés à personne. Ce n'est pas une question de contenu, le post n'a pas été diffusé du tout.`,
+          `${zero.value} posts sit at 0 views: TikTok never showed them to anyone. This isn't a content problem, the post was not distributed at all.`,
+          en,
+        );
+      }
+      const seed = has("stuck_in_seed");
+      const starved = has("below_follower_reach");
+      const collapse = has("reach_collapse");
+      const parts = [
+        seed ? t(`${seed.value} des ${r.videoCount >= 3 ? "derniers" : ""} posts restent sous ${fmtNum(r.reachFloor, en)} vues, le lot de test dont ils ne sont jamais sortis`, `${seed.value} recent posts stay under ${fmtNum(r.reachFloor, en)} views, the seed batch they never left`, en) : "",
+        starved ? t(`la portée ne fait que ${fmtPct1(starved.value, en)} des abonnés, moins que ce que le fil « Abonnements » suffit à donner`, `reach is only ${fmtPct1(starved.value, en)} of the follower base, less than the Following feed alone delivers`, en) : "",
+        collapse ? t(`la médiane récente est à ${fmtSigma(collapse.value, en)} de la normale du compte, sous tout ce qu'il avait produit`, `the recent median sits ${fmtSigma(collapse.value, en)} from this account's own normal, below anything it had produced`, en) : "",
+      ].filter(Boolean);
       return t(
-        `Les ${r.consecutiveLowCount} derniers posts ont chuté de ${pct(r.dropPct)} par rapport à la médiane du compte. C'est la signature typique d'une suppression de portée.`,
-        `The last ${r.consecutiveLowCount} posts dropped ${pct(r.dropPct)} below the account's median. That's the typical signature of a reach suppression.`,
+        `Deux mesures concordent : ${parts.join(" ; ")}. C'est la signature d'une suppression de portée, pas d'une mauvaise série.`,
+        `Two measurements agree: ${parts.join("; ")}. That's the signature of reach suppression, not of a bad run.`,
         en,
       );
+    }
     case "mild":
       return t(
-        `Baisse de ${pct(r.dropPct)} par rapport à la médiane, pas encore assez soutenue pour conclure. Un seul post faible n'est pas un signal : à surveiller sur les prochains jours.`,
-        `A ${pct(r.dropPct)} dip versus the median, not yet sustained enough to conclude. One weak post alone isn't a signal: watch the next few days.`,
+        `Un seul signal, pas deux : ${fmtSigma(r.zScore, en)} sous la normale du compte, qui varie déjà de ${fmtSwing(r.swingFactor, en)} d'un post à l'autre. Pas de quoi conclure — à recomparer dans quelques jours.`,
+        `One signal, not two: ${fmtSigma(r.zScore, en)} below this account's normal, and it already swings ${fmtSwing(r.swingFactor, en)} between posts. Not enough to conclude — compare again in a few days.`,
         en,
       );
     case "insufficient":
       return t(
-        "Il faut au moins 5 posts récents pour comparer la portée actuelle à la médiane du compte.",
-        "At least 5 recent posts are needed to compare current reach to the account's median.",
+        `Il faut au moins 5 posts de plus de 48 h pour mesurer quoi que ce soit${r.freshCount ? ` (${r.freshCount} post(s) encore trop récent(s), les vues montent encore)` : ""}.`,
+        `At least 5 posts older than 48h are needed to measure anything${r.freshCount ? ` (${r.freshCount} post(s) still too recent, views are still climbing)` : ""}.`,
         en,
       );
-    default:
-      return t("La portée récente est cohérente avec la médiane du compte. Rien d'anormal détecté.", "Recent reach is consistent with the account's median. Nothing abnormal detected.", en);
+    default: {
+      const drop = Math.round(r.dropPct * 100);
+      if (r.dropPct >= 0.4) {
+        return t(
+          `La portée récente est ${drop} % sous la médiane, et c'est normal : ce compte varie de ${fmtSwing(r.swingFactor, en)} d'un post à l'autre, donc cette baisse ne fait que ${fmtSigma(r.zScore, en)}. Aucun post n'est resté sous le plancher de diffusion (${fmtNum(r.reachFloor, en)} vues). Un pourcentage de baisse ne prouve rien : un shadowban se voit à des posts qui ne sortent pas du lot de test, pas à des posts qui ne percent pas.`,
+          `Recent reach is ${drop}% below the median, and that's normal: this account swings ${fmtSwing(r.swingFactor, en)} between posts, so the dip is only ${fmtSigma(r.zScore, en)}. No post stayed under the distribution floor (${fmtNum(r.reachFloor, en)} views). A drop percentage proves nothing: a shadowban shows up as posts that never leave the seed batch, not as posts that don't take off.`,
+          en,
+        );
+      }
+      return t(
+        `Portée récente ${fmtNum(r.recentMedianViews, en)} vues, dans la zone normale du compte. Rien n'indique une suppression de portée.`,
+        `Recent reach ${fmtNum(r.recentMedianViews, en)} median views, inside this account's normal range. Nothing points to reach suppression.`,
+        en,
+      );
+    }
   }
 }
 
@@ -126,7 +190,7 @@ export function ShadowbanDetail({ account, en, onClose }: { account: ShadowbanAc
         ) : null}
       </p>
 
-      <ShadowbanRounds rounds={r.rounds} en={en} />
+      <ShadowbanRounds rounds={r.rounds} en={en} swingFactor={r.swingFactor} volatility={r.volatility} verdict={r.verdict} />
 
       {level !== "insufficient" ? (
         <div className="ss-chart-card">
@@ -135,8 +199,8 @@ export function ShadowbanDetail({ account, en, onClose }: { account: ShadowbanAc
               <h2>{t("Vues par vidéo", "Views per video", en)}</h2>
               <p>
                 {t(
-                  `${r.videoCount} dernières vidéos · fenêtre ${r.windowMode === "date" ? "7 vs 28 jours" : "récentes vs plus anciennes"} · médiane récente ${fmtNum(r.recentAvgViews, en)} contre ${fmtNum(r.baselineAvgViews, en)} de référence`,
-                  `Last ${r.videoCount} videos · ${r.windowMode === "date" ? "7-day vs 28-day" : "recent vs older"} window · recent median ${fmtNum(r.recentAvgViews, en)} vs ${fmtNum(r.baselineAvgViews, en)} baseline`,
+                  `${r.videoCount} posts mûrs · fenêtre ${r.windowMode === "date" ? "7 vs 28 jours" : "récents vs plus anciens"} · médiane récente ${fmtNum(r.recentMedianViews, en)} contre ${fmtNum(r.baselineMedianViews, en)} de référence · variation naturelle ${fmtSwing(r.swingFactor, en)}`,
+                  `${r.videoCount} mature posts · ${r.windowMode === "date" ? "7-day vs 28-day" : "recent vs older"} window · recent median ${fmtNum(r.recentMedianViews, en)} vs ${fmtNum(r.baselineMedianViews, en)} baseline · natural swing ${fmtSwing(r.swingFactor, en)}`,
                   en,
                 )}
               </p>
@@ -145,7 +209,7 @@ export function ShadowbanDetail({ account, en, onClose }: { account: ShadowbanAc
               {showTable ? t("Masquer le détail", "Hide details", en) : t("Détail par vidéo", "Per-video details", en)}
             </button>
           </div>
-          <ViewsChart points={r.points} baseline={r.baselineAvgViews} en={en} />
+          <ViewsChart points={r.points} report={r} en={en} />
           {showTable ? (
             <div className="ss-shadow-table ss-flash-in">
               <table>
@@ -163,7 +227,17 @@ export function ShadowbanDetail({ account, en, onClose }: { account: ShadowbanAc
                       <td>{fmtDate(p.createdAt, en)}</td>
                       <td>{fmtNum(p.views, en)}</td>
                       <td>{pct(p.engagementRate)}</td>
-                      <td>{p.isLow ? t("En chute", "Collapsed", en) : p.bucket === "excluded" ? t("Hors fenêtre", "Out of window", en) : t("Normal", "Normal", en)}</td>
+                      <td>
+                        {p.state === "suppressed"
+                          ? t("Non diffusé", "Not distributed", en)
+                          : p.state === "unusual"
+                            ? t("Inhabituel", "Unusual", en)
+                            : p.state === "fresh"
+                              ? t("Trop récent", "Too recent", en)
+                              : p.bucket === "excluded"
+                                ? t("Hors fenêtre", "Out of window", en)
+                                : t("Normal", "Normal", en)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

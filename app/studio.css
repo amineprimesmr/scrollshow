@@ -4428,6 +4428,10 @@ a.ss-btn-ghost {
   animation-delay: var(--d, 0ms);
 }
 
+.ss-sb-spark i.is-unusual {
+  background: var(--ss-warn-fg);
+}
+
 .ss-sb-spark i.is-low {
   background: var(--ss-err-fg);
 }
@@ -4700,6 +4704,41 @@ a.ss-btn-ghost {
   right: 0;
   border-top: 1.5px dashed var(--ss-muted-2);
   pointer-events: none;
+}
+
+.ss-sb-chart__bars i.is-unusual {
+  background: var(--ss-warn-fg);
+}
+
+/* La zone normale du compte : une barre dedans n'est pas un signal, quelle que
+   soit sa hauteur par rapport a la mediane. */
+.ss-sb-chart__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--ss-muted-2) 16%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ss-muted-2) 34%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ss-muted-2) 34%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Le plancher de diffusion : sous ce trait, le post n'a jamais ete montre. */
+.ss-sb-chart__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dotted var(--ss-err-fg);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.ss-shadow-legend__band {
+  width: 14px !important;
+  height: 8px !important;
+  background: color-mix(in srgb, var(--ss-muted-2) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-muted-2) 34%, transparent);
+  border-radius: 2px !important;
 }
 
 .ss-sb-detail .ss-chart-card__head {

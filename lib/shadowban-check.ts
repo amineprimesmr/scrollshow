@@ -28,25 +28,14 @@ export class ShadowbanLookupError extends Error {
 }
 
 /**
- * Three indicators, no score. A single soft post never trips anything: the
- * "shadowban" level needs a sustained collapse (three mature posts in a row
- * at <30% of the baseline) or a histogram stuck in the seed round with an
- * audience that still engages, which is the throttling signature.
+ * The level is decided by `analyzeShadowban`, which requires absolute evidence
+ * (posts never seeded, posts stuck in the seed batch, reach under what the
+ * follower base alone delivers) before it says shadowban. This only maps its
+ * verdict onto the level the UI shows.
  */
 export function levelOf(report: ShadowbanReport): ShadowbanLevel {
-  if (report.videoCount < 5 || report.windowMode === "none") return "insufficient";
-  const r = report.rounds;
-  const streak = report.consecutiveLowCount;
-  const collapsed = streak >= 3 && report.dropPct >= 0.7;
-  const throttled = r.diagnosis === "throttled" && r.r0Share >= 0.5;
-  const neverSeeded = r.zeroViewPosts >= 2;
-  if (collapsed || throttled || neverSeeded) return "likely";
-
-  const dipping = streak >= 2 && report.dropPct >= 0.5;
-  const weakHistogram = r.diagnosis !== "healthy" && r.r0Share >= 0.3;
-  const sinking = r.trend.changePct != null && r.trend.changePct <= -0.6 && r.trend.last10Median < 500;
-  if (dipping || weakHistogram || sinking || r.probability >= 40) return "mild";
-  return "none";
+  if (report.verdict === "insufficient_data") return "insufficient";
+  return report.verdict;
 }
 
 function toTikTokVideo(v: AccountVideo): TikTokVideo {
@@ -66,7 +55,7 @@ function toTikTokVideo(v: AccountVideo): TikTokVideo {
 /** Analyzes one connected TikTok account through its own video.list. */
 export async function checkConnectedAccount(channel: Channel): Promise<ShadowbanAccount> {
   const videos = await listRecentVideos(channel.accessToken as string, 30);
-  const report = analyzeShadowban(videos);
+  const report = analyzeShadowban(videos, { followers: channel.followers });
   return {
     key: `ch:${channel.id}`,
     source: "connected",
@@ -115,7 +104,7 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
     }
   }
   if (!videos.length) throw new ShadowbanLookupError("private_or_empty");
-  const report = analyzeShadowban(videos.slice(0, 30).map(toTikTokVideo));
+  const report = analyzeShadowban(videos.slice(0, 30).map(toTikTokVideo), { followers: account.followers });
   return {
     key: `ac:${account.id}`,
     source: "library",
@@ -153,7 +142,7 @@ export async function checkPublicAccount(raw: string): Promise<ShadowbanAccount>
   if (!videos.length && !profile) throw new ShadowbanLookupError("not_found");
   if (!videos.length) throw new ShadowbanLookupError("private_or_empty");
 
-  const report = analyzeShadowban(videos.slice(0, 30).map(toTikTokVideo));
+  const report = analyzeShadowban(videos.slice(0, 30).map(toTikTokVideo), { followers: profile?.followers });
   return {
     key: `lookup:${handle}`,
     source: "lookup",

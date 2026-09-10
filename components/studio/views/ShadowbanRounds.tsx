@@ -1,6 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
+import type { ShadowbanVerdict } from "@/lib/shadowban";
 import { FIX_TEXT, ROUNDS, type FixId, type Round, type RoundsReport, type Signal, type SignalId } from "@/lib/shadowban-rounds";
 
 const ROUND_COPY: Record<Round, { range: string; fr: string; en: string }> = {
@@ -54,13 +55,20 @@ function fmt(n: number, en: boolean) {
   return Math.round(n).toLocaleString(en ? "en-US" : "fr-FR");
 }
 
-function diagColor(d: RoundsReport["diagnosis"]) {
+function diagColor(d: RoundsReport["diagnosis"], suppressed: boolean) {
   if (d === "throttled" || d === "content_fails_seed") return { bg: "var(--ss-err-bg)", fg: "var(--ss-err-fg)" };
-  if (d === "mixed" || d === "insufficient_data") return { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)" };
+  if (d === "mixed" || d === "insufficient_data" || suppressed) return { bg: "var(--ss-warn-bg)", fg: "var(--ss-warn-fg)" };
   return { bg: "var(--ss-ok-bg)", fg: "var(--ss-ok-fg)" };
 }
 
-function diagnosisCopy(r: RoundsReport, en: boolean) {
+/**
+ * This panel only reads the round histogram — an absolute measure. It must
+ * never announce "nothing points to throttling" under a verdict that found
+ * suppression somewhere else (reach against the follower base, collapse
+ * against the account's own normal): that contradiction is what made the whole
+ * page untrustworthy.
+ */
+function diagnosisCopy(r: RoundsReport, en: boolean, suppressed: boolean) {
   switch (r.diagnosis) {
     case "throttled":
       return {
@@ -95,6 +103,16 @@ function diagnosisCopy(r: RoundsReport, en: boolean) {
         body: t("Il faut au moins 5 posts pour que l'histogramme ait un sens.", "At least 5 posts are needed for the histogram to mean anything.", en),
       };
     default:
+      if (suppressed) {
+        return {
+          title: t("Distribution normale dans l'absolu", "Normal distribution in absolute terms", en),
+          body: t(
+            `Médiane ${fmt(r.medianViews, en)} vues, ${pct(r.r0Share)} des posts sous 200 vues : les posts sortent bien du lot de test. Ce n'est donc pas là que ça bloque — la suppression mesurée porte sur la portée du compte, pas sur le seeding (voir le verdict ci-dessus).`,
+            `Median ${fmt(r.medianViews, en)} views, ${pct(r.r0Share)} of posts under 200 views: posts do leave the seed batch. That is not where it breaks — the suppression measured is about the account's reach, not its seeding (see the verdict above).`,
+            en,
+          ),
+        };
+      }
       return {
         title: t("Distribution saine", "Healthy distribution", en),
         body: t(
@@ -106,9 +124,24 @@ function diagnosisCopy(r: RoundsReport, en: boolean) {
   }
 }
 
-export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: boolean }) {
-  const color = diagColor(rounds.diagnosis);
-  const diag = diagnosisCopy(rounds, en);
+export function ShadowbanRounds({
+  rounds,
+  en,
+  swingFactor,
+  volatility,
+  verdict,
+}: {
+  rounds: RoundsReport;
+  en: boolean;
+  /** Natural swing of this account, so a big % change is not read as a diagnosis. */
+  swingFactor?: number;
+  volatility?: "steady" | "normal" | "erratic";
+  /** Overall verdict, so this panel never contradicts it. */
+  verdict?: ShadowbanVerdict;
+}) {
+  const suppressed = verdict === "likely" || verdict === "mild";
+  const color = diagColor(rounds.diagnosis, suppressed);
+  const diag = diagnosisCopy(rounds, en, suppressed);
   const maxCount = Math.max(1, ...Object.values(rounds.histogram));
   const trend = rounds.trend.changePct;
 
@@ -124,6 +157,16 @@ export function ShadowbanRounds({ rounds, en }: { rounds: RoundsReport; en: bool
               {t("10 derniers vs 10 précédents :", "Last 10 vs previous 10:", en)}{" "}
               <b>{trend >= 0 ? "+" : ""}{Math.round(trend * 100)}%</b>{" "}
               ({fmt(rounds.trend.last10Median, en)} {t("vs", "vs", en)} {fmt(rounds.trend.previous10Median, en)} {t("vues médianes", "median views", en)})
+              {volatility === "erratic" && swingFactor ? (
+                <>
+                  {" — "}
+                  {t(
+                    `dans la variation naturelle du compte (×${swingFactor.toFixed(1).replace(".", ",")} d'un post à l'autre)`,
+                    `within this account's natural swing (×${swingFactor.toFixed(1)} between posts)`,
+                    en,
+                  )}
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
