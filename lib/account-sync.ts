@@ -2,7 +2,7 @@ import { fetchAccountVideoPage, metricsEnabled } from "./metrics";
 import { fetchTikTokProfile } from "./tiktok-profile";
 import { loadTikTokChannel } from "./tiktok-account";
 import { fetchUserInfo, profileFieldsForScopes, listVideoPage, type TikTokVideo } from "./tiktok";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStore } from "./store";
 import type { AccountVideo, StoreData, VideoSync } from "./types";
 
 export function officialAccountVideo(v: TikTokVideo, handle: string): AccountVideo {
@@ -35,7 +35,9 @@ export async function syncAccountPosts(userId: string, key: string, restart = fa
 }
 
 async function syncPage(userId: string, key: string, restart: boolean) {
-  const target = targetIn(await readStore(), userId, key);
+  // Le cache de videos est garde (la synchronisation s'appuie dessus), mais ni
+  // les recherches ni le texte des slides ne sont transferes.
+  const target = targetIn(await readStoreSlice(["accounts", "channels"], { videos: true }), userId, key);
   if (!target) throw new Error("missing");
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;

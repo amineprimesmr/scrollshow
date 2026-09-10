@@ -202,12 +202,17 @@ route touchant la base en 500).
   absentes. Toute écriture passe par `updateStore`, qui lit tout.
 - Lire une collection non demandée **lève** (`store_slice_missing_*`) : une
   liste vide silencieuse donnerait un calendrier vide sans erreur visible.
-- Reste à traiter : `consumeLimit` (`lib/rate-limit.ts`) fait un `updateStore`
-  complet — lecture **et** écriture de tout le document — à chaque tentative de
-  connexion. C'est le prochain gros poste.
+- `consumeLimit` (`lib/rate-limit.ts`) fait son incrément **dans Postgres** et ne
+  rapatrie qu'un entier. Il était le pire poste : `updateStore` complet (lecture
+  *et* écriture, ≈16 Mo) à chaque appel, sur des routes très sollicitées —
+  `/api/studio/tiktok/cover`, plafonnée à 600 appels / 10 min, faisait passer des
+  centaines de Mo pour incrémenter un nombre. Le chemin SQL retombe sur
+  `updateStore` en cas d'échec : un compteur cassé ne doit pas fermer le site.
+- Déjà passés en tranches : `/api/studio`, `/api/auth/login`, `lib/insights.ts`,
+  `lib/account-sync.ts`. Toute nouvelle route sollicitée doit faire pareil.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (115 tests), puis build isolé
+`npm run typecheck`, `npm test` (120 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 

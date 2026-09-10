@@ -1,5 +1,5 @@
 import { metricsEnabled } from "./metrics";
-import { readStore } from "./store";
+import { readStoreSlice } from "./store";
 import { withPublicationText } from "./publication-text";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
 import { inScope } from "./projects";
@@ -198,7 +198,9 @@ function sortVideos(videos: AccountVideo[]) {
 export async function accountInsights(user: SessionUser, key: string, days: number | null): Promise<AccountInsights | null> {
   const parsed = parseKey(key);
   if (!parsed) return null;
-  const store = await readStore();
+  // Les insights ont besoin du cache de videos, mais pas des recherches :
+  // c'est 3 Mo de moins transferes a chaque ouverture d'un compte.
+  const store = await readStoreSlice(["accounts", "channels", "posts", "publicationText"], { videos: true });
   const channels = store.channels.filter((c) => inScope(c, user));
   const accounts = store.accounts.filter((a) => inScope(a, user));
   const networkFollowers =
