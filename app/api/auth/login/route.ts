@@ -1,5 +1,5 @@
 import { setSessionCookie, verifyPassword } from "@/lib/auth";
-import { findUserByEmail, publicUser, readStore } from "@/lib/store";
+import { findUserByEmail, publicUser, readStoreSlice } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { consumeLimit } from "@/lib/rate-limit";
@@ -15,8 +15,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  if (!(await consumeLimit(`login:${parsed.data.email.toLowerCase()}`, 10, 900000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
-  const data = await readStore();
+  // Une base indisponible n'est pas un mauvais mot de passe : sans cette
+  // distinction, une panne se lit « identifiants incorrects » et l'utilisateur
+  // change un mot de passe qui n'a jamais ete en cause.
+  let data;
+  try {
+    if (!(await consumeLimit(`login:${parsed.data.email.toLowerCase()}`, 10, 900000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
+    data = await readStoreSlice([]);
+  } catch (error) {
+    console.error("auth_store_unavailable", { route: "login", message: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
+  }
   const user = findUserByEmail(data, parsed.data.email);
   if (!user) {
     return NextResponse.json({ error: "credentials" }, { status: 401 });

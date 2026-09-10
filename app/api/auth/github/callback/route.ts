@@ -30,11 +30,19 @@ export async function GET(request: Request) {
     );
 
   if (err) return fail(err === "access_denied" ? "github_denied" : "github");
-  if (!code || !stored.state || stored.state !== state) return fail("github");
+  // Voir le callback Google : un etat perime se dit, il ne se rejoue pas.
+  if (!code || !stored.state || stored.state !== state) return fail("github_state");
 
+  let profile: Awaited<ReturnType<typeof fetchGithubProfile>>;
   try {
     const tokens = await exchangeGithubCode(origin, code);
-    const profile = await fetchGithubProfile(tokens.access_token);
+    profile = await fetchGithubProfile(tokens.access_token);
+  } catch (error) {
+    console.error("github_oauth_failed", { message: error instanceof Error ? error.message : String(error) });
+    return fail("github");
+  }
+
+  try {
     const user = await updateStore((data) => {
       const existing =
         data.users.find((item) => item.githubId === profile.githubId) ||
@@ -66,7 +74,8 @@ export async function GET(request: Request) {
 
     await setSessionCookie(publicUser(user));
     return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));
-  } catch {
-    return fail("github");
+  } catch (error) {
+    console.error("auth_store_unavailable", { provider: "github", message: error instanceof Error ? error.message : String(error) });
+    return fail("unavailable");
   }
 }

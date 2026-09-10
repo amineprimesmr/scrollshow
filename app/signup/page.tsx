@@ -14,10 +14,15 @@ import "../liquid-glass.css";
 const OAUTH_ERRORS: Record<string, string> = {
   google_not_configured: "La connexion Google est momentanément indisponible.",
   google_denied: "La connexion Google a été annulée.",
-  google: "Connexion Google interrompue. Réessaie.",
+  google: "Google n’a pas confirmé ton identité. Réessaie.",
+  google_state: "Ta demande de connexion a expiré. Reclique sur Google.",
   github_not_configured: "La connexion GitHub est momentanément indisponible.",
   github_denied: "La connexion GitHub a été annulée.",
   github: "Connexion GitHub interrompue. Vérifie qu’une adresse email vérifiée est associée à ton compte GitHub.",
+  github_state: "Ta demande de connexion a expiré. Reclique sur GitHub.",
+  // Panne de notre cote : ne jamais la maquiller en probleme de compte, sinon
+  // l'utilisateur cherche une erreur qu'il n'a pas commise.
+  unavailable: "Le service est momentanément indisponible. Ton compte n’est pas en cause, réessaie dans quelques minutes.",
 };
 
 function GithubMark() {
@@ -120,6 +125,10 @@ function SignupForm() {
               ? "Ce compte utilise GitHub. Continue avec GitHub."
               : "Adresse email ou mot de passe incorrect.",
         );
+        return;
+      }
+      if (res.status === 503) {
+        setError(OAUTH_ERRORS.unavailable);
         return;
       }
       if (!res.ok) {
