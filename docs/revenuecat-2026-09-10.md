@@ -1,4 +1,4 @@
-# ScrollShow dans RevenueCat — état au 10 septembre 2026
+# ScrollShow : compte Stripe dédié + RevenueCat — 10 septembre 2026
 
 ## Décision
 
@@ -6,79 +6,121 @@ ScrollShow facture depuis **son propre compte Stripe**, `Scrollshow`
 (`acct_1UE4ENQSj8XJlvHm`), un compte de l'organisation Stripe `Process`. Le
 compte `Process` (`acct_1U6V0h3yrYjpyuOy`) garde les autres business.
 
-RevenueCat sépare les produits par **projet** ; le projet `ScrollShow`
-(`0d6bdeb6`) ne lit que le compte Stripe `Scrollshow`.
+RevenueCat sépare par **projet** : le projet `ScrollShow` ne lit que le compte
+Stripe `Scrollshow`.
 
 ## Fait
 
+### Stripe — compte `Scrollshow`, mode live
+
+| Produit | Prix | Cadence | `lookup_key` |
+|---|---|---|---|
+| `prod_VEXZ1UbWxc0aZq` ScrollShow Monthly | `price_1UE4U6QSj8XJlvHmkXB3Hs5U` | 29 € / mois | `scrollshow_monthly_eur_29_v1` |
+| `prod_VEXaNe6pX1ArPD` ScrollShow Lifetime | `price_1UE4VKQSj8XJlvHmm3KvQaBW` | 99 € ponctuel | `scrollshow_lifetime_eur_99_v1` |
+| `prod_VEXbcU7sAxBCD7` ScrollShow Yearly | `price_1UE4WJQSj8XJlvHmO34ZBTuT` | 199 € / an | `scrollshow_yearly_eur_199_v1` |
+
+Les `lookup_key` reprennent celles de `scripts/provision-billing.mjs` : ce script
+reste donc idempotent sur ce compte et ne recréera pas de doublons.
+
+Webhook `we_1UE4lhQSj8XJlvHm3c5qRFKR` — « ScrollShow production », actif, vers
+`https://scrollshow.io/api/stripe/webhook`, à l'écoute des cinq événements que
+`app/api/stripe/webhook/route.ts` traite réellement :
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+`customer.subscription.updated`, `customer.subscription.deleted`,
+`charge.refunded`.
+
+### RevenueCat — projet `ScrollShow` (`0d6bdeb6`)
+
 | Élément | Valeur |
 |---|---|
-| Projet RevenueCat | `ScrollShow` — `0d6bdeb6` (Business / Web) |
-| Comptes Stripe liés à RevenueCat | `Process` et `Scrollshow`, tous deux en Live |
-| Config Stripe du projet | `ScrollShow (Stripe)` — `app68f82b22c2` → **`acct_1UE4ENQSj8XJlvHm`** |
-| Managed Payments | décoché (le checkout le désactive déjà : c'est une décision fiscale, et 3,5 % de frais) |
-| Code de déclaration | `lib/revenuecat.ts`, branché dans le webhook Stripe, 12 tests |
+| Comptes Stripe liés au compte RevenueCat | `Process` et `Scrollshow`, en Live |
+| Config Stripe du projet | `ScrollShow (Stripe)` — `app68f82b22c2` → `acct_1UE4ENQSj8XJlvHm` |
+| Managed Payments | décoché (décision fiscale, et 3,5 % de frais) |
+| Produits importés | les 3, publiés |
+| Entitlement | `studio` — `entl5036800587`, les 3 produits attachés |
+| Offering | `default` « ScrollShow » — `ofrng70ee3142ce` |
+| Packages | `$rc_monthly`, `$rc_annual`, `$rc_lifetime` |
 
-## Reste à faire, dans l'ordre
+### Code
 
-Chaque étape 1 à 4 manipule une clé : elles se font à la main, pas par l'agent.
+`lib/revenuecat.ts` (déclaration des achats), branchement dans le webhook
+Stripe, `scripts/revenuecat-backfill.ts`, `tests/revenuecat.test.ts` (12 tests).
+Inactif sans `REVENUECAT_STRIPE_PUBLIC_KEY` : la facturation Stripe ne dépend
+jamais de RevenueCat.
 
-1. **Créer les produits dans le compte `Scrollshow`.** Son catalogue live est
-   vide. Le script du repo le fait, idempotent, à blanc par défaut :
+## Reste à faire : les quatre secrets
 
-   ```
-   read -rs STRIPE_SECRET_KEY && export STRIPE_SECRET_KEY
-   node scripts/provision-billing.mjs            # à blanc
-   node scripts/provision-billing.mjs --apply    # crée et affiche les price ids
-   ```
+Les identifiants de prix et la clé secrète doivent changer **ensemble**. Un prix
+du nouveau compte avec la clé de l'ancien fait échouer `prices.retrieve` et le
+checkout répond `billing_price_mismatch` à tous les acheteurs. D'où un script
+qui vérifie tout avant d'écrire, puis écrit tout d'un coup :
 
-   `read -rs` évite de laisser la clé dans l'historique du shell.
+```
+bash scripts/switch-stripe-account.sh
+```
 
-2. **Créer le webhook Stripe du nouveau compte** vers
-   `https://scrollshow.io/api/stripe/webhook`, événements
-   `checkout.session.completed`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, `charge.refunded`. Récupérer son secret.
+Il demande au clavier (rien dans l'historique du shell) :
 
-3. **Basculer les variables** (production, preview, development) :
-   `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`,
-   `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_LIFETIME`,
-   `STRIPE_PRICE_YEARLY` (ids sortis de l'étape 1).
+1. la clé secrète Stripe du compte `Scrollshow` (`sk_live_…`) ;
+2. le secret de signature du webhook ci-dessus (`whsec_…`, bouton œil sur la
+   page du webhook) ;
+3. la clé publiable Stripe (`pk_live_…`) ;
+4. la clé **publique** de l'app Stripe RevenueCat (`strp_…`) : projet ScrollShow
+   → Web → `ScrollShow (Stripe)` → *Public API Key*. Ce n'est pas une clé
+   secrète v2. La *Sandbox API Key* de la même page sert au mode test.
 
-4. **Poser `REVENUECAT_STRIPE_PUBLIC_KEY`** : projet ScrollShow → Web →
-   `ScrollShow (Stripe)` → *Public API Key*. Clé **publique** (`strp_…`), pas une
-   clé secrète v2. La *Sandbox API Key* de la même page sert au mode test.
+Il vérifie que la clé appartient bien à `acct_1UE4ENQSj8XJlvHm`, que les trois
+prix existent, sont actifs, en EUR, au bon montant et à la bonne cadence (les
+mêmes contrôles que le checkout), écrit les sept variables sur Vercel
+(production, preview, development) et met `.env.local` à jour.
 
-5. Puis, côté RevenueCat (faisable par l'agent) : importer les produits, créer
-   l'*Offering*, créer l'*Entitlement*, et `npm run revenuecat:backfill`.
+Ensuite, dans cet ordre :
 
-## Le point qui coûte de l'argent si on l'oublie
+```
+npx vercel --prod
+```
 
-Un abonné live reste sur le compte `Process` : `devqwiet@gmail.com`
-(Evan Narozny), **résiliation déjà prévue le 9 octobre 2026**.
+Puis **désactiver l'ancien webhook du compte `Process`**, qui pointe encore sur
+`https://scrollshow.io/api/stripe/webhook` : sa signature n'est plus celle
+attendue, il répondrait 400 en boucle jusqu'à ce que Stripe le désactive et
+envoie des alertes. Après le redéploiement, jamais avant — tant que la
+production tourne sur `Process`, c'est lui qui porte la facturation.
 
-Dès que `STRIPE_SECRET_KEY` pointe sur `Scrollshow`, ScrollShow ne reçoit plus
-les événements Stripe de cet abonnement : sa résiliation ne sera pas vue et le
-compte gardera l'accès `pro` indéfiniment. Le code ne peut pas vérifier deux
-endpoints de webhook à la fois (`STRIPE_WEBHOOK_SECRET` est unique). Donc, au
-moment de la bascule, il faut au choix :
-- résilier l'abonnement à la main dans Stripe et repasser le compte en `free` ;
-- ou noter de le repasser en `free` après le 9 octobre 2026.
+```
+npm run revenuecat:backfill              # à blanc
+npm run revenuecat:backfill -- --apply
+```
+
+## Points à surveiller
+
+- **Activation du compte.** Vérifier que l'onboarding Stripe du compte
+  `Scrollshow` est terminé (entreprise + banque) : sans activation complète,
+  aucun paiement live ne passe, même avec des clés `live`.
+- **TVA.** Les prix ont été créés avec « Inclure les taxes dans le tarif :
+  Automatique », donc exprimés **TTC**. Aucune immatriculation fiscale n'est
+  active sur ce compte, donc Stripe ne calcule aucune taxe aujourd'hui : le
+  client paie 29 € et le revenu est 29 €. À confirmer avec la comptabilité avant
+  d'activer Stripe Tax.
+- **L'abonné resté sur `Process`.** `devqwiet@gmail.com`, résiliation prévue le
+  9 octobre 2026. Après la bascule, ScrollShow ne reçoit plus ses événements :
+  sa résiliation ne sera pas vue et le compte gardera l'accès `pro`. Arbitré
+  comme négligeable ; à repasser en `free` à la main si besoin.
 
 ## Pourquoi la déclaration par API et pas le webhook RevenueCat
 
-RevenueCat offre deux chemins pour les achats faits hors de ses propres flux :
+Deux chemins existent pour les achats faits hors des flux RevenueCat :
 
 - **`POST /v1/receipts`** (retenu) : ScrollShow déclare l'achat avec un
   `app_user_id` qu'il choisit — l'identifiant du compte ScrollShow. Identité
-  garantie, aucun secret partagé à gérer.
+  garantie, aucun secret partagé de plus.
 - **Webhook Stripe → RevenueCat**
   (`https://api.revenuecat.com/v1/incoming-webhooks/stripe/app68f82b22c2`,
   section *External purchase tracking*) : zéro code, mais RevenueCat déduit
-  l'`app_user_id` d'une clé de métadonnée configurable lue sur la Checkout
+  l'`app_user_id` d'une clé de métadonnée configurable, lue sur la Checkout
   Session et l'abonnement. Si on l'active un jour, la régler sur **`userId`** :
   c'est la clé que `app/api/stripe/checkout/route.ts` écrit déjà. Sans elle,
-  RevenueCat retomberait sur l'identifiant client Stripe et créerait deux
-  clients pour une même personne.
+  RevenueCat retombe sur l'identifiant client Stripe et crée deux clients pour
+  une même personne.
 
 ## Limites connues
 
