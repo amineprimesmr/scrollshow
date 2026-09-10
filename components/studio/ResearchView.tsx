@@ -136,7 +136,12 @@ function SlideText({ accountId, postId, tr }: { accountId: string; postId: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  // Le mode strict monte, demonte puis remonte : sans remettre le drapeau a vrai
+  // au montage, la boucle de lecture ignorerait toutes les reponses en dev.
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
 
   async function read() {
     setBusy(true);
@@ -227,7 +232,9 @@ export function ResearchView() {
   }, [load]);
 
   const running = useMemo(() => jobs.filter((job) => LIVE.has(job.status)), [jobs]);
-  const run = running[0] || jobs.find((job) => job.id === lastRun) || null;
+  // Apres un rechargement, la derniere recherche reste la reference : sans elle
+  // le segment de portee disparait et les resultats se noient dans la bibliotheque.
+  const run = running[0] || jobs.find((job) => job.id === lastRun) || jobs[0] || null;
   const activeId = running[0]?.id || null;
 
   // Une recherche en cours : on relit vite, les comptes arrivent au fil de l'eau.
