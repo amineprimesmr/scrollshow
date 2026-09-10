@@ -11,6 +11,7 @@ import { PostViewer } from "./PostViewer";
 import { TikTokScanLine } from "./TikTokScan";
 import { IconCheck, IconChevron } from "./icons";
 import { coverSrc } from "./cover";
+import { carriesPost, keepErrorLabel, keepInLibrary, setDragPayload } from "./library-drop";
 import { Metal } from "@/components/fx/Metal";
 import { Orb } from "@/components/fx/Orb";
 import "./research.css";
@@ -212,6 +213,10 @@ export function ResearchView() {
   const [shown, setShown] = useState(PAGE);
   const [open, setOpen] = useState<{ post: AccountVideo; handle: string; accountId: string; slide: number } | null>(null);
   const [lastRun, setLastRun] = useState<string | null>(null);
+  // Garder un carrousel : le bouton et le glissement partagent cet etat, pour
+  // qu'une tuile deja gardee le dise quel que soit le geste employe.
+  const [keeping, setKeeping] = useState<string | null>(null);
+  const [kept, setKept] = useState<Record<string, true>>({});
 
   const load = useCallback(async () => {
     try {
@@ -378,7 +383,7 @@ export function ResearchView() {
       search_provider_rejected: tr("TikTok a refusé la recherche. Réessaie.", "TikTok refused the search. Try again."),
       load_failed: tr("Chargement impossible.", "Could not load."),
       request_failed: tr("Requête impossible.", "Request failed."),
-    })[code] || tr("Recherche impossible pour le moment.", "Search failed for now.");
+    })[code] || keepErrorLabel(code, english);
 
   const isHandle = query.trim().startsWith("@");
 
@@ -421,6 +426,17 @@ export function ResearchView() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function keep(post: AccountVideo, handle: string) {
+    const url = post.url || (handle ? `https://www.tiktok.com/@${handle}/photo/${post.id}` : "");
+    if (!url || keeping) return;
+    setKeeping(post.id);
+    setError("");
+    const result = await keepInLibrary(url);
+    setKeeping(null);
+    if (result.ok) setKept((current) => ({ ...current, [post.id]: true }));
+    else setError(result.error);
   }
 
   async function stop() {
@@ -527,13 +543,32 @@ export function ResearchView() {
             {visible.map((row, i) => {
               const lift = liftOf(row.post, row.metrics);
               return (
-                <li key={`${row.account.handle}:${row.post.id}`} style={{ "--i": Math.min(i, 11) } as CSSProperties}>
+                <li
+                  key={`${row.account.handle}:${row.post.id}`}
+                  style={{ "--i": Math.min(i, 11) } as CSSProperties}
+                  draggable
+                  onDragStart={(event) => setDragPayload(event, { url: row.post.url, handle: row.account.handle, cover: row.post.cover })}
+                >
                   <PostTile
                     post={row.post}
                     en={english}
                     author={{ handle: row.account.handle, avatar: row.account.avatar }}
                     badge={lift ? `×${lift.toFixed(1)}` : null}
                     onOpen={(slide) => setOpen({ post: row.post, handle: row.account.handle, accountId: row.account.id, slide })}
+                    footer={
+                      <button
+                        type="button"
+                        className="ss-rs__keep"
+                        disabled={keeping === row.post.id || kept[row.post.id]}
+                        onClick={() => void keep(row.post, row.account.handle)}
+                      >
+                        {kept[row.post.id]
+                          ? tr("Dans la bibliothèque", "In the library")
+                          : keeping === row.post.id
+                            ? tr("Ajout…", "Adding…")
+                            : tr("+ Bibliothèque", "+ Library")}
+                      </button>
+                    }
                   />
                 </li>
               );

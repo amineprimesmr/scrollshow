@@ -14,6 +14,7 @@ import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
+import { carriesPost, keepInLibrary, readDragPayload } from "./library-drop";
 import { StudioProvider, useStudio } from "./StudioContext";
 import ProjectSwitcher from "./ProjectSwitcher";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
@@ -111,15 +112,48 @@ function SidebarProfile() {
 function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; pathname: string; english: boolean }) {
   const active = navActive(pathname, entry.href);
   const label = english ? entry.en : entry.fr;
+  const router = useRouter();
+  // La Bibliotheque accepte les carrousels glisses depuis la Recherche : c'est
+  // la seule cible visible depuis les deux pages, la barre laterale ne bougeant
+  // jamais. Le bouton de la tuile fait la meme chose sans glisser.
+  const droppable = entry.href === "/app/marketplace";
+  const [over, setOver] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const dropProps = droppable
+    ? {
+        onDragOver: (event: React.DragEvent) => {
+          if (!carriesPost(event)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy" as const;
+          setOver(true);
+        },
+        onDragLeave: () => setOver(false),
+        onDrop: async (event: React.DragEvent) => {
+          const payload = readDragPayload(event);
+          if (!payload) return;
+          event.preventDefault();
+          setOver(false);
+          setSaving(true);
+          await keepInLibrary(payload.url);
+          setSaving(false);
+          router.refresh();
+        },
+      }
+    : {};
+
   return (
     <Link
       href={entry.href}
       onClick={() => !active && sound.nav()}
+      {...dropProps}
       className={[
         "ss-sidebar-link",
         active ? "is-active" : "",
         entry.highlight ? "is-highlight" : "",
         entry.locked ? "is-locked" : "",
+        over ? "is-drop" : "",
+        saving ? "is-saving" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -146,7 +180,10 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     onCalendar ||
     pathname.startsWith("/app/home") ||
     pathname.startsWith("/app/discover") ||
-    pathname.startsWith("/app/unshadowban");
+    pathname.startsWith("/app/unshadowban") ||
+    pathname.startsWith("/app/marketplace") ||
+    pathname.startsWith("/app/post-us") ||
+    pathname.startsWith("/app/warmed-accounts");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // The saved preference wins over whatever this browser last stored.

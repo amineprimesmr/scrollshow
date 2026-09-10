@@ -262,3 +262,22 @@
 /* Un candidat trouvé mais pas encore mesuré : présent, mais en retrait. */
 .ss-rs__wall > li.is-hunting .ss-posttile { opacity: 0.72; }
 .ss-rs__wall > li.is-hunting:hover .ss-posttile { opacity: 1; }
+
+/* Garder un carrousel : le geste au clavier, jumeau du glissement. */
+.ss-rs__keep {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--ss-line);
+  background: var(--ss-card);
+  color: var(--ss-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.ss-rs__keep:hover:not(:disabled) { background: var(--ss-soft); color: var(--ss-ink); }
+.ss-rs__keep:disabled { cursor: default; color: var(--ss-ok-fg); }
+.ss-rs__wall > li[draggable="true"] { cursor: grab; }
+.ss-rs__wall > li[draggable="true"]:active { cursor: grabbing; }
