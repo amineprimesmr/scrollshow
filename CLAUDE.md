@@ -187,8 +187,27 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes` dans
 `next.config.ts`, sinon le binaire manque en production.
 
+## Store : lire par tranches, jamais tout
+`lib/store.ts`. Le store est **un seul document JSONB** : `readStore()` le
+transfère **en entier** à chaque appel. Mesuré à 7,9 Mo, dont 98 % de caches
+`videos` dans `accounts`/`channels` et de `researchJobs` — transférés même pour
+un sondage du studio. C'est ce qui a épuisé le quota de transfert Neon le
+10 septembre 2026 et mis la production hors service (Postgres `53000`, toute
+route touchant la base en 500).
+- Pour une lecture, utiliser `readStoreSlice(["posts", ...])` : seules les
+  collections demandées (plus `users` et `projects`) sont transférées, sans les
+  caches `videos` sauf `{ videos: true }`. `/api/studio` passe de 7,9 Mo à
+  132 Ko, `/api/auth/login` à 14 Ko.
+- Une tranche est en **lecture seule** : la réécrire effacerait les collections
+  absentes. Toute écriture passe par `updateStore`, qui lit tout.
+- Lire une collection non demandée **lève** (`store_slice_missing_*`) : une
+  liste vide silencieuse donnerait un calendrier vide sans erreur visible.
+- Reste à traiter : `consumeLimit` (`lib/rate-limit.ts`) fait un `updateStore`
+  complet — lecture **et** écriture de tout le document — à chaque tentative de
+  connexion. C'est le prochain gros poste.
+
 ## Build et vérification
-`npm run typecheck`, `npm test` (111 tests), puis build isolé
+`npm run typecheck`, `npm test` (115 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
@@ -266,5 +285,10 @@ renouvellements, résiliations, remboursements — sans appel par événement.
   `npm run revenuecat:backfill` (à blanc) puis `-- --apply`.
 - ScrollShow facture depuis son propre compte Stripe `Scrollshow`
   (`acct_1UE4ENQSj8XJlvHm`, organisation `Process`), lu par le seul projet
-  RevenueCat `ScrollShow` (`0d6bdeb6`, config `app68f82b22c2`). État et étapes
-  restantes : `docs/revenuecat-2026-09-10.md`.
+  RevenueCat `ScrollShow` (`0d6bdeb6`, config `app68f82b22c2`, entitlement
+  `studio`, offering `default`). Identifiants de prix, webhook et bascule des
+  variables : `docs/revenuecat-2026-09-10.md` et
+  `scripts/switch-stripe-account.sh`.
+- Les prix et la clé secrète Stripe changent **ensemble** : un prix du nouveau
+  compte avec la clé de l'ancien fait échouer `prices.retrieve` et le checkout
+  répond `billing_price_mismatch` à tous les acheteurs.

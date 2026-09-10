@@ -96,6 +96,86 @@ export async function writeStore(data: StoreData) {
   await updateStore(current => Object.assign(current, normalize(data)));
 }
 
+/** Collections que `normalize` exige presentes, meme vides. */
+const REQUIRED_KEYS = ["users", "accounts", "runs", "channels", "posts", "media", "apiKeys"] as const;
+/** Toujours lues : minuscules, et la resolution de projet en depend. */
+const ALWAYS_KEYS = ["users", "projects"] as const;
+/** Ces deux collections portent un cache de videos qui pese 98 % de leur poids
+ * et que seuls les insights et la recherche lisent. */
+const VIDEO_HOLDERS = ["accounts", "channels"] as const;
+
+/** Ne garde que les collections demandees, en otant les caches de videos.
+ * Pure : c'est aussi le chemin du store local et des tests. */
+export function projectSlice(full: Record<string, unknown>, keys: readonly string[], videos: boolean) {
+  const out: Record<string, unknown> = {};
+  for (const key of new Set<string>([...ALWAYS_KEYS, ...keys])) {
+    const value = full[key];
+    if (value === undefined) continue;
+    out[key] = !videos && (VIDEO_HOLDERS as readonly string[]).includes(key) && Array.isArray(value)
+      ? value.map((row) => { const { videos: _cache, ...rest } = row as Record<string, unknown>; return rest; })
+      : value;
+  }
+  return out;
+}
+
+/** Une collection non demandee vaut `[]` apres normalisation : la lire
+ * silencieusement rendrait une reponse fausse — un calendrier vide, un compte
+ * introuvable — au lieu d'une erreur. On la rend donc bruyante. */
+function guardSlice(data: StoreData, keys: readonly string[]): StoreData {
+  const wanted = new Set<string>([...ALWAYS_KEYS, ...keys]);
+  return new Proxy(data, {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && (REQUIRED_KEYS as readonly string[]).includes(prop) && !wanted.has(prop)) {
+        throw new Error(`store_slice_missing_${prop}`);
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as StoreData;
+}
+
+/**
+ * Lecture partielle, en LECTURE SEULE : ne transfere que les collections
+ * demandees, sans les caches de videos sauf `videos: true`.
+ *
+ * Le store est un document JSONB unique de plusieurs mega-octets, et
+ * `readStore` le transferait en entier a chaque requete — sondage du studio
+ * compris. C'est ce qui a epuise le quota de transfert de la base. Une tranche
+ * du studio pese quelques dizaines de kilo-octets au lieu de huit mega-octets.
+ *
+ * Ne jamais reecrire une tranche : les collections absentes seraient effacees.
+ * Toute ecriture passe par `updateStore`, qui lit le document complet.
+ */
+export async function readStoreSlice(
+  keys: readonly (keyof StoreData)[],
+  options: { videos?: boolean } = {},
+): Promise<StoreData> {
+  const videos = options.videos === true;
+  const wanted = [...new Set<string>([...ALWAYS_KEYS, ...(keys as readonly string[])])];
+  let partial: Record<string, unknown>;
+
+  if (databaseEnabled()) {
+    const rows = await database()`
+      SELECT COALESCE(jsonb_object_agg(kv.key, CASE
+        WHEN ${!videos} AND kv.key IN ('accounts', 'channels')
+          THEN (SELECT COALESCE(jsonb_agg(elem - 'videos'), '[]'::jsonb) FROM jsonb_array_elements(kv.value) elem)
+        ELSE kv.value END
+      ) FILTER (WHERE kv.key = ANY(${wanted}::text[])), '{}'::jsonb) AS data
+      FROM scrollshow_state s
+      LEFT JOIN LATERAL jsonb_each(s.data) kv ON true
+      WHERE s.id = 1
+      GROUP BY s.id`;
+    if (!rows.length) throw new Error("database_not_migrated");
+    partial = rows[0].data as Record<string, unknown>;
+  } else {
+    // Hors base, le transfert ne coute rien : on lit tout puis on projette,
+    // pour que les deux chemins rendent exactement la meme forme.
+    partial = projectSlice(await readStore() as unknown as Record<string, unknown>, wanted, videos);
+  }
+
+  for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
+  return guardSlice(normalize(partial as unknown as StoreData), wanted);
+}
+
 export function seedAccounts(userId: string): Account[] {
   const now = new Date().toISOString();
   return [
