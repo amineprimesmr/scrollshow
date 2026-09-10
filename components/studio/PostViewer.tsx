@@ -15,12 +15,16 @@ export function PostViewer({
   handle,
   en,
   onClose,
+  extra,
 }: {
   initialSlide: number;
   video: AccountVideo;
   handle: string;
   en: boolean;
   onClose: () => void;
+  /** Encart propre a la page hote, sous les compteurs. La Recherche y met
+   *  la lecture du texte des slides ; l'Overview n'en met aucun. */
+  extra?: React.ReactNode;
 }) {
   const id = embedId(video);
   const [visibleSlide, setVisibleSlide] = useState(initialSlide);
@@ -121,6 +125,7 @@ export function PostViewer({
               <p>{transcript.text || t(transcript.status === "pending" ? "Lecture en cours…" : "Aucun texte lisible détecté.", transcript.status === "pending" ? "Reading…" : "No readable text detected.", en)}</p>
               {transcript.status === "uncertain" ? <small>{t("Lecture automatique incertaine : vérifie l’image.", "Uncertain automatic reading: check the image.", en)}</small> : null}
             </section> : null}
+            {extra}
             {video.caption || video.title ? <p className="ss-postview__caption">{video.caption || video.title}</p> : null}
             {link ? (
               <a href={link} target="_blank" rel="noreferrer" className="ss-btn-ghost lg-press">

@@ -19,7 +19,8 @@ export function publicJob(job: ResearchJob) {
     current: job.phase==="search"
       ? { kind:"search" as const, label: job.input.keywords[job.keywordIndex] ?? null }
       : { kind:"measure" as const, label: job.candidates.find(c=>!job.processed.includes(c.handle))?.handle ?? null },
-    pending: job.candidates.filter(c=>!job.processed.includes(c.handle)).slice(0,30).map(c=>({ handle:c.handle, nickname:c.nickname ?? null, avatar:c.avatar ?? null, followers:c.followers ?? null, keyword:c.keyword })),
+    pending: job.candidates.filter(c=>!job.processed.includes(c.handle)).slice(0,8).map(c=>({ handle:c.handle, nickname:c.nickname ?? null, avatar:c.avatar ?? null, followers:c.followers ?? null, keyword:c.keyword,
+      posts: c.posts.slice(0,2).map(p=>({ id:p.id, cover:p.cover, images:p.images, views:p.views, likes:p.likes, url:p.url, kind:p.kind, createdAt:p.createdAt, missingMetrics:p.missingMetrics })) })),
     results:job.results.map(({posts,...r})=>({...r, metrics:researchMetrics(posts,r.followers,Date.parse(r.measuredAt),job.input.filters.days,job.input.filters.minPostViews)})),
     nextAction:job.status==="needs_attention" ? "resolve_in_collector_then_resume" : job.status==="queued" ? (job.input.source==="browser"?"run_browser_collector":"advance_research") : null,
   };
