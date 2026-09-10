@@ -171,6 +171,18 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 - Le cron recherche tourne **toutes les cinq minutes via GitHub Actions**
   (`.github/workflows/publish-scheduled.yml`, job `research`), pas via `vercel.json` :
   Vercel Hobby refuse cette fréquence.
+- **Le mur d'une recherche = les carrousels du mot-clé**, pas les meilleurs posts
+  des comptes trouvés. Les posts ramenés par `searchPhotos` sont conservés, fusionnés
+  dans `Account.videos` même s'ils sont au-delà des pages lues, et marqués
+  (`AccountVideo.matchedKeywords`). Ils étaient effacés (`c.posts=[]`) au profit du
+  feed complet : « sleepmaxing » rendait alors le meilleur carrousel du compte, sur
+  un tout autre sujet. Les marques déjà posées sont relues avant chaque fusion,
+  sinon une nouvelle mesure les effacerait.
+- Les cartes « en attente » passent le **même** filtre que le mur (`keepForWall`).
+  Sans ça elles affichaient des posts à 500 vues sous un filtre 100k+, qui
+  disparaissaient à la mesure : c'est ce clignotement qu'on ne veut plus.
+- Paliers de vues : `[0, 1k, 5k, 10k, 25k, 50k, 100k, 500k, 1M]`, défaut **10k**.
+  100k combiné à 30 jours ne laissait presque rien passer.
 - L'UI (`ResearchView.tsx`) est une page unique : une seule saisie (mots-clés,
   ou `@compte` pour analyser), réglages repliés, bandeau vivant par recherche en
   cours (étape courante via `publicJob().current`, compteurs, barre animée), et
@@ -212,7 +224,7 @@ route touchant la base en 500).
   `lib/account-sync.ts`. Toute nouvelle route sollicitée doit faire pareil.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (120 tests), puis build isolé
+`npm run typecheck`, `npm test` (124 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 

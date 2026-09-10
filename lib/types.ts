@@ -142,6 +142,10 @@ export type AccountVideo = {
   kind: "photo" | "video";
   createdAt: number; // unix seconds
   url: string;
+  /** Mots-cles de recherche qui ont ramene ce post. Sans cette trace, un
+   * carrousel trouve pour « sleepmaxing » est indiscernable du reste du feed du
+   * compte, et le mur affiche du hors-sujet. */
+  matchedKeywords?: string[];
 };
 
 export type PublicationSlideText = {

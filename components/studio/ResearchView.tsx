@@ -26,7 +26,7 @@ const PAGE = 24;
  *  prolifique ne doit pas remplir tout l'ecran. */
 const PER_ACCOUNT = 4;
 
-const VIEW_STEPS = [0, 50_000, 100_000, 500_000, 1_000_000];
+const VIEW_STEPS = [0, 1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000, 1_000_000];
 const DAY_STEPS = [7, 30, 90, 365];
 
 async function api(url: string, body?: unknown) {
@@ -197,7 +197,9 @@ export function ResearchView() {
   const tr = useCallback((fr: string, en: string) => t(fr, en, english), [english]);
 
   const [query, setQuery] = useState("");
-  const [minPostViews, setMinPostViews] = useState(100_000);
+  // 100k combine a 30 jours ne laissait presque rien passer : la page finissait
+  // vide alors que TikTok regorge de carrousels sur le sujet.
+  const [minPostViews, setMinPostViews] = useState(10_000);
   const [days, setDays] = useState(30);
   const [scope, setScope] = useState<"run" | "all">("all");
 
@@ -273,6 +275,25 @@ export function ResearchView() {
     () => new Set((run?.results || []).map((r) => r.handle).concat((run?.pending || []).map((c) => c.handle))),
     [run],
   );
+  /** Les mots-cles de la recherche affichee. « sleepmaxing » doit rendre des
+   *  carrousels sleepmaxing, pas le meilleur post du compte ou on les a trouves. */
+  const runKeywords = useMemo(
+    () => new Set((run?.input?.keywords || []).map((k) => k.toLowerCase())),
+    [run],
+  );
+  /** Les comptes mesures avant que les carrousels soient marques n'ont aucune
+   *  trace de mot-cle : leur appliquer le filtre viderait le mur au lieu de
+   *  l'affiner. On ne s'y limite que s'il existe au moins une correspondance. */
+  const hasKeywordMatches = useMemo(
+    () =>
+      runKeywords.size > 0 &&
+      items.some((item) =>
+        (item.account.videos || []).some((video) =>
+          (video.matchedKeywords || []).some((k) => runKeywords.has(k.toLowerCase())),
+        ),
+      ),
+    [items, runKeywords],
+  );
 
   /** Le mur : les carrousels qui franchissent le plancher, les plus vus d'abord,
    *  entrelaces pour qu'aucun compte ne monopolise l'ecran. */
@@ -284,6 +305,11 @@ export function ResearchView() {
       const rows: Row[] = [];
       for (const post of item.account.videos || []) {
         if (post.kind !== "photo") continue;
+        // Sur une recherche, on ne garde que ce que le mot-cle a ramene. Sans
+        // ca, un compte trouve pour « sleepmaxing » impose son carrousel le plus
+        // vu, meme s'il parle d'autre chose.
+        if (scope === "run" && hasKeywordMatches
+          && !(post.matchedKeywords || []).some((k) => runKeywords.has(k.toLowerCase()))) continue;
         if (minPostViews > 0 && (post.missingMetrics?.includes("views") || post.views < minPostViews)) continue;
         if (post.createdAt > 0 && post.createdAt * 1000 < floor) continue;
         rows.push({ post, account: item.account, metrics: item.metrics });
@@ -296,13 +322,28 @@ export function ResearchView() {
       for (const group of groups) if (group[round]) out.push(group[round]);
     }
     return out;
-  }, [items, scope, minPostViews, days, runHandles]);
+  }, [items, scope, minPostViews, days, runHandles, runKeywords, hasKeywordMatches]);
 
   const waiting = useMemo(() => {
     if (!run || !LIVE.has(run.status)) return [];
     const measured = new Set(wall.map((row) => row.account.handle));
-    return (run.pending || []).filter((c) => !measured.has(c.handle));
-  }, [run, wall]);
+    const floor = Date.now() - days * 86400000;
+    // Meme plancher et meme fenetre que le mur. Une carte qui ne les passe pas
+    // s'affichait pendant la recherche puis disparaissait a la mesure : c'est ce
+    // clignotement, et ces vues bien en dessous du filtre, que l'on supprime.
+    return (run.pending || [])
+      .filter((c) => !measured.has(c.handle))
+      .map((c) => ({
+        ...c,
+        posts: (c.posts || []).filter(
+          (p) =>
+            p.kind === "photo" &&
+            !(minPostViews > 0 && (p.missingMetrics?.includes("views") || p.views < minPostViews)) &&
+            !(p.createdAt > 0 && p.createdAt * 1000 < floor),
+        ),
+      }))
+      .filter((c) => c.posts.length > 0);
+  }, [run, wall, minPostViews, days]);
 
   // Un seuil rond s'ecrit rond : « 1M+ », jamais « 1.0M+ ».
   const viewLabel = useCallback(

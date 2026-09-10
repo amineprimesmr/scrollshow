@@ -22,7 +22,8 @@ export async function GET(request: Request) {
       videos: (account.videos || []).filter(v => v.kind === "photo").sort((a, b) => b.views - a.views).slice(0, 60)
         .map(v => ({ id: v.id, url: v.url, kind: v.kind, cover: v.cover, images: v.images, views: v.views, likes: v.likes,
           comments: v.comments, shares: v.shares, caption: v.caption, title: v.title, hashtags: v.hashtags,
-          missingMetrics: v.missingMetrics, createdAt: v.createdAt, measuredAt: v.measuredAt, slideTexts: v.slideTexts })),
+          missingMetrics: v.missingMetrics, createdAt: v.createdAt, measuredAt: v.measuredAt, slideTexts: v.slideTexts,
+          matchedKeywords: v.matchedKeywords })),
     },
     metrics, measuredAt,
   }));
