@@ -115,6 +115,21 @@ session (même dossier, hot reload) : ouvrir `http://localhost:3000` dans le
 Chrome de l'utilisateur, qui est déjà connecté (compte « Dev Local »), plutôt
 que de relancer un serveur ou tenter de se connecter.
 
+## Provenance des chiffres — non négociable
+Un compteur affiché doit avoir été **mesuré**, jamais reçu d'un appelant.
+- `POST /api/accounts` et `PATCH /api/accounts/[id]` n'acceptent que des
+  annotations (`niche`, `verdict`, `notes`). `followers`, `posts` et `avgViews`
+  sont mesurés côté serveur sur le profil public. Ne jamais les rouvrir : un
+  agent MCP y a écrit 966 600 abonnés sur un compte qui en a 2 372.
+- `fetchTikTokProfile` renvoie `null` (jamais `0`) pour un compteur absent de la
+  page. Tout appelant doit distinguer les deux : `?? ` ne rattrape pas `0`, donc
+  un zéro inventé se propage comme une mesure et fausse les filtres.
+- Un compte de bibliothèque est **re-mesuré à chaque synchronisation**
+  (`account-sync.ts`) : sans cela un chiffre faux reste à vie.
+- L'avatar et les abonnés d'un candidat viennent de la réponse de recherche
+  (`authorAvatar` dans `research/normalize.ts`), pas du scrape de profil qui
+  échoue souvent. Ne pas refaire dépendre l'affichage de ce scrape.
+
 ## Moteur de recherche
 `lib/research/` (modèle, jobs, provider, normalisation, statistiques, OCR, formats,
 schéma collecteur) + routes `app/api/research/{route,jobs,studies,collector}` et
@@ -128,6 +143,12 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
   mot-clé, 30 jours) et plafonds durs : ne pas les relever sans mesurer le coût
   fournisseur. Garde-fou global : `RESEARCH_PROVIDER_DAILY_LIMIT`.
 - Un compte rejeté conserve son motif explicite : ne jamais masquer la sélection.
+- `minFollowers` vaut **2000 par défaut**, côté serveur comme dans l'UI.
+- La couverture distingue quatre arrêts : `profile_end` (tout lu),
+  `window_covered` (fenêtre couverte), `page_limit`, `collecting`. Ne pas les
+  reconfondre : « période couverte » ne veut pas dire « compte lu en entier ».
+- Toute statistique sauf les abonnés ne vaut que pour la fenêtre demandée.
+  L'afficher sans nommer la période est un bug (le palmarès en a souffert).
 - Le cron recherche tourne **toutes les cinq minutes via GitHub Actions**
   (`.github/workflows/publish-scheduled.yml`, job `research`), pas via `vercel.json` :
   Vercel Hobby refuse cette fréquence.

@@ -97,8 +97,12 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     const merged=new Map((c.measuredPosts??[]).map(p=>[p.id,p]));result.posts.forEach(p=>merged.set(p.id,p));c.measuredPosts=[...merged.values()].slice(0,1000);c.pages=(c.pages??0)+1;
     if(result.followers!==undefined)c.followers=result.followers;if(result.nickname)c.nickname=result.nickname;if(result.bio)c.bio=result.bio;if(result.avatar)c.avatar=result.avatar;
     const pageOld=result.posts.length>0&&result.posts.every(p=>p.createdAt>0&&p.createdAt*1000<Date.now()-j.input.filters.days*86400000);
-    const covered=!result.hasMore||pageOld||result.complete===true;
+    // Deux raisons opposees de s'arreter : avoir tout lu, ou avoir seulement
+    // couvert la fenetre demandee. L'interface doit pouvoir les distinguer.
+    const profileEnd=!result.hasMore||result.complete===true;
+    const covered=profileEnd||pageOld;
     const finished=covered||c.pages>=j.input.maxPages||j.input.source==="browser";
+    const stopReason=profileEnd?"profile_end":pageOld?"window_covered":finished?"page_limit":"collecting";
     if(!finished && (!result.cursor || result.cursor===c.cursor)) {j.status="paused";j.error="pagination_did_not_advance";event(j,"pagination_stalled");return;}
     c.cursor=result.cursor;
     const now=stamp(),posts=c.measuredPosts;
@@ -106,12 +110,12 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
     const cache=new Map((a.videos??[]).map(p=>[p.id,p]));posts.forEach(p=>cache.set(p.id,p));
     Object.assign(a,{nickname:c.nickname??a.nickname,bio:c.bio??a.bio,avatar:c.avatar??a.avatar,followers:c.followers??a.followers,videos:[...cache.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,2000),videosFetchedAt:now,lastSyncAt:now,
-      researchCoverage:{complete:covered,pages:c.pages,windowDays:j.input.filters.days,measuredAt:now,reason:covered?"window_or_profile_end":finished?"page_limit":"collecting"}});
+      researchCoverage:{complete:covered,pages:c.pages,windowDays:j.input.filters.days,measuredAt:now,reason:stopReason,loaded:posts.length}});
     a.avgViews=researchMetrics(posts,a.followers).averageViews??0;
     if(finished) {
       const verdict=evaluateResearch(posts,a.followers,j.input.filters);
       if(c.followers===undefined) {verdict.reasons.push("followers_unavailable");if(j.input.filters.minFollowers>0)verdict.accepted=false;}
-      j.results=j.results.filter(r=>r.handle!==c.handle);j.results.push({accountId:a.id,handle:c.handle,measuredAt:now,accepted:verdict.accepted,reasons:verdict.reasons,coverage:{complete:covered,pages:c.pages,reason:covered?"window_or_profile_end":"page_limit"},posts,followers:a.followers});j.processed.push(c.handle);
+      j.results=j.results.filter(r=>r.handle!==c.handle);j.results.push({accountId:a.id,handle:c.handle,measuredAt:now,accepted:verdict.accepted,reasons:verdict.reasons,coverage:{complete:covered,pages:c.pages,reason:stopReason},posts,followers:a.followers});j.processed.push(c.handle);
       c.measuredPosts=undefined;c.posts=[];
     }
   }

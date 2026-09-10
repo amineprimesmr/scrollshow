@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inScope } from "@/lib/projects";
 
+// Annotations seulement. Les compteurs viennent de la mesure (synchronisation
+// ou moteur de recherche) : les laisser modifiables laissait un agent ecrire
+// des abonnes inventes par-dessus une mesure exacte.
 const schema = z.object({
   niche: z.string().trim().max(60).optional(),
-  followers: z.number().int().min(0).optional(),
-  avgViews: z.number().int().min(0).optional(),
-  posts: z.number().int().min(0).optional(),
   verdict: z.enum(["keep", "watch", "skip"]).optional(),
   notes: z.string().max(800).optional(),
 });

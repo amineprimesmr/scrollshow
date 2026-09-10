@@ -4,12 +4,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inScope } from "@/lib/projects";
 
+// Les compteurs ne sont plus acceptes de l'appelant : ils sont mesures sur le
+// profil public. Un agent qui les envoyait ecrivait des chiffres inventes dans
+// les memes champs qu'une mesure, sans rien pour les distinguer.
 const schema = z.object({
   handle: z.string().trim().min(2).max(40),
   niche: z.string().trim().max(60).optional(),
-  followers: z.number().int().min(0).optional(),
-  avgViews: z.number().int().min(0).optional(),
-  posts: z.number().int().min(0).optional(),
   verdict: z.enum(["keep", "watch", "skip"]).optional(),
   notes: z.string().max(800).optional(),
 });

@@ -348,7 +348,7 @@ async function channelInsights(
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: studioSummary(mine),
-    sync: channel.videoSync ? { complete: channel.videoSync.complete, hasMore: channel.videoSync.hasMore, error: channel.videoSync.error, loaded: (channel.videos || []).length, source: channel.videoSync.source } : null,
+    sync: channel.videoSync ? { complete: channel.videoSync.complete, hasMore: channel.videoSync.hasMore, error: channel.videoSync.error, loaded: all.length, source: channel.videoSync.source } : null,
     source,
     canFetch: channel.platform === "tiktok" && (Boolean(channel.accessToken && channel.connected !== false) || (metricsEnabled() && Boolean(channel.handle))),
     fetchedAt: channel.videosFetchedAt || null,

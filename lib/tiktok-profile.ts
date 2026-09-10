@@ -6,9 +6,11 @@ export type TikTokProfile = {
   avatar: string;
   bio: string;
   verified: boolean;
-  followers: number;
-  likes: number;
-  videos: number;
+  /** null = le compteur n'etait pas dans la page. Jamais 0 par defaut : un zero
+   * invente se propage ensuite comme une mesure et fausse tous les filtres. */
+  followers: number | null;
+  likes: number | null;
+  videos: number | null;
 };
 
 export class ProfileError extends Error {
@@ -36,9 +38,10 @@ function mergeStats(a: any, b: any) {
   return out;
 }
 
-function num(value: unknown) {
+function num(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
-  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
 }
 
 function pickUserDetail(data: any): { user: any; stats: any } | null {

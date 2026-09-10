@@ -9,6 +9,12 @@ export function firstImage(value: any): string {
   if (value && typeof value === "object") return firstImage(value.url_list ?? value.urlList ?? value.url ?? value.display_image ?? value.imageURL ?? value.image_url);
   return "";
 }
+/** Avatar d'auteur, quelle que soit la forme renvoyee (web ou app). */
+export function authorAvatar(author: any): string {
+  const raw = firstImage(author?.avatarThumb ?? author?.avatarMedium ?? author?.avatarLarger ?? author?.avatar_thumb ?? author?.avatar_medium ?? author?.avatar_larger);
+  return allowedCoverUrl(raw) ? raw : "";
+}
+
 export function normalizePost(item: Raw, fallbackHandle = "", measuredAt = new Date().toISOString()): AccountVideo | null {
   const id = String(item?.aweme_id ?? item?.id ?? "");
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) return null;
@@ -57,7 +63,10 @@ export function parseSearch(raw: unknown, keyword: string): { candidates: Candid
     if(!post || post.kind!=="photo") continue;
     const stats={ ...item.authorStats, ...item.authorStatsV2 };
     const followerRaw=stats.followerCount ?? item.author?.follower_count;
-    const candidate=found.get(handle) ?? { handle, nickname: String(item.author?.nickname ?? "").slice(0,150), bio: String(item.author?.signature ?? "").slice(0,2000), followers: followerRaw===undefined ? undefined : Number(followerRaw), keyword, sourceUrl: `https://www.tiktok.com/@${handle}`, posts:[] };
+    // L'avatar est deja dans la reponse de recherche : le lire ici evite de
+    // dependre du scrape de profil, qui echoue souvent et laissait la pastille vide.
+    const candidate=found.get(handle) ?? { handle, nickname: String(item.author?.nickname ?? "").slice(0,150), bio: String(item.author?.signature ?? "").slice(0,2000), avatar: authorAvatar(item.author), followers: followerRaw===undefined ? undefined : Number(followerRaw), keyword, sourceUrl: `https://www.tiktok.com/@${handle}`, posts:[] };
+    if(!candidate.avatar) candidate.avatar=authorAvatar(item.author);
     if(!candidate.posts.some(p=>p.id===post.id)) candidate.posts.push(post);
     found.set(handle,candidate);
   }

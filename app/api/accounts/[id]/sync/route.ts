@@ -19,9 +19,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       found.avatar = profile.avatar;
       found.bio = profile.bio;
       found.verified = profile.verified;
-      found.followers = profile.followers;
-      found.likes = profile.likes;
-      found.posts = profile.videos;
+      // Un compteur absent de la page laisse la derniere mesure en place.
+      if (profile.followers !== null) found.followers = profile.followers;
+      if (profile.likes !== null) found.likes = profile.likes;
+      if (profile.videos !== null) found.posts = profile.videos;
       found.lastSyncAt = new Date().toISOString();
       found.syncError = undefined;
     } catch (error) {

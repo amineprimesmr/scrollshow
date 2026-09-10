@@ -57,7 +57,10 @@ export type AddLibraryResult =
 export async function addLibraryAccount(
   user: SessionUser,
   rawHandle: string,
-  extra: { niche?: string; followers?: number; avgViews?: number; posts?: number; verdict?: "keep" | "watch" | "skip"; notes?: string } = {},
+  // Seules les annotations sont acceptees de l'appelant. Les compteurs
+  // (abonnes, publications, vues moyennes) sont mesures ici : un agent qui les
+  // fournirait ecrirait des chiffres inventes dans les memes champs qu'une mesure.
+  extra: { niche?: string; verdict?: "keep" | "watch" | "skip"; notes?: string } = {},
 ): Promise<AddLibraryResult> {
   const handle = normalizeHandle(rawHandle);
   if (!handle) return { error: "invalid" };
@@ -78,16 +81,16 @@ export async function addLibraryAccount(
       projectId: user.projectId,
       handle: profile?.handle || handle,
       niche: extra.niche || "",
-      followers: profile?.followers ?? extra.followers ?? 0,
-      avgViews: extra.avgViews || 0,
-      posts: profile?.videos ?? extra.posts ?? 0,
+      followers: profile?.followers ?? 0,
+      avgViews: 0,
+      posts: profile?.videos ?? 0,
       verdict: extra.verdict || "watch",
       notes: extra.notes || "",
       createdAt: new Date().toISOString(),
       nickname: profile?.nickname,
       avatar: profile?.avatar,
       bio: profile?.bio,
-      likes: profile?.likes,
+      likes: profile?.likes ?? undefined,
       verified: profile?.verified,
       lastSyncAt: new Date().toISOString(),
       syncError,

@@ -48,6 +48,7 @@ export function ResearchView() {
   const [minMedian, setMinMedian] = useState(0);
   const [minShare, setMinShare] = useState(50);
   const [minPosts, setMinPosts] = useState(5);
+  const [minFollowers, setMinFollowers] = useState(2000);
   const [maxPages, setMaxPages] = useState(3);
   const [pivot, setPivot] = useState(false);
 
@@ -151,7 +152,7 @@ export function ResearchView() {
       followers_unavailable: tr("Abonnés non mesurés", "Followers unavailable"),
     })[s] || s;
 
-  const filters = () => ({ days, minSlideshowShare: minShare / 100, minMedianViews: minMedian, minTotalViews: minViews, minPosts });
+  const filters = () => ({ days, minSlideshowShare: minShare / 100, minMedianViews: minMedian, minTotalViews: minViews, minPosts, minFollowers });
 
   async function start(event: React.FormEvent) {
     event.preventDefault();
@@ -289,6 +290,7 @@ export function ResearchView() {
               { label: tr("Vues cumulées minimum", "Minimum total views"), value: minViews, set: setMinViews, min: 0, max: 1e12 },
               { label: tr("Vues médianes minimum", "Minimum median views"), value: minMedian, set: setMinMedian, min: 0, max: 1e10 },
               { label: tr("Carrousels mesurés minimum", "Minimum measured carousels"), value: minPosts, set: setMinPosts, min: 1, max: 100 },
+              { label: tr("Abonnés minimum", "Minimum followers"), value: minFollowers, set: setMinFollowers, min: 0, max: 1e10 },
               { label: tr("Pages max par compte", "Max pages per account"), value: maxPages, set: setMaxPages, min: 1, max: 10 },
             ].map((field) => (
               <label key={field.label}>
@@ -395,6 +397,7 @@ export function ResearchView() {
                 measuredAt={measuredAt}
                 verdict={verdictOf(account.handle)}
                 fresh={freshHandles.has(account.handle)}
+                days={days}
                 tr={tr}
                 num={num}
                 compactNum={compactNum}
@@ -654,12 +657,22 @@ function SkeletonCard() {
   );
 }
 
+/** Trois arrets tres differents que « période couverte » confondait. */
+function coverageLabel(reason: string | undefined, complete: boolean, tr: (fr: string, en: string) => string) {
+  if (reason === "profile_end") return tr("compte lu en entier", "whole account read");
+  if (reason === "window_covered") return tr("période couverte", "period covered");
+  if (reason === "page_limit") return tr("arrêté à la limite de pages", "stopped at the page limit");
+  if (reason === "collecting") return tr("collecte en cours", "still collecting");
+  return complete ? tr("période couverte", "period covered") : tr("échantillon partiel", "partial sample");
+}
+
 function AccountCard({
   account,
   metrics,
   measuredAt,
   verdict,
   fresh,
+  days,
   tr,
   num,
   compactNum,
@@ -674,6 +687,7 @@ function AccountCard({
   measuredAt: string | null;
   verdict: { accepted: boolean; reasons: string[] } | null;
   fresh: boolean;
+  days: number;
   tr: (fr: string, en: string) => string;
   num: (n: number | null | undefined) => string;
   compactNum: (n: number | null | undefined) => string;
@@ -684,6 +698,9 @@ function AccountCard({
   english: boolean;
 }) {
   const top = metrics.topPosts.slice(0, 4);
+  // Tout, sauf les abonnes, ne vaut que pour la fenetre demandee. Le taire
+  // laissait croire a un palmares de tout le compte.
+  const period = tr(`${days} derniers jours`, `last ${days} days`);
   return (
     <article className={`ss-research-card ${fresh ? "is-fresh" : ""}`}>
       <header>
@@ -727,7 +744,7 @@ function AccountCard({
 
       {top.length ? (
         <div className="ss-research-card__posts">
-          <h4>{tr("Ses meilleurs carrousels", "Its best carousels")}</h4>
+          <h4>{tr(`Ses meilleurs carrousels · ${period}`, `Its best carousels · ${period}`)}</h4>
           <ul>
             {top.map((post) => (
               <li key={post.id}>
@@ -753,9 +770,10 @@ function AccountCard({
       <footer>
         {measuredAt ? new Date(measuredAt).toLocaleDateString(english ? "en-US" : "fr-FR") : tr("Non mesuré", "Not measured")}
         {" · "}
-        {account.researchCoverage?.complete ? tr("période couverte", "period covered") : tr("échantillon partiel", "partial sample")}
+        {coverageLabel(account.researchCoverage?.reason, Boolean(account.researchCoverage?.complete), tr)}
         {" · "}
-        {num(metrics.samplePosts)} {tr("posts vus", "posts seen")}
+        {num(metrics.samplePosts)} {tr(`posts sur ${period}`, `posts over the ${period}`)}
+        {account.researchCoverage?.loaded ? ` · ${num(account.researchCoverage.loaded)} ${tr("lus au total", "read in total")}` : ""}
       </footer>
     </article>
   );

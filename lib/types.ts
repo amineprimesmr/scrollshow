@@ -188,7 +188,7 @@ export type Account = {
   videos?: AccountVideo[];
   videosFetchedAt?: string;
   videoSync?: VideoSync;
-  researchCoverage?: { complete: boolean; pages: number; windowDays: number; measuredAt: string; reason: string };
+  researchCoverage?: { complete: boolean; pages: number; windowDays: number; measuredAt: string; reason: string; loaded?: number };
 };
 
 export type Run = {

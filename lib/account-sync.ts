@@ -1,4 +1,5 @@
 import { fetchAccountVideoPage, metricsEnabled } from "./metrics";
+import { fetchTikTokProfile } from "./tiktok-profile";
 import { loadTikTokChannel } from "./tiktok-account";
 import { fetchUserInfo, profileFieldsForScopes, listVideoPage, type TikTokVideo } from "./tiktok";
 import { readStore, updateStore } from "./store";
@@ -54,6 +55,10 @@ async function syncPage(userId: string, key: string, restart: boolean) {
     // must not discard successfully retrieved publications.
     const profile = channel?.accessToken && !cursor
       ? await fetchUserInfo(channel.accessToken, profileFieldsForScopes(channel.scopes)).catch(() => null) : null;
+    // Un compte de bibliotheque n'a pas de jeton : ses compteurs se relisent sur
+    // le profil public. Sans cela un chiffre faux ecrit une fois restait a vie.
+    const publicProfile = !channel && !cursor && target.handle
+      ? await fetchTikTokProfile(target.handle.replace(/^@/, "")).catch(() => null) : null;
     await updateStore(data => {
       const current = targetIn(data, userId, key);
       if (!current) return;
@@ -67,6 +72,14 @@ async function syncPage(userId: string, key: string, restart: boolean) {
       const now = new Date().toISOString();
       current.videosFetchedAt = now;
       current.videoSync = { source, cursor: page.cursor, hasMore: page.hasMore, complete: !page.hasMore, seenIds, updatedAt: now };
+      if (publicProfile && !("platform" in current)) {
+        if (publicProfile.followers !== null) current.followers = publicProfile.followers;
+        if (publicProfile.likes !== null) current.likes = publicProfile.likes;
+        if (publicProfile.videos !== null) current.posts = publicProfile.videos;
+        current.nickname = publicProfile.nickname || current.nickname;
+        current.avatar = publicProfile.avatar || current.avatar;
+        current.bio = publicProfile.bio || current.bio;
+      }
       if (profile && "platform" in current) {
         current.followers = Number(profile.follower_count ?? current.followers ?? 0);
         current.likes = Number(profile.likes_count ?? current.likes ?? 0);

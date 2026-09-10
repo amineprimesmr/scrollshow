@@ -6,7 +6,7 @@ export const filtersSchema = z.object({
   minSlideshowShare: z.number().min(0).max(1).default(.5),
   minMedianViews: z.number().min(0).max(1e10).default(0),
   minTotalViews: z.number().min(0).max(1e12).default(100000),
-  minFollowers: z.number().int().min(0).max(1e10).default(0),
+  minFollowers: z.number().int().min(0).max(1e10).default(2000),
   minPosts: z.number().int().min(1).max(100).default(5),
 });
 export const startResearchSchema = z.object({
