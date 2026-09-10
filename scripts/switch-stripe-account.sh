@@ -36,7 +36,13 @@ echo
 [[ $SK == sk_* ]]    || die "La cle secrete doit commencer par sk_."
 [[ $WH == whsec_* ]] || die "Le secret de webhook doit commencer par whsec_."
 [[ $PK == pk_* ]]    || die "La cle publiable doit commencer par pk_."
-[[ -n $RC ]]         || die "La cle RevenueCat est vide."
+# Le premier passage a laisse entrer l'URL de la page au lieu de la cle : une
+# valeur non vide ne suffit pas, il faut qu'elle ressemble a une cle.
+[[ -n $RC ]]                     || die "La cle RevenueCat est vide."
+[[ $RC != *"://"* ]]             || die "Ca ressemble a une URL, pas a une cle. Ouvre la page Web du projet RevenueCat, colonne Public API Key, revele et copie la valeur."
+[[ $RC != *[[:space:]]* ]]       || die "La cle RevenueCat contient un espace : la copie a pris autre chose."
+(( ${#RC} >= 20 ))               || die "La cle RevenueCat est trop courte (${#RC} caracteres) : ce n'est pas la bonne valeur."
+[[ $RC == strp_* ]] || printf '\033[33m  attention : la cle RevenueCat ne commence pas par strp_ ; verifie que c est bien la Public API Key de l app Stripe.\033[0m\n'
 
 stripe_get() { curl -sS -u "$SK:" "https://api.stripe.com/v1/$1"; }
 
