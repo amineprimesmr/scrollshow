@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { compact, type FanItem } from "./AccountsFan";
+import { PostTile } from "./PostTile";
 import { IconChevron } from "./icons";
 import { coverSrc } from "./cover";
 import { useStudio } from "./StudioContext";
@@ -424,20 +425,15 @@ export function AccountPanel({
               <ul className="ss-acc__gallery">
                 {videos.slice(0, shown).map((v) => (
                   <li key={v.id}>
-                    <article className="ss-posttile">
-                      {v.kind === "photo" && v.images?.length ? <TikTokSlides key={`${v.id}:${matchingSlide(v, query, hookOnly)?.index ?? 0}`} initialIndex={matchingSlide(v, query, hookOnly)?.index ?? 0} images={v.images} en={en} onOpen={slide => openPublication(v.id, slide)} /> :
-                        <button type="button" className="ss-posttile__cover" aria-label={t("Ouvrir la publication", "Open post", en)} onClick={() => openPublication(v.id)}>
-                          <span className="ss-posttile__placeholder" aria-hidden>{v.kind === "photo" ? "▦" : "▶"}</span>
-                          {v.cover ? <img src={coverSrc(v.cover)} alt="" loading="lazy" onError={e => { e.currentTarget.hidden = true; }} /> : null}
-                        </button>}
-                      <dl className="ss-posttile__counts">
-                        <div><dt>{t("Vues", "Views", en)}</dt><dd>{v.missingMetrics?.includes("views") ? "—" : compact(v.views)}</dd></div>
-                        <div><dt>Likes</dt><dd>{v.missingMetrics?.includes("likes") ? "—" : compact(v.likes)}</dd></div>
-                      </dl>
-                      {normalizeSlideSearch(query) ? <button type="button" className="ss-posttile__match" onClick={() => openPublication(v.id, matchingSlide(v, query, hookOnly)?.index ?? 0)}>
+                    <PostTile
+                      post={v}
+                      en={en}
+                      initialSlide={matchingSlide(v, query, hookOnly)?.index ?? 0}
+                      onOpen={slide => openPublication(v.id, slide)}
+                      footer={normalizeSlideSearch(query) ? <button type="button" className="ss-posttile__match" onClick={() => openPublication(v.id, matchingSlide(v, query, hookOnly)?.index ?? 0)}>
                         {t(`Voir le texte · slide ${(matchingSlide(v, query, hookOnly)?.index ?? 0) + 1}`, `View text · slide ${(matchingSlide(v, query, hookOnly)?.index ?? 0) + 1}`, en)}
                       </button> : null}
-                    </article>
+                    />
                   </li>
                 ))}
               </ul>
