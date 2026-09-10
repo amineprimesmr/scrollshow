@@ -71,6 +71,25 @@ liste) et lisibles en entier dans le studio via l'embed officiel
 - Le lecteur est monté en portal sur `document.body` : le panneau crée son
   propre contexte d'empilement.
 
+## Page Recherche
+`components/studio/ResearchView.tsx` + `components/studio/research.css`
+(namespace `.ss-rs`). Elle cherche des **posts**, pas des comptes : le mur de
+carrousels est le contenu, le compte n'est qu'une attribution.
+- Les vignettes passent **obligatoirement** par `PostTile`, partagé avec
+  l'Overview. Écrire une vignette à la main fait diverger les deux pages.
+- Le direct passe par `TikTokScan` / `TikTokScanLine` (logo TikTok + radar).
+- Trois paramètres visibles, pas plus : mots-clés (le champ), vues minimum par
+  post, période de publication. Tout le reste garde ses défauts.
+- **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
+  `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq
+  carrousels au-dessus de 100k — porte bien trop étroite. La pastille pilote
+  les deux, et force `minTotalViews: 0` (défaut 100000, sinon un plancher
+  cumulé invisible rejette des comptes).
+- `topPosts` n'est **pas** filtré par `minPostViews` (c'est un simple tri) :
+  le filtre par post se fait côté client, sinon le paramètre est décoratif.
+- `publicJob` part aussi au MCP et à la REST : `pending` reste borné
+  (8 candidats, 2 posts chacun), et la route bibliothèque projette les vidéos.
+
 ## Calendrier
 `components/studio/CalendarView.tsx` : une seule `PostCard` pour jour/semaine/
 mois, navigation par flèches selon la vue, résumé calculé sur la période
