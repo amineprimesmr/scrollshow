@@ -4,6 +4,9 @@ import type { AccountVideo } from "../types";
 export const filtersSchema = z.object({
   days: z.number().int().min(1).max(365).default(30),
   minSlideshowShare: z.number().min(0).max(1).default(.5),
+  /** Plancher de vues d'un SEUL post. Les autres seuils sont des agregats par
+   * compte ; celui-ci repond a « trouve-moi des carrousels qui ont marche ». */
+  minPostViews: z.number().min(0).max(1e10).default(0),
   minMedianViews: z.number().min(0).max(1e10).default(0),
   minTotalViews: z.number().min(0).max(1e12).default(100000),
   minFollowers: z.number().int().min(0).max(1e10).default(2000),

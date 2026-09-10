@@ -1,0 +1,84 @@
+/* Compléments à .ss-posttile pour l'usage hors Overview : un mur de posts
+   venus de plusieurs comptes. Le contenu reste opaque, jamais de verre. */
+
+.ss-posttile {
+  display: flex;
+  flex-direction: column;
+}
+
+.ss-posttile__media {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Pastille posée sur la couverture : elle flotte, donc verre autorisé. */
+.ss-posttile__badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.3));
+  -webkit-backdrop-filter: blur(14px) saturate(var(--lg-sat));
+  backdrop-filter: blur(14px) saturate(var(--lg-sat));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.4)),
+    0 2px 8px rgb(var(--lg-shade) / var(--lg-shade-a));
+  color: var(--ss-ink);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+.ss-posttile__author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+  min-width: 0;
+  color: var(--ss-ink);
+  text-decoration: none;
+}
+
+.ss-posttile__author img,
+.ss-posttile__author span {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--ss-soft);
+}
+
+.ss-posttile__author b {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-posttile__author:hover b {
+  text-decoration: underline;
+}
+
+/* L'auteur affiché sépare déjà la couverture des compteurs. */
+.ss-posttile__author + .ss-posttile__counts {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ss-posttile__badge {
+    background: var(--ss-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

@@ -9,7 +9,10 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const params = new URL(request.url).searchParams;
   const days = Math.min(365, Math.max(1, Number(params.get("days")) || 30));
-  return NextResponse.json({ items: await researchLibrary(user, params.get("q") || "", days), discoveryAvailable: researchCapabilities().discovery, capabilities: researchCapabilities() });
+  // Plancher de vues par post : la bibliotheque se relit avec le meme reglage
+  // que la recherche, sinon les resultats affiches ne repondent plus au filtre.
+  const minPostViews = Math.min(1e10, Math.max(0, Number(params.get("minPostViews")) || 0));
+  return NextResponse.json({ items: await researchLibrary(user, params.get("q") || "", days, minPostViews), discoveryAvailable: researchCapabilities().discovery, capabilities: researchCapabilities() });
 }
 export async function POST(request: Request) {
   const user = await readStudioSession();

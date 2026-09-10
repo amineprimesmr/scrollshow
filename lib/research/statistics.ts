@@ -9,7 +9,7 @@ export function quantile(values: number[], q = .5): number | null {
 export function known(p: AccountVideo, key: "views" | "likes" | "comments" | "shares" | "saves") {
   return !p.missingMetrics?.includes(key) && typeof p[key] === "number" && Number.isFinite(p[key]) && p[key]! >= 0;
 }
-export function researchMetrics(videos: AccountVideo[], followers: number, now = Date.now(), days?: number) {
+export function researchMetrics(videos: AccountVideo[], followers: number, now = Date.now(), days?: number, minPostViews = 0) {
   const dedup = new Map<string, AccountVideo>();
   for (const p of videos) if (p.id && p.createdAt > 0 && p.createdAt*1000 <= now && (!days || p.createdAt*1000 >= now-days*86400000)) {
     const prev = dedup.get(p.id);
@@ -31,6 +31,9 @@ export function researchMetrics(videos: AccountVideo[], followers: number, now =
   const threshold = med !== null ? med*2 : null;
   const overperformers = threshold !== null && threshold > 0 ? sample.filter(p=>p.views>=threshold) : [];
   const topPosts = [...sample].sort((a,b)=>b.views-a.views).slice(0,10);
+  // Les carrousels qui franchissent le plancher demande : c'est la mesure qui
+  // repond a « ce compte a-t-il des posts qui fonctionnent ? ».
+  const strongPosts = minPostViews>0 ? sample.filter(p=>p.views>=minPostViews).length : sample.length;
   return {
     samplePosts: valid.length, slideshowPosts: photos.length, measuredSlideshowPosts: sample.length,
     slideshowShare: valid.length ? photos.length/valid.length : null,
@@ -39,7 +42,7 @@ export function researchMetrics(videos: AccountVideo[], followers: number, now =
     medianViewsPerFollower: med !== null && followers>0 ? med/followers : null,
     engagementRate, saveRate: savedViews ? saved.reduce((a,p)=>a+p.saves!,0)/savedViews : null,
     engagementCoverage: sample.length ? interactionPosts.length/sample.length : null,
-    topPostShare: concentration, overperformingPosts: overperformers.length,
+    topPostShare: concentration, overperformingPosts: overperformers.length, strongPosts, minPostViews,
     observedPostsPerWeek: span && valid.length>1 ? Math.round((valid.length-1)/span*70)/10 : null,
     regularity: gaps.length>=4 && gapMedian !== null && gapMedian>0 && gapMad !== null ? Math.round(100/(1+gapMad/gapMedian)) : null,
     sampleFrom: oldest === null ? null : new Date(oldest*1000).toISOString(),
@@ -51,9 +54,11 @@ export function researchMetrics(videos: AccountVideo[], followers: number, now =
   };
 }
 export function evaluateResearch(videos: AccountVideo[], followers: number, filters: ResearchFilters, now = Date.now()) {
-  const metrics = researchMetrics(videos,followers,now,filters.days), reasons: string[]=[];
+  const metrics = researchMetrics(videos,followers,now,filters.days,filters.minPostViews), reasons: string[]=[];
   if (!metrics.samplePosts) reasons.push("no_posts_in_window");
-  if (metrics.measuredSlideshowPosts<filters.minPosts) reasons.push("insufficient_slideshows");
+  // Avec un plancher par post, « assez de carrousels » veut dire « assez de
+  // carrousels qui ont marche », pas simplement « assez de carrousels mesures ».
+  if (metrics.strongPosts<filters.minPosts) reasons.push(filters.minPostViews>0 ? "not_enough_strong_posts" : "insufficient_slideshows");
   if ((metrics.slideshowShare ?? 0)<filters.minSlideshowShare) reasons.push("slideshow_share_below_filter");
   if (filters.minMedianViews>0 && (metrics.medianViews === null || metrics.medianViews<filters.minMedianViews)) reasons.push("median_views_below_filter");
   if (filters.minTotalViews>0 && (metrics.totalViews === null || metrics.totalViews<filters.minTotalViews)) reasons.push("total_views_below_filter");

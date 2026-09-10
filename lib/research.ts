@@ -53,10 +53,10 @@ export async function discoverResearchAccounts(user: SessionUser, keywords: stri
   return startResearch(user, { keywords: keywords.split(",").map(k => k.trim()).filter(Boolean) });
 }
 
-export async function researchLibrary(user: SessionUser, query = "", days = 30) {
+export async function researchLibrary(user: SessionUser, query = "", days = 30, minPostViews = 0) {
   const data = await readStore();
   return data.accounts.filter(a => inScope(a, user) && `${a.handle} ${a.nickname || ""} ${a.bio || ""} ${a.niche} ${a.notes} ${(a.videos || []).flatMap(p => p.hashtags || []).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
-    .map(account => ({ account, metrics: researchMetrics(account.videos || [], account.followers, Date.now(), days), measuredAt: account.videosFetchedAt || null }));
+    .map(account => ({ account, metrics: researchMetrics(account.videos || [], account.followers, Date.now(), days, minPostViews), measuredAt: account.videosFetchedAt || null }));
 }
 
 export async function contentBrief(user: SessionUser) {

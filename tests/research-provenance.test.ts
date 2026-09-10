@@ -65,3 +65,25 @@ test("the follower threshold defaults to 2000 and actually rejects", () => {
   const open = filtersSchema.parse({ minTotalViews: 0, minPosts: 1, minFollowers: 0 });
   assert.equal(evaluateResearch(posts, 87, open, now).accepted, true);
 });
+
+test("the per-post views floor decides which carousels count as working ones", () => {
+  const posts = [photo("a", 5_000), photo("b", 120_000), photo("c", 340_000), photo("d", 900)];
+
+  // Sans plancher, tout carrousel mesure compte.
+  const open = filtersSchema.parse({ minTotalViews: 0, minFollowers: 0, minPosts: 3 });
+  assert.equal(evaluateResearch(posts, 9_000, open, now).accepted, true);
+
+  // Avec un plancher de 100k, seuls deux posts tiennent : trois etaient demandes.
+  const strict = filtersSchema.parse({ minTotalViews: 0, minFollowers: 0, minPosts: 3, minPostViews: 100_000 });
+  const verdict = evaluateResearch(posts, 9_000, strict, now);
+  assert.equal(verdict.accepted, false);
+  assert.deepEqual(verdict.reasons, ["not_enough_strong_posts"], "le motif dit que ce sont les posts forts qui manquent, pas les carrousels");
+  assert.equal(verdict.metrics.strongPosts, 2);
+
+  // Deux suffisaient : le compte passe.
+  const two = filtersSchema.parse({ minTotalViews: 0, minFollowers: 0, minPosts: 2, minPostViews: 100_000 });
+  assert.equal(evaluateResearch(posts, 9_000, two, now).accepted, true);
+
+  // Le plancher ne touche ni la mediane ni le palmares, qui restent sur tout l'echantillon.
+  assert.equal(evaluateResearch(posts, 9_000, strict, now).metrics.topPosts[0].views, 340_000);
+});
