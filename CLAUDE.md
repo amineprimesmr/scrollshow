@@ -245,3 +245,7 @@ renouvellements, résiliations, remboursements — sans appel par événement.
   réparer RevenueCat. La trace `revenuecat_declare_failed` est le rattrapage.
 - Les abonnés antérieurs au branchement ne remontent pas seuls :
   `npm run revenuecat:backfill` (à blanc) puis `-- --apply`.
+- ScrollShow facture depuis son propre compte Stripe `Scrollshow`
+  (`acct_1UE4ENQSj8XJlvHm`, organisation `Process`), lu par le seul projet
+  RevenueCat `ScrollShow` (`0d6bdeb6`, config `app68f82b22c2`). État et étapes
+  restantes : `docs/revenuecat-2026-09-10.md`.
