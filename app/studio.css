@@ -7677,7 +7677,7 @@ body.ss-dragging .ss-day:hover {
 
 .ss-drag-ghost.is-doomed .ss-post {
   transform: scale(0.92) rotate(0deg);
-  border-color: var(--ss-danger, #e5484d);
+  border-color: var(--ss-err-fg);
   opacity: 0.8;
 }
 

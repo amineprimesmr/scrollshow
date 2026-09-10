@@ -11,7 +11,8 @@ import { PostViewer } from "./PostViewer";
 import { TikTokScanLine } from "./TikTokScan";
 import { IconCheck, IconChevron } from "./icons";
 import { coverSrc } from "./cover";
-import { carriesPost, keepErrorLabel, keepInLibrary, setDragPayload } from "./library-drop";
+import { keepErrorLabel, keepInLibrary } from "./library-drop";
+import { useKeepDrag } from "./useKeepDrag";
 import { Metal } from "@/components/fx/Metal";
 import { Orb } from "@/components/fx/Orb";
 import "./research.css";
@@ -217,6 +218,7 @@ export function ResearchView() {
   // qu'une tuile deja gardee le dise quel que soit le geste employe.
   const [keeping, setKeeping] = useState<string | null>(null);
   const [kept, setKept] = useState<Record<string, true>>({});
+  const keepingRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -428,16 +430,21 @@ export function ResearchView() {
     }
   }
 
-  async function keep(post: AccountVideo, handle: string) {
-    const url = post.url || (handle ? `https://www.tiktok.com/@${handle}/photo/${post.id}` : "");
-    if (!url || keeping) return;
+  const keep = useCallback(async ({ post, url }: { post: AccountVideo; url: string }) => {
+    if (!url || keepingRef.current) return;
+    keepingRef.current = post.id;
     setKeeping(post.id);
     setError("");
     const result = await keepInLibrary(url);
+    keepingRef.current = null;
     setKeeping(null);
     if (result.ok) setKept((current) => ({ ...current, [post.id]: true }));
     else setError(result.error);
-  }
+  }, []);
+
+  // Le glissement reprend exactement le geste du calendrier : fantome sous le
+  // pointeur, tuile d'origine estompee, cible flottante qui grossit.
+  const keepDrag = useKeepDrag({ english, onKeep: keep });
 
   async function stop() {
     if (!activeId) return;
@@ -545,9 +552,9 @@ export function ResearchView() {
               return (
                 <li
                   key={`${row.account.handle}:${row.post.id}`}
+                  className={keepDrag.draggedId === row.post.id ? "is-lifted" : undefined}
                   style={{ "--i": Math.min(i, 11) } as CSSProperties}
-                  draggable
-                  onDragStart={(event) => setDragPayload(event, { url: row.post.url, handle: row.account.handle, cover: row.post.cover })}
+                  {...keepDrag.handlers({ post: row.post, handle: row.account.handle, url: row.post.url })}
                 >
                   <PostTile
                     post={row.post}
@@ -560,7 +567,7 @@ export function ResearchView() {
                         type="button"
                         className="ss-rs__keep"
                         disabled={keeping === row.post.id || kept[row.post.id]}
-                        onClick={() => void keep(row.post, row.account.handle)}
+                        onClick={() => void keep({ post: row.post, url: row.post.url })}
                       >
                         {kept[row.post.id]
                           ? tr("Dans la bibliothèque", "In the library")
@@ -623,6 +630,8 @@ export function ResearchView() {
           </p>
         </section>
       )}
+
+      {keepDrag.overlay}
 
       {open ? (
         <PostViewer
