@@ -1,0 +1,608 @@
+/* Bibliothèque — un mur de carrousels, une barre, rien d'autre.
+   Namespace .ss-lib : rien n'est hérité de l'ancienne page marketplace.
+   Le verre va sur la barre, le champ, les pastilles et les menus (chrome
+   flottant). Les cartes restent opaques : ce sont les carrousels qu'on lit. */
+
+.ss-lib {
+  --lib-ease: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --lib-out: cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* ── La barre ──────────────────────────────────────────────────────────── */
+.ss-lib__bar {
+  position: sticky;
+  top: 0;
+  z-index: 14;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px);
+  gap: 10px 20px;
+  padding: 14px 22px 12px;
+  background: rgb(var(--lg-rgb) / 0.5);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow: inset 0 -1px 0 rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.35));
+}
+
+.ss-lib__title { min-width: 0; align-self: center; }
+
+.ss-lib__title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ss-lib__title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ss-muted);
+  animation: ss-flash-in 0.32s var(--lib-out) both;
+}
+
+/* ── Le champ de recherche ─────────────────────────────────────────────── */
+.ss-lib__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  min-height: 42px;
+  padding: 0 6px 0 13px;
+  border-radius: 999px;
+  color: var(--ss-muted);
+  transition: transform 0.34s var(--lib-ease);
+}
+
+.ss-lib__field:focus-within { color: var(--ss-ink); transform: translateY(-1px); }
+
+.ss-lib__field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ss-ink);
+  outline: none;
+}
+
+.ss-lib__field input::placeholder { color: var(--ss-muted-2); }
+
+.ss-lib__clear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  cursor: pointer;
+  transition: transform 0.34s var(--lib-ease), color 0.2s ease;
+}
+
+.ss-lib__clear:hover { color: var(--ss-ink); }
+.ss-lib__clear:active { transform: scale(0.9); }
+
+/* ── Onglets, filtres et actions ───────────────────────────────────────── */
+.ss-lib__tools {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-lib__spacer { flex: 1; min-width: 0; }
+
+.ss-lib__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+}
+
+.ss-lib__tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ss-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.24s var(--lib-ease), color 0.2s ease, transform 0.34s var(--lib-ease);
+}
+
+.ss-lib__tabs button:active { transform: scale(0.96); }
+
+.ss-lib__tabs button.is-on {
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+}
+
+.ss-lib__tabs b { font-size: 11px; font-weight: 750; opacity: 0.65; font-variant-numeric: tabular-nums; }
+
+.ss-lib__filters { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.ss-lib__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ss-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.34s var(--lib-ease), color 0.2s ease;
+}
+
+.ss-lib__pill:active { transform: scale(0.96); }
+.ss-lib__pill svg { color: var(--ss-muted); }
+.ss-lib__pill b { font-size: 11px; font-weight: 750; color: var(--ss-muted); font-variant-numeric: tabular-nums; }
+
+.ss-lib__pill.is-on {
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+  box-shadow: none;
+}
+
+.ss-lib__pill.is-on b,
+.ss-lib__pill.is-on svg { color: inherit; opacity: 0.7; }
+
+.ss-lib__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.34s var(--lib-ease), opacity 0.2s ease;
+}
+
+.ss-lib__cta:active { transform: scale(0.96); }
+.ss-lib__cta:disabled { opacity: 0.5; cursor: default; }
+
+/* ── L'import ──────────────────────────────────────────────────────────── */
+.ss-lib-import {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.28));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    0 10px 30px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.7));
+  animation: lg-pop 0.34s var(--lib-ease) both;
+}
+
+.ss-lib-import p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ss-muted);
+}
+
+.ss-lib-import__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ss-lib-import input[type="url"] {
+  flex: 1;
+  min-width: 220px;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-card);
+  box-shadow: inset 0 0 0 1px var(--ss-line);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ss-ink);
+  outline: none;
+}
+
+.ss-lib-import input[type="url"]:focus { box-shadow: inset 0 0 0 1px var(--ss-ink); }
+
+.ss-lib-import label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ss-lib__err {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ss-err-fg);
+  animation: ss-flash-in 0.24s var(--lib-out) both;
+}
+
+/* ── Le mur ────────────────────────────────────────────────────────────── */
+.ss-lib__wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 18px 22px 72px;
+  list-style: none;
+}
+
+.ss-lib__wall > li {
+  min-width: 0;
+  animation: ss-fade-up 0.5s var(--lib-out) both;
+  animation-delay: calc(min(var(--i, 0), 11) * 28ms);
+}
+
+.ss-lib-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 20px;
+  background: var(--ss-card);
+  box-shadow: inset 0 0 0 1px var(--ss-line), var(--ss-shadow);
+  transition: transform 0.4s var(--lib-ease), box-shadow 0.4s var(--lib-ease), opacity 0.24s ease;
+}
+
+.ss-lib__wall > li:hover .ss-lib-card {
+  transform: translateY(-3px);
+  box-shadow: inset 0 0 0 1px var(--ss-line), 0 14px 34px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.85));
+}
+
+.ss-lib-card.is-busy { opacity: 0.55; pointer-events: none; }
+
+/* La couverture : l'aperçu est rendu à largeur fixe puis mis à l'échelle sur
+   la largeur réelle de la carte, mesurée une fois pour tout le mur (--k).
+   Étirer l'aperçu en CSS fausserait la taille des textes, calculée en px
+   depuis PREVIEW_WIDTH. */
+.ss-lib-card__cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+  background: var(--ss-soft);
+  cursor: pointer;
+}
+
+.ss-lib-card__scale {
+  display: block;
+  width: 300px;
+  transform-origin: top left;
+  transform: scale(var(--k, 1));
+}
+
+.ss-lib-card__scale .ss-slide-preview { border-radius: 0; }
+
+.ss-lib-card__slides,
+.ss-lib-card__views {
+  position: absolute;
+  top: 9px;
+  z-index: 3;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.3));
+  -webkit-backdrop-filter: blur(14px) saturate(var(--lg-sat));
+  backdrop-filter: blur(14px) saturate(var(--lg-sat));
+  box-shadow: inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.4));
+  color: var(--ss-ink);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.ss-lib-card__slides { left: 9px; }
+.ss-lib-card__views { right: 9px; }
+
+.ss-lib-card__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.06), rgb(0 0 0 / 0.34));
+  opacity: 0;
+  transition: opacity 0.3s var(--lib-out);
+}
+
+.ss-lib__wall > li:hover .ss-lib-card__veil,
+.ss-lib-card__cover:focus-visible .ss-lib-card__veil { opacity: 1; }
+
+.ss-lib-card__veil span {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  color: #0a0a0a;
+  font-size: 12.5px;
+  font-weight: 750;
+  transform: translateY(6px);
+  transition: transform 0.34s var(--lib-ease);
+}
+
+.ss-lib__wall > li:hover .ss-lib-card__veil span { transform: none; }
+
+/* ── Le pied de carte ──────────────────────────────────────────────────── */
+.ss-lib-card__foot {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 13px 13px;
+}
+
+.ss-lib-card__foot > p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.38;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ss-lib-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+}
+
+.ss-lib-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.ss-lib-tag.is-published { background: var(--ss-ok-bg); color: var(--ss-ok-fg); }
+.ss-lib-tag.is-scheduled { background: var(--ss-info-bg); color: var(--ss-info-fg); }
+.ss-lib-tag.is-draft { background: var(--ss-soft); color: var(--ss-muted); }
+
+.ss-lib-card__handle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-muted-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-lib-card__acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-lib-card__go {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: transform 0.34s var(--lib-ease), background 0.2s ease;
+}
+
+.ss-lib-card__go:hover { background: var(--ss-line); }
+.ss-lib-card__go:active { transform: scale(0.96); }
+.ss-lib-card__go:disabled { opacity: 0.5; cursor: default; }
+.ss-lib-card__go svg { flex: none; }
+
+/* ── Le menu d'une carte ───────────────────────────────────────────────── */
+.ss-lib-menu-wrap { position: relative; flex: none; }
+
+.ss-lib-more {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  cursor: pointer;
+  transition: transform 0.34s var(--lib-ease), background 0.2s ease, color 0.2s ease;
+}
+
+.ss-lib-more:hover { background: var(--ss-line); color: var(--ss-ink); }
+.ss-lib-more:active { transform: scale(0.92); }
+
+.ss-lib-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  min-width: 208px;
+  padding: 6px;
+  border-radius: 18px;
+  background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.32));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    0 14px 40px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.9));
+  animation: lg-pop 0.3s var(--lib-ease) both;
+}
+
+.ss-lib-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ss-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 620;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ss-lib-menu button:hover { background: var(--ss-soft); }
+.ss-lib-menu button:disabled { opacity: 0.45; cursor: default; }
+.ss-lib-menu button svg { flex: none; color: var(--ss-muted); }
+
+.ss-lib-card__copied {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ss-ok-fg);
+  animation: ss-flash-in 0.24s var(--lib-out) both;
+}
+
+/* ── Le vide ───────────────────────────────────────────────────────────── */
+.ss-lib-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin: 18px 22px 22px;
+  padding: 42px 30px;
+  border-radius: 24px;
+  background: var(--ss-card);
+  box-shadow: inset 0 0 0 1px var(--ss-line), var(--ss-shadow);
+  animation: ss-fade-up 0.45s var(--lib-out) both;
+}
+
+.ss-lib-empty__mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+}
+
+.ss-lib-empty h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+}
+
+.ss-lib-empty p {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ss-muted);
+}
+
+.ss-lib-empty__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+/* ── Petits écrans ─────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .ss-lib__bar { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .ss-lib__bar { padding: 12px 14px 10px; }
+  .ss-lib__wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 14px 56px; }
+  .ss-lib-card__go { font-size: 11px; padding: 0 8px; }
+  .ss-lib-empty { margin: 14px; padding: 32px 20px; }
+}
+
+/* Le verre restauré en opaque. Écrit ici et pas via les tokens : theme.css les
+   redéfinit sur le thème sombre, ce qui annulerait la restauration globale. */
+@media (prefers-reduced-transparency: reduce) {
+  .ss-lib__bar,
+  .ss-lib__field,
+  .ss-lib__tabs,
+  .ss-lib__pill,
+  .ss-lib-import,
+  .ss-lib-menu,
+  .ss-lib-card__slides,
+  .ss-lib-card__views {
+    background: var(--ss-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .ss-lib__bar { box-shadow: inset 0 -1px 0 var(--ss-line); }
+  .ss-lib__field,
+  .ss-lib__tabs,
+  .ss-lib__pill,
+  .ss-lib-card__slides,
+  .ss-lib-card__views { box-shadow: inset 0 0 0 1px var(--ss-line); }
+  .ss-lib-import,
+  .ss-lib-menu { box-shadow: 0 12px 40px rgb(0 0 0 / 0.14), inset 0 0 0 1px var(--ss-line); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-lib__wall > li,
+  .ss-lib-menu,
+  .ss-lib-import,
+  .ss-lib-empty,
+  .ss-lib__title p,
+  .ss-lib-card__copied,
+  .ss-lib__err { animation: none; }
+  .ss-lib-card,
+  .ss-lib-card__veil,
+  .ss-lib-card__veil span,
+  .ss-lib__field,
+  .ss-lib__cta,
+  .ss-lib__pill,
+  .ss-lib-more,
+  .ss-lib-card__go { transition: none; }
+  .ss-lib__wall > li:hover .ss-lib-card { transform: none; }
+}
