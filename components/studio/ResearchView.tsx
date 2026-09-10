@@ -195,7 +195,8 @@ function SlideText({ accountId, postId, tr }: { accountId: string; postId: strin
 }
 
 export function ResearchView() {
-  const { english } = useStudio();
+  // `posts` est la bibliotheque du projet : elle dit ce qui est deja garde.
+  const { english, posts: library } = useStudio();
   const tr = useCallback((fr: string, en: string) => t(fr, en, english), [english]);
 
   const [query, setQuery] = useState("");
@@ -219,6 +220,10 @@ export function ResearchView() {
   const [keeping, setKeeping] = useState<string | null>(null);
   const [kept, setKept] = useState<Record<string, true>>({});
   const keepingRef = useRef<string | null>(null);
+  // Une tuile gardee quitte le mur, mais pas d'un coup : elle joue sa sortie
+  // avant de disparaitre, sinon le clic donne l'impression d'avoir casse quelque chose.
+  const [leaving, setLeaving] = useState<Record<string, true>>({});
+  const [gone, setGone] = useState<Record<string, true>>({});
 
   const load = useCallback(async () => {
     try {
@@ -278,6 +283,16 @@ export function ResearchView() {
     };
   }, [activeId, load]);
 
+  // Un carrousel deja garde n'a plus rien a faire dans la decouverte. La
+  // reconstruction en editable suffixe l'identifiant : on le neutralise.
+  const keptIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const post of library) {
+      if (post.tiktokId) ids.add(post.tiktokId.replace(/-editable$/, ""));
+    }
+    return ids;
+  }, [library]);
+
   const runHandles = useMemo(
     () => new Set((run?.results || []).map((r) => r.handle).concat((run?.pending || []).map((c) => c.handle))),
     [run],
@@ -319,6 +334,9 @@ export function ResearchView() {
           && !(post.matchedKeywords || []).some((k) => runKeywords.has(k.toLowerCase()))) continue;
         if (minPostViews > 0 && (post.missingMetrics?.includes("views") || post.views < minPostViews)) continue;
         if (post.createdAt > 0 && post.createdAt * 1000 < floor) continue;
+        // Deja garde : on le retire, sauf le temps de sa sortie.
+        if (gone[post.id]) continue;
+        if (keptIds.has(post.id) && !leaving[post.id]) continue;
         rows.push({ post, account: item.account, metrics: item.metrics });
       }
       if (rows.length) byAccount.set(item.account.handle, rows.sort((a, b) => b.post.views - a.post.views));
@@ -367,7 +385,9 @@ export function ResearchView() {
       ? tr("On fouille TikTok…", "Digging through TikTok…")
       : wall.length
       ? `${wall.length} ${plural(wall.length, tr("carrousel", "carousel"), tr("carrousels", "carousels"))} · ${accounts} ${plural(accounts, tr("compte", "account"), tr("comptes", "accounts"))} · ${viewLabel(minPostViews)} · ${dayLabel(days)}`
-      : items.length
+      : keptIds.size && items.length
+        ? tr("Tout est déjà dans ta bibliothèque", "Everything is already in your library")
+        : items.length
         ? tr(`Aucun carrousel au-dessus de ${viewLabel(minPostViews)} sur ${dayLabel(days)}`, `No carousel above ${viewLabel(minPostViews)} over the ${dayLabel(days)}`)
         : tr("Lance une recherche pour trouver des carrousels qui marchent", "Run a search to find carousels that work");
 
@@ -438,8 +458,20 @@ export function ResearchView() {
     const result = await keepInLibrary(url);
     keepingRef.current = null;
     setKeeping(null);
-    if (result.ok) setKept((current) => ({ ...current, [post.id]: true }));
-    else setError(result.error);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setKept((current) => ({ ...current, [post.id]: true }));
+    setLeaving((current) => ({ ...current, [post.id]: true }));
+    window.setTimeout(() => {
+      setGone((current) => ({ ...current, [post.id]: true }));
+      setLeaving((current) => {
+        const next = { ...current };
+        delete next[post.id];
+        return next;
+      });
+    }, 420);
   }, []);
 
   // Le glissement reprend exactement le geste du calendrier : fantome sous le
@@ -552,7 +584,7 @@ export function ResearchView() {
               return (
                 <li
                   key={`${row.account.handle}:${row.post.id}`}
-                  className={keepDrag.draggedId === row.post.id ? "is-lifted" : undefined}
+                  className={[keepDrag.draggedId === row.post.id ? "is-lifted" : "", leaving[row.post.id] ? "is-kept" : ""].filter(Boolean).join(" ") || undefined}
                   style={{ "--i": Math.min(i, 11) } as CSSProperties}
                   {...keepDrag.handlers({ post: row.post, handle: row.account.handle, url: row.post.url })}
                 >

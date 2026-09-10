@@ -337,3 +337,18 @@
   .ss-keep-ghost { animation: none; transition: none; rotate: 0deg; scale: 1; }
   .ss-keep-target { animation: none; transition: none; }
 }
+
+/* La tuile gardee s'en va vers la bibliotheque au lieu de disparaitre net. */
+.ss-rs__wall > li.is-kept {
+  animation: ss-rs-kept 0.42s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  pointer-events: none;
+}
+
+@keyframes ss-rs-kept {
+  40% { transform: translateY(-6px) scale(1.02); opacity: 1; }
+  100% { transform: translateY(26px) scale(0.86); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-rs__wall > li.is-kept { animation: none; opacity: 0; }
+}
