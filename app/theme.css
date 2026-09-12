@@ -26,6 +26,7 @@
   --ss-pink-bg: #fff1f6;
   --ss-pink-line: #f3c4d6;
   --ss-pink-fg: #c43b73;
+  --ss-link: #0b62d6;
   --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
   --ss-glass-rgb: 255 255 255;
   --ss-scheme: light;
@@ -67,6 +68,7 @@ html[data-theme="dark"] {
   --ss-pink-bg: #240d19;
   --ss-pink-line: #831843;
   --ss-pink-fg: #f472b6;
+  --ss-link: #6aa8ff;
   --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
   --ss-glass-rgb: 11 11 13;
   --ss-scheme: dark;
@@ -109,7 +111,8 @@ html[data-theme="dark"] {
     --ss-pink-bg: #240d19;
     --ss-pink-line: #831843;
     --ss-pink-fg: #f472b6;
-    --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+    --ss-link: #6aa8ff;
+  --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
     --ss-scheme: dark;
     --ss-glass-rgb: 11 11 13;
     /* Liquid Glass */

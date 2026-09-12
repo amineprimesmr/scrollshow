@@ -4,7 +4,7 @@ export const PROJECT_COOKIE = "ss_project";
 
 /** Entites possedees par un projet. Toute nouvelle collection scopee doit etre
  * ajoutee ici, sinon la retro-migration la laisserait orpheline. */
-const OWNED = ["accounts", "runs", "channels", "posts", "media", "apiKeys"] as const;
+const OWNED = ["accounts", "runs", "channels", "posts", "media", "apiKeys", "researchJobs", "formatStudies"] as const;
 
 export function projectName(user: User): string {
   const business = user.business?.name?.trim();
@@ -31,6 +31,13 @@ export function ensureUserProjects(data: StoreData, user: User): Project {
     const migrated = existing.find((item) => item.id === `prj_${user.id}_1`);
     if (migrated && !migrated.completedAt) migrated.completedAt = accountOnboardedAt(user);
     const preferred = existing.find((item) => item.id === user.lastProjectId);
+    // Unassigned legacy content belongs to the original workspace, never to
+    // whichever workspace the user most recently opened. Preserve archives.
+    const original = data.projects.find(item => item.userId === user.id && item.id === `prj_${user.id}_1`)
+      || [...existing].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
+    for (const key of OWNED) for (const row of data[key] || []) {
+      if (row.userId === user.id && !row.projectId) row.projectId = original.id;
+    }
     return preferred || existing[0];
   }
   const project: Project = {
@@ -129,11 +136,10 @@ export function withProject<T extends PublicUser>(user: T, project: Project | nu
 
 /** Une ligne appartient-elle au projet actif du demandeur ?
  * - jamais si elle est a un autre compte ;
- * - une ligne sans projet (jamais rattachee) reste visible : mieux vaut un
- *   contenu partage entre projets qu'un contenu qui disparait ;
+ * - une ligne sans projet est retro-migree a la lecture, jamais partagee ;
  * - un demandeur sans projet actif (chemin ancien) voit tout son compte. */
 export function inScope(row: { userId: string; projectId?: string }, user: Pick<SessionUser, "id" | "projectId">): boolean {
   if (row.userId !== user.id) return false;
-  if (!user.projectId || !row.projectId) return true;
+  if (!user.projectId) return true;
   return row.projectId === user.projectId;
 }

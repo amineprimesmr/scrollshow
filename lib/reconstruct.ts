@@ -1,3 +1,4 @@
+import { withMediaUser, validateMediaInput, type MediaUser } from "./media-permissions";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { readSlideBytes } from "./media-files";
@@ -206,7 +207,14 @@ async function reconstructWithVision(recipe: CarouselRecipe): Promise<CarouselRe
   };
 }
 
-export async function reconstructRecipe(recipe: CarouselRecipe): Promise<CarouselRecipe> {
+export async function reconstructRecipe(recipe: CarouselRecipe, user?: MediaUser): Promise<CarouselRecipe> {
+  if (user) {
+    await validateMediaInput(recipe, user);
+    return withMediaUser(user, () => reconstruct(recipe));
+  }
+  return reconstruct(recipe);
+}
+async function reconstruct(recipe: CarouselRecipe): Promise<CarouselRecipe> {
   if (!recipe.slides.length) throw new ReconstructError("no_slides", 400);
   // Default: OCR only — keep the photos, lift the on-slide texts. Vision waits on AI Gateway
   // (often a billing 403) and made reconstruct look "stuck" for minutes.

@@ -1,3 +1,4 @@
+import { publishingEnabled } from "@/lib/publishing-config";
 import { reconcilePendingPublishes, runScheduledPublishes } from "@/lib/publish-queue";
 import { NextResponse } from "next/server";
 import { monitoredOperation, opsAuthorized } from "@/lib/operations";
@@ -6,6 +7,7 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   if (!opsAuthorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!publishingEnabled()) return NextResponse.json({ ok: true, skipped: true, reason: "tiktok_approval_pending" });
   try {
     const result = await monitoredOperation("publish", async () => {
       const published = await runScheduledPublishes();

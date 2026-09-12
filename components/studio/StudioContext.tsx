@@ -62,7 +62,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [editing, setEditing] = useState<StudioPost | null>(null);
   const [composeDate, setComposeDate] = useState<string | null>(null);
 
+  const projectRef = useRef<string | undefined>(undefined);
   const applySnapshot = useCallback((json: StudioSnapshot) => {
+    if (projectRef.current && projectRef.current !== json.user.projectId) {
+      setActiveChannel("all"); setEditing(null); setPostOpen(false); setAddOpen(false); setComposeDate(null);
+    }
+    projectRef.current = json.user.projectId;
     setUser(json.user);
     setChannels(json.channels || []);
     setPosts(json.posts || []);
@@ -111,7 +116,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       initial = false;
       try { await sync.refresh(); failures = 0; } catch { failures += 1; }
       clearTimeout(timer);
-      if (active()) timer = setTimeout(refresh, Math.min(5_000 * 2 ** failures, 30_000));
+      if (active()) timer = setTimeout(refresh, Math.min(30_000 * 2 ** failures, 120_000));
     }
     function wake() { void refresh(); }
     function offline() { clearTimeout(timer); setSyncError("offline"); }

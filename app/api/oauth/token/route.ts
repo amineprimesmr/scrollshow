@@ -1,5 +1,3 @@
-import { hasStudioAccess } from "@/lib/plans";
-import { readStore } from "@/lib/store";
 import {
   canonicalResource,
   consumeCode,
@@ -8,7 +6,7 @@ import {
   rotateRefreshToken,
   verifyPkce,
 } from "@/lib/oauth";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +20,8 @@ function fail(error: string, description: string, status = 400) {
 }
 
 /** Echange du code, puis renouvellement. Clients publics : PKCE fait foi. */
-export async function POST(request: Request) {
+async function exchange(request: Request) {
+  if (!await consumePublicAuthLimit(request, "oauth-token", 120)) return fail("temporarily_unavailable", "Too many token requests.", 429);
   const form = await request.formData().catch(() => null);
   if (!form) return fail("invalid_request", "Expected application/x-www-form-urlencoded.");
   const value = (key: string) => String(form.get(key) || "").trim();
@@ -53,6 +52,7 @@ export async function POST(request: Request) {
     const tokens = await issueTokens({
       clientId,
       userId: record.userId,
+      projectId: record.projectId,
       resource: record.resource,
       scope: record.scope,
     });
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   if (grantType === "refresh_token") {
     const refresh = value("refresh_token");
     if (!refresh) return fail("invalid_request", "Missing refresh_token.");
-    const outcome = await rotateRefreshToken(refresh, clientId);
+    const outcome = await rotateRefreshToken(refresh, clientId, value("resource"));
     if ("error" in outcome) {
       return fail("invalid_grant", outcome.error === "replay"
         ? "This refresh token was already used. The whole authorization has been revoked."
@@ -73,20 +73,7 @@ export async function POST(request: Request) {
     }
 
     const grant = outcome.grant;
-    // Le compte peut avoir disparu entre-temps : on relit avant de reconduire.
-    const data = await readStore();
-    const user = data.users.find((item) => item.id === grant.userId);
-    if (!user || user.deletionPendingAt || !user.emailVerifiedAt) {
-      return fail("invalid_grant", "The ScrollShow account is no longer available.");
-    }
-
-    const tokens = await issueTokens({
-      clientId,
-      userId: grant.userId,
-      resource: grant.resource,
-      scope: grant.scope || OAUTH_SCOPE,
-      grantId: grant.grantId,
-    });
+    const tokens = outcome.tokens;
     return Response.json(
       { access_token: tokens.accessToken, token_type: "Bearer", expires_in: tokens.expiresIn, refresh_token: tokens.refreshToken, scope: grant.scope || OAUTH_SCOPE },
       { headers: cors },
@@ -98,4 +85,13 @@ export async function POST(request: Request) {
 
 export function OPTIONS() {
   return new Response(null, { status: 204, headers: cors });
+}
+
+export async function POST(request: Request) {
+  try { return await exchange(request); }
+  catch (error) {
+    if (error instanceof Error && error.message === "oauth_account_unavailable") return fail("invalid_grant", "The account or consented workspace is no longer available.");
+    console.error("oauth_exchange_unavailable", { code: (error as { code?: string })?.code });
+    return fail("temporarily_unavailable", "ScrollShow is temporarily unavailable. Keep your saved authorization and retry later.", 503);
+  }
 }

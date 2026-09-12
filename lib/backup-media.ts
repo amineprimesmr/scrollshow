@@ -52,6 +52,11 @@ export function quarantineRestoredStore(data: CompleteBackup): StoreData {
   restored.operations = {};
   restored.restoreReviewRequired = true;
   restored.apiKeys = [];
+  restored.revenueCatOutbox = [];
+  restored.oauthTokens = [];
+  restored.oauthCodes = [];
+  restored.oauthUsedRefresh = [];
+  restored.tiktokQrAttempts = [];
   for (const user of restored.users) {
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     delete user.recoveryHash; delete user.recoveryExpiresAt;

@@ -1,5 +1,5 @@
 import { resolveStoreUserId } from "./local-user";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
 import { refreshAccessToken } from "./tiktok";
 import type { Channel, SessionUser } from "./types";
 import { inScope } from "./projects";
@@ -10,7 +10,7 @@ async function refreshChannelIfNeeded(channel: Channel): Promise<Channel> {
 
   try {
     const tokens = await refreshAccessToken(channel.refreshToken);
-    return updateStore((store) => {
+    return updateStoreSlice(["channels"], (store) => {
       const current = store.channels.find((item) => item.id === channel.id);
       if (!current) return channel;
       current.accessToken = tokens.access_token;
@@ -32,7 +32,7 @@ function connectedChannels(data: { channels: Channel[] }, userId: string, projec
 }
 
 export async function loadTikTokChannel(userId: string, channelId?: string, projectId?: string): Promise<Channel | null> {
-  const data = await readStore();
+  const data = await readStoreSlice(["channels"]);
   const channels = connectedChannels(data, userId, projectId);
   if (!channelId && channels.length > 1) throw new Error("channel_required");
   const channel = channelId ? channels.find(item => item.id === channelId) : channels[0];
@@ -47,13 +47,13 @@ export async function loadTikTokChannel(userId: string, channelId?: string, proj
  * other connected account's videos and views.
  */
 export async function loadTikTokChannels(userId: string, projectId?: string): Promise<Channel[]> {
-  const data = await readStore();
+  const data = await readStoreSlice(["channels"]);
   const channels = connectedChannels(data, userId, projectId);
   return Promise.all(channels.map((channel) => refreshChannelIfNeeded(channel)));
 }
 
 export async function tiktokUserId(session: Pick<SessionUser, "id" | "email">) {
-  return resolveStoreUserId(await readStore(), session);
+  return resolveStoreUserId(await readStoreSlice(["channels"]), session);
 }
 
 export async function loadTikTokChannelForSession(session: Pick<SessionUser, "id" | "email" | "projectId">, channelId?: string) {

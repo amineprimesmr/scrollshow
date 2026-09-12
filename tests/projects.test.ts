@@ -84,12 +84,12 @@ test("the last remaining project cannot be archived", () => {
   assert.equal(archiveProject(data, "u1", "prj_inconnu"), null);
 });
 
-test("inScope isolates projects but never hides unassigned or legacy-path content", () => {
+test("inScope isolates projects, including unassigned content", () => {
   const me = { id: "u1", projectId: "p1" };
   assert.equal(inScope({ userId: "u1", projectId: "p1" }, me), true);
   assert.equal(inScope({ userId: "u1", projectId: "p2" }, me), false, "un autre projet du meme compte est invisible");
   assert.equal(inScope({ userId: "u2", projectId: "p1" }, me), false, "jamais le contenu d'un autre compte, meme avec le meme id de projet");
-  assert.equal(inScope({ userId: "u1" }, me), true, "une ligne jamais rattachee reste visible plutot que de disparaitre");
+  assert.equal(inScope({ userId: "u1" }, me), false, "une ligne non migree ne doit pas etre partagee entre projets");
   assert.equal(inScope({ userId: "u1", projectId: "p2" }, { id: "u1" }), true, "un appelant sans projet (chemin ancien) voit tout son compte");
 });
 

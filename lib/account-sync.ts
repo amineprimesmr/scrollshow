@@ -2,12 +2,14 @@ import { fetchAccountVideoPage, metricsEnabled } from "./metrics";
 import { fetchTikTokProfile } from "./tiktok-profile";
 import { loadTikTokChannel } from "./tiktok-account";
 import { fetchUserInfo, profileFieldsForScopes, listVideoPage, type TikTokVideo } from "./tiktok";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts", "channels"], fn);
 import type { AccountVideo, StoreData, VideoSync } from "./types";
 
 export function officialAccountVideo(v: TikTokVideo, handle: string): AccountVideo {
   return {
     id: String(v.id), title: v.title || v.video_description || "", cover: v.cover_image_url || "",
+    missingMetrics: (["views", "likes", "comments", "shares"] as const).filter((_, index) => !Number.isFinite([v.view_count, v.like_count, v.comment_count, v.share_count][index])),
     views: Number(v.view_count ?? 0), likes: Number(v.like_count ?? 0),
     comments: Number(v.comment_count ?? 0), shares: Number(v.share_count ?? 0),
     kind: v.share_url?.includes("/photo/") ? "photo" : "video",
@@ -35,7 +37,9 @@ export async function syncAccountPosts(userId: string, key: string, restart = fa
 }
 
 async function syncPage(userId: string, key: string, restart: boolean) {
-  const target = targetIn(await readStore(), userId, key);
+  // Le cache de videos est garde (la synchronisation s'appuie dessus), mais ni
+  // les recherches ni le texte des slides ne sont transferes.
+  const target = targetIn(await readStoreSlice(["accounts", "channels"], { videos: true }), userId, key);
   if (!target) throw new Error("missing");
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;
@@ -66,9 +70,9 @@ async function syncPage(userId: string, key: string, restart: boolean) {
       if (current.videoSync?.updatedAt !== target.videoSync?.updatedAt) return;
       const seenIds = [...new Set([...(previous?.seenIds || []), ...page.videos.map(v => v.id)])];
       const merged = new Map((current.videos || []).map(v => [v.id, v]));
-      for (const video of page.videos) merged.set(video.id, video);
+      for (const video of page.videos) merged.set(video.id, mergeAccountVideo(merged.get(video.id), video));
       const seen = new Set(seenIds);
-      current.videos = [...merged.values()].filter(v => page.hasMore || seen.has(v.id)).sort((a, b) => b.createdAt - a.createdAt);
+      current.videos = [...merged.values()].filter(v => page.hasMore || seen.has(v.id) || Boolean(v.matchedKeywords?.length)).sort((a, b) => b.createdAt - a.createdAt);
       const now = new Date().toISOString();
       current.videosFetchedAt = now;
       current.videoSync = { source, cursor: page.cursor, hasMore: page.hasMore, complete: !page.hasMore, seenIds, updatedAt: now };
@@ -97,4 +101,13 @@ async function syncPage(userId: string, key: string, restart: boolean) {
     });
     throw new Error(code);
   }
+}
+
+/** Refresh measured fields while retaining research provenance and media. */
+export function mergeAccountVideo(previous: AccountVideo | undefined, fresh: AccountVideo): AccountVideo {
+  if (!previous) return fresh;
+  const merged = { ...previous, ...fresh };
+  merged.matchedKeywords = [...new Set([...(previous.matchedKeywords || []), ...(fresh.matchedKeywords || [])])];
+  if (!fresh.images?.length && previous.images?.length) merged.images = previous.images;
+  return merged;
 }

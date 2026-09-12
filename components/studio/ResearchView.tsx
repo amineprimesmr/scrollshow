@@ -11,6 +11,8 @@ import { PostViewer } from "./PostViewer";
 import { TikTokScanLine } from "./TikTokScan";
 import { IconCheck, IconChevron } from "./icons";
 import { coverSrc } from "./cover";
+import { keepErrorLabel, keepInLibrary } from "./library-drop";
+import { useKeepDrag } from "./useKeepDrag";
 import { Metal } from "@/components/fx/Metal";
 import { Orb } from "@/components/fx/Orb";
 import "./research.css";
@@ -26,7 +28,7 @@ const PAGE = 24;
  *  prolifique ne doit pas remplir tout l'ecran. */
 const PER_ACCOUNT = 4;
 
-const VIEW_STEPS = [0, 50_000, 100_000, 500_000, 1_000_000];
+const VIEW_STEPS = [0, 1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000, 1_000_000];
 const DAY_STEPS = [7, 30, 90, 365];
 
 async function api(url: string, body?: unknown) {
@@ -193,11 +195,14 @@ function SlideText({ accountId, postId, tr }: { accountId: string; postId: strin
 }
 
 export function ResearchView() {
-  const { english } = useStudio();
+  // `posts` est la bibliotheque du projet : elle dit ce qui est deja garde.
+  const { english, posts: library } = useStudio();
   const tr = useCallback((fr: string, en: string) => t(fr, en, english), [english]);
 
   const [query, setQuery] = useState("");
-  const [minPostViews, setMinPostViews] = useState(100_000);
+  // 100k combine a 30 jours ne laissait presque rien passer : la page finissait
+  // vide alors que TikTok regorge de carrousels sur le sujet.
+  const [minPostViews, setMinPostViews] = useState(10_000);
   const [days, setDays] = useState(30);
   const [scope, setScope] = useState<"run" | "all">("all");
 
@@ -210,6 +215,15 @@ export function ResearchView() {
   const [shown, setShown] = useState(PAGE);
   const [open, setOpen] = useState<{ post: AccountVideo; handle: string; accountId: string; slide: number } | null>(null);
   const [lastRun, setLastRun] = useState<string | null>(null);
+  // Garder un carrousel : le bouton et le glissement partagent cet etat, pour
+  // qu'une tuile deja gardee le dise quel que soit le geste employe.
+  const [keeping, setKeeping] = useState<string | null>(null);
+  const [kept, setKept] = useState<Record<string, true>>({});
+  const keepingRef = useRef<string | null>(null);
+  // Une tuile gardee quitte le mur, mais pas d'un coup : elle joue sa sortie
+  // avant de disparaitre, sinon le clic donne l'impression d'avoir casse quelque chose.
+  const [leaving, setLeaving] = useState<Record<string, true>>({});
+  const [gone, setGone] = useState<Record<string, true>>({});
 
   const load = useCallback(async () => {
     try {
@@ -269,9 +283,38 @@ export function ResearchView() {
     };
   }, [activeId, load]);
 
+  // Un carrousel deja garde n'a plus rien a faire dans la decouverte. La
+  // reconstruction en editable suffixe l'identifiant : on le neutralise.
+  const keptIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const post of library) {
+      if (post.tiktokId) ids.add(post.tiktokId.replace(/-editable$/, ""));
+    }
+    return ids;
+  }, [library]);
+
   const runHandles = useMemo(
     () => new Set((run?.results || []).map((r) => r.handle).concat((run?.pending || []).map((c) => c.handle))),
     [run],
+  );
+  /** Les mots-cles de la recherche affichee. « sleepmaxing » doit rendre des
+   *  carrousels sleepmaxing, pas le meilleur post du compte ou on les a trouves. */
+  const runKeywords = useMemo(
+    () => new Set((run?.input?.keywords || []).map((k) => k.toLowerCase())),
+    [run],
+  );
+  /** Les comptes mesures avant que les carrousels soient marques n'ont aucune
+   *  trace de mot-cle : leur appliquer le filtre viderait le mur au lieu de
+   *  l'affiner. On ne s'y limite que s'il existe au moins une correspondance. */
+  const hasKeywordMatches = useMemo(
+    () =>
+      runKeywords.size > 0 &&
+      items.some((item) =>
+        (item.account.videos || []).some((video) =>
+          (video.matchedKeywords || []).some((k) => runKeywords.has(k.toLowerCase())),
+        ),
+      ),
+    [items, runKeywords],
   );
 
   /** Le mur : les carrousels qui franchissent le plancher, les plus vus d'abord,
@@ -284,8 +327,16 @@ export function ResearchView() {
       const rows: Row[] = [];
       for (const post of item.account.videos || []) {
         if (post.kind !== "photo") continue;
+        // Sur une recherche, on ne garde que ce que le mot-cle a ramene. Sans
+        // ca, un compte trouve pour « sleepmaxing » impose son carrousel le plus
+        // vu, meme s'il parle d'autre chose.
+        if (scope === "run" && hasKeywordMatches
+          && !(post.matchedKeywords || []).some((k) => runKeywords.has(k.toLowerCase()))) continue;
         if (minPostViews > 0 && (post.missingMetrics?.includes("views") || post.views < minPostViews)) continue;
         if (post.createdAt > 0 && post.createdAt * 1000 < floor) continue;
+        // Deja garde : on le retire, sauf le temps de sa sortie.
+        if (gone[post.id]) continue;
+        if (keptIds.has(post.id) && !leaving[post.id]) continue;
         rows.push({ post, account: item.account, metrics: item.metrics });
       }
       if (rows.length) byAccount.set(item.account.handle, rows.sort((a, b) => b.post.views - a.post.views));
@@ -296,13 +347,28 @@ export function ResearchView() {
       for (const group of groups) if (group[round]) out.push(group[round]);
     }
     return out;
-  }, [items, scope, minPostViews, days, runHandles]);
+  }, [items, scope, minPostViews, days, runHandles, runKeywords, hasKeywordMatches]);
 
   const waiting = useMemo(() => {
     if (!run || !LIVE.has(run.status)) return [];
     const measured = new Set(wall.map((row) => row.account.handle));
-    return (run.pending || []).filter((c) => !measured.has(c.handle));
-  }, [run, wall]);
+    const floor = Date.now() - days * 86400000;
+    // Meme plancher et meme fenetre que le mur. Une carte qui ne les passe pas
+    // s'affichait pendant la recherche puis disparaissait a la mesure : c'est ce
+    // clignotement, et ces vues bien en dessous du filtre, que l'on supprime.
+    return (run.pending || [])
+      .filter((c) => !measured.has(c.handle))
+      .map((c) => ({
+        ...c,
+        posts: (c.posts || []).filter(
+          (p) =>
+            p.kind === "photo" &&
+            !(minPostViews > 0 && (p.missingMetrics?.includes("views") || p.views < minPostViews)) &&
+            !(p.createdAt > 0 && p.createdAt * 1000 < floor),
+        ),
+      }))
+      .filter((c) => c.posts.length > 0);
+  }, [run, wall, minPostViews, days]);
 
   // Un seuil rond s'ecrit rond : « 1M+ », jamais « 1.0M+ ».
   const viewLabel = useCallback(
@@ -319,7 +385,9 @@ export function ResearchView() {
       ? tr("On fouille TikTok…", "Digging through TikTok…")
       : wall.length
       ? `${wall.length} ${plural(wall.length, tr("carrousel", "carousel"), tr("carrousels", "carousels"))} · ${accounts} ${plural(accounts, tr("compte", "account"), tr("comptes", "accounts"))} · ${viewLabel(minPostViews)} · ${dayLabel(days)}`
-      : items.length
+      : keptIds.size && items.length
+        ? tr("Tout est déjà dans ta bibliothèque", "Everything is already in your library")
+        : items.length
         ? tr(`Aucun carrousel au-dessus de ${viewLabel(minPostViews)} sur ${dayLabel(days)}`, `No carousel above ${viewLabel(minPostViews)} over the ${dayLabel(days)}`)
         : tr("Lance une recherche pour trouver des carrousels qui marchent", "Run a search to find carousels that work");
 
@@ -337,7 +405,7 @@ export function ResearchView() {
       search_provider_rejected: tr("TikTok a refusé la recherche. Réessaie.", "TikTok refused the search. Try again."),
       load_failed: tr("Chargement impossible.", "Could not load."),
       request_failed: tr("Requête impossible.", "Request failed."),
-    })[code] || tr("Recherche impossible pour le moment.", "Search failed for now.");
+    })[code] || keepErrorLabel(code, english);
 
   const isHandle = query.trim().startsWith("@");
 
@@ -381,6 +449,34 @@ export function ResearchView() {
       setBusy(false);
     }
   }
+
+  const keep = useCallback(async ({ post, url }: { post: AccountVideo; url: string }) => {
+    if (!url || keepingRef.current) return;
+    keepingRef.current = post.id;
+    setKeeping(post.id);
+    setError("");
+    const result = await keepInLibrary(url);
+    keepingRef.current = null;
+    setKeeping(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setKept((current) => ({ ...current, [post.id]: true }));
+    setLeaving((current) => ({ ...current, [post.id]: true }));
+    window.setTimeout(() => {
+      setGone((current) => ({ ...current, [post.id]: true }));
+      setLeaving((current) => {
+        const next = { ...current };
+        delete next[post.id];
+        return next;
+      });
+    }, 420);
+  }, []);
+
+  // Le glissement reprend exactement le geste du calendrier : fantome sous le
+  // pointeur, tuile d'origine estompee, cible flottante qui grossit.
+  const keepDrag = useKeepDrag({ english, onKeep: keep });
 
   async function stop() {
     if (!activeId) return;
@@ -486,13 +582,32 @@ export function ResearchView() {
             {visible.map((row, i) => {
               const lift = liftOf(row.post, row.metrics);
               return (
-                <li key={`${row.account.handle}:${row.post.id}`} style={{ "--i": Math.min(i, 11) } as CSSProperties}>
+                <li
+                  key={`${row.account.handle}:${row.post.id}`}
+                  className={[keepDrag.draggedId === row.post.id ? "is-lifted" : "", leaving[row.post.id] ? "is-kept" : ""].filter(Boolean).join(" ") || undefined}
+                  style={{ "--i": Math.min(i, 11) } as CSSProperties}
+                  {...keepDrag.handlers({ post: row.post, handle: row.account.handle, url: row.post.url })}
+                >
                   <PostTile
                     post={row.post}
                     en={english}
                     author={{ handle: row.account.handle, avatar: row.account.avatar }}
                     badge={lift ? `×${lift.toFixed(1)}` : null}
                     onOpen={(slide) => setOpen({ post: row.post, handle: row.account.handle, accountId: row.account.id, slide })}
+                    footer={
+                      <button
+                        type="button"
+                        className="ss-rs__keep"
+                        disabled={keeping === row.post.id || kept[row.post.id]}
+                        onClick={() => void keep({ post: row.post, url: row.post.url })}
+                      >
+                        {kept[row.post.id]
+                          ? tr("Dans la bibliothèque", "In the library")
+                          : keeping === row.post.id
+                            ? tr("Ajout…", "Adding…")
+                            : tr("+ Bibliothèque", "+ Library")}
+                      </button>
+                    }
                   />
                 </li>
               );
@@ -547,6 +662,8 @@ export function ResearchView() {
           </p>
         </section>
       )}
+
+      {keepDrag.overlay}
 
       {open ? (
         <PostViewer

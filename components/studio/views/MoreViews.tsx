@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "../StudioContext";
 import { LoadingOrb } from "@/components/fx/Orb";
+import { ComingSoon } from "../ComingSoon";
 
 type Filter = { region: "all" | "us" | "eu"; platform: "all" | "tiktok" | "instagram" };
 
@@ -268,9 +269,30 @@ export function WarmedAccountsView() {
         )}
         <p className="ss-lead">
           {t("Tu préfères le faire toi-même ?", "Prefer doing it yourself?", en)}{" "}
-          <Link href="/app/post-us">{t("Guide : poster aux US à 100 %", "Guide: post to the US, 100%", en)}</Link>
+          <Link href="/app/post-us">{t("Guide : développer une audience US", "Guide: grow a US audience", en)}</Link>
         </p>
       </div>
     </div>
+  );
+}
+
+/** La page Comptes warmés n'est pas ouverte : le catalogue reste affiché, mais
+    flouté et inerte, derrière une carte « bientôt disponible ». Pour rouvrir la
+    page, rendre WarmedAccountsView directement depuis la route. */
+export function WarmedAccountsLocked() {
+  const { english: en } = useStudio();
+  return (
+    <ComingSoon
+      badge={t("Bientôt disponible", "Coming soon", en)}
+      title={t("Comptes warmés", "Warmed accounts", en)}
+      note={t(
+        "Des comptes US déjà chauffés sur de vrais téléphones. On finit de les préparer.",
+        "US accounts already warmed on real phones. We are finishing them.",
+        en,
+      )}
+      action={<Link href="/app/post-us">{t("Faire le mien en 1 h", "Make mine in an hour", en)}</Link>}
+    >
+      <WarmedAccountsView />
+    </ComingSoon>
   );
 }

@@ -30,16 +30,28 @@ export async function GET(request: Request) {
     );
 
   if (err) return fail(err === "access_denied" ? "google_denied" : "google");
-  if (!code || !stored.state || stored.state !== state) return fail("google");
+  // Etat absent ou different : la demande a expire, ou un second onglet a
+  // remplace le cookie. Le dire evite de faire recliquer sans rien changer.
+  if (!code || !stored.state || stored.state !== state) return fail("google_state");
 
+  let profile: Awaited<ReturnType<typeof fetchGoogleProfile>>;
   try {
     const tokens = await exchangeGoogleCode(origin, code);
-    const profile = await fetchGoogleProfile(tokens.access_token);
-    const user = await upsertGoogleUser(profile);
+    profile = await fetchGoogleProfile(tokens.access_token);
+  } catch (error) {
+    console.error("google_oauth_failed", { message: error instanceof Error ? error.message : String(error) });
+    return fail("google");
+  }
 
+  try {
+    const user = await upsertGoogleUser(profile);
     await setSessionCookie(publicUser(user));
     return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));
-  } catch {
-    return fail("google");
+  } catch (error) {
+    // Google a repondu : l'echec est chez nous. L'annoncer comme une panne
+    // Google enverrait l'utilisateur recliquer sur un bouton qui ne peut pas
+    // marcher, et masquerait une base indisponible derriere une fausse piste.
+    console.error("auth_store_unavailable", { provider: "google", message: error instanceof Error ? error.message : String(error) });
+    return fail("unavailable");
   }
 }

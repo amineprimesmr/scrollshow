@@ -276,3 +276,59 @@ export function IconTrash(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconSearch(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="6.5" {...stroke} />
+      <path d="m16 16 4.5 4.5" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconDots(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="5.5" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="18.5" cy="12" r="1.6" fill="currentColor" />
+    </Svg>
+  );
+}
+
+export function IconLink(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1.4 1.4" {...stroke} />
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1.4-1.4" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconSparkle(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4.5 13.6 9l4.4 1.7-4.4 1.7L12 17l-1.6-4.6L6 10.7 10.4 9 12 4.5Z" {...stroke} />
+      <path d="M18.5 4v3M17 5.5h3" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconCopy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" {...stroke} />
+      <path d="M15 5.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 5.5 15" {...stroke} />
+    </Svg>
+  );
+}
+
+export function IconDownload(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4v10" {...stroke} />
+      <path d="m8 11 4 4 4-4" {...stroke} />
+      <path d="M5 17v1.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V17" {...stroke} />
+    </Svg>
+  );
+}

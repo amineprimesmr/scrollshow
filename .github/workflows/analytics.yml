@@ -1,0 +1,24 @@
+name: Capture daily analytics and retry receipts
+on:
+  schedule:
+    - cron: '43 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: scrollshow-analytics
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: vars.PRODUCTION_AUTOMATIONS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Capture observations and deliver pending receipts
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://scrollshow.io/api/cron/analytics

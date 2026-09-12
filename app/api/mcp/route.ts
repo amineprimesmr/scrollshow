@@ -26,7 +26,7 @@ import {
 } from "@/lib/agent";
 import { agentOptions, headerToken } from "@/lib/agent-http";
 import { resolveApiKey } from "@/lib/api-keys";
-import { MCP_RESOURCE, OAUTH_SCOPE, resolveAccessToken } from "@/lib/oauth";
+import { MCP_RESOURCE, OAUTH_SCOPE, resolveOAuthUser } from "@/lib/oauth";
 import { publicUser } from "@/lib/store";
 import { hasStudioAccess } from "@/lib/plans";
 import { recipeInputSchema } from "@/lib/recipe";
@@ -518,7 +518,7 @@ const handler = createMcpHandler(
       {
         title: "TikTok shadowban / throttling check",
         description:
-          "Tell whether the connected TikTok account(s), or any public account given by handle, are shadowbanned or throttled: a 0-100 probability per account, the distribution-round histogram (R0-R4) behind it, the spam/automation signals found (burst posting, duplicate captions, repeated hashtags, zero-view posts), whether the account is throttled (engagement >=1%) or the content fails the seed test (<1%), the last-10 vs previous-10 trend, and a fix list. Use when the user asks 'am I shadowbanned', 'why did my reach drop', 'why 200 views', or is about to abandon/recreate an account. Present it as a diagnosis with a table, not raw JSON.",
+          "Tell whether the connected TikTok account(s), or any public account given by handle, are shadowbanned or throttled: a verdict per account with the named evidence behind it (posts never seeded, posts stuck under the account's reach floor, reach below what the follower base alone delivers, a collapse measured in the account's own standard deviations), the distribution-round histogram (R0-R4), the account's natural volatility, the spam/automation signals found (burst posting, duplicate captions, repeated hashtags, zero-view posts), whether the account is throttled (engagement >=1%) or the content fails the seed test (<1%), the last-10 vs previous-10 trend, and a fix list. A percentage drop alone is never a shadowban: an ordinary account swings several times over between two posts, so read zScore and volatility, not dropPct. Use when the user asks 'am I shadowbanned', 'why did my reach drop', 'why 200 views', or is about to abandon/recreate an account. Present it as a diagnosis with a table, not raw JSON.",
         inputSchema: z.object({
           handle: z.string().optional().describe("Check a public TikTok account by @handle or profile URL instead of the connected ones (one-off, nothing stored)."),
         }),
@@ -582,23 +582,22 @@ const handler = createMcpHandler(
  */
 async function userFromToken(token: string) {
   if (!token) return null;
-  const granted = await resolveAccessToken(token, MCP_RESOURCE);
-  if (granted) {
-    const { readStore } = await import("@/lib/store");
-    const data = await readStore();
-    const item = data.users.find((entry) => entry.id === granted.userId);
-    if (!item || item.deletionPendingAt || !item.emailVerifiedAt) return null;
-    return publicUser(item);
-  }
+  if (token.startsWith("ss_at_")) return resolveOAuthUser(token, MCP_RESOURCE);
   return resolveApiKey(token);
+}
+
+const requestUsers = new WeakMap<Request, ReturnType<typeof userFromToken>>();
+function requestUser(request: Request, token: string) {
+  let pending = requestUsers.get(request);
+  if (!pending) { pending = userFromToken(token); requestUsers.set(request, pending); }
+  return pending;
 }
 
 async function verifyToken(_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   const token = bearerToken?.trim();
   if (!token) return undefined;
-  const user = await userFromToken(token);
+  const user = await requestUser(_req, token);
   if (!user || !hasStudioAccess(user.plan)) return undefined;
-  if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) return undefined;
   return {
     token,
     clientId: user.id,
@@ -631,21 +630,27 @@ function refuse(status: number, error: string, message: string, action: string) 
 async function gate(request: Request) {
   const token = headerToken(request);
   if (!token) return null; // aucun porteur : la couche MCP repond son defi de decouverte
-  const user = await userFromToken(token);
+  const user = await requestUser(request, token);
   if (!user) {
     return refuse(401, "invalid_token", "This ScrollShow authorization is unknown, expired or was revoked.", `Refresh this host’s saved ScrollShow authorization, or run its OAuth login if refresh fails. Follow the login process and call whoami after success. Do not open a generic help page, ask for a confirmation word, or request credentials in chat.`);
   }
   if (!hasStudioAccess(user.plan)) {
     return refuse(402, "payment_required", "This ScrollShow account has no active access, so the tools stay locked.", `Authorization is valid for ${user.email}, but the account needs an active plan at ${SITE}/pricing. Keep the current authorization; no reinstall or new login is needed.`);
   }
+  if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) return refuse(429, "rate_limit_exceeded", "Too many requests.", "Retry in one minute.");
   return null;
 }
 
 async function handle(request: Request) {
   if (request.method === "OPTIONS") return agentOptions();
-  const refusal = await gate(request);
-  if (refusal) return refusal;
-  return authHandler(request);
+  try {
+    const refusal = await gate(request);
+    if (refusal) return refusal;
+    return await authHandler(request);
+  } catch (error) {
+    console.error("mcp_unavailable", { code: (error as { code?: string })?.code });
+    return NextResponse.json({ error: "temporarily_unavailable", message: "The service is temporarily unavailable. Keep your authorization and retry later." }, { status: 503, headers: { "Retry-After": "60", "Access-Control-Allow-Origin": "*" } });
+  }
 }
 
 export { handle as GET, handle as POST, handle as DELETE, handle as OPTIONS };

@@ -1,11 +1,12 @@
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { emailAvailable } from "@/lib/email";
 import { deliverVerification, redeemVerification } from "@/lib/email-verification";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 import { publicUser } from "@/lib/store";
 import { z } from "zod";
 const schema = z.discriminatedUnion("action", [z.object({ action: z.literal("request") }), z.object({ action: z.literal("confirm"), token: z.string().min(40).max(100) })]);
 export async function POST(request: Request) {
+  if (!await consumePublicAuthLimit(request, "verification")) return Response.json({ error: "rate_limited" }, { status: 429 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid" }, { status: 400 });
   if (parsed.data.action === "confirm") {

@@ -53,8 +53,8 @@ export const FAQ: FaqBlock[] = [
       {
         q: { fr: "Comment toucher le public US depuis la France ?", en: "How do I reach the US audience from abroad?" },
         a: {
-          fr: "Deux méthodes : contenu 100 % anglais publié aux heures de New York, ou un iPhone US dédié avec ton propre VPN Outline. Le guide complet est dans Poster aux US.",
-          en: "Two methods: 100% English content posted on New York time, or a dedicated US iPhone with your own Outline VPN. The full guide is under Post to the US.",
+          fr: "Un téléphone dédié sans SIM, derrière ton propre VPN américain : c'est la seule méthode qui donne un compte réellement enregistré aux États-Unis. Six étapes, une heure, environ 5 € par mois. Tout est dans Poster aux US.",
+          en: "A dedicated phone with no SIM, behind your own US VPN: the only method that gives an account genuinely registered in the United States. Six steps, one hour, about €5 a month. It is all under Post to the US.",
         },
         href: "/app/post-us",
       },
@@ -142,10 +142,10 @@ export const FAQ: FaqBlock[] = [
       {
         q: { fr: "C'est quoi un compte warmé ?", en: "What is a warmed account?" },
         a: {
-          fr: "Un compte TikTok ou Instagram US/EU chauffé sur un vrai téléphone, livré prêt à connecter à ScrollShow.",
-          en: "A US/EU TikTok or Instagram account warmed on a real phone, delivered ready to connect to ScrollShow.",
+          fr: "Un compte TikTok ou Instagram US/EU chauffé sur un vrai téléphone, livré prêt à connecter à ScrollShow. La page n'est pas encore ouverte : en attendant, le guide « Poster aux US » te fait le tien en une heure.",
+          en: "A US/EU TikTok or Instagram account warmed on a real phone, delivered ready to connect to ScrollShow. That page is not open yet: meanwhile, the “Post to the US” guide makes you your own in an hour.",
         },
-        href: "/app/warmed-accounts",
+        href: "/app/post-us",
       },
       {
         q: { fr: "Comment supprimer mon compte ou mes données ?", en: "How do I delete my account or data?" },
@@ -221,7 +221,7 @@ export function SupportView() {
         <h2>{t("Ressources", "Resources", en)}</h2>
         <ul className="ss-feat">
           <li>
-            <Link href="/app/post-us">{t("Guide : poster aux US à 100 %", "Guide: post to the US, 100%", en)}</Link>
+            <Link href="/app/post-us">{t("Guide : développer une audience US", "Guide: grow a US audience", en)}</Link>
           </li>
           <li>
             <Link href="/app/unshadowban">{t("Détecteur de shadowban", "Shadowban detector", en)}</Link>

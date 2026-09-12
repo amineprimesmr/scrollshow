@@ -5,7 +5,7 @@ description: Research TikTok accounts, compare measured slideshow performance, p
 
 # ScrollShow SaaS
 
-Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, with cloud research and an optional local browser collector. Call `whoami` first for the business, plan, capabilities and quotas. A ScrollShow account can hold several projects (one per business); an API key is bound to exactly one project, so everything you read or write through this key belongs to the project returned by `whoami`. Switching business means the user connects you with that project's key. Do not claim unavailable capabilities: cloud discovery and detailed public-post metrics need the configured data service, and live publication needs an authorized TikTok account.
+Use the connected ScrollShow MCP server. This is the web studio at https://scrollshow.io, with cloud research and an optional local browser collector. Call `whoami` first for the business, plan, capabilities and quotas. A ScrollShow account can hold several projects (one per business); an API key or OAuth consent is bound to exactly one project, so everything you read or write through this key belongs to the project returned by `whoami`. Switching business means the user connects you with that project's key. Do not claim unavailable capabilities: cloud discovery and detailed public-post metrics need the configured data service, and live publication needs an authorized TikTok account plus an enabled publishing capability. When `whoami.capabilities.publishingStatus` is `pending_review`, prepare and export drafts; explain that automatic delivery waits for the platform approval.
 
 **Language.** These instructions are in English; your answers are not. Always write to the user in the language they use, and keep it for the whole session. Most ScrollShow users write French. Carousel copy, hooks and captions follow the audience of the business in `whoami`, not the language of this document.
 
@@ -88,7 +88,7 @@ A creation request should end with a complete carousel saved in ScrollShow’s c
 
 ## Reports and boundaries
 
-Use `get_analytics` or `get_report` for performance. Explain trends using dated measurements and distinguish lifetime counters from period growth. `shadowban_check` is a heuristic signal, never a calibrated probability or proof of platform enforcement.
+Use `get_analytics` or `get_report` for performance. Explain trends using dated measurements and distinguish lifetime counters from period growth. `shadowban_check` is a heuristic signal, never a calibrated probability or proof of platform enforcement. A drop in views is not a shadowban: read `zScore` (the drop in the account's own standard deviations) and `volatility`/`swingFactor` before saying anything, and quote the `evidence` entries (posts never seeded, posts stuck under the reach floor, reach below the follower base) rather than `dropPct`.
 
 Present a short comparison plus a recommendation and the next useful action. Link account handles and source posts. Never include API credentials in a report, shared recipe, screenshot or public link. API access is not authorization for unrelated account changes, payments or publication.
 

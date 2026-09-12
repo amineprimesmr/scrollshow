@@ -1,5 +1,5 @@
 import { registerClient, usableRedirectUri } from "@/lib/oauth";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const schema = z.object({
@@ -16,6 +16,7 @@ const cors = {
 
 /** RFC 7591 : un agent inconnu s'enregistre seul avant d'ouvrir le navigateur. */
 export async function POST(request: Request) {
+  if (!await consumePublicAuthLimit(request, "oauth-register")) return Response.json({ error: "rate_limited" }, { status: 429 });
   // L'enregistrement est anonyme par nature : on le limite par adresse.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (!(await consumeLimit(`oauth-register:${ip}`, 20, 3600000))) {

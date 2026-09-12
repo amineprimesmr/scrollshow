@@ -1,4 +1,6 @@
-import { readStore, updateStore } from "../store";
+import { readStoreSlice, updateStoreSlice } from "../store";
+const readStore = () => readStoreSlice(["researchJobs", "accounts", "runs"], { videos: true });
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["researchJobs", "accounts", "runs"], fn);
 import { consumeLimit } from "../rate-limit";
 import { fetchAccountVideoPage } from "../metrics";
 import { fetchTikTokProfile, normalizeHandle } from "../tiktok-profile";
@@ -9,6 +11,14 @@ import type { AccountVideo, SessionUser, StoreData } from "../types";
 import { inScope } from "../projects";
 
 const stamp=()=>new Date().toISOString();
+/** Un post merite-t-il le mur ? Un compteur de vues absent n'est pas un zero :
+ * on l'ecarte plutot que de le faire passer pour un echec mesure. */
+export function keepForWall(post: AccountVideo, filters: ResearchFilters, now=Date.now()) {
+  if(post.kind!=="photo") return false;
+  if(filters.minPostViews>0 && (post.missingMetrics?.includes("views") || post.views<filters.minPostViews)) return false;
+  if(post.createdAt>0 && post.createdAt*1000 < now-filters.days*86400000) return false;
+  return true;
+}
 const terminal=new Set(["done","stopped","error"]);
 export function publicJob(job: ResearchJob) {
   return { id:job.id, input:job.input, status:job.status, phase:job.phase, createdAt:job.createdAt, updatedAt:job.updatedAt, revision:job.revision,
@@ -20,7 +30,9 @@ export function publicJob(job: ResearchJob) {
       ? { kind:"search" as const, label: job.input.keywords[job.keywordIndex] ?? null }
       : { kind:"measure" as const, label: job.candidates.find(c=>!job.processed.includes(c.handle))?.handle ?? null },
     pending: job.candidates.filter(c=>!job.processed.includes(c.handle)).slice(0,8).map(c=>({ handle:c.handle, nickname:c.nickname ?? null, avatar:c.avatar ?? null, followers:c.followers ?? null, keyword:c.keyword,
-      posts: c.posts.slice(0,2).map(p=>({ id:p.id, cover:p.cover, images:p.images, views:p.views, likes:p.likes, url:p.url, kind:p.kind, createdAt:p.createdAt, missingMetrics:p.missingMetrics })) })),
+      // Meme plancher et meme fenetre que le mur : une carte qui ne passerait
+      // pas le filtre ne doit pas s'afficher pour disparaitre a la mesure.
+      posts: c.posts.filter(p=>keepForWall(p,job.input.filters)).slice(0,2).map(p=>({ id:p.id, cover:p.cover, images:p.images, views:p.views, likes:p.likes, url:p.url, kind:p.kind, createdAt:p.createdAt, missingMetrics:p.missingMetrics })) })),
     results:job.results.map(({posts,...r})=>({...r, metrics:researchMetrics(posts,r.followers,Date.parse(r.measuredAt),job.input.filters.days,job.input.filters.minPostViews)})),
     nextAction:job.status==="needs_attention" ? "resolve_in_collector_then_resume" : job.status==="queued" ? (job.input.source==="browser"?"run_browser_collector":"advance_research") : null,
   };
@@ -107,9 +119,23 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     if(!finished && (!result.cursor || result.cursor===c.cursor)) {j.status="paused";j.error="pagination_did_not_advance";event(j,"pagination_stalled");return;}
     c.cursor=result.cursor;
     const now=stamp(),posts=c.measuredPosts;
-    let a=data.accounts.find(a=>a.userId===j.userId&&a.handle===c.handle);
+    let a=data.accounts.find(a=>a.userId===j.userId&&a.projectId===j.projectId&&a.handle===c.handle);
     if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
+    // Les carrousels ramenes par le mot-cle sont exactement ce qui a ete
+    // demande. Ils etaient ecrases par le feed du compte puis effaces : on les
+    // conserve, on les ajoute s'ils sont au-dela des pages lues, et on les
+    // marque pour que le mur puisse s'y limiter.
+    //
+    // Les marques deja posees sont relevees avant la fusion : une page mesuree
+    // rapporte le post sans elles, et re-mesurer un compte effacerait sinon les
+    // mots-cles des recherches precedentes.
+    const previousKeywords=new Map((a.videos??[]).filter(p=>p.matchedKeywords?.length).map(p=>[p.id,p.matchedKeywords!]));
     const cache=new Map((a.videos??[]).map(p=>[p.id,p]));posts.forEach(p=>cache.set(p.id,p));
+    for(const p of c.posts) if(!cache.has(p.id)) cache.set(p.id,p);
+    // Les marques s'ajoutent a la suite : l'ordre reste celui des recherches.
+    const tag=(id:string,keywords:string[])=>{const v=cache.get(id);if(v)cache.set(id,{...v,matchedKeywords:[...new Set([...(v.matchedKeywords??[]),...keywords])]});};
+    for(const [id,keywords] of previousKeywords) tag(id,keywords);
+    for(const p of c.posts) tag(p.id,[c.keyword]);
     Object.assign(a,{nickname:c.nickname??a.nickname,bio:c.bio??a.bio,avatar:c.avatar??a.avatar,followers:c.followers??a.followers,videos:[...cache.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,2000),videosFetchedAt:now,lastSyncAt:now,
       researchCoverage:{complete:covered,pages:c.pages,windowDays:j.input.filters.days,measuredAt:now,reason:stopReason,loaded:posts.length}});
     a.avgViews=researchMetrics(posts,a.followers).averageViews??0;

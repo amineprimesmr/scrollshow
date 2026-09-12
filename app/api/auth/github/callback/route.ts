@@ -1,7 +1,7 @@
 import { setSessionCookie } from "@/lib/auth";
 import { afterAuthPath, signupUrl } from "@/lib/auth-urls";
 import { exchangeGithubCode, fetchGithubProfile } from "@/lib/github-auth";
-import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
+import { findUserByEmail, publicUser, updateStoreSlice } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { User } from "@/lib/types";
@@ -30,16 +30,26 @@ export async function GET(request: Request) {
     );
 
   if (err) return fail(err === "access_denied" ? "github_denied" : "github");
-  if (!code || !stored.state || stored.state !== state) return fail("github");
+  // Voir le callback Google : un etat perime se dit, il ne se rejoue pas.
+  if (!code || !stored.state || stored.state !== state) return fail("github_state");
 
+  let profile: Awaited<ReturnType<typeof fetchGithubProfile>>;
   try {
     const tokens = await exchangeGithubCode(origin, code);
-    const profile = await fetchGithubProfile(tokens.access_token);
-    const user = await updateStore((data) => {
-      const existing =
+    profile = await fetchGithubProfile(tokens.access_token);
+  } catch (error) {
+    console.error("github_oauth_failed", { message: error instanceof Error ? error.message : String(error) });
+    return fail("github");
+  }
+
+  try {
+    const user = await updateStoreSlice([], (data) => {
+      if (data.restoreReviewRequired) throw new Error("restoration_review_required");
+    const existing =
         data.users.find((item) => item.githubId === profile.githubId) ||
         findUserByEmail(data, profile.email);
       if (existing) {
+      if (existing.deletionPendingAt) throw new Error("account_deletion_pending");
         // An unconfirmed password account proves nothing: drop the password rather
         // than hand the session to whoever registered the address first.
         if (!existing.emailVerifiedAt && !existing.googleId && !existing.githubId) {
@@ -66,7 +76,8 @@ export async function GET(request: Request) {
 
     await setSessionCookie(publicUser(user));
     return NextResponse.redirect(new URL(afterAuthPath(user.plan, stored.next, Boolean(user.onboarding?.completedAt)), origin));
-  } catch {
-    return fail("github");
+  } catch (error) {
+    console.error("auth_store_unavailable", { provider: "github", message: error instanceof Error ? error.message : String(error) });
+    return fail("unavailable");
   }
 }

@@ -1,0 +1,113 @@
+/* Page verrouillée : contenu flouté derrière, cadenas et carte de verre devant.
+   La carte est du chrome flottant, donc verre ; ce qu'elle recouvre reste du
+   contenu, simplement rendu illisible. */
+
+.ss-soon {
+  position: relative;
+  /* Une page verrouillée n'a rien à faire défiler : elle tient dans la zone
+     visible et le flou reste immobile sous la carte. */
+  height: 100%;
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.ss-soon__under {
+  filter: blur(7px) saturate(0.55);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.01);
+}
+
+.ss-soon__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(var(--lg-rgb) / 0.28);
+}
+
+.ss-soon__card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 30px 32px 32px;
+  border-radius: 24px;
+  text-align: center;
+  background: rgb(var(--lg-rgb) / calc(var(--lg-alpha) + 0.3));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    0 18px 50px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.9));
+  animation: lg-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.ss-soon__badge {
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ss-soon__card a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+  font-size: 12.5px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.ss-soon__card a:active { transform: scale(0.96); }
+
+.ss-soon__lock {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted-2);
+}
+
+.ss-soon__card h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ss-soon__card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ss-muted);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ss-soon__veil { background: rgb(var(--lg-rgb) / 0.7); }
+  .ss-soon__card {
+    background: var(--ss-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.16), inset 0 0 0 1px var(--ss-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-soon__card { animation: none; }
+}

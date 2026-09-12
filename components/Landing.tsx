@@ -1,6 +1,6 @@
 "use client";
 
-import { LandingTestimonials, LandingFAQ, LandingFooter } from "@/components/LandingBottom";
+import { LandingFAQ, LandingFooter } from "@/components/LandingBottom";
 import { PricingCards } from "@/components/PricingCards";
 import { HeroSkill } from "@/components/HeroSkill";
 import { LandingDemo } from "@/components/LandingDemo";
@@ -227,7 +227,6 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
           <p className="af-ld-pricing__note">{t("L’accès à vie couvre la durée d’exploitation du service. Mêmes quotas de traitement pour toutes les offres. Abonnements aux assistants IA non inclus.", "Lifetime access covers the operating lifetime of the service. Every plan has the same processing quotas. AI assistant subscriptions are not included.", english)} <Link href="/pricing">{t("Détails des offres", "Plan details", english)}</Link></p>
         </section>
 
-        <LandingTestimonials english={english} />
         <LandingFAQ english={english} />
       </main>
 

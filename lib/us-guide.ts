@@ -1,4 +1,6 @@
-// Generated from useprocess/website/src/affiliate/us-guide.js — keep in sync.
+// US_LINKS et US_AGENT_PROMPT viennent de useprocess/website/src/affiliate/us-guide.js
+// — garder les deux en phase. Le reste (kit, étapes, cases à cocher) est propre à
+// ScrollShow : le portail affiliés n'a pas de progression par utilisateur.
 export const US_LINKS = {
   "hetzner": "https://www.hetzner.com/cloud",
   "hetznerConsole": "https://console.hetzner.cloud/",
@@ -15,56 +17,229 @@ export const US_AGENT_PROMPT: { fr: string; en: string } = {
   en: "# US TikTok VPN setup — Hetzner Ashburn + Outline\n\nYou are an autonomous agent (Cursor / Claude Code) with shell access. Do the ENTIRE server yourself. Do not explain commands: run them. Do not ask the human to paste SSH if you can SSH.\n\n## What the human ALREADY did — do not redo it, do not ask\n- Dedicated factory-reset phone, language English (United States), region United States\n- Timezone New York or Los Angeles, automatic OFF\n- GPS / Location Services OFF\n- No SIM, Wi-Fi only\n- Fresh email + US Apple ID / Google (ZIP 10001 or 90001, payment None)\n- Hetzner Cloud account verified with a card\n\nYou do NOT touch the phone. VPS + Outline only.\n\n## Hard constraints — one violation = stop\n- Hetzner location: Ashburn, VA only. Location code `ash`. Never Falkenstein, Nuremberg, Helsinki, or any EU region.\n- Image: ubuntu-22.04\n- Type: cx22\n- Cloud-init User Data EXACTLY (one line):\n  #include get.docker.com\n- VPN: official Jigsaw Outline script only. No WireGuard, no OpenVPN, no Nord/Express, no Vultr.\n- Hetzner firewall required: TCP 22 + Outline API port (TCP) + Outline access port (TCP and UDP)\n- Do not create the TikTok account. Do not post anything.\n\n## Procedure\n\n### 0. Hetzner token\nIf `HCLOUD_TOKEN` or a `hcloud` context already exists, continue.\nOtherwise: look in env / `~/.config/hcloud/cli.toml`. If nothing, ask ONCE for the token (Read & Write, created in console.hetzner.cloud → Security → API Tokens).\nInstall the CLI if needed: `brew install hcloud` (Mac) or the official binary.\n\n### 1. SSH key\nUse `~/.ssh/id_ed25519.pub` or `id_rsa.pub`. Import it into Hetzner (`hcloud ssh-key create`) if it is not there yet.\n\n### 2. Server\n```\nhcloud server create \\\n  --name tiktok-us \\\n  --type cx22 \\\n  --location ash \\\n  --image ubuntu-22.04 \\\n  --ssh-key <key-name> \\\n  --user-data $'#include get.docker.com\\n'\n```\nWait until status is `running`. Grab the public IPv4.\n\n### 3. SSH\n`ssh -o StrictHostKeyChecking=accept-new root@IP`\n\nWait ~90 seconds for cloud-init to install Docker, then `docker --version`.\n\n### 4. Update + Outline\n```\napt update && apt upgrade -y\nsudo bash -c \"$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)\"\n```\nIf the script asks Docker? → y. Takes 1–3 minutes.\n\nAt “CONGRATULATIONS!”, copy the FULL JSON between `{` and `}` (`apiUrl` + `certSha256`) and note the TWO ports it printed.\n\n### 5. Firewall\nCreate a firewall `tiktok-us` with:\n- TCP 22\n- TCP <Outline API port>\n- TCP + UDP <Outline access port>\nAttach it to the server. Confirm you can still SSH.\n\n### 6. Final recap — print ONLY this at the end\n\n```\nSERVER_IP: x.x.x.x\nOUTLINE_JSON:\n{\"apiUrl\":\"...\",\"certSha256\":\"...\"}\n\nPORTS: 22 / API=xxxx / ACCESS=xxxx (tcp+udp)\n\nYOU NEXT (human, not the agent):\n1. PC: Outline Manager → https://getoutline.org/get-started/ → Set up Outline anywhere → paste the JSON → Online green\n2. + a key (e.g. iPhone-TikTok) → QR / ss://\n3. US phone: Outline Client (US App Store / Play Store) → scan QR → Connect → key icon\n4. Safari: https://whatismyipaddress.com/ = United States\n5. VPN ON → uninstall TikTok → reinstall → new United States account\n6. Every session: Wi-Fi (no SIM) → Outline Connect → US IP → THEN TikTok\n\nGolden rule: one TikTok open without VPN can burn the account.\n```\n\n## Fallback without a token\nIf there is no token: ask for IP + root password (server already created in Ashburn, Ubuntu 22.04, CX22, user data `#include get.docker.com`). Then SSH and resume at step 3.\n\n## Stop\nIf Hetzner has no Ashburn, if Outline fails after 1 retry, or if you have neither token nor IP: stop and say exactly what blocked you. Do not improvise an EU VPN.\n",
 };
 
-export type UsChecklistItem = { id: string; fr: string; en: string };
-export type UsChecklistGroup = { id: string; fr: string; en: string; items: UsChecklistItem[] };
 
-export const US_CHECKLIST: UsChecklistGroup[] = [
+
+/* Une seule méthode : un téléphone dédié, sans SIM, derrière ton propre VPN
+   américain. C'est la seule qui donne un compte réellement enregistré aux
+   États-Unis. L'ancienne « méthode A » (organique sans VPN) a été retirée.
+
+   La page n'est qu'une liste d'étapes. Pas d'introduction, pas de tableau
+   comparatif, pas de liste d'achats : chaque coût et chaque lien apparaît dans
+   l'étape qui en a besoin, au moment où on en a besoin.
+
+   Les identifiants de tâche sont persistés par utilisateur (User.usChecklist) :
+   ne jamais les renommer, sinon la progression enregistrée est perdue. */
+
+export type UsBit = { fr: string; en: string };
+
+/** Une case à cocher : une action, faite ou pas. Le détail tient sur une ligne. */
+export type UsTask = UsBit & { detailFr?: string; detailEn?: string; id: string };
+
+export type UsLink = { href: string; fr: string; en: string };
+
+export type UsStep = UsBit & {
+  id: string;
+  minutes: number;
+  tasks: UsTask[];
+  links?: UsLink[];
+  /** L'étape porte le prompt à copier pour l'agent. */
+  agentPrompt?: boolean;
+};
+
+/** Le seul chiffre affiché hors des étapes. */
+export const US_COST: UsBit = {
+  fr: "≈ 1 h de setup · 5 € / mois · + un téléphone dédié",
+  en: "≈ 1 h of setup · €5 / month · + a dedicated phone",
+};
+
+export const US_STEPS: UsStep[] = [
   {
     id: "phone",
-    fr: "Téléphone US dédié",
-    en: "Dedicated US phone",
-    items: [
-      { id: "phone_reset", fr: "Téléphone dédié, neuf ou reset usine", en: "Dedicated phone, new or factory-reset" },
-      { id: "phone_lang", fr: "English (United States), région United States, clavier US", en: "English (United States), region United States, US keyboard" },
-      { id: "phone_tz", fr: "Fuseau New York ou Los Angeles, automatique OFF", en: "Timezone New York or Los Angeles, automatic OFF" },
-      { id: "phone_loc", fr: "Localisation OFF en global", en: "Location OFF globally" },
-      { id: "phone_sim", fr: "Aucune SIM, Wi-Fi uniquement", en: "No SIM, Wi-Fi only" },
-      { id: "phone_apple", fr: "Apple ID US neuf (ZIP 10001 / 90001, paiement None)", en: "Fresh US Apple ID (ZIP 10001 / 90001, payment None)" },
+    fr: "Le téléphone",
+    en: "The phone",
+    minutes: 25,
+    tasks: [
+      {
+        id: "phone_reset",
+        fr: "Téléphone dédié, remis à zéro",
+        en: "Dedicated phone, factory-reset",
+        detailFr: "Pas ton téléphone de tous les jours.",
+        detailEn: "Not your everyday phone.",
+      },
+      {
+        id: "phone_lang",
+        fr: "Langue et région United States",
+        en: "Language and region United States",
+        detailFr: "Dès l'écran de configuration, clavier US compris.",
+        detailEn: "Right on the setup screen, US keyboard included.",
+      },
+      {
+        id: "phone_tz",
+        fr: "Fuseau New York, réglage auto désactivé",
+        en: "New York timezone, automatic setting off",
+        detailFr: "Réglages › Général › Date et heure.",
+        detailEn: "Settings › General › Date & Time.",
+      },
+      {
+        id: "phone_loc",
+        fr: "Localisation désactivée",
+        en: "Location services off",
+        detailFr: "Réglages › Confidentialité.",
+        detailEn: "Settings › Privacy.",
+      },
+      {
+        id: "phone_sim",
+        fr: "Aucune SIM. Wi‑Fi seulement",
+        en: "No SIM. Wi‑Fi only",
+        detailFr: "Une SIM annonce ton vrai pays, même VPN activé.",
+        detailEn: "A SIM announces your real country, even with the VPN on.",
+      },
+    ],
+  },
+  {
+    id: "appleid",
+    fr: "L'Apple ID américain",
+    en: "The US Apple ID",
+    minutes: 10,
+    tasks: [
+      {
+        id: "phone_apple",
+        fr: "Apple ID pays United States",
+        en: "Apple ID with country United States",
+        detailFr: "Email neuf, paiement None, code postal 10001.",
+        detailEn: "Fresh email, payment None, ZIP 10001.",
+      },
+    ],
+    links: [
+      { href: US_LINKS.appleId, fr: "Créer l'Apple ID", en: "Create the Apple ID" },
+      { href: US_LINKS.textnow, fr: "Numéro US gratuit", en: "Free US number" },
     ],
   },
   {
     id: "server",
-    fr: "Serveur Outline",
-    en: "Outline server",
-    items: [
-      { id: "srv_hetzner", fr: "Compte Hetzner Cloud + token API Read & Write", en: "Hetzner Cloud account + Read & Write API token" },
-      { id: "srv_agent", fr: "Prompt agent lancé, serveur Ashburn créé, JSON récupéré", en: "Agent prompt run, Ashburn server created, JSON retrieved" },
-      { id: "srv_manager", fr: "Outline Manager : serveur Online (vert)", en: "Outline Manager: server Online (green)" },
-      { id: "srv_key", fr: "Clé iPhone-TikTok créée (QR / ss://)", en: "iPhone-TikTok key created (QR / ss://)" },
+    fr: "Le serveur américain",
+    en: "The US server",
+    minutes: 15,
+    agentPrompt: true,
+    tasks: [
+      {
+        id: "srv_hetzner",
+        fr: "Compte Hetzner + jeton API",
+        en: "Hetzner account + API token",
+        detailFr: "Security › API Tokens › Generate, en Read & Write. ≈ 5 € / mois.",
+        detailEn: "Security › API Tokens › Generate, Read & Write. ≈ €5 / month.",
+      },
+      {
+        id: "srv_agent",
+        fr: "Prompt collé dans Cursor ou Claude Code",
+        en: "Prompt pasted into Cursor or Claude Code",
+        detailFr: "L'agent monte le serveur et te rend un JSON.",
+        detailEn: "The agent builds the server and hands you a JSON.",
+      },
+      {
+        id: "srv_manager",
+        fr: "JSON collé dans Outline Manager",
+        en: "JSON pasted into Outline Manager",
+        detailFr: "Le serveur doit passer Online.",
+        detailEn: "The server must turn Online.",
+      },
+      {
+        id: "srv_key",
+        fr: "Une clé créée, nommée iPhone-TikTok",
+        en: "One key created, named iPhone-TikTok",
+        detailFr: "Elle donne le QR code que le téléphone va scanner.",
+        detailEn: "It gives the QR code the phone will scan.",
+      },
+    ],
+    links: [
+      { href: US_LINKS.hetznerConsole, fr: "Console Hetzner", en: "Hetzner console" },
+      { href: US_LINKS.outlineGetStarted, fr: "Outline Manager", en: "Outline Manager" },
     ],
   },
   {
-    id: "account",
-    fr: "Compte TikTok",
-    en: "TikTok account",
-    items: [
-      { id: "acc_client", fr: "Outline Client installé depuis l’App Store US, connecté", en: "Outline Client installed from the US App Store, connected" },
-      { id: "acc_ip", fr: "whatismyipaddress.com = United States", en: "whatismyipaddress.com = United States" },
-      { id: "acc_tiktok", fr: "TikTok réinstallé VPN ON, nouveau compte country = United States", en: "TikTok reinstalled with VPN ON, new account country = United States" },
-      { id: "acc_scrollshow", fr: "Compte connecté à ScrollShow depuis l’iPhone US, VPN ON", en: "Account connected to ScrollShow from the US phone, VPN ON" },
+    id: "connect",
+    fr: "Le VPN sur le téléphone",
+    en: "The VPN on the phone",
+    minutes: 10,
+    tasks: [
+      {
+        id: "acc_client",
+        fr: "Outline installé et connecté",
+        en: "Outline installed and connected",
+        detailFr: "Scanne le QR code, puis Connect.",
+        detailEn: "Scan the QR code, then Connect.",
+      },
+      {
+        id: "acc_ip",
+        fr: "L'IP affiche United States",
+        en: "The IP shows United States",
+        detailFr: "Si ce n'est pas le cas, ne va pas plus loin.",
+        detailEn: "If it does not, do not go further.",
+      },
+    ],
+    links: [
+      { href: US_LINKS.outlineIos, fr: "Outline iPhone", en: "Outline iPhone" },
+      { href: US_LINKS.outlineAndroid, fr: "Outline Android", en: "Outline Android" },
+      { href: US_LINKS.ipCheck, fr: "Vérifier l'IP", en: "Check the IP" },
     ],
   },
   {
-    id: "content",
-    fr: "Contenu et warm-up",
-    en: "Content and warm-up",
-    items: [
-      { id: "ct_bio", fr: "Username, bio, langue de l’app en anglais", en: "Username, bio, app language in English" },
-      { id: "ct_tz", fr: "Fuseau du scheduler America/New_York", en: "Scheduler timezone America/New_York" },
-      { id: "ct_day1", fr: "Jour 1 : 3 carrousels EN postés à la main", en: "Day 1: 3 EN carousels posted by hand" },
-      { id: "ct_week", fr: "Jours 2 à 7 : 1 carrousel / jour, créneau ET", en: "Days 2 to 7: 1 carousel a day, ET window" },
+    id: "tiktok",
+    fr: "Le compte TikTok",
+    en: "The TikTok account",
+    minutes: 10,
+    tasks: [
+      {
+        id: "acc_tiktok",
+        fr: "VPN activé, TikTok réinstallé, nouveau compte",
+        en: "VPN on, TikTok reinstalled, new account",
+        detailFr: "Le pays se fige à l'inscription : c'est le seul moment qui compte.",
+        detailEn: "Country is frozen at signup: the only moment that counts.",
+      },
+      { id: "ct_bio", fr: "Nom, bio et langue de l'app en anglais", en: "Name, bio and app language in English" },
+      {
+        id: "acc_scrollshow",
+        fr: "Compte connecté à ScrollShow depuis ce téléphone",
+        en: "Account connected to ScrollShow from this phone",
+      },
+      { id: "ct_tz", fr: "Calendrier réglé sur America/New_York", en: "Calendar set to America/New_York" },
     ],
+    links: [
+      { href: "/app/integrations", fr: "Connecter le compte", en: "Connect the account" },
+      { href: "/app/settings", fr: "Régler le fuseau", en: "Set the timezone" },
+    ],
+  },
+  {
+    id: "warmup",
+    fr: "Les 7 premiers jours",
+    en: "The first 7 days",
+    minutes: 15,
+    tasks: [
+      {
+        id: "ct_day1",
+        fr: "Jour 1 : 3 carrousels postés à la main",
+        en: "Day 1: 3 carousels posted by hand",
+        detailFr: "Depuis le téléphone, VPN activé.",
+        detailEn: "From the phone, VPN on.",
+      },
+      {
+        id: "ct_week",
+        fr: "Jours 2 à 7 : 1 par jour, 11 h – 14 h à New York",
+        en: "Days 2 to 7: 1 a day, 11am – 2pm New York",
+        detailFr: "17 h – 20 h à Paris. Jamais 5 posts par jour sur un compte neuf.",
+        detailEn: "5pm – 8pm in Paris. Never 5 posts a day on a new account.",
+      },
+    ],
+    links: [{ href: "/app", fr: "Ouvrir le calendrier", en: "Open the calendar" }],
   },
 ];
 
-export const US_CHECKLIST_IDS = new Set(US_CHECKLIST.flatMap((g) => g.items.map((i) => i.id)));
+export const US_CHECKLIST_IDS = new Set(US_STEPS.flatMap((step) => step.tasks.map((task) => task.id)));
+
+export const US_TASK_TOTAL = US_STEPS.reduce((total, step) => total + step.tasks.length, 0);
+
+/** La seule phrase de la page qui ne soit pas une case à cocher. */
+export const US_GOLDEN_RULE: UsBit = {
+  fr: "Chaque session : Wi‑Fi sans SIM → Outline → vérifier l'IP → TikTok. Une seule ouverture sans VPN grille le compte.",
+  en: "Every session: Wi‑Fi with no SIM → Outline → check the IP → TikTok. A single open without the VPN burns the account.",
+};

@@ -1,9 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { publicUser, updateStore } from "./store";
-import { resolveProject, withProject } from "./projects";
+import { publicUser, readStoreSlice, updateStoreSlice } from "./store";
+import { findProject, resolveProject, withProject } from "./projects";
 import type { ApiKey, SessionUser } from "./types";
 
 const PREFIX = "ss_live_";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["apiKeys"], fn);
 
 export function publicApiKey(key: ApiKey) {
   return {
@@ -32,8 +33,10 @@ export async function createApiKey(userId: string, name: string, projectId?: str
   };
   const created = await updateStore((data) => {
     // Sans projet demande, la cle suit le projet actif du compte.
-    if (!item.projectId) item.projectId = resolveProject(data, userId, null)?.id;
-    const mine = (data.apiKeys || []).filter((key) => key.userId === userId);
+    const project = item.projectId ? findProject(data, userId, item.projectId) : resolveProject(data, userId, null);
+    if (!project || data.restoreReviewRequired) return null;
+    item.projectId = project.id;
+    const mine = (data.apiKeys || []).filter((key) => key.userId === userId && (!key.expiresAt || Date.parse(key.expiresAt) > Date.now()));
     if (mine.length >= 10) return null;
     data.apiKeys = data.apiKeys || [];
     data.apiKeys.unshift(item);
@@ -44,10 +47,9 @@ export async function createApiKey(userId: string, name: string, projectId?: str
 }
 
 export async function listApiKeys(userId: string, projectId?: string) {
-  const { readStore } = await import("./store");
-  const data = await readStore();
+  const data = await readStoreSlice(["apiKeys"]);
   return (data.apiKeys || [])
-    .filter((key) => key.userId === userId && (!projectId || !key.projectId || key.projectId === projectId))
+    .filter((key) => key.userId === userId && (!projectId || key.projectId === projectId))
     .map(publicApiKey);
 }
 
@@ -57,10 +59,12 @@ export async function listApiKeys(userId: string, projectId?: string) {
  * redoing onboarding can never hit the 10-key ceiling.
  */
 export async function rotateOnboardingKey(userId: string) {
+  const project = resolveProject(await readStoreSlice([]), userId, null);
+  if (!project) return null;
   await updateStore((data) => {
-    data.apiKeys = (data.apiKeys || []).filter((key) => !(key.userId === userId && key.name === ONBOARDING_KEY_NAME));
+    data.apiKeys = (data.apiKeys || []).filter((key) => !(key.userId === userId && key.projectId === project.id && key.name === ONBOARDING_KEY_NAME));
   });
-  return createApiKey(userId, ONBOARDING_KEY_NAME);
+  return createApiKey(userId, ONBOARDING_KEY_NAME, project.id);
 }
 
 export const ONBOARDING_KEY_NAME = "ScrollShow";
@@ -75,17 +79,23 @@ export async function resolveApiKey(token: string): Promise<SessionUser | null> 
   const value = token.trim();
   if (!value.startsWith(PREFIX)) return null;
   const hash = hashApiKey(value);
-  return updateStore((data) => {
+  const data = await readStoreSlice(["apiKeys"]);
     if (data.restoreReviewRequired) return null;
     const found = (data.apiKeys || []).find((key) => hashesEqual(key.hash, hash));
     if (!found) return null;
     if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) return null;
     const user = data.users.find((item) => item.id === found.userId);
     if (!user || user.deletionPendingAt || !user.emailVerifiedAt) return null;
-    found.lastUsedAt = new Date().toISOString();
-    // Une cle est liee a un projet : l'agent ne voit et n'ecrit que dans celui-ci.
-    return withProject(publicUser(user), resolveProject(data, user.id, found.projectId));
-  });
+    const project = found.projectId ? findProject(data, user.id, found.projectId) : null;
+    if (!project) return null;
+    // Activity is informational: coalesce writes to at most once per hour.
+    if (!found.lastUsedAt || Date.now() - Date.parse(found.lastUsedAt) >= 3600000) {
+      await updateStore(current => {
+        const key = current.apiKeys.find(item => item.id === found.id && item.hash === hash);
+        if (key && (!key.lastUsedAt || Date.now() - Date.parse(key.lastUsedAt) >= 3600000)) key.lastUsedAt = new Date().toISOString();
+      });
+    }
+    return withProject(publicUser(user), project);
 }
 
 function hashApiKey(value: string) {

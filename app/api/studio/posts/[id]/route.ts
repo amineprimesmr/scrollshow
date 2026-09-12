@@ -1,6 +1,8 @@
+import { assertMediaReferences } from "@/lib/media-permissions";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { applyRecipePatch, coverOf, ensureRecipe, newShareId, recipeInputSchema } from "@/lib/recipe";
-import { updateStore } from "@/lib/store";
+import { updateStoreSlice } from "@/lib/store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media", "mediaDeletionQueue"], fn);
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
@@ -40,6 +42,7 @@ export async function PATCH(
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
   const post = await updateStore((data) => {
+    assertMediaReferences(data, parsed.data, user);
     const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     assertEditable(found);

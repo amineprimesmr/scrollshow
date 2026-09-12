@@ -8,9 +8,11 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { SignJWT } from "jose";
 import { hash } from "bcryptjs";
+import sharp from "sharp";
+import { unzipSync, strFromU8 } from "fflate";
 
 const directory = await mkdtemp(join(tmpdir(), "scrollshow-smoke-"));
-const port = "3107";
+const port = process.env.SCROLLSHOW_SMOKE_PORT || "3107";
 const base = `http://127.0.0.1:${port}`;
 const secret = randomBytes(32).toString("hex");
 const token = "ss_live_" + randomBytes(24).toString("base64url");
@@ -127,6 +129,51 @@ try {
   check(!!comparison.result?.content?.length && !comparison.result.isError, "MCP comparison executes");
   const page = await fetch(base + "/app/discover", { headers });
   check(page.ok && (await page.text()).includes("Recherche"), "authenticated research page renders");
+  // Exercise real multipart decoding, ownership, persistence, rendering and ZIP contents.
+  const fileBytes = await sharp({ create: { width: 108, height: 192, channels: 3, background: "#243b70" } }).png().toBuffer();
+  const form = new FormData(); form.set("file", new Blob([fileBytes], { type: "image/png" }), "fixture.png");
+  const upload = await fetch(base + "/api/studio/media", { method: "POST", headers: { Cookie: headers.Cookie }, body: form });
+  const uploaded = (await upload.json()).media;
+  check(upload.status === 201 && uploaded?.url?.startsWith("/api/i/"), "multipart upload stores a decoded owned image");
+  check((await fetch(base + uploaded.url)).status === 404, "private uploaded image is hidden anonymously");
+  check((await fetch(base + uploaded.url, { headers })).ok, "image owner can read the uploaded bytes");
+  const uploadedPostResponse = await fetch(base + "/api/studio/posts", { method: "POST", headers, body: JSON.stringify({ ...input, body: "Owned media fixture", photo_images: [uploaded.url] }) });
+  const uploadedPost = (await uploadedPostResponse.json()).post;
+  check(uploadedPostResponse.ok && uploadedPost?.id, "uploaded media can become a saved draft");
+  const archiveResponse = await fetch(base + `/api/studio/posts/${uploadedPost.id}/export`, { headers });
+  check(archiveResponse.ok && archiveResponse.headers.get("content-type") === "application/zip", "saved carousel exports as ZIP");
+  const archive = unzipSync(new Uint8Array(await archiveResponse.arrayBuffer()));
+  check(Object.keys(archive).some(name => name.startsWith("slide-01.")) && strFromU8(archive["caption.txt"]) === "Owned media fixture", "ZIP contains rendered media and exact caption");
+  const composedResponse = await fetch(base + "/api/studio/posts", { method: "POST", headers, body: JSON.stringify({ ...input, image: "", body: "Texte et photo", recipe: { slides: [
+    { image: "", backgroundColor: "#111111", keepPhoto: false, overlays: [{ text: "Créer, modifier, enregistrer.", align: "left", x: 7, y: 36 }] },
+    { image: uploaded.url, keepPhoto: true, overlays: [{ text: "Photo importée", y: 50 }] },
+    { image: "", backgroundColor: "#123456", keepPhoto: false, overlays: [] },
+  ] } }) });
+  const composed = (await composedResponse.json()).post;
+  check(composedResponse.ok && composed.recipe.slides[0].image === "" && composed.recipe.slides[1].image === uploaded.url, "mixed text/photo/blank carousel preserves slide order without demo images");
+  const composedExport = await fetch(base + `/api/studio/posts/${composed.id}/export`, { headers });
+  check(composedExport.ok, "WebP photo and editable text export together successfully");
+  const rendered = unzipSync(new Uint8Array(await composedExport.arrayBuffer()));
+  const slides = Object.keys(rendered).filter(name => name.startsWith("slide-"));
+  check(slides.length === 3, "composed ZIP preserves all three slides");
+  const info = await sharp(rendered["slide-01.png"]).metadata();
+  const textStats = await sharp(rendered["slide-01.png"]).stats();
+  const blankStats = await sharp(rendered["slide-03.png"]).stats();
+  check(info.width === 1080 && info.height === 1920 && textStats.channels[0].max > 200 && textStats.channels[0].min < 30, "text export contains visible glyphs on the requested 1080 × 1920 background");
+  check(blankStats.channels[0].min === 18 && blankStats.channels[0].max === 18 && blankStats.channels[1].min === 52, "blank slide exports its exact background colour");
+  const stolen = await fetch(base + "/api/studio/posts", { method: "POST", headers: { ...headers, Cookie: verifiedCookie }, body: JSON.stringify({ ...input, photo_images: [uploaded.url] }) });
+  check(stolen.status === 403, "another user cannot claim a known private image URL");
+  const newProjectResponse = await fetch(base + "/api/projects", { method: "POST", headers, body: JSON.stringify({ action: "create", name: "Isolated business" }) });
+  const newProject = (await newProjectResponse.json()).activeId;
+  const otherProjectHeaders = { ...headers, Cookie: headers.Cookie + `; ss_project=${newProject}` };
+  check(newProjectResponse.ok && newProject, "second business project can be created");
+  check((await fetch(base + `/api/studio/posts/${uploadedPost.id}/export`, { headers: otherProjectHeaders })).status === 404, "another project cannot export the original private draft");
+  check((await fetch(base + uploaded.url, { headers: otherProjectHeaders })).status === 404, "another project cannot read the private uploaded image");
+  const originalProjectHeaders = { ...headers, Cookie: headers.Cookie + "; ss_project=prj_smoke-user_1" };
+  check((await fetch(base + `/api/studio/posts/${uploadedPost.id}/export`, { headers: originalProjectHeaders })).ok, "switching back retains original project and media");
+  const whoami = await rpc("tools/call", { name: "whoami", arguments: {} }, 90);
+  check(!whoami.result?.isError && JSON.stringify(whoami).includes("pending_review"), "MCP advertises pending TikTok approval truthfully");
+  check((await fetch(base + "/api/cron/analytics")).status === 401, "daily analytics cron is protected");
   console.log(`${checks} smoke checks passed; ${names.length} MCP tools available.`);
   if (process.env.SCROLLSHOW_SMOKE_BROWSER === "1") {
     console.log(`Isolated browser fixture ready at ${base}/signup?mode=signin. Stop with Ctrl-C after visual QA.`);

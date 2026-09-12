@@ -1,3 +1,4 @@
+import { inScope } from "@/lib/projects";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { tiktokUserId } from "@/lib/tiktok-account";
 import { revokeAccessToken } from "@/lib/tiktok";
@@ -18,11 +19,9 @@ export async function POST(request: Request) {
   }
 
   const data = await readStore();
-  // No channelId (legacy callers) falls back to the user's first TikTok channel.
-  const target = channelId
-    ? data.channels.find((item) => item.id === channelId && item.userId === userId && item.platform === "tiktok")
-    : data.channels.find((item) => item.userId === userId && item.platform === "tiktok");
-  if (!target) return NextResponse.json({ ok: true });
+  if (!channelId) return NextResponse.json({ error: "channel_id_required" }, { status: 400 });
+  const target = data.channels.find(item => item.id === channelId && inScope(item, user) && item.platform === "tiktok");
+  if (!target) return NextResponse.json({ error: "missing" }, { status: 404 });
 
   if (target.accessToken) await revokeAccessToken(target.accessToken);
   await updateStore((store) => {

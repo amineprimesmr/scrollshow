@@ -1,3 +1,5 @@
+import { readStoreSlice } from "@/lib/store";
+import { listProjects } from "@/lib/projects";
 import { readSession } from "@/lib/auth";
 import { hasStudioAccess } from "@/lib/plans";
 import { canonicalResource, findClient, OAUTH_SCOPE } from "@/lib/oauth";
@@ -58,6 +60,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     redirect(`/signup?mode=signin&next=${encodeURIComponent(self.pathname + self.search)}`);
   }
 
+  const projects = listProjects(await readStoreSlice([]), user.id);
   return (
     <main className="ss-oauth">
       <div className="ss-oauth__card">
@@ -82,6 +85,11 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         )}
 
         <form method="post" action="/api/oauth/authorize" className="ss-oauth__actions">
+          <label>Projet autorisé
+            <select name="project_id" defaultValue={user.projectId} required>
+              {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </select>
+          </label>
           <input type="hidden" name="client_id" value={clientId} />
           <input type="hidden" name="redirect_uri" value={redirectUri} />
           <input type="hidden" name="code_challenge" value={codeChallenge} />

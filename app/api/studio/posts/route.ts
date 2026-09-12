@@ -1,6 +1,8 @@
+import { assertMediaReferences } from "@/lib/media-permissions";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { coverOf, newShareId, recipeFromPhotos, recipeInputSchema } from "@/lib/recipe";
-import { updateStore } from "@/lib/store";
+import { updateStoreSlice } from "@/lib/store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media", "mediaDeletionQueue"], fn);
 import type { StudioPost } from "@/lib/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -38,12 +40,13 @@ export async function POST(request: Request) {
   const origin = parsed.data.origin || "manual";
   const photos = parsed.data.photo_images?.length
     ? parsed.data.photo_images
-    : parsed.data.recipe?.slides?.map((slide) => slide.image || "").filter(Boolean).length
-      ? (parsed.data.recipe?.slides || []).map((slide) => slide.image || "").filter(Boolean)
-      : [parsed.data.image || "/assets/tiktoks/01-glowup-188k.png"];
+    : parsed.data.recipe?.slides?.length
+      ? parsed.data.recipe.slides.map((slide) => slide.image || "")
+      : [parsed.data.image || ""];
   const recipe = recipeFromPhotos(photos, origin, parsed.data.recipe);
 
   const post = await updateStore((data) => {
+    assertMediaReferences(data, parsed.data, user);
     const created: StudioPost = {
       id: crypto.randomUUID(),
       userId: user.id, projectId: user.projectId,

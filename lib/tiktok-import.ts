@@ -26,6 +26,7 @@ export type ImportedTikTok = {
   shares: number;
   kind: "photo" | "video";
   images: string[];
+  importSummary?: { expected: number; imported: number; failed: number; truncated: boolean; videoPreviewOnly?: boolean };
 };
 
 export function tiktokHeaders(extra?: Record<string, string>): HeadersInit {
@@ -54,7 +55,7 @@ export function parseTikTokUrl(raw: string) {
   return url.toString();
 }
 
-async function resolveUrl(input: string) {
+export async function resolveUrl(input: string) {
   const start = parseTikTokUrl(input);
   try {
     const res = await safeFetchBytes(start, { maxBytes: 5000000, headers: tiktokHeaders() as Record<string, string> });
@@ -283,5 +284,6 @@ export async function importTikTokFromUrl(input: string): Promise<ImportedTikTok
     shares: parsed.shares,
     kind: images.length > 1 ? "photo" : parsed.kind,
     images,
+    importSummary: { videoPreviewOnly: parsed.kind === "video" && images.length === 1, expected: parsed.imageUrls.length, imported: images.length, failed: Math.min(35, parsed.imageUrls.length) - images.length, truncated: parsed.imageUrls.length > 35 },
   };
 }

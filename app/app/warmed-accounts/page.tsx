@@ -1,5 +1,5 @@
-import { WarmedAccountsView } from "@/components/studio/views/MoreViews";
+import { WarmedAccountsLocked } from "@/components/studio/views/MoreViews";
 
 export default function WarmedAccountsPage() {
-  return <WarmedAccountsView />;
+  return <WarmedAccountsLocked />;
 }

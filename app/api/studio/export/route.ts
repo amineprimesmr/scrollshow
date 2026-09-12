@@ -14,7 +14,9 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "missing" }, { status: 404 });
 
     return NextResponse.json({
+      formatVersion: 2,
       user: publicUser(user),
+      projects: (data.projects || []).filter(project => project.userId === session.id),
       channels: data.channels.filter((item) => item.userId === session.id).map(publicChannel),
       posts: data.posts.filter((item) => item.userId === session.id),
       media: data.media
@@ -32,7 +34,7 @@ export async function GET() {
       channelStats: data.channelStats?.filter(s => data.channels.some(c => c.id === s.channelId && c.userId === session.id)),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "export_failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("studio_operation_unavailable");
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
   }
 }

@@ -1,6 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { readStore, updateStore } from "./store";
-import type { OAuthClient, StoreData } from "./types";
+import { publicUser, readStoreSlice, updateStoreSlice } from "./store";
+import { findProject, resolveProject, withProject } from "./projects";
+const KEYS = ["oauthClients", "oauthCodes", "oauthTokens", "oauthUsedRefresh"] as const;
+const readStore = () => readStoreSlice(KEYS);
+const updateStore = <T>(fn: (data: StoreData) => T | Promise<T>) => updateStoreSlice(KEYS, fn);
+import type { OAuthClient, SessionUser, StoreData } from "./types";
 
 /**
  * Serveur d'autorisation OAuth 2.1 pour le serveur MCP, tel que l'exige la
@@ -98,6 +102,7 @@ export async function findClient(clientId: string) {
 export async function issueCode(input: {
   clientId: string;
   userId: string;
+  projectId?: string;
   redirectUri: string;
   codeChallenge: string;
   resource: string;
@@ -105,9 +110,13 @@ export async function issueCode(input: {
 }) {
   const code = randomBytes(32).toString("base64url");
   await updateStore((data) => {
+    const project = input.projectId ? findProject(data, input.userId, input.projectId) : resolveProject(data, input.userId);
+    const user = data.users.find(item => item.id === input.userId);
+    if (data.restoreReviewRequired || !project || !user?.emailVerifiedAt || user.deletionPendingAt) throw new Error("oauth_account_unavailable");
     data.oauthCodes = (data.oauthCodes || []).filter((item) => item.expiresAt > Date.now());
     data.oauthCodes.push({
       hash: hashSecret(code),
+      projectId: project.id,
       clientId: input.clientId,
       userId: input.userId,
       redirectUri: input.redirectUri,
@@ -135,42 +144,38 @@ export async function consumeCode(code: string) {
 
 export type IssuedTokens = { accessToken: string; refreshToken: string; expiresIn: number };
 
-export async function issueTokens(input: {
-  clientId: string;
-  userId: string;
-  resource: string;
-  scope: string;
-  grantId?: string;
-}): Promise<IssuedTokens> {
+type GrantInput = { clientId: string; userId: string; projectId?: string; resource: string; scope: string; grantId?: string };
+
+function activeGrant(data: StoreData, grant: GrantInput) {
+  const user = data.users.find(item => item.id === grant.userId);
+  return !data.restoreReviewRequired && user?.emailVerifiedAt && !user.deletionPendingAt
+    && findProject(data, grant.userId, grant.projectId);
+}
+
+function appendTokens(data: StoreData, input: GrantInput): IssuedTokens {
+  if (!activeGrant(data, input)) throw new Error("oauth_account_unavailable");
   const accessToken = `${ACCESS_PREFIX}${randomBytes(32).toString("base64url")}`;
   const refreshToken = `${REFRESH_PREFIX}${randomBytes(32).toString("base64url")}`;
-  const grantId = input.grantId || `ssg_${randomBytes(12).toString("base64url")}`;
   const now = Date.now();
-
-  await updateStore((data) => {
-    data.oauthTokens = (data.oauthTokens || []).filter((item) => item.refreshExpiresAt > now);
-    data.oauthTokens.push({
-      grantId,
-      clientId: input.clientId,
-      userId: input.userId,
-      resource: input.resource,
-      scope: input.scope,
-      accessHash: hashSecret(accessToken),
-      refreshHash: hashSecret(refreshToken),
-      accessExpiresAt: now + ACCESS_TTL,
-      refreshExpiresAt: now + REFRESH_TTL,
-      createdAt: new Date(now).toISOString(),
-    });
+  data.oauthTokens = (data.oauthTokens || []).filter(item => item.refreshExpiresAt > now);
+  data.oauthTokens.push({
+    ...input, grantId: input.grantId || `ssg_${randomBytes(12).toString("base64url")}`,
+    accessHash: hashSecret(accessToken), refreshHash: hashSecret(refreshToken),
+    accessExpiresAt: now + ACCESS_TTL, refreshExpiresAt: now + REFRESH_TTL,
+    createdAt: new Date(now).toISOString(),
   });
-
   return { accessToken, refreshToken, expiresIn: Math.floor(ACCESS_TTL / 1000) };
+}
+
+export async function issueTokens(input: GrantInput): Promise<IssuedTokens> {
+  return updateStore(data => appendTokens(data, input));
 }
 
 /**
  * Renouvellement avec rotation. Un jeton de renouvellement deja consomme est le
  * signe d'un vol : on coupe toute l'autorisation plutot que de servir le voleur.
  */
-export async function rotateRefreshToken(refreshToken: string, clientId: string) {
+export async function rotateRefreshToken(refreshToken: string, clientId: string, resource?: string) {
   const hash = hashSecret(refreshToken);
   const outcome = await updateStore((data) => {
     const list = data.oauthTokens || [];
@@ -184,16 +189,17 @@ export async function rotateRefreshToken(refreshToken: string, clientId: string)
       data.oauthTokens = list.filter((item) => item.grantId !== replayed.grantId);
       return "replay" as const;
     }
-    if (found.clientId !== clientId) return "unknown" as const;
+    if (found.clientId !== clientId || (resource && canonicalResource(resource) !== found.resource)) return "unknown" as const;
+    if (!activeGrant(data, found)) return "unknown" as const;
     if (found.refreshExpiresAt <= Date.now()) return "expired" as const;
     data.oauthTokens = list.filter((item) => item.refreshHash !== hash);
     data.oauthUsedRefresh = [...(data.oauthUsedRefresh || []), { hash, grantId: found.grantId }].slice(-5000);
-    return found;
+    return { grant: found, tokens: appendTokens(data, found) };
   });
 
   if (outcome === "replay") return { error: "replay" as const };
   if (outcome === "unknown" || outcome === "expired") return { error: outcome };
-  return { grant: outcome };
+  return outcome;
 }
 
 /** Verifie un jeton d'acces : existence, expiration, audience. */
@@ -204,8 +210,18 @@ export async function resolveAccessToken(token: string, resource: string) {
   const found = (data.oauthTokens || []).find((item) => item.accessHash === hash);
   if (!found) return null;
   if (found.accessExpiresAt <= Date.now()) return null;
-  if (found.resource !== resource) return null;
+  if (found.resource !== resource || !activeGrant(data, found)) return null;
   return found;
+}
+
+/** Resolve the user and the consented workspace in one small database read. */
+export async function resolveOAuthUser(token: string, resource: string): Promise<SessionUser | null> {
+  if (!token.startsWith(ACCESS_PREFIX)) return null;
+  const data = await readStoreSlice(["oauthTokens"]);
+  const grant = data.oauthTokens?.find(item => item.accessHash === hashSecret(token));
+  if (!grant || grant.accessExpiresAt <= Date.now() || grant.resource !== resource || !activeGrant(data, grant)) return null;
+  const user = data.users.find(item => item.id === grant.userId)!;
+  return withProject(publicUser(user), findProject(data, user.id, grant.projectId));
 }
 
 /* ── Autorisations accordees ───────────────────────────────────────────── */
@@ -234,6 +250,7 @@ export async function revokeGrant(userId: string, grantId: string) {
 
 /** Coupe tout : suppression de compte, changement d'email, mot de passe change. */
 export function revokeAllForUser(data: StoreData, userId: string) {
+  data.apiKeys = (data.apiKeys || []).filter(item => item.userId !== userId);
   data.oauthTokens = (data.oauthTokens || []).filter((item) => item.userId !== userId);
   data.oauthCodes = (data.oauthCodes || []).filter((item) => item.userId !== userId);
 }

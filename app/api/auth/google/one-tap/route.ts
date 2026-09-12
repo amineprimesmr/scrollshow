@@ -6,6 +6,7 @@ import { publicUser } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { consumePublicAuthLimit } from "@/lib/rate-limit";
 const NONCE_COOKIE = "ss_google_onetap";
 
 /** Prepare une session One Tap : renvoie le client id public et un nonce a usage unique. */
@@ -25,6 +26,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!await consumePublicAuthLimit(request, "google-onetap")) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   const jar = await cookies();
   const nonce = jar.get(NONCE_COOKIE)?.value || "";
   jar.delete(NONCE_COOKIE);

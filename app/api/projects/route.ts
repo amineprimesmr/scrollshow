@@ -1,7 +1,9 @@
 import { readStudioSession } from "@/lib/auth";
 import { archiveProject, createProject, findProject, listProjects, publicProject, resolveProject } from "@/lib/projects";
 import { PROJECT_COOKIE, readProjectCookie, setProjectCookie } from "@/lib/project-context";
-import { readStore, updateStore } from "@/lib/store";
+import { readStoreSlice, updateStoreSlice } from "@/lib/store";
+const readStore = () => readStoreSlice([]);
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice([], fn);
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";

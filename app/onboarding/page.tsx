@@ -154,7 +154,7 @@ function OnboardingInner() {
         if (projectParam) {
           // Un compte pas encore onboarde termine d'abord son propre parcours.
           if (!me.onboarded || !hasStudioAccess(me.plan)) { router.replace("/onboarding"); return; }
-          if (json.project?.completed) { router.replace("/app"); return; }
+          // Completed projects can be edited and re-analyzed here.
           if (Number.isInteger(json.step) && json.step >= 0 && json.step <= 2) setStep(json.step as Step);
         } else if (me.onboarded && !hasStudioAccess(me.plan)) setStep(5);
         else if (me.onboarded && hasStudioAccess(me.plan) && !params.get("next")) { router.replace("/app"); return; }
@@ -165,15 +165,15 @@ function OnboardingInner() {
         setCompany(json.company || "");
         setLogo(json.logo || "");
         const found: BusinessProfile | null = json.business || (projectParam ? null : me.business);
-        if (found?.url) {
+        if (found) {
           setBusiness(found);
           setUrl(found.url);
           setRevealed(true);
         }
       })
       .catch((res: Response | Error) => {
-        if (projectParam && res instanceof Response && res.status === 404) { router.replace("/app"); return; }
-        router.replace("/signup?mode=signin&next=/onboarding");
+        if (res instanceof Response && res.status === 401) { router.replace("/signup?mode=signin&next=/onboarding"); return; }
+        setError("Impossible de charger ton espace. Réessaie dans un instant.");
       });
   }, [router, params, projectParam]);
 
@@ -198,7 +198,7 @@ function OnboardingInner() {
 
   /* ── step 0 ─────────────────────────────────────────────────────────── */
   function onLogoFile(file: File | undefined) {
-    if (!file || !/^image\/(png|jpe?g|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) return;
+    if (!file || !/^image\/(png|jpe?g|webp)$/.test(file.type) || file.size > 1_500_000) return;
     const reader = new FileReader();
     reader.onload = () => setLogo(String(reader.result || ""));
     reader.readAsDataURL(file);
@@ -286,7 +286,7 @@ function OnboardingInner() {
     if (!business || !tiktokInput.trim()) return;
     setTiktokBusy(true);
     try {
-      const json = await post({ action: "tiktok", handle: tiktokInput });
+      const json = await post({ action: "tiktok", handle: tiktokInput, ...(projectMode ? { project: projectParam } : {}) });
       if (!json.tiktok) {
         setError(t("Compte TikTok introuvable.", "TikTok account not found."));
         return;
@@ -504,7 +504,7 @@ function OnboardingInner() {
                 {logo ? <img src={logo} alt="" /> : <span className="ss-onb-drop__icon">＋</span>}
                 <div>
                   <b>{logo ? t("Logo ajouté", "Logo added") : t("Logo (optionnel)", "Logo (optional)")}</b>
-                  <span>{t("PNG, JPG ou WebP · 5 Mo max", "PNG, JPG or WebP · 5 MB max")}</span>
+                  <span>{t("PNG, JPG ou WebP · 1,1,5 Mo max", "PNG, JPG or WebP · 1.1.5 MB max")}</span>
                 </div>
                 {logo ? (
                   <button

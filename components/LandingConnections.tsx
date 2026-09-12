@@ -3,21 +3,11 @@ import type { CSSProperties } from "react";
 import { ConnectorRegistry } from "@/components/ConnectorRegistry";
 
 const connections = [
-  { name: "TikTok", detail: "ton canal de diffusion", image: "/assets/platforms/tiktok.png", color: "#69e5de" },
-  { name: "Claude", detail: "ton agent IA", image: "/assets/ai/claude.png", color: "#dba38c" },
-  { name: "Codex", detail: "ton agent IA", image: "/assets/ai/codex.png", color: "#e2e4ed" },
-  { name: "Cursor", detail: "ton espace de code", image: "/assets/ai/cursor.png", color: "#a9b8e7" },
-  { name: "Instagram", detail: "tes carrousels ailleurs", image: "/assets/platforms/instagram.png", color: "#e7a0c4" },
-  { name: "YouTube", detail: "tes formats longs", image: "/assets/platforms/youtube.svg", color: "#f08a8a" },
-  { name: "Snapchat", detail: "ton audience mobile", image: "/assets/platforms/snapchat.png", color: "#f5e08a" },
-  { name: "Reddit", detail: "les sujets qui montent", image: "/assets/platforms/reddit.png", color: "#f0a878" },
-  { name: "Telegram", detail: "tes alertes de publication", image: "/assets/platforms/telegram.svg", color: "#8fc9ee" },
-  { name: "Google Reviews", detail: "la preuve sociale", image: "/assets/platforms/google-reviews.png", color: "#9bb8f0" },
-  { name: "Apify", detail: "la donnée des créateurs", image: "/assets/platforms/apify.svg", color: "#f0b078" },
-  { name: "ElevenLabs", detail: "les voix de tes vidéos", image: "/assets/platforms/elevenlabs.svg", color: "#d4d4d8" },
-  { name: "TikTok Shop", detail: "tes produits en ligne", image: "/assets/platforms/tiktok-shop.svg", color: "#f08aa0" },
-  { name: "SEO & GEO", detail: "ta visibilité en recherche", image: "/assets/platforms/seo.svg", color: "#8fd4a8" },
-  { name: "Web Search", detail: "explore ta niche", icon: "search", color: "#9bafff" },
+  { name: "TikTok", detail: "connexion, données et carrousels", image: "/assets/platforms/tiktok.png", color: "#69e5de" },
+  { name: "Claude", detail: "ton assistant via MCP", image: "/assets/ai/claude.png", color: "#dba38c" },
+  { name: "Codex", detail: "ton assistant via MCP", image: "/assets/ai/codex.png", color: "#e2e4ed" },
+  { name: "Cursor", detail: "ton assistant via MCP", image: "/assets/ai/cursor.png", color: "#a9b8e7" },
+  { name: "Export ZIP", detail: "tes images et ta légende", icon: "slides", color: "#9bafff" },
 ];
 
 const paths: Record<string, string> = {

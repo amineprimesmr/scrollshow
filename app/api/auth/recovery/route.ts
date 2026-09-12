@@ -1,5 +1,5 @@
 import { issueRecovery, redeemRecovery } from "@/lib/account-recovery";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sendAccountEmail } from "@/lib/email";
@@ -8,6 +8,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset"), token: z.string().min(40).max(100), password: z.string().min(8).max(80) }),
 ]);
 export async function POST(request: Request) {
+  if (!await consumePublicAuthLimit(request, "recovery")) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const body = parsed.data;

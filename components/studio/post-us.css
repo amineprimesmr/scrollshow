@@ -1,0 +1,306 @@
+/* Poster aux US — six étapes, rien d'autre.
+   Namespace .ss-us. Le verre va sur la barre collante (chrome flottant) ;
+   les étapes restent opaques, c'est ce qu'on lit. */
+
+.ss-us {
+  --us-ease: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --us-out: cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* ── La barre ──────────────────────────────────────────────────────────── */
+.ss-us__bar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding: 15px 22px 13px;
+  background: rgb(var(--lg-rgb) / 0.5);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow: inset 0 -1px 0 rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.35));
+}
+
+.ss-us__title { min-width: 0; }
+
+.ss-us__title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ss-us__title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ss-muted);
+}
+
+.ss-us__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.ss-us__bar-track {
+  flex: 1;
+  height: 5px;
+  min-width: 110px;
+  border-radius: 999px;
+  background: var(--ss-line);
+  overflow: hidden;
+}
+
+.ss-us__bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ss-ink);
+  transition: width 0.5s var(--us-out);
+}
+
+.ss-us__progress span {
+  font-size: 12.5px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── La page ───────────────────────────────────────────────────────────── */
+.ss-us__page {
+  width: 100%;
+  max-width: 720px;
+  padding: 20px 22px 72px;
+}
+
+/* ── Les étapes ────────────────────────────────────────────────────────── */
+.ss-us-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-us-step {
+  border-radius: 18px;
+  background: var(--ss-card);
+  box-shadow: inset 0 0 0 1px var(--ss-line);
+  overflow: hidden;
+  animation: ss-fade-up 0.4s var(--us-out) both;
+  transition: box-shadow 0.3s var(--us-ease);
+}
+
+.ss-us-step.is-open { box-shadow: inset 0 0 0 1px var(--ss-muted-2); }
+
+.ss-us-step__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ss-us-step__head:hover { background: var(--ss-soft); }
+.ss-us-step__head > strong { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; letter-spacing: -0.015em; }
+.ss-us-step__head > i { flex: none; font-style: normal; font-size: 11.5px; color: var(--ss-muted-2); font-variant-numeric: tabular-nums; }
+.ss-us-step__head > svg { flex: none; color: var(--ss-muted-2); }
+
+.ss-us-step__num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--ss-soft);
+  font-size: 12.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.3s var(--us-ease), color 0.3s var(--us-ease);
+}
+
+.ss-us-step.is-done .ss-us-step__num { background: var(--ss-ok-bg); color: var(--ss-ok-fg); }
+
+.ss-us-step__count {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ss-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ss-us-step.is-done .ss-us-step__count { color: var(--ss-ok-fg); }
+
+.ss-us-step__body {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 14px 54px;
+  animation: ss-fade-up 0.3s var(--us-out) both;
+}
+
+/* ── Les cases ─────────────────────────────────────────────────────────── */
+.ss-us-tasks {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-us-tasks label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 9px;
+  margin: 0 -9px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.ss-us-tasks label:hover { background: var(--ss-soft); }
+
+.ss-us-tasks input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ss-us-tasks__box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: var(--ss-soft);
+  box-shadow: inset 0 0 0 1px var(--ss-line);
+  color: transparent;
+  transition: background 0.24s var(--us-ease), color 0.24s ease;
+}
+
+.ss-us-tasks li.is-done .ss-us-tasks__box {
+  background: var(--ss-ink);
+  box-shadow: none;
+  color: var(--ss-on-ink);
+}
+
+.ss-us-tasks input:focus-visible + .ss-us-tasks__box {
+  outline: 2px solid var(--ss-ink);
+  outline-offset: 2px;
+}
+
+.ss-us-tasks__text { display: grid; gap: 1px; min-width: 0; }
+
+.ss-us-tasks__text b {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ss-us-tasks li.is-done .ss-us-tasks__text b {
+  color: var(--ss-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--ss-muted-2);
+}
+
+.ss-us-tasks__text em {
+  font-style: normal;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ss-muted);
+}
+
+/* ── Le prompt de l'agent ──────────────────────────────────────────────── */
+.ss-us-copy {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ss-ink);
+  color: var(--ss-on-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.34s var(--us-ease), background 0.24s ease;
+}
+
+.ss-us-copy:active { transform: scale(0.96); }
+.ss-us-copy.is-copied { background: var(--ss-ok-fg); color: #fff; }
+
+/* ── Les liens : des liens, bleus et soulignés ─────────────────────────── */
+.ss-us-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.ss-us-links a {
+  color: var(--ss-link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ss-us-links a:hover { text-decoration-thickness: 2px; }
+
+/* ── La règle d'or ─────────────────────────────────────────────────────── */
+.ss-us-rule {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ss-muted);
+}
+
+/* ── Petits écrans ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ss-us__bar { padding: 12px 14px 10px; }
+  .ss-us__progress { width: 100%; }
+  .ss-us__page { padding: 16px 14px 56px; }
+  .ss-us-step__body { padding: 0 14px 14px; }
+}
+
+/* Le verre restauré en opaque : les tokens sont redéfinis par le thème sombre,
+   donc la restauration globale de liquid-glass.css ne suffit pas ici. */
+@media (prefers-reduced-transparency: reduce) {
+  .ss-us__bar {
+    background: var(--ss-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 -1px 0 var(--ss-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-us-step,
+  .ss-us-step__body { animation: none; }
+  .ss-us__bar-track i,
+  .ss-us-tasks__box,
+  .ss-us-step__num,
+  .ss-us-copy { transition: none; }
+}

@@ -13,5 +13,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user.emailVerified) redirect("/signup?verify=1");
   if (!user.onboarded) redirect("/onboarding?next=/app");
   if (!hasStudioAccess(user.plan)) redirect("/onboarding?step=payment");
-  return <StudioShell>{children}</StudioShell>;
+  return <StudioShell key={user.projectId || user.id}>{children}</StudioShell>;
 }

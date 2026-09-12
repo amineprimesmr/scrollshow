@@ -1,3 +1,4 @@
+import { processAccountDeletion } from "@/lib/account-deletion";
 import { clearSessionCookie, hashPassword, readSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { isValidTimezone, resolveSettings } from "@/lib/settings";
 import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
@@ -135,55 +136,14 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE() {
-  const session = await readSession();
+  const session = await readSession({ allowPendingDeletion: true });
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const claim = new Date().toISOString();
-  const prepared = await updateStore(data => {
-    const owner = data.users.find(u => u.id === session.id);
-    if (!owner || owner.deletionPendingAt) return null;
-    if (data.posts.some(p => p.userId === session.id && ["PREPARING", "INITIATING", "PROCESSING", "REVIEW_REQUIRED"].includes(p.publishState || ""))) return "publication_in_progress" as const;
-    const channels = data.channels.filter(c => c.userId === session.id);
-    if (channels.some(c => c.accessToken && c.platform !== "tiktok")) return "disconnect_other_platforms_first" as const;
-    owner.deletionPendingAt = claim;
-    return { owner: structuredClone(owner), channels: structuredClone(channels) };
-  });
-  if (!prepared) return NextResponse.json({ error: "missing_or_deletion_pending" }, { status: 409 });
-  if (typeof prepared === "string") return NextResponse.json({ error: prepared }, { status: 409 });
   try {
-    if (prepared.owner.stripeSubscriptionId) {
-      const subscription = await stripe().subscriptions.retrieve(prepared.owner.stripeSubscriptionId);
-      if (subscription.status !== "canceled") await stripe().subscriptions.cancel(subscription.id);
-    }
-    for (const channel of prepared.channels) if (channel.accessToken) await revokeAccessToken(channel.accessToken);
-  } catch {
-    await updateStore(data => { const owner = data.users.find(u => u.id === session.id); if (owner?.deletionPendingAt === claim) owner.deletionPendingAt = undefined; });
-    return NextResponse.json({ error: "provider_cancellation_required_retry_or_contact_support" }, { status: 503 });
+    const result = await processAccountDeletion(session.id, true);
+    await clearSessionCookie();
+    return NextResponse.json({ ok: true, pending: result.pending }, { status: result.pending ? 202 : 200 });
+  } catch (error) {
+    const known = error instanceof Error && ["publication_in_progress", "disconnect_other_platforms_first"].includes(error.message);
+    return NextResponse.json({ error: known ? (error as Error).message : "deletion_unavailable" }, { status: known ? 409 : 503 });
   }
-
-  await updateStore((data) => {
-    const owner = data.users.find(u => u.id === session.id);
-    if (owner?.deletionPendingAt !== claim) throw new Error("deletion_claim_lost");
-    queueDeletedMedia(data, { user: owner, posts: data.posts.filter(p => p.userId === session.id), media: data.media.filter(m => m.userId === session.id) });
-    const channelIds = new Set(data.channels.filter(c => c.userId === session.id).map(c => c.id));
-    data.pushSubscriptions = data.pushSubscriptions?.filter(s => s.userId !== session.id);
-    data.warmedOrders = data.warmedOrders?.filter(o => o.userId !== session.id);
-    data.videoStats = data.videoStats?.filter(s => !channelIds.has(s.channelId));
-    data.channelStats = data.channelStats?.filter(s => !channelIds.has(s.channelId));
-    data.users = data.users.filter((item) => item.id !== session.id);
-    data.projects = (data.projects || []).filter((item) => item.userId !== session.id);
-    data.tiktokQrAttempts = (data.tiktokQrAttempts || []).filter((item) => item.userId !== session.id);
-    data.channels = data.channels.filter((item) => item.userId !== session.id);
-    data.posts = data.posts.filter((item) => item.userId !== session.id);
-    data.media = data.media.filter((item) => item.userId !== session.id);
-    data.apiKeys = data.apiKeys.filter((item) => item.userId !== session.id);
-    data.accounts = data.accounts.filter((item) => item.userId !== session.id);
-    data.runs = data.runs.filter((item) => item.userId !== session.id);
-    data.researchJobs = data.researchJobs?.filter(item => item.userId !== session.id);
-    data.formatStudies = data.formatStudies?.filter(item => item.userId !== session.id);
-    data.publicationText = data.publicationText?.filter(item => item.userId !== session.id);
-  });
-
-  await clearSessionCookie();
-  return NextResponse.json({ ok: true });
 }

@@ -149,6 +149,38 @@ Un compteur affiché doit avoir été **mesuré**, jamais reçu d'un appelant.
   (`authorAvatar` dans `research/normalize.ts`), pas du scrape de profil qui
   échoue souvent. Ne pas refaire dépendre l'affichage de ce scrape.
 
+## Shadowban — une baisse n'est jamais une preuve
+`lib/shadowban.ts` (verdict) + `lib/shadowban-rounds.ts` (histogramme R0–R4) +
+`lib/shadowban-check.ts` + `components/studio/views/Shadowban*.tsx`.
+Tests : `tests/shadowban.test.ts`, dont un fixture réel (@ladyycinnamon, 33 posts,
+de 1 040 à 1 360 142 vues) qui doit rester « Aucun risque ».
+- Les vues TikTok sont **log-normales** et un compte ordinaire varie d'un facteur
+  5 à 7 d'un post à l'autre. Comparer la médiane récente à la médiane globale en
+  pourcentage ne veut donc rien dire : l'ancien moteur criait « Shadowban » à
+  −70 %, et annonçait un bridage à une créatrice dont les 4 derniers posts
+  faisaient 1 400 vues après un post à 1,3 M.
+- Toute comparaison se fait **en log, à l'échelle du compte** : `zScore` =
+  (ln médiane récente − ln médiane de référence) / écart-type robuste (MAD × 1,4826)
+  mesuré sur la fenêtre de référence. Plancher `MIN_LOG_SPREAD` à 0,35 pour qu'un
+  compte anormalement régulier ne transforme pas ±40 % en z infini.
+- **Une baisse relative seule ne peut jamais donner « Shadowban »**. Il faut deux
+  signaux durs, dont au moins un absolu : posts à 0 vue (`never_seeded`), posts
+  récents sous le plancher de diffusion (`stuck_in_seed`), portée sous 3 % des
+  abonnés (`below_follower_reach`), effondrement de ≥ 2,5 σ **et** sous le
+  10ᵉ centile historique (`reach_collapse`). Un seul signal = « À surveiller ».
+- Plancher de diffusion = `max(200, min(1000, 2 % des abonnés))` : 200 vues est le
+  lot de test dont un post n'est jamais sorti, un fait absolu et non une comparaison.
+  Abonnés inconnus (0/`null`) = plancher à 200 et signaux « abonnés » désactivés,
+  jamais un ratio calculé sur zéro.
+- Les posts de moins de 48 h sont **exclus** du verdict (`freshCount`) : les vues
+  montent encore. Minimum 5 posts mûrs, référence d'au moins 5 posts.
+- Aucun panneau ne doit contredire le verdict : `ShadowbanRounds` reçoit `verdict`
+  et ne dit plus « Distribution saine / rien n'indique un bridage » sous un
+  verdict Shadowban. C'est cette contradiction qui a fait perdre confiance dans la page.
+- Les graphes (détail et sparkline) sont en **échelle log** : sur une échelle
+  linéaire un seul post viral écrase les trente autres. La bande grise est la zone
+  normale du compte (médiane ± 1 σ) — une barre dedans n'est pas un signal.
+
 ## Moteur de recherche
 `lib/research/` (modèle, jobs, provider, normalisation, statistiques, OCR, formats,
 schéma collecteur) + routes `app/api/research/{route,jobs,studies,collector}` et
@@ -171,6 +203,18 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 - Le cron recherche tourne **toutes les cinq minutes via GitHub Actions**
   (`.github/workflows/publish-scheduled.yml`, job `research`), pas via `vercel.json` :
   Vercel Hobby refuse cette fréquence.
+- **Le mur d'une recherche = les carrousels du mot-clé**, pas les meilleurs posts
+  des comptes trouvés. Les posts ramenés par `searchPhotos` sont conservés, fusionnés
+  dans `Account.videos` même s'ils sont au-delà des pages lues, et marqués
+  (`AccountVideo.matchedKeywords`). Ils étaient effacés (`c.posts=[]`) au profit du
+  feed complet : « sleepmaxing » rendait alors le meilleur carrousel du compte, sur
+  un tout autre sujet. Les marques déjà posées sont relues avant chaque fusion,
+  sinon une nouvelle mesure les effacerait.
+- Les cartes « en attente » passent le **même** filtre que le mur (`keepForWall`).
+  Sans ça elles affichaient des posts à 500 vues sous un filtre 100k+, qui
+  disparaissaient à la mesure : c'est ce clignotement qu'on ne veut plus.
+- Paliers de vues : `[0, 1k, 5k, 10k, 25k, 50k, 100k, 500k, 1M]`, défaut **10k**.
+  100k combiné à 30 jours ne laissait presque rien passer.
 - L'UI (`ResearchView.tsx`) est une page unique : une seule saisie (mots-clés,
   ou `@compte` pour analyser), réglages repliés, bandeau vivant par recherche en
   cours (étape courante via `publicJob().current`, compteurs, barre animée), et
@@ -187,8 +231,32 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes` dans
 `next.config.ts`, sinon le binaire manque en production.
 
+## Store : lire par tranches, jamais tout
+`lib/store.ts`. Le store est **un seul document JSONB** : `readStore()` le
+transfère **en entier** à chaque appel. Mesuré à 7,9 Mo, dont 98 % de caches
+`videos` dans `accounts`/`channels` et de `researchJobs` — transférés même pour
+un sondage du studio. C'est ce qui a épuisé le quota de transfert Neon le
+10 septembre 2026 et mis la production hors service (Postgres `53000`, toute
+route touchant la base en 500).
+- Pour une lecture, utiliser `readStoreSlice(["posts", ...])` : seules les
+  collections demandées (plus `users` et `projects`) sont transférées, sans les
+  caches `videos` sauf `{ videos: true }`. `/api/studio` passe de 7,9 Mo à
+  132 Ko, `/api/auth/login` à 14 Ko.
+- Une tranche est en **lecture seule** : la réécrire effacerait les collections
+  absentes. Toute écriture passe par `updateStore`, qui lit tout.
+- Lire une collection non demandée **lève** (`store_slice_missing_*`) : une
+  liste vide silencieuse donnerait un calendrier vide sans erreur visible.
+- `consumeLimit` (`lib/rate-limit.ts`) fait son incrément **dans Postgres** et ne
+  rapatrie qu'un entier. Il était le pire poste : `updateStore` complet (lecture
+  *et* écriture, ≈16 Mo) à chaque appel, sur des routes très sollicitées —
+  `/api/studio/tiktok/cover`, plafonnée à 600 appels / 10 min, faisait passer des
+  centaines de Mo pour incrémenter un nombre. Le chemin SQL retombe sur
+  `updateStore` en cas d'échec : un compteur cassé ne doit pas fermer le site.
+- Déjà passés en tranches : `/api/studio`, `/api/auth/login`, `lib/insights.ts`,
+  `lib/account-sync.ts`. Toute nouvelle route sollicitée doit faire pareil.
+
 ## Build et vérification
-`npm run typecheck`, `npm test` (111 tests), puis build isolé
+`npm run typecheck`, `npm test` (124 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
@@ -266,5 +334,10 @@ renouvellements, résiliations, remboursements — sans appel par événement.
   `npm run revenuecat:backfill` (à blanc) puis `-- --apply`.
 - ScrollShow facture depuis son propre compte Stripe `Scrollshow`
   (`acct_1UE4ENQSj8XJlvHm`, organisation `Process`), lu par le seul projet
-  RevenueCat `ScrollShow` (`0d6bdeb6`, config `app68f82b22c2`). État et étapes
-  restantes : `docs/revenuecat-2026-09-10.md`.
+  RevenueCat `ScrollShow` (`0d6bdeb6`, config `app68f82b22c2`, entitlement
+  `studio`, offering `default`). Identifiants de prix, webhook et bascule des
+  variables : `docs/revenuecat-2026-09-10.md` et
+  `scripts/switch-stripe-account.sh`.
+- Les prix et la clé secrète Stripe changent **ensemble** : un prix du nouveau
+  compte avec la clé de l'ancien fait échouer `prices.retrieve` et le checkout
+  répond `billing_price_mismatch` à tous les acheteurs.

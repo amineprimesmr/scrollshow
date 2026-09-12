@@ -97,6 +97,9 @@ export type User = {
   verificationHash?: string;
   verificationExpiresAt?: number;
   deletionPendingAt?: string;
+  deletionClaim?: string;
+  deletionLeaseUntil?: number;
+  deletionAttempts?: number;
   emailChange?: { email: string; oldHash: string; newHash: string; expiresAt: number; oldConfirmed: boolean; newConfirmed: boolean };
   billingEventAt?: number;
   lifetimePaymentId?: string;
@@ -142,6 +145,10 @@ export type AccountVideo = {
   kind: "photo" | "video";
   createdAt: number; // unix seconds
   url: string;
+  /** Mots-cles de recherche qui ont ramene ce post. Sans cette trace, un
+   * carrousel trouve pour « sleepmaxing » est indiscernable du reste du feed du
+   * compte, et le mur affiche du hors-sujet. */
+  matchedKeywords?: string[];
 };
 
 export type PublicationSlideText = {
@@ -273,6 +280,7 @@ export type CarouselRecipe = {
 };
 
 export type StudioPost = {
+  importSummary?: { expected: number; imported: number; failed: number; truncated: boolean; videoPreviewOnly?: boolean };
   id: string;
   userId: string;
   /** Projet proprietaire. Retro-rempli par le store pour les donnees anterieures. */
@@ -306,6 +314,7 @@ export type StudioPost = {
   /** Creator's explicit Direct Post choices, captured on the Post to TikTok page. */
   tiktok?: import("./tiktok-compliance").TikTokPostOptions;
   publishId?: string;
+  previousPublishId?: string;
   publishState?: string;
   publishChannelId?: string;
   publishClaim?: string;
@@ -378,6 +387,7 @@ export type OAuthClient = {
 };
 
 export type OAuthCode = {
+  projectId?: string;
   hash: string;
   clientId: string;
   userId: string;
@@ -389,6 +399,7 @@ export type OAuthCode = {
 };
 
 export type OAuthToken = {
+  projectId?: string;
   /** Une autorisation = un couple utilisateur/agent, revocable d'un bloc. */
   grantId: string;
   clientId: string;
@@ -403,12 +414,13 @@ export type OAuthToken = {
 };
 
 export type StoreData = {
+  revenueCatOutbox?: import("./revenuecat-outbox").RevenueCatDelivery[];
   tiktokQrAttempts?: import("./tiktok-qr-session").TikTokQrAttempt[];
   publicationText?: Array<PublicationSlideText & { userId: string; postId: string }>;
   researchJobs?: import("./research/model").ResearchJob[];
   formatStudies?: import("./research/model").FormatStudy[];
   restoreReviewRequired?: boolean;
-  mediaDeletionQueue?: Array<{ name: string; notBefore: number; attempts: number }>;
+  mediaDeletionQueue?: Array<{ name: string; notBefore: number; attempts: number; claim?: string; leaseUntil?: number }>;
   operations?: Record<string, { lastStartedAt?: number; lastSucceededAt?: number; lastFailedAt?: number; leaseUntil?: number; claim?: string }>;
   billingEvents?: string[];
   refundedLifetimePayments?: string[];

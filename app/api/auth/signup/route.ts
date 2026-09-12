@@ -1,10 +1,10 @@
 import { hashPassword, setSessionCookie } from "@/lib/auth";
-import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
+import { findUserByEmail, publicUser, updateStoreSlice } from "@/lib/store";
 import { deliverVerification } from "@/lib/email-verification";
 import { emailAvailable } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(40),
@@ -14,6 +14,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+  if (!await consumePublicAuthLimit(request, "signup")) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   if (!emailAvailable()) return NextResponse.json({ error: "email_not_configured" }, { status: 503 });
   if (!(await consumeLimit(`signup:${email}`, 5, 3600000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
   const passwordHash = await hashPassword(parsed.data.password);
-  const user = await updateStore((data) => {
+  const user = await updateStoreSlice([], (data) => {
     if (findUserByEmail(data, email)) return null;
     const created = {
       id: crypto.randomUUID(),
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   await deliverVerification(user.id).catch(() => console.error("verification_email_delivery_failed"));
   return NextResponse.json({ user: publicUser(user) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "server";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("signup_unavailable");
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
   }
 }

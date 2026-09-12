@@ -5,7 +5,7 @@ import { resolveStoreUser } from "@/lib/local-user";
 import { platformAvailability } from "@/lib/platforms";
 import { coverOf, ensureRecipe } from "@/lib/recipe";
 import { seedStudio } from "@/lib/studio-seed";
-import { publicUser, readStore, updateStore } from "@/lib/store";
+import { publicUser, readStoreSlice, updateStore } from "@/lib/store";
 import { publicChannel } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
@@ -18,7 +18,10 @@ export async function GET(request: Request) {
     const user = await readSession();
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
 
-    let data = await readStore();
+    // Tranche : le studio n'a besoin ni des recherches, ni du texte des slides,
+    // ni des caches de videos (98 % du poids de `accounts` et `channels`).
+    // `ownedChannels` ne lit que des compteurs, jamais `videos`.
+    let data = await readStoreSlice(["channels", "accounts", "posts", "media"]);
     // Demo initialization is local only, and runs once when actually needed.
     // Normal studio reads must never lock and rewrite the whole database.
     if (localAutoSeedEnabled() && (needsDemoWorkspace(data, user.id, user.projectId) || !data.media.some(item => inScope(item, user)))) {
@@ -56,7 +59,7 @@ export async function GET(request: Request) {
       }),
     }, { headers });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "studio_failed";
-    return NextResponse.json({ error: message }, { status: 500, headers: privateHeaders });
+    console.error("studio_operation_unavailable");
+    return NextResponse.json({ error: "unavailable" }, { status: 503, headers: privateHeaders });
   }
 }
