@@ -1,5 +1,6 @@
 "use client";
 
+import { useUndoState } from "@/lib/use-undo-state";
 import { t } from "@/lib/i18n";
 import { platformName } from "@/lib/platforms";
 import {
@@ -24,28 +25,12 @@ import { Metal } from "@/components/fx/Metal";
 import { Orb } from "@/components/fx/Orb";
 
 function rebuildCopy(code: string, english: boolean) {
-  if (code === "ai_gateway_billing") {
-    return t(
-      "Vercel demande une carte pour activer AI Gateway (crédits offerts ensuite). Ajoute-la puis réessaie.",
-      "Vercel needs a card to enable AI Gateway (free credits unlock after). Add it, then try again.",
-      english,
-    );
-  }
-  if (code === "ai_gateway_missing") {
-    return t(
-      "Le modèle du site n’est pas branché. Active AI Gateway sur le projet Vercel, ou ajoute AI_GATEWAY_API_KEY.",
-      "The site model is not connected. Enable AI Gateway on the Vercel project, or add AI_GATEWAY_API_KEY.",
-      english,
-    );
-  }
-  if (code === "image_missing") {
-    return t("Impossible de lire les images importées.", "Could not read the imported images.", english);
-  }
-  return t("Impossible de recréer les calques éditables. Réessaie dans un instant.", "Could not rebuild the editable layers. Try again in a moment.", english);
+  if (code === "image_missing" || code === "media_access_denied") return t("Impossible de lire une image du carrousel. Vérifie son accès ou importe-la à nouveau.", "Could not read a carousel image. Check access or upload it again.", english);
+  return t("Impossible de recréer les textes éditables pour le moment. Tes images sont conservées ; réessaie dans un instant.", "Could not rebuild editable text right now. Your images are preserved; please try again.", english);
 }
 
 export function CreatePostModal() {
-  const { user, english, postOpen, setPostOpen, channels, media, editing, setEditing, composeDate, setComposeDate, reload, activeChannel } = useStudio();
+  const { user, english, availability, postOpen, setPostOpen, channels, media, editing, setEditing, composeDate, setComposeDate, reload, activeChannel } = useStudio();
   const [body, setBody] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("18:00");
@@ -57,7 +42,11 @@ export function CreatePostModal() {
   const [progress, setProgress] = useState<PublishProgress | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [recipe, setRecipe] = useState<CarouselRecipe>(() => recipeFromPhotos([], "manual"));
+  const history = useUndoState<CarouselRecipe>(() => recipeFromPhotos([], "manual"));
+  const { value: recipe, set: setRecipe, reset: resetRecipe } = history;
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [uploading, setUploading] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildError, setRebuildError] = useState("");
@@ -69,6 +58,7 @@ export function CreatePostModal() {
   const creatorState = useTikTokCreator(postOpen && connected.length > 0, channelIds[0]);
   const optionsError = validatePostOptions(options, creatorState.creator);
   const canPublish =
+    availability?.tiktokPublishing === true &&
     connected.length > 0 &&
     !creatorState.loading &&
     !creatorState.blocked &&
@@ -84,6 +74,22 @@ export function CreatePostModal() {
   // wipe the creator's choices or the publish status they are watching.
   const initKey = postOpen ? editing?.id || "new" : "";
   const lastInit = useRef("");
+  const baseline = useRef("");
+  const [showDiscard, setShowDiscard] = useState(false);
+  const latestDraft = useRef("");
+  latestDraft.current = JSON.stringify({ body, date, time, status, channelIds, options, recipe });
+  const closeEditor = () => {
+    if (pending || uploading || rebuilding) return;
+    if (baseline.current && baseline.current !== latestDraft.current) { setShowDiscard(true); return; }
+    setPostOpen(false); setEditing(null);
+  };
+  const closeRef = useRef(closeEditor); closeRef.current = closeEditor;
+  useEffect(() => {
+    if (!postOpen) return;
+    const frame = requestAnimationFrame(() => { baseline.current = latestDraft.current; });
+    return () => cancelAnimationFrame(frame);
+  }, [postOpen, initKey]);
+  useEffect(() => { setSlideIndex(index => Math.max(0, Math.min(index, recipe.slides.length - 1))); }, [recipe.slides.length]);
   useEffect(() => {
     if (!postOpen) {
       lastInit.current = "";
@@ -91,6 +97,7 @@ export function CreatePostModal() {
     }
     if (lastInit.current === initKey) return;
     lastInit.current = initKey;
+    setShowDiscard(false);
     if (editing) {
       const next = ensureRecipe(editing);
       setBody(editing.body);
@@ -98,7 +105,7 @@ export function CreatePostModal() {
       setTime(editing.time);
       setStatus(editing.status === "published" ? "scheduled" : editing.status);
       setChannelIds(editing.channelIds);
-      setRecipe(next);
+      resetRecipe(next);
       setSlideIndex(0);
       setMessage("");
       setShowOriginal(Boolean(next.slides.some((item) => item.keepPhoto)));
@@ -111,13 +118,15 @@ export function CreatePostModal() {
       return;
     }
     const settings = user?.settings;
-    const first = media[0]?.url || "/assets/tiktoks/01-glowup-188k.png";
+    const first = media[0]?.url || "";
     setBody("");
     setDate(composeDate || dateInTimeZone(settings?.timezone || "Europe/Paris"));
     setComposeDate(null);
     setTime(settings?.defaultPostTime || "18:00");
-    setStatus(settings?.defaultStatus || "scheduled");
-    setRecipe(recipeFromPhotos([first], "manual"));
+    setStatus(availability?.tiktokPublishing && connected.length ? settings?.defaultStatus || "scheduled" : "draft");
+    const draft = recipeFromPhotos([first], "manual");
+    if (!first) { draft.slides[0].backgroundColor = "#111111"; draft.slides[0].keepPhoto = false; draft.editable = true; }
+    resetRecipe(draft);
     setSlideIndex(0);
     setChannelIds(
       activeChannel === "all"
@@ -201,6 +210,23 @@ export function CreatePostModal() {
     };
   }, [postOpen, progress, reload]);
 
+  useEffect(() => {
+    if (!postOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>("button, input, textarea, select")?.focus());
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key === "Tab") {
+        const controls = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]):not([hidden]), textarea, select, a[href]') || [])].filter(el => el.offsetParent !== null);
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener("keydown", keydown); previous?.focus(); };
+  }, [postOpen]);
+
   if (!postOpen || !slide) return null;
 
   function patchSlide(id: string, next: Partial<CarouselSlide>) {
@@ -223,11 +249,48 @@ export function CreatePostModal() {
 
   function addSlide() {
     const url = media.find((item) => !recipe.slides.some((slideItem) => slideItem.image === item.url))?.url || media[0]?.url;
-    if (!url) return;
-    const next = defaultSlide(url);
+    if (recipe.slides.length >= 35) return;
+    const next = defaultSlide(url || "");
+    if (!url) { next.backgroundColor = "#111111"; next.keepPhoto = false; }
     setRecipe((current) => ({ ...current, slides: [...current.slides, next] }));
     setSlideIndex(recipe.slides.length);
   }
+
+  function changeAlignment(id: string, align: "left" | "center" | "right") {
+    const anchor = { left: 0, center: 0.5, right: 1 };
+    patchSlide(slide.id, { overlays: slide.overlays.map(item => {
+      if (item.id !== id) return item;
+      const width = item.width ?? 86;
+      // Alignment also chooses the stored anchor. Preserve the box position.
+      const x = item.x + width * (anchor[align] - anchor[item.align || "center"]);
+      return { ...item, align, x: Math.max(width * anchor[align], Math.min(100 - width * (1 - anchor[align]), x)) };
+    }) });
+  }
+
+  function moveSlide(direction: number) {
+    const nextIndex = slideIndex + direction;
+    if (nextIndex < 0 || nextIndex >= recipe.slides.length) return;
+    const slides = [...recipe.slides];
+    [slides[slideIndex], slides[nextIndex]] = [slides[nextIndex], slides[slideIndex]];
+    setRecipe({ ...recipe, slides }); setSlideIndex(nextIndex);
+  }
+
+  async function uploadImage(file?: File) {
+    if (!file || uploading) return;
+    if (file.size > 3_000_000) { setMessage(t("Image trop grande : 3 Mo maximum.", "Image too large: 3 MB maximum.", english)); return; }
+    setUploading(true); setMessage("");
+    try {
+      const form = new FormData(); form.set("file", file);
+      const response = await fetch("/api/studio/media", { method: "POST", body: form });
+      const json = await response.json();
+      if (!response.ok || !json.media?.url) throw new Error("upload_failed");
+      patchSlide(slide.id, { image: json.media.url, sourceImage: json.media.url, keepPhoto: true });
+      await reload();
+    } catch { setMessage(t("L’image n’a pas pu être importée. Réessaie.", "Could not upload the image. Try again.", english)); }
+    finally { setUploading(false); if (uploadRef.current) uploadRef.current.value = ""; }
+  }
+
+
 
   function removeSlide(id: string) {
     if (recipe.slides.length < 2) return;
@@ -237,6 +300,8 @@ export function CreatePostModal() {
   }
 
   async function reconstruct() {
+    try {
+
     if (!editing?.id || rebuilding) return;
     setRebuilding(true);
     setRebuildError("");
@@ -252,6 +317,8 @@ export function CreatePostModal() {
       setRecipe(ensureRecipe(json.post));
       reload();
     }
+
+    } catch { setRebuildError(t("Extraction impossible. Réessaie.", "Could not extract text. Try again.", english)); } finally { setRebuilding(false); }
   }
 
   async function save(event: React.FormEvent) {
@@ -309,6 +376,8 @@ export function CreatePostModal() {
   }
 
   async function remove() {
+    try {
+
     if (!editing?.id) return;
     if (!window.confirm(t("Supprimer ce post ? C'est définitif.", "Delete this post? This can't be undone.", english))) return;
     setPending(true);
@@ -326,9 +395,13 @@ export function CreatePostModal() {
     } finally {
       setPending(false);
     }
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setPending(false); }
   }
 
   async function publishNow() {
+    try {
+
     if (!canPublish) {
       if (optionsError) setMessage(optionsErrorCopy(optionsError, english));
       return;
@@ -378,18 +451,24 @@ export function CreatePostModal() {
     sound.notify();
     setProgress({ publishId: String(json.publish_id || ""), status: "PROCESSING" });
     reload();
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setPending(false); }
   }
 
   return (
     <div
       className="ss-modal"
-      onClick={() => {
-        setPostOpen(false);
-        setEditing(null);
-      }}
+      onClick={closeEditor}
     >
-      <div className="ss-dialog ss-dialog--recipe" onClick={(event) => event.stopPropagation()}>
-        <h2>{editing ? t("Modifier le TikTok", "Edit TikTok", english) : t("Publier sur TikTok", "Publish to TikTok", english)}</h2>
+      <div className="ss-dialog ss-dialog--recipe" ref={dialogRef} role="dialog" aria-modal="true" aria-label={english ? "Carousel editor" : "Éditeur de carrousel"} onClick={(event) => event.stopPropagation()}>
+        {availability?.tiktokPublishing === false ? <p role="status" style={{ padding: "12px 24px", margin: 0 }}>{english ? "TikTok publishing is awaiting approval. You can create, save and export your carousels." : "Publication TikTok en attente de validation. Tu peux créer, enregistrer et exporter tes carrousels."}</p> : null}
+        <button type="button" className="ss-btn-ghost" style={{ float: "right" }} onClick={closeEditor} aria-label={t("Fermer", "Close", english)}>×</button>
+        <h2>{editing ? t("Modifier le TikTok", "Edit TikTok", english) : t("Créer un carrousel", "Create a carousel", english)}</h2>
+        {showDiscard ? <div role="alertdialog" aria-label={t("Modifications non enregistrées", "Unsaved changes", english)} className="ss-panel" style={{ margin: 16 }}>
+          <p>{t("Ce carrousel contient des modifications non enregistrées.", "This carousel has unsaved changes.", english)}</p>
+          <button type="button" className="ss-btn-purple" onClick={() => setShowDiscard(false)}>{t("Continuer l’édition", "Continue editing", english)}</button>
+          <button type="button" className="ss-btn-ghost" onClick={() => { setShowDiscard(false); setPostOpen(false); setEditing(null); }}>{t("Abandonner les modifications", "Discard changes", english)}</button>
+        </div> : null}
         <form className="ss-recipe" onSubmit={save}>
           {baked || rebuilding || rebuildError || recipe.editable ? (
             <div className={`ss-recipe__banner${rebuildError ? " ss-recipe__banner--err" : ""}`}>
@@ -453,6 +532,14 @@ export function CreatePostModal() {
             </div>
           </div>
           <div className="ss-form ss-recipe__form">
+            <div className="ss-recipe__overlay-row">
+              <button type="button" className="ss-btn-ghost" disabled={!history.canUndo} onClick={history.undo}>{t("Annuler", "Undo", english)}</button>
+              <button type="button" className="ss-btn-ghost" disabled={!history.canRedo} onClick={history.redo}>{t("Rétablir", "Redo", english)}</button>
+              <button type="button" className="ss-btn-ghost" disabled={slideIndex === 0} onClick={() => moveSlide(-1)}>← {t("Déplacer", "Move", english)}</button>
+              <button type="button" className="ss-btn-ghost" disabled={slideIndex === recipe.slides.length - 1} onClick={() => moveSlide(1)}>{t("Déplacer", "Move", english)} →</button>
+            </div>
+            <button type="button" className="ss-btn-ghost" disabled={uploading} onClick={() => uploadRef.current?.click()}>{uploading ? t("Import en cours…", "Uploading…", english) : t("Importer une image · 3 Mo max", "Upload image · 3 MB max", english)}</button>
+            <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={event => void uploadImage(event.target.files?.[0])} />
             <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder={t("Légende…", "Caption…", english)} required />
             <label className="ss-recipe__label">{t("Police", "Font", english)}</label>
             <select value={recipe.fontFamily} onChange={(event) => setFont(event.target.value)}>
@@ -552,6 +639,15 @@ export function CreatePostModal() {
                     </button>
                   ) : null}
                 </div>
+                <div className="ss-recipe__overlay-row">
+                  {(["x", "y", "width"] as const).map(field => <label key={field}>{field === "width" ? t("Largeur %", "Width %", english) : `${field.toUpperCase()} %`}
+                    <input aria-label={`${field} ${overlayIndex + 1}`} type="number" min={field === "width" ? 1 : 0} max={100} value={overlay[field] ?? 86}
+                      onChange={event => patchSlide(slide.id, { overlays: slide.overlays.map(item => item.id === overlay.id ? { ...item, [field]: Math.max(field === "width" ? 1 : 0, Math.min(100, Number(event.target.value))) } : item) })} />
+                  </label>)}
+                  <select aria-label={t("Alignement", "Alignment", english)} value={overlay.align} onChange={event => changeAlignment(overlay.id, event.target.value as "left" | "center" | "right")}>
+                    <option value="left">{t("Gauche", "Left", english)}</option><option value="center">{t("Centre", "Center", english)}</option><option value="right">{t("Droite", "Right", english)}</option>
+                  </select>
+                </div>
                 {overlayIndex === 0 ? <span>{t("Taille · couleur", "Size · color", english)}</span> : null}
               </div>
             ))}
@@ -602,7 +698,7 @@ export function CreatePostModal() {
                 </button>
               ) : null}
               <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding}>
-                {pending ? "…" : editing ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
+                {pending ? "…" : editing || status === "draft" ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
               </button>
               <span
                 className="ss-ttp__publish"

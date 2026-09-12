@@ -1,3 +1,4 @@
+import { assertCurrentMediaAccess, importedName, registerGeneratedMedia, type MediaUser } from "./media-permissions";
 import { del, get, put } from "@vercel/blob";
 import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -40,17 +41,19 @@ export async function savePublicImage(bytes: Buffer, contentType: string, source
       addRandomSuffix: false,
       allowOverwrite: true,
     });
+    await registerGeneratedMedia(`/api/i/${name}`);
     return `/api/i/${name}`;
   }
   const dir = path.join(process.env.SCROLLSHOW_DATA_DIR || path.join(process.cwd(), ".data"), "imports");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), bytes);
+  await registerGeneratedMedia(`/api/i/${name}`);
   return `/api/i/${name}`;
 }
 
-export async function readSlideBytes(url: string) {
-  const name = url.match(/\/api\/i\/([^/?#]+)/)?.[1];
-  if (name) return readImportedFile(name);
+export async function readSlideBytes(url: string, user?: MediaUser) {
+  const name = importedName(url);
+  if (name) { await assertCurrentMediaAccess(name, user); return readImportedFile(name); }
   if (url.startsWith("/")) {
     try {
       const root = path.resolve(process.cwd(), "public");

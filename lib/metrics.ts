@@ -1,3 +1,4 @@
+import { consumeLimit } from "./rate-limit";
 import type { AccountVideo } from "./types";
 import { normalizePost } from "./research/normalize";
 
@@ -29,7 +30,13 @@ function firstUrl(value: any): string {
 
 function toVideo(item: any): AccountVideo | null { return normalizePost(item); }
 
+export async function consumeMetricsBudget() {
+  const configured = Number(process.env.METRICS_PROVIDER_DAILY_LIMIT || process.env.RESEARCH_PROVIDER_DAILY_LIMIT || 1000);
+  const limit = Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 1000;
+  if (!await consumeLimit(`metrics-provider:${new Date().toISOString().slice(0,10)}`, limit, 86400000)) throw new MetricsError("http", "metrics_provider_daily_limit");
+}
 export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>): Promise<any> {
+  await consumeMetricsBudget();
   const deadline = AbortSignal.timeout(40000);
   const res = await fetch(`${base()}/run`, {
     method: "POST",
@@ -158,6 +165,7 @@ export async function discoverTools(query: string, limit = 24): Promise<Connecto
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
+    await consumeMetricsBudget();
     const res = await fetch(`${base()}/discover`, {
       method: "POST",
       headers: headers(),

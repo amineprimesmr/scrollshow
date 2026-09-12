@@ -3,7 +3,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { isPaidPlan, type Plan } from "./plans";
 import { PROJECT_COOKIE, resolveProject, withProject } from "./projects";
-import { publicUser, readStore } from "./store";
+import { publicUser, readStoreSlice } from "./store";
 import type { SessionUser } from "./types";
 
 const COOKIE = "ss_session";
@@ -37,21 +37,21 @@ export async function signSession(user: SessionUser) {
     .sign(secret());
 }
 
-export async function readSession(): Promise<SessionUser | null> {
+export async function readSession({ allowPendingDeletion = false }: { allowPendingDeletion?: boolean } = {}): Promise<SessionUser | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret());
-    if (!payload.sub || typeof payload.email !== "string") return null;
-    const data = await readStore(true);
-    if (data.restoreReviewRequired) return null;
-    const stored = data.users.find(item => item.id === payload.sub);
-    if (!stored || stored.deletionPendingAt || (stored.sessionVersion || 0) !== (payload.sv || 0)) return null;
-    const requested = (await cookies()).get(PROJECT_COOKIE)?.value || null;
-    return withProject(publicUser(stored), resolveProject(data, stored.id, requested));
-  } catch {
-    return null;
-  }
+  let payload;
+  try { ({ payload } = await jwtVerify(token, secret())); }
+  catch { return null; }
+  if (!payload.sub || typeof payload.email !== "string") return null;
+  // A database outage is a service failure, not an invalid session. Preserve
+  // the cookie and let the boundary offer retry instead of signing users out.
+  const data = await readStoreSlice([]);
+  if (data.restoreReviewRequired) return null;
+  const stored = data.users.find(item => item.id === payload.sub);
+  if (!stored || (stored.deletionPendingAt && !allowPendingDeletion) || (stored.sessionVersion || 0) !== (payload.sv || 0)) return null;
+  const requested = (await cookies()).get(PROJECT_COOKIE)?.value || null;
+  return withProject(publicUser(stored), resolveProject(data, stored.id, requested));
 }
 
 /** Le visiteur a-t-il un cookie de session valide ?
@@ -91,14 +91,7 @@ export async function clearSessionCookie() {
 export async function refreshSessionFromStore(): Promise<SessionUser | null> {
   const session = await readSession();
   if (!session) return null;
-  const data = await readStore();
-  const stored = data.users.find((item) => item.id === session.id);
-  if (!stored) return null;
-  const user = publicUser(stored);
-  if (user.plan !== session.plan || user.name !== session.name || user.email !== session.email || user.onboarded !== session.onboarded) {
-    await setSessionCookie(user);
-  }
-  return user;
+  return session;
 }
 
 export function canAddAccount(plan: Plan) {

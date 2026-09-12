@@ -222,7 +222,7 @@ function emptyReport(all: TikTokVideo[], mature: TikTokVideo[], freshIds: Set<st
  */
 export function analyzeShadowban(videos: TikTokVideo[], options: { followers?: number | null } = {}): ShadowbanReport {
   const followers = options.followers && options.followers > 0 ? options.followers : null;
-  const all = [...videos].sort((a, b) => b.create_time - a.create_time);
+  const all = videos.filter(v => Number.isFinite(v.view_count) && (v.view_count as number) >= 0 && Number.isFinite(v.create_time) && v.create_time > 0).sort((a, b) => b.create_time - a.create_time);
   const now = Date.now();
   const freshIds = new Set(all.filter((v) => now - v.create_time * 1000 < FRESH_MS).map((v) => v.id));
   const mature = all.filter((v) => !freshIds.has(v.id));

@@ -1,7 +1,9 @@
+import { withMediaUser, validateMediaInput, type MediaUser } from "./media-permissions";
 import { readSlideBytes, savePublicImage } from "./media-files";
 import { needsRasterize } from "./recipe";
 import type { CarouselRecipe, CarouselSlide } from "./types";
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 
 const FONT_URLS: Record<string, Array<{ weight: 400 | 700 | 800; url: string }>> = {
   Inter: [
@@ -41,7 +43,7 @@ const fontCache = new Map<string, ArrayBuffer>();
 async function loadFont(url: string) {
   const hit = fontCache.get(url);
   if (hit) return hit;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error("font_missing");
   const data = await res.arrayBuffer();
   fontCache.set(url, data);
@@ -49,6 +51,7 @@ async function loadFont(url: string) {
 }
 
 async function fontsFor(recipe: CarouselRecipe, slide: CarouselSlide) {
+  if (!slide.overlays.some(overlay => overlay.text.trim())) return [];
   const names = new Set<string>([recipe.fontFamily, ...slide.overlays.map((overlay) => overlay.fontFamily)]);
   const fonts: Array<{ name: string; data: ArrayBuffer; weight: 400 | 700 | 800; style: "normal" }> = [];
   for (const name of names) {
@@ -73,8 +76,12 @@ function alignTransform(align: CarouselSlide["overlays"][number]["align"]) {
 async function dataUrl(url?: string) {
   if (!url) return "";
   const file = await readSlideBytes(url);
-  if (!file) return "";
-  return `data:${file.contentType};base64,${file.bytes.toString("base64")}`;
+  if (!file) throw new Error("media_unavailable");
+  // Satori cannot decode WebP data URIs. Normalize uploaded and remote images
+  // before composition, keeping dimensions bounded and applying EXIF rotation.
+  const bytes = await sharp(file.bytes, { limitInputPixels: 40_000_000 })
+    .rotate().resize(1080, 1920, { fit: "cover" }).png().toBuffer();
+  return `data:image/png;base64,${bytes.toString("base64")}`;
 }
 
 export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecipe) {
@@ -142,7 +149,14 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
   return savePublicImage(bytes, "image/png");
 }
 
-export async function rasterizeRecipe(recipe: CarouselRecipe) {
+export async function rasterizeRecipe(recipe: CarouselRecipe, user?: MediaUser): Promise<string[]> {
+  if (user) {
+    await validateMediaInput(recipe, user);
+    return withMediaUser(user, () => renderRecipe(recipe));
+  }
+  return renderRecipe(recipe);
+}
+async function renderRecipe(recipe: CarouselRecipe) {
   if (!needsRasterize(recipe)) {
     return recipe.slides.map((slide) => slide.image).filter(Boolean);
   }

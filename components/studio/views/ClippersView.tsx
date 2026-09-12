@@ -1,4 +1,5 @@
 "use client";
+import { checkedFetch } from "@/lib/client-request";
 
 import { t } from "@/lib/i18n";
 import type { Account } from "@/lib/types";
@@ -50,10 +51,10 @@ export function ClippersView() {
   const [draftNotes, setDraftNotes] = useState("");
 
   useEffect(() => {
-    fetch("/api/accounts")
+    checkedFetch("/api/accounts")
       .then((res) => res.json())
       .then((json) => setAccounts(json.accounts || []))
-      .catch(() => {})
+      .catch(() => setError(t("Chargement impossible. Réessaie.", "Could not load. Retry.", en)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -82,7 +83,7 @@ export function ClippersView() {
     setAdding(true);
     setError(null);
     try {
-      const res = await fetch("/api/accounts", {
+      const res = await checkedFetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle: value, niche }),
@@ -110,37 +111,41 @@ export function ClippersView() {
   async function sync(id: string) {
     setBusy(id);
     try {
-      const res = await fetch(`/api/accounts/${id}/sync`, { method: "POST" });
+      const res = await checkedFetch(`/api/accounts/${id}/sync`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.account) replace(json.account);
-    } finally {
+    } catch { setError(t("Actualisation impossible. Réessaie.", "Could not refresh. Retry.", en)); } finally {
       setBusy(null);
     }
   }
 
   async function patch(id: string, body: Partial<Pick<Account, "verdict" | "notes" | "niche" | "avgViews">>) {
-    const res = await fetch(`/api/accounts/${id}`, {
+    try {
+    const res = await checkedFetch(`/api/accounts/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
     if (res.ok && json.account) replace(json.account);
+    } catch { setError(t("Modification non enregistrée.", "Change was not saved.", en)); }
   }
 
   async function remove(id: string) {
-    const res = await fetch(`/api/accounts/${id}`, { method: "DELETE" });
-    if (res.ok) setAccounts((prev) => prev.filter((item) => item.id !== id));
+    try {
+      const res = await checkedFetch(`/api/accounts/${id}`, { method: "DELETE" });
+      if (res.ok) setAccounts((prev) => prev.filter((item) => item.id !== id));
+    } catch { setError(t("Suppression impossible. Réessaie.", "Could not delete. Retry.", en)); }
   }
 
   return (
     <div className="ss-clippers">
       <div className="ss-panel">
-        <h2>{t("Ton réseau de comptes", "Your accounts network", en)}</h2>
+        <h2>{t("Tes comptes suivis", "Your tracked accounts", en)}</h2>
         <p className="ss-lead">
           {t(
-            "Les comptes TikTok qui postent pour toi ou que tu veux reverse-engineer. Les abonnés, likes et nombre de posts viennent du profil public TikTok, sans clé API. Donne un verdict, note les formats qui marchent. Ils apparaissent dans l'éventail de l'Overview.",
-            "The TikTok accounts posting for you or the ones you want to reverse-engineer. Followers, likes and post counts come from the public TikTok profile, no API key. Set a verdict, note the formats that work. They show up in the Overview fan.",
+            "Les comptes TikTok publics que tu suis pour étudier leurs formats. Les abonnés, likes et nombre de posts viennent du profil public TikTok, sans clé API. Donne un verdict, note les formats qui marchent. Ils apparaissent dans l'éventail de l'Overview.",
+            "The public TikTok accounts you track to study their formats. Followers, likes and post counts come from the public TikTok profile, no API key. Set a verdict, note the formats that work. They show up in the Overview fan.",
             en,
           )}
         </p>

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
-import { updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["apiKeys", "oauthTokens", "oauthCodes"], fn);
 import { hash } from "bcryptjs";
 import { revokeAllForUser } from "./oauth";
 
@@ -15,8 +16,12 @@ export async function issueRecovery(email: string) {
   return exists ? token : null;
 }
 export async function redeemRecovery(token: string, password: string) {
+  const tokenHash = digest(token);
+  const before = await readStoreSlice([]);
+  if (before.restoreReviewRequired || !before.users.some(u => !u.deletionPendingAt && u.recoveryHash === tokenHash && (u.recoveryExpiresAt || 0) > Date.now())) return false;
   const passwordHash = await hash(password, 12);
   return updateStore(data => {
+    if (data.restoreReviewRequired) return false;
     const user = data.users.find(u => !u.deletionPendingAt && u.recoveryHash === digest(token) && (u.recoveryExpiresAt || 0) > Date.now());
     if (!user) return false;
     user.passwordHash = passwordHash;

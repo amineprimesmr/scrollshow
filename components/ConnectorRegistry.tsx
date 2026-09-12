@@ -57,7 +57,7 @@ export function ConnectorRegistry({ english = false }: { english?: boolean }) {
         <span className="ss-registry__mark" aria-hidden="true">M</span>
         <div className="ss-registry__copy">
           <strong>{t("Tous les connecteurs", "Every connector")}</strong>
-          <span>{t("1 700+ outils et API que ton agent appelle à la demande, sur un seul solde.", "1,700+ tools and APIs your agent calls on demand, on a single balance.")}</span>
+          <span>{t("Explore un catalogue d’outils externes et leurs descriptions.", "Explore a catalog of external tools and their descriptions.")}</span>
         </div>
         <button type="button" className="ss-registry__open lg-press" onClick={() => setOpen(true)} aria-haspopup="dialog">
           {t("Voir tous les outils", "See every tool")} <span aria-hidden="true">→</span>
@@ -119,7 +119,7 @@ export function ConnectorRegistry({ english = false }: { english?: boolean }) {
             </div>
 
             <footer className="ss-registry__foot">
-              <span>{t("Appels facturés à l’usage, sur le solde ScrollShow. Aucune clé à fournir.", "Usage-based calls on the ScrollShow balance. No key to provide.")}</span>
+              <span>{t("Catalogue informatif : ces outils ne sont pas exécutés ni facturés depuis ScrollShow.", "Informational catalog: these tools are not executed or billed through ScrollShow.")}</span>
             </footer>
           </div>
         </div>

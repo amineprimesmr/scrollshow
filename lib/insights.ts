@@ -69,6 +69,8 @@ function hookOf(title: string) {
 }
 
 function statsOf(videos: AccountVideo[]) {
+  const missingMetrics = [...new Set(videos.flatMap(v => v.missingMetrics || []))];
+  videos = videos.filter(v => !v.missingMetrics?.length);
   const views = videos.reduce((n, v) => n + v.views, 0);
   const videoLikes = videos.reduce((n, v) => n + v.likes, 0);
   const comments = videos.reduce((n, v) => n + v.comments, 0);
@@ -78,7 +80,7 @@ function statsOf(videos: AccountVideo[]) {
     ? Math.round(sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
     : 0;
   return {
-    missingMetrics: [...new Set(videos.flatMap(v => v.missingMetrics || []))],
+    missingMetrics,
     views,
     videoLikes,
     comments,
@@ -92,6 +94,7 @@ function statsOf(videos: AccountVideo[]) {
 
 /** Buckets the posts by day (short ranges) or week, so the panel can draw a trend. */
 function buildTimeline(videos: AccountVideo[], days: number | null): InsightPoint[] {
+  if (videos.some(v => v.missingMetrics?.length)) return [];
   const dated = videos.filter((v) => v.createdAt > 0);
   if (!dated.length) return [];
   const oldest = Math.min(...dated.map((v) => v.createdAt));
@@ -122,6 +125,7 @@ function buildTimeline(videos: AccountVideo[], days: number | null): InsightPoin
 }
 
 function buildFormats(videos: AccountVideo[]): InsightFormat[] {
+  videos = videos.filter(v => !v.missingMetrics?.includes("views"));
   const groups: Record<string, InsightFormat> = {
     photo: { id: "photo", label: "Carrousel", count: 0, views: 0, avgViews: 0, bestViews: 0 },
     video: { id: "video", label: "Vidéo", count: 0, views: 0, avgViews: 0, bestViews: 0 },
@@ -139,6 +143,7 @@ function buildFormats(videos: AccountVideo[]): InsightFormat[] {
 }
 
 function buildHooks(videos: AccountVideo[]): InsightHook[] {
+  videos = videos.filter(v => !v.missingMetrics?.includes("views"));
   const map = new Map<string, { count: number; views: number }>();
   for (const v of videos) {
     const hook = hookOf(v.slideTexts?.find(s => s.index === 0 && (s.status === "read" || s.status === "pending"))?.text || "");

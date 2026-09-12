@@ -1,4 +1,6 @@
-import { readStore, updateStore } from "../store";
+import { readStoreSlice, updateStoreSlice } from "../store";
+const readStore = () => readStoreSlice(["researchJobs", "accounts", "runs"], { videos: true });
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["researchJobs", "accounts", "runs"], fn);
 import { consumeLimit } from "../rate-limit";
 import { fetchAccountVideoPage } from "../metrics";
 import { fetchTikTokProfile, normalizeHandle } from "../tiktok-profile";
@@ -117,7 +119,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     if(!finished && (!result.cursor || result.cursor===c.cursor)) {j.status="paused";j.error="pagination_did_not_advance";event(j,"pagination_stalled");return;}
     c.cursor=result.cursor;
     const now=stamp(),posts=c.measuredPosts;
-    let a=data.accounts.find(a=>a.userId===j.userId&&a.handle===c.handle);
+    let a=data.accounts.find(a=>a.userId===j.userId&&a.projectId===j.projectId&&a.handle===c.handle);
     if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
     // Les carrousels ramenes par le mot-cle sont exactement ce qui a ete
     // demande. Ils etaient ecrases par le feed du compte puis effaces : on les

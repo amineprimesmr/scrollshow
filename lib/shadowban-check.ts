@@ -1,3 +1,4 @@
+import { mergeAccountVideo } from "./account-sync";
 import { fetchAccountVideos, MetricsError, metricsEnabled } from "./metrics";
 import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
 import { listRecentVideos, type TikTokVideo } from "./tiktok";
@@ -38,11 +39,11 @@ export function levelOf(report: ShadowbanReport): ShadowbanLevel {
   return report.verdict;
 }
 
-function toTikTokVideo(v: AccountVideo): TikTokVideo {
+export function toTikTokVideo(v: AccountVideo): TikTokVideo {
   return {
     id: v.id,
     create_time: v.createdAt,
-    view_count: v.views,
+    view_count: v.missingMetrics?.includes("views") ? Number.NaN : v.views,
     like_count: v.likes,
     comment_count: v.comments,
     share_count: v.shares,
@@ -87,7 +88,9 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
       await updateStore((data) => {
         const found = data.accounts.find((a) => a.id === account.id);
         if (!found) return;
-        found.videos = list;
+        const cache = new Map((found.videos || []).map(v => [v.id, v]));
+        for (const video of list) cache.set(video.id, mergeAccountVideo(cache.get(video.id), video));
+        found.videos = [...cache.values()].sort((a,b) => b.createdAt - a.createdAt);
         found.videosFetchedAt = fetched;
         if (!found.posts) found.posts = list.length;
       });

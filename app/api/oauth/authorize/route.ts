@@ -44,6 +44,7 @@ export async function POST(request: Request) {
   const code = await issueCode({
     clientId: client.id,
     userId: user.id,
+    projectId: value("project_id") || user.projectId,
     redirectUri,
     codeChallenge,
     resource,

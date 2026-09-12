@@ -39,7 +39,7 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
         const owned = data.posts.some(p => inScope(p, user) && p.status === "published" && (p.id === video.id || p.tiktokId === video.id) &&
           (p.image === image || p.recipe?.slides.some(s => s.image === image)));
         if (!owned) throw new Error("invalid_image");
-        file = await readSlideBytes(image);
+        file = await readSlideBytes(image, user);
       }
       if (!file || !file.contentType.startsWith("image/") || file.bytes.length > 8000000) throw new Error("invalid_image");
       result = await readPublicationImageText(file.bytes);

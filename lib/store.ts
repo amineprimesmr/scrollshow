@@ -70,8 +70,9 @@ export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): P
       const rows = await tx`SELECT data FROM scrollshow_state WHERE id = 1 FOR UPDATE`;
       if (!rows.length) throw new Error("database_not_migrated");
       const data = normalize(rows[0].data);
+      const before = JSON.stringify(data);
       const output = await fn(data);
-      await tx`UPDATE scrollshow_state SET data = ${tx.json(data as never)}, updated_at = now() WHERE id = 1`;
+      if (JSON.stringify(data) !== before) await tx`UPDATE scrollshow_state SET data = ${tx.json(data as never)}, updated_at = now() WHERE id = 1`;
       return { output };
     });
     return (result as { output: T }).output;
@@ -99,7 +100,7 @@ export async function writeStore(data: StoreData) {
 /** Collections que `normalize` exige presentes, meme vides. */
 const REQUIRED_KEYS = ["users", "accounts", "runs", "channels", "posts", "media", "apiKeys"] as const;
 /** Toujours lues : minuscules, et la resolution de projet en depend. */
-const ALWAYS_KEYS = ["users", "projects"] as const;
+const ALWAYS_KEYS = ["users", "projects", "restoreReviewRequired"] as const;
 /** Ces deux collections portent un cache de videos qui pese 98 % de leur poids
  * et que seuls les insights et la recherche lisent. */
 const VIDEO_HOLDERS = ["accounts", "channels"] as const;
@@ -121,14 +122,19 @@ export function projectSlice(full: Record<string, unknown>, keys: readonly strin
 /** Une collection non demandee vaut `[]` apres normalisation : la lire
  * silencieusement rendrait une reponse fausse — un calendrier vide, un compte
  * introuvable — au lieu d'une erreur. On la rend donc bruyante. */
+const STORE_KEYS = ["users", "projects", "accounts", "runs", "channels", "posts", "media", "apiKeys", "videoStats", "channelStats", "billingEvents", "refundedLifetimePayments", "rateLimits", "operations", "mediaDeletionQueue", "restoreReviewRequired", "oauthClients", "oauthCodes", "oauthTokens", "oauthUsedRefresh", "pushSubscriptions", "warmedOrders", "tiktokQrAttempts", "publicationText", "researchJobs", "formatStudies", "revenueCatOutbox"];
 function guardSlice(data: StoreData, keys: readonly string[]): StoreData {
   const wanted = new Set<string>([...ALWAYS_KEYS, ...keys]);
   return new Proxy(data, {
     get(target, prop, receiver) {
-      if (typeof prop === "string" && (REQUIRED_KEYS as readonly string[]).includes(prop) && !wanted.has(prop)) {
+      if (typeof prop === "string" && STORE_KEYS.includes(prop) && !wanted.has(prop)) {
         throw new Error(`store_slice_missing_${prop}`);
       }
       return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value, receiver) {
+      if (typeof prop === "string" && STORE_KEYS.includes(prop) && !wanted.has(prop)) throw new Error(`store_slice_missing_${prop}`);
+      return Reflect.set(target, prop, value, receiver);
     },
   }) as StoreData;
 }
@@ -143,7 +149,8 @@ function guardSlice(data: StoreData, keys: readonly string[]): StoreData {
  * du studio pese quelques dizaines de kilo-octets au lieu de huit mega-octets.
  *
  * Ne jamais reecrire une tranche : les collections absentes seraient effacees.
- * Toute ecriture passe par `updateStore`, qui lit le document complet.
+ * Toute ecriture partielle passe par `updateStoreSlice`, qui fusionne uniquement
+ * les collections declarees sous verrou.
  */
 export async function readStoreSlice(
   keys: readonly (keyof StoreData)[],
@@ -174,6 +181,50 @@ export async function readStoreSlice(
 
   for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
   return guardSlice(normalize(partial as unknown as StoreData), wanted);
+}
+
+/** Atomically update selected collections without transferring unrelated caches.
+ * A slice must never be passed to writeStore: the SQL merge below preserves all
+ * other keys while the same row lock protects concurrent mutations.
+ */
+export async function updateStoreSlice<T>(
+  keys: readonly (keyof StoreData)[],
+  fn: (data: StoreData) => T | Promise<T>,
+): Promise<T> {
+  const wanted = [...new Set<string>([...ALWAYS_KEYS, ...keys])];
+  if (!databaseEnabled()) return updateStore(async full => {
+    const partial = projectSlice(full as unknown as Record<string, unknown>, wanted, true);
+    // Clone: a failed callback must not modify collections by shared reference.
+    const raw = structuredClone(partial) as unknown as StoreData;
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(raw[key])) (raw[key] as unknown[]) = [];
+    const output = await fn(guardSlice(normalize(raw), wanted));
+    for (const key of wanted) {
+      (full as unknown as Record<string, unknown>)[key] = (raw as unknown as Record<string, unknown>)[key];
+    }
+    return output;
+  });
+  const result = await database().begin(async tx => {
+    const rows = await tx`
+      SELECT (SELECT COALESCE(jsonb_object_agg(kv.key, kv.value), '{}'::jsonb)
+        FROM jsonb_each(s.data) kv WHERE kv.key = ANY(${wanted}::text[])) AS data
+      FROM scrollshow_state s WHERE s.id = 1 FOR UPDATE`;
+    if (!rows.length) throw new Error("database_not_migrated");
+    const partial = rows[0].data as Record<string, unknown>;
+    const before = new Map(wanted.map(key => [key, JSON.stringify(partial[key])]));
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
+    const raw = normalize(partial as unknown as StoreData);
+    const output = await fn(guardSlice(raw, wanted));
+    const patch: Record<string, unknown> = {};
+    for (const key of wanted) {
+      const value = (raw as unknown as Record<string, unknown>)[key];
+      if (JSON.stringify(value) !== before.get(key)) patch[key] = value ?? null;
+    }
+    if (Object.keys(patch).length) {
+      await tx`UPDATE scrollshow_state SET data = data || ${tx.json(patch as never)}, updated_at = now() WHERE id = 1`;
+    }
+    return { output };
+  });
+  return (result as { output: T }).output;
 }
 
 export function seedAccounts(userId: string): Account[] {

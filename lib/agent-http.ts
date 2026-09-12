@@ -15,7 +15,7 @@ export function headerToken(request: Request) {
 }
 
 export function bearerToken(request: Request) {
-  return headerToken(request) || keyFromUrl(request);
+  return headerToken(request);
 }
 
 export function keyFromUrl(request: Request) {
@@ -51,6 +51,7 @@ export function agentOptions() {
 export function agentCatch(error: unknown) {
   if (error instanceof PostValidationError) return agentResponse({ error: error.message }, error.message === "publication_locked" ? 409 : 400);
   if (error instanceof AgentError) return agentResponse({ error: error.message }, error.status);
-  const message = error instanceof Error ? error.message : "server";
-  return agentResponse({ error: message }, 500);
+  if (error instanceof Error && error.message === "media_access_denied") return agentResponse({ error: error.message }, 403);
+  console.error("agent_request_failed", { code: (error as { code?: string })?.code });
+  return agentResponse({ error: "temporarily_unavailable" }, 503);
 }

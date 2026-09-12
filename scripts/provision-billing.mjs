@@ -7,6 +7,10 @@ const offers = [
   { name: 'ScrollShow Lifetime', cents: 9900, lookup: 'scrollshow_lifetime_eur_99_v1' },
 ];
 const apply = process.argv.includes('--apply');
+if (apply && process.env.STRIPE_SECRET_KEY.startsWith('sk_live_')) {
+  if (!process.argv.includes('--allow-live') || !process.env.STRIPE_ACCOUNT_ID) throw new Error('Live provisioning requires --allow-live and STRIPE_ACCOUNT_ID.');
+  if ((await stripe.accounts.retrieve()).id !== process.env.STRIPE_ACCOUNT_ID) throw new Error('Wrong Stripe account');
+}
 // --only=<mot> limite l'execution a une offre : indispensable en live, ou les
 // prix historiques n'ont pas de lookup_key et seraient recrees en double.
 const only = process.argv.find(arg => arg.startsWith('--only='))?.slice('--only='.length);

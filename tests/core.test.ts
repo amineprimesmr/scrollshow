@@ -151,6 +151,7 @@ test("queued cleanup keeps shared media then removes only unreferenced files", a
   const second=await cleanDeletedMedia(); assert.equal(second.deleted,1); assert.equal(await readImportedFile(name),null);
 });
 test("scheduler lease prevents concurrent runs and health detects stale work", async () => {
+  process.env.TIKTOK_PUBLISH_ENABLED = "1";
   await fixture(); let starts=0;
   let started!: () => void; let release!: () => void;
   const ready = new Promise<void>(resolve => { started = resolve; });

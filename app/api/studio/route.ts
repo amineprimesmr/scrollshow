@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       }),
     }, { headers });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "studio_failed";
-    return NextResponse.json({ error: message }, { status: 500, headers: privateHeaders });
+    console.error("studio_operation_unavailable");
+    return NextResponse.json({ error: "unavailable" }, { status: 503, headers: privateHeaders });
   }
 }

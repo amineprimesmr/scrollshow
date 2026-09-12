@@ -178,6 +178,7 @@ export function AccountPanel({
       shares: videos.reduce((n, v) => n + v.shares, 0),
       engagement: views ? Math.round((inter / views) * 1000) / 10 : 0,
       avgViews: videos.length ? Math.round(views / videos.length) : 0,
+      unknown: videos.some(v => v.missingMetrics?.length),
     };
   }, [videos]);
 
@@ -385,9 +386,9 @@ export function AccountPanel({
             {videos.length ? (
               <dl className="ss-acc__summary">
                 <div><dd>{videos.length}</dd><dt>{t("posts", "posts", en)}</dt></div>
-                <div><dd>{compact(filteredTotals.views)}</dd><dt>{t("vues", "views", en)}</dt></div>
-                <div><dd>{compact(filteredTotals.avgViews)}</dd><dt>{t("vues moy.", "avg views", en)}</dt></div>
-                <div><dd>{filteredTotals.engagement}%</dd><dt>{t("engagement", "engagement", en)}</dt></div>
+                <div><dd>{filteredTotals.unknown ? "—" : compact(filteredTotals.views)}</dd><dt>{t("vues", "views", en)}</dt></div>
+                <div><dd>{filteredTotals.unknown ? "—" : compact(filteredTotals.avgViews)}</dd><dt>{t("vues moy.", "avg views", en)}</dt></div>
+                <div><dd>{filteredTotals.unknown ? "—" : `${filteredTotals.engagement}%`}</dd><dt>{t("engagement", "engagement", en)}</dt></div>
                 <div><dd>{rangeLabel}</dd><dt>{t("période", "period", en)}</dt></div>
               </dl>
             ) : (

@@ -1,7 +1,7 @@
 import { setSessionCookie } from "@/lib/auth";
 import { afterAuthPath, signupUrl } from "@/lib/auth-urls";
 import { exchangeGithubCode, fetchGithubProfile } from "@/lib/github-auth";
-import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
+import { findUserByEmail, publicUser, updateStoreSlice } from "@/lib/store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { User } from "@/lib/types";
@@ -43,11 +43,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const user = await updateStore((data) => {
-      const existing =
+    const user = await updateStoreSlice([], (data) => {
+      if (data.restoreReviewRequired) throw new Error("restoration_review_required");
+    const existing =
         data.users.find((item) => item.githubId === profile.githubId) ||
         findUserByEmail(data, profile.email);
       if (existing) {
+      if (existing.deletionPendingAt) throw new Error("account_deletion_pending");
         // An unconfirmed password account proves nothing: drop the password rather
         // than hand the session to whoever registered the address first.
         if (!existing.emailVerifiedAt && !existing.googleId && !existing.githubId) {

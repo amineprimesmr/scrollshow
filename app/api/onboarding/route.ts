@@ -1,3 +1,4 @@
+import { validateMediaInput } from "@/lib/media-permissions";
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { analyzeBusiness, AnalyzeError, enrichTikTok } from "@/lib/business-analyzer";
 import { savePublicImage } from "@/lib/media-files";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
 
 const analyzeSchema = z.object({ action: z.literal("analyze"), url: z.string().trim().min(2).max(300) });
 
-const tiktokSchema = z.object({ action: z.literal("tiktok"), handle: z.string().trim().min(2).max(80) });
+const tiktokSchema = z.object({ project: z.string().optional(), action: z.literal("tiktok"), handle: z.string().trim().min(2).max(80) });
 
 const projectRef = z.string().trim().min(1).max(120).optional();
 
@@ -166,6 +167,13 @@ export async function POST(request: Request) {
 
   if (body.action === "tiktok") {
     const tiktok = await enrichTikTok(body.handle);
+    await updateStore(data => {
+      const project = targetProject(data, session.id, body.project, projectCookie);
+      if (!project?.business) throw new Error("project_business_required");
+      project.business.tiktok = tiktok;
+      const user = data.users.find(item => item.id === session.id);
+      if (!projectMode && user?.business) user.business.tiktok = tiktok;
+    });
     return NextResponse.json({ tiktok });
   }
 
@@ -203,6 +211,7 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "business") {
+    await validateMediaInput(body.business, session);
     const result = await updateStore((data) => {
       const item = data.users.find((entry) => entry.id === session.id);
       if (!item) return null;

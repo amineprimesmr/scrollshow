@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
-import { updateStore } from "./store";
+import { updateStoreSlice } from "./store";
 import { accountLink, sendAccountEmail } from "./email";
 import { revokeAllForUser } from "./oauth";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["apiKeys", "oauthCodes", "oauthTokens", "oauthUsedRefresh"], fn);
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export async function issueVerification(userId: string) {
@@ -56,7 +57,7 @@ export async function redeemEmailChange(token: string) {
     // L'identite change : les agents autorises sur l'ancienne doivent retomber.
     revokeAllForUser(data, user.id);
     user.sessionVersion = (user.sessionVersion || 0) + 1;
-    user.googleId = undefined;
+    user.googleId = undefined; user.githubId = undefined;
     user.recoveryHash = undefined; user.verificationHash = undefined;
     data.apiKeys = data.apiKeys.filter(k => k.userId !== user.id);
     return "complete";

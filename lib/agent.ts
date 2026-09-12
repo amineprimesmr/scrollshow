@@ -1,3 +1,6 @@
+import { publishingEnabled } from "./publishing-config";
+import { readSlideBytes, savePublicImage } from "./media-files";
+import { assertMediaReferences, validateMediaInput, withMediaUser, importedName } from "./media-permissions";
 import { ownedChannels } from "./owned-channels";
 import { researchCapabilities } from "./research/provider";
 import { loadTikTokChannel, loadTikTokChannels } from "./tiktok-account";
@@ -18,13 +21,13 @@ import {
   recipeFromPhotos,
   recipeJsonUrl,
 } from "./recipe";
-import { importTikTokFromUrl } from "./tiktok-import";
+import { importTikTokFromUrl, resolveUrl } from "./tiktok-import";
 import { reconstructRecipe, ReconstructError } from "./reconstruct";
 import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
 import { coerceOptions, type TikTokPostOptions } from "./tiktok-compliance";
 import { directPostPhotos, PublishError } from "./tiktok-publish";
-import { readStore, updateStore, localStoreEnabled } from "./store";
+import { readStoreSlice, updateStoreSlice, localStoreEnabled } from "./store";
 import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
 import type { RecipeInput } from "./recipe";
 import { assertEditable, validatePost } from "./post-validation";
@@ -33,6 +36,11 @@ import { queueDeletedMedia } from "./media-cleanup";
 import { dateInTimeZone, resolveSettings } from "./settings";
 import { inScope } from "./projects";
 import { resolveProject } from "./projects";
+
+// These operations never need account video caches or research job payloads.
+const AGENT_KEYS = ["accounts", "channels", "posts", "media", "apiKeys", "runs", "mediaDeletionQueue", "videoStats", "channelStats"] as const;
+const readStore = () => readStoreSlice(AGENT_KEYS);
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(AGENT_KEYS, fn);
 
 export class AgentError extends Error {
   constructor(
@@ -51,7 +59,7 @@ export async function agentWhoami(user: SessionUser) {
   const business = project?.business || owner?.business || null;
   const settings = resolveSettings(owner);
   return {
-    capabilities: { research: true, ...researchCapabilities(), export: true, publishing: "tiktok", htmlExport: false },
+    capabilities: { research: true, ...researchCapabilities(), export: true, publishing: publishingEnabled() ? "tiktok" : false, publishingStatus: publishingEnabled() ? "ready" : "pending_review", htmlExport: false },
     limits: { analysesPerDay: 30, discoveriesPerDay: 10, exportsPerDay: 20 },
     user: { id: user.id, email: user.email, name: user.name, plan: user.plan },
     calendar: { timezone: settings.timezone, today: dateInTimeZone(settings.timezone), defaultPostTime: settings.defaultPostTime },
@@ -119,6 +127,7 @@ export async function agentCreatePost(
     tiktok?: Partial<TikTokPostOptions>;
   },
 ) {
+  await validateMediaInput(input, user);
   const caption = input.caption.trim();
   if (!caption) throw new AgentError("caption_required");
   const channels = await agentChannels(user);
@@ -184,6 +193,7 @@ export async function agentUpdatePost(
     const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
     assertEditable(found);
+    assertMediaReferences(data, input, user);
     if (input.caption) found.body = input.caption.slice(0, 2200);
     if (input.tiktok) found.tiktok = coerceOptions({ ...found.tiktok, ...input.tiktok }, found.body);
     if (input.date) found.date = input.date;
@@ -222,7 +232,7 @@ export async function agentGetRecipe(user: SessionUser, idOrShare: string) {
   const data = await readStore();
   const post = data.posts.find((item) => item.id === idOrShare || item.shareId === idOrShare);
   if (!post) throw new AgentError("post_missing", 404);
-  if (post.userId !== user.id && post.visibility !== "public") throw new AgentError("post_missing", 404);
+  if (!inScope(post, user) && post.visibility !== "public") throw new AgentError("post_missing", 404);
   return publicRecipe(post);
 }
 
@@ -238,6 +248,7 @@ export async function agentUpdateRecipe(
     );
     if (!found) return null;
     assertEditable(found);
+    assertMediaReferences(data, input, user);
     found.recipe = applyRecipePatch(ensureRecipe(found), input);
     found.image = coverOf(found);
     if (input.caption) found.body = input.caption.slice(0, 2200);
@@ -258,7 +269,7 @@ export async function agentReconstructPost(user: SessionUser, idOrShare: string)
   if (!found) throw new AgentError("post_missing", 404);
   try {
     assertEditable(found);
-    const recipe = await reconstructRecipe(ensureRecipe(found));
+    const recipe = await reconstructRecipe(ensureRecipe(found), user);
     const post = await updateStore((store) => {
       const item = store.posts.find((entry) => entry.id === found.id && inScope(entry, user));
       if (!item) return null;
@@ -283,7 +294,7 @@ export async function agentRasterizePost(user: SessionUser, idOrShare: string, r
   if (!found) throw new AgentError("post_missing", 404);
   if (!(await consumeLimit(`render:${user.id}`, 30, 86400000))) throw new AgentError("daily_render_limit", 429);
   const recipe = recipePatch || ensureRecipe(found!);
-  const photo_images = await rasterizeRecipe(recipe);
+  const photo_images = await rasterizeRecipe(recipe, user);
   if (!photo_images.length) throw new AgentError("photos_required");
   await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => inScope(m, user) && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, url, name: `Slide ${index+1}`, createdAt: new Date().toISOString() }); }));
   return { photo_images, recipe };
@@ -311,6 +322,24 @@ export async function agentEnsureShare(user: SessionUser, id: string) {
 }
 
 export async function agentForkPost(user: SessionUser, id: string) {
+  const source = (await readStore()).posts.find(item => item.id === id && (inScope(item, user) || item.visibility === "public"));
+  if (!source) throw new AgentError("post_missing", 404);
+  const recipe = cloneRecipe(ensureRecipe(source));
+  recipe.origin = "fork";
+  // A fork has its own files, so revoking the source share cannot break it.
+  await withMediaUser(user, async () => {
+    const copied = new Map<string, string>();
+    for (const slide of recipe.slides) for (const field of ["image", "sourceImage"] as const) {
+      const url = slide[field];
+      if (!url || !importedName(url)) continue;
+      if (!copied.has(url)) {
+        const file = await readSlideBytes(url, user);
+        if (!file) throw new AgentError("media_unavailable", 422);
+        copied.set(url, await savePublicImage(file.bytes, file.contentType));
+      }
+      slide[field] = copied.get(url)!;
+    }
+  });
   const created = await updateStore((data) => {
     const found = data.posts.find(
       (item) => item.id === id && (inScope(item, user) || item.visibility === "public"),
@@ -318,10 +347,7 @@ export async function agentForkPost(user: SessionUser, id: string) {
     if (!found) return null;
     if (found.userId !== user.id) found.clones = (found.clones || 0) + 1;
     const now = new Date();
-    const recipe = cloneRecipe(ensureRecipe(found));
-    recipe.origin = "fork";
     const copy: StudioPost = {
-      ...found,
       id: crypto.randomUUID(),
       userId: user.id, projectId: user.projectId,
       channelIds: data.channels.filter((item) => inScope(item, user)).slice(0, 1).map((item) => item.id),
@@ -330,10 +356,10 @@ export async function agentForkPost(user: SessionUser, id: string) {
       time: found.time || "18:00",
       status: "draft",
       image: coverOf({ image: found.image, recipe }),
-      views: found.userId === user.id ? 0 : found.views,
-      likes: found.userId === user.id ? 0 : found.likes,
-      comments: found.userId === user.id ? 0 : found.comments,
-      shares: found.userId === user.id ? 0 : found.shares,
+      views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
       origin: "fork",
       shareId: newShareId(),
       recipe,
@@ -341,6 +367,7 @@ export async function agentForkPost(user: SessionUser, id: string) {
       inCalendar: false,
       clones: 0,
       forkedFrom: found.id,
+      shareEnabled: false,
       createdAt: now.toISOString(),
     };
     data.posts.unshift(copy);
@@ -354,18 +381,20 @@ export async function agentImportTikTok(
   user: SessionUser,
   input: { url: string; visibility?: "private" | "public"; reconstruct?: boolean },
 ) {
-  const imported = await importTikTokFromUrl(input.url);
+  const canonical = await resolveUrl(input.url);
+  const tiktokId = canonical.match(/\/(?:video|photo)\/(\d+)/)?.[1];
   const current = await readStore();
-  const existing = current.posts.find(
-    (item) => inScope(item, user) && imported.tiktokId && item.tiktokId === imported.tiktokId,
-  );
-  if (existing) return publicPost(existing);
+  const duplicate = current.posts.find(item => inScope(item, user) && tiktokId && item.tiktokId === tiktokId);
+  if (duplicate) return publicPost(duplicate);
+  const imported = await importTikTokFromUrl(canonical);
   const now = new Date();
   const recipe = recipeFromPhotos(imported.images, "import", {
     origin: "import",
     prompt: `Pixel-perfect import of ${imported.url}. Keep these exact slides and caption.`,
   });
   const post = await updateStore((data) => {
+    const concurrent = data.posts.find(item => inScope(item, user) && imported.tiktokId && item.tiktokId === imported.tiktokId);
+    if (concurrent) { queueDeletedMedia(data, imported.images); return concurrent; }
     imported.images.forEach((url, index) => {
       data.media.unshift({
         id: crypto.randomUUID(),
@@ -396,6 +425,7 @@ export async function agentImportTikTok(
       inCalendar: false,
       kind: imported.kind,
       tiktokUrl: imported.url,
+      importSummary: imported.importSummary,
       tiktokId: imported.tiktokId,
       authorHandle: imported.authorHandle,
       authorName: imported.authorName,
@@ -407,6 +437,9 @@ export async function agentImportTikTok(
     };
     data.posts.unshift(created);
     return created;
+  }).catch(async error => {
+    await updateStoreSlice(["mediaDeletionQueue"], data => queueDeletedMedia(data, imported.images)).catch(() => {});
+    throw error;
   });
   if (input.reconstruct) return agentReconstructPost(user, post.id);
   return publicPost(post);
@@ -528,6 +561,8 @@ function daysAgoKey(days: number) {
 // The only way to get a real windowed number for ANY account is to snapshot
 // the lifetime counters ourselves once a day and diff two snapshots. Accuracy
 // grows with how long we've been collecting; it's not retroactive.
+function knownCounter(value: unknown) { return typeof value === "number" && Number.isFinite(value) && value >= 0; }
+
 async function snapshotVideoStats(channelId: string, videos: any[]) {
   if (!videos.length) return;
   const day = dayKey(new Date());
@@ -536,6 +571,7 @@ async function snapshotVideoStats(channelId: string, videos: any[]) {
     await updateStore((store) => {
       store.videoStats ||= [];
       for (const video of videos) {
+        if (!video.id || ![video.view_count, video.like_count, video.comment_count, video.share_count].every(knownCounter)) continue;
         const videoId = String(video.id);
         const existing = store.videoStats!.find((s) => s.channelId === channelId && s.videoId === videoId && s.day === day);
         const snap = {
@@ -558,7 +594,7 @@ async function snapshotVideoStats(channelId: string, videos: any[]) {
 }
 
 async function snapshotChannelStats(channelId: string, profile: Record<string, unknown> | null) {
-  if (!profile) return;
+  if (!profile || ![profile.follower_count, profile.likes_count, profile.video_count].every(knownCounter)) return;
   const day = dayKey(new Date());
   const capturedAt = new Date().toISOString();
   try {
@@ -777,7 +813,7 @@ export async function agentLibrary(user: SessionUser, query?: string, verdict?: 
 }
 
 export async function agentGetAccount(user: SessionUser, idOrHandle: string) {
-  const data = await readStore();
+  const data = await readStoreSlice(["accounts"], { videos: true });
   const value = idOrHandle.replace(/^@/, "").toLowerCase();
   const account = data.accounts.find(
     (item) => inScope(item, user) && (item.id === idOrHandle || item.handle.toLowerCase() === value),
@@ -937,6 +973,7 @@ function publicPost(post: StudioPost) {
     inCalendar: post.inCalendar !== false,
     kind: post.kind || (recipe.slides.length > 1 ? "photo" : "photo"),
     tiktokUrl: post.tiktokUrl || null,
+    importSummary: post.importSummary || null,
     tiktokId: post.tiktokId || null,
     authorHandle: post.authorHandle || null,
     authorName: post.authorName || null,

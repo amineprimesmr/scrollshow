@@ -142,10 +142,10 @@ export function recipeFromPhotos(
   const count = Math.max(photos.length, extraSlides.length);
   const slides = count
     ? Array.from({ length: count }, (_, index) => defaultSlide(
-      photos[index] || extraSlides[index]?.image || "",
+      extraSlides[index]?.image ?? photos[index] ?? "",
       extraSlides[index] as Partial<CarouselSlide> | undefined,
     ))
-    : [defaultSlide("/assets/tiktoks/01-glowup-188k.png")];
+    : [defaultSlide("", { backgroundColor: "#111111", keepPhoto: false })];
   return normalizeRecipe({
     version: 1,
     origin: extra?.origin || origin,
@@ -161,13 +161,14 @@ export function recipeFromPhotos(
 export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | undefined, origin: CarouselRecipe["origin"] = "manual"): CarouselRecipe {
   const slides = (input?.slides || [])
     .map((slide) => {
-      if (!slide?.image && !slide?.html && !slide?.backgroundColor && !slide?.sourceImage) return null;
+      if (!slide) return null;
+      const blank = !slide.image && !slide.html && !slide.sourceImage;
       return defaultSlide(slide.image || "", {
         id: slide.id,
         html: slide.html,
         css: slide.css,
         sourceImage: slide.sourceImage,
-        backgroundColor: slide.backgroundColor,
+        backgroundColor: slide.backgroundColor || (blank ? "#111111" : undefined),
         backgroundColor2: slide.backgroundColor2,
         keepPhoto: slide.keepPhoto,
         overlays: slide.overlays,
@@ -182,7 +183,7 @@ export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | u
     css: input?.css,
     prompt: input?.prompt,
     editable: input?.editable,
-    slides: slides.length ? slides : [defaultSlide("/assets/tiktoks/01-glowup-188k.png")],
+    slides: slides.length ? slides : [defaultSlide("", { backgroundColor: "#111111", keepPhoto: false })],
   };
 }
 
@@ -196,7 +197,7 @@ export function photosOf(recipe: CarouselRecipe) {
 }
 
 export function coverOf(post: Pick<StudioPost, "image" | "recipe">) {
-  return post.recipe?.slides?.[0]?.image || post.image || "/assets/tiktoks/01-glowup-188k.png";
+  return post.recipe?.slides?.[0]?.image || post.image || "/logo.png";
 }
 
 export function cloneRecipe(recipe: CarouselRecipe): CarouselRecipe {

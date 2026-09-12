@@ -23,3 +23,18 @@ export function decryptBackup(bytes: Buffer, key: string): StoreData {
   validateSnapshot(result.data);
   return result.data;
 }
+
+/** Version 2 envelopes can authenticate a manifest or one bounded media part. */
+export function encryptBackupPart(value: unknown, key: string) {
+  const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", keyOf(key), iv);
+  cipher.setAAD(Buffer.from("scrollshow-backup-v2"));
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  return Buffer.from(JSON.stringify({ version: 2, iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), ciphertext: ciphertext.toString("base64") }));
+}
+export function decryptBackupPart(bytes: Buffer, key: string): unknown {
+  const envelope = JSON.parse(bytes.toString());
+  if (envelope.version !== 2) throw new Error("unsupported_backup_version");
+  const decipher = createDecipheriv("aes-256-gcm", keyOf(key), Buffer.from(envelope.iv, "base64"));
+  decipher.setAAD(Buffer.from("scrollshow-backup-v2")); decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
+  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext, "base64")), decipher.final()]).toString());
+}

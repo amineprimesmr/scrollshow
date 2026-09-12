@@ -61,6 +61,7 @@ export function platformName(id: string) {
 
 export function platformAvailability() {
   return {
+    tiktokPublishing: process.env.TIKTOK_PUBLISH_ENABLED === "1",
     tiktok: Boolean(process.env.TIKTOK_CLIENT_KEY?.trim() && process.env.TIKTOK_CLIENT_SECRET?.trim()),
     meta: Boolean(process.env.META_APP_ID?.trim() && process.env.META_APP_SECRET?.trim()),
     x: Boolean(process.env.X_CLIENT_ID?.trim() && process.env.X_CLIENT_SECRET?.trim()),

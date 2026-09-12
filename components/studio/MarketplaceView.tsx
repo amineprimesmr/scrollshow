@@ -1,4 +1,5 @@
 "use client";
+import { checkedFetch } from "@/lib/client-request";
 
 import { t } from "@/lib/i18n";
 import { ensureRecipe, needsReconstruct } from "@/lib/recipe";
@@ -140,9 +141,13 @@ export function MarketplaceView() {
   const [message, setMessage] = useState("");
 
   async function loadPublic() {
-    const res = await fetch("/api/studio/marketplace?tab=public");
+    try {
+
+    const res = await checkedFetch("/api/studio/marketplace?tab=public");
     const json = await res.json().catch(() => ({}));
     setPublicItems(Array.isArray(json.items) ? json.items : []);
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   useEffect(() => {
@@ -180,10 +185,12 @@ export function MarketplaceView() {
   }
 
   async function importUrl(event: React.FormEvent) {
+    try {
+
     event.preventDefault();
     setBusy("import");
     setMessage("");
-    const res = await fetch("/api/studio/marketplace", {
+    const res = await checkedFetch("/api/studio/marketplace", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, visibility: sharePublic ? "public" : "private" }),
@@ -204,6 +211,11 @@ export function MarketplaceView() {
       setMessage(t(copy[0], copy[1], english));
       return;
     }
+    if (json.post?.importSummary?.videoPreviewOnly) setMessage(t("Seule la miniature de cette vidéo a été importée. Le fichier vidéo n’est pas importé ni éditable ici.", "Only this video's thumbnail was imported. The video file is not imported or editable here.", english));
+    if (json.post?.importSummary?.failed || json.post?.importSummary?.truncated) {
+      const summary = json.post.importSummary;
+      setMessage(t(`Import partiel : ${summary.imported} image(s) sur ${summary.expected}. Vérifie le carrousel avant de l’utiliser.`, `Partial import: ${summary.imported} of ${summary.expected} images. Check the carousel before using it.`, english));
+    }
     setUrl("");
     setImportOpen(false);
     setTab(sharePublic ? "public" : "private");
@@ -213,18 +225,24 @@ export function MarketplaceView() {
       setEditing(json.post);
       setPostOpen(true);
     }
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   /** Un seul chemin pour toute copie : on montre « Copie » au meme endroit. */
   async function copyText(id: string, text: string) {
+    try {
+
     if (!text.trim()) {
       setMessage(t("Rien a copier sur ce carrousel.", "Nothing to copy on this carousel.", english));
       return;
     }
-    await navigator.clipboard.writeText(text).catch(() => undefined);
+    await navigator.clipboard.writeText(text);
     setCopied(id);
     setMessage("");
     window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1600);
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   /** Le .zip des images, deja produit par le serveur : slide-01.jpg, la
@@ -233,7 +251,7 @@ export function MarketplaceView() {
     setBusy(item.id);
     setMessage("");
     try {
-      const res = await fetch(`/api/studio/posts/${item.id}/export`);
+      const res = await checkedFetch(`/api/studio/posts/${item.id}/export`);
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         setMessage(
@@ -260,28 +278,34 @@ export function MarketplaceView() {
   }
 
   async function copyLink(item: MarketItem) {
+    try {
+
     const mine = item.mine ?? item.userId === user?.id;
     const flash = (id: string) => {
       setCopied(id);
       window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 2000);
     };
     if (!mine && item.shareId) {
-      await navigator.clipboard.writeText(`${window.location.origin}/r/${item.shareId}`).catch(() => undefined);
+      await navigator.clipboard.writeText(`${window.location.origin}/r/${item.shareId}`);
       flash(item.id);
       return;
     }
     setBusy(item.id);
-    const res = await fetch(`/api/studio/posts/${item.id}/share`, { method: "POST" });
+    const res = await checkedFetch(`/api/studio/posts/${item.id}/share`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
     setBusy(null);
     if (!json.shareId) return;
-    await navigator.clipboard.writeText(`${window.location.origin}/r/${json.shareId}`).catch(() => undefined);
+    await navigator.clipboard.writeText(`${window.location.origin}/r/${json.shareId}`);
     flash(item.id);
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   async function fork(id: string) {
+    try {
+
     setBusy(id);
-    const res = await fetch(`/api/studio/posts/${id}/fork`, { method: "POST" });
+    const res = await checkedFetch(`/api/studio/posts/${id}/fork`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
     setBusy(null);
     await reload();
@@ -291,11 +315,15 @@ export function MarketplaceView() {
       setEditing(json.post);
       setPostOpen(true);
     }
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   async function setVisibility(id: string, visibility: "private" | "public") {
+    try {
+
     setBusy(id);
-    await fetch(`/api/studio/marketplace/${id}`, {
+    await checkedFetch(`/api/studio/marketplace/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ visibility }),
@@ -303,11 +331,15 @@ export function MarketplaceView() {
     setBusy(null);
     await reload();
     await loadPublic();
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   async function addToCalendar(id: string) {
+    try {
+
     setBusy(id);
-    const res = await fetch(`/api/studio/marketplace/${id}`, {
+    const res = await checkedFetch(`/api/studio/marketplace/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ inCalendar: true }),
@@ -319,12 +351,16 @@ export function MarketplaceView() {
       setEditing(json.post);
       setPostOpen(true);
     }
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   async function reconstruct(item: MarketItem) {
+    try {
+
     setBusy(item.id);
     setMessage("");
-    const res = await fetch(`/api/studio/posts/${item.id}/reconstruct`, { method: "POST" });
+    const res = await checkedFetch(`/api/studio/posts/${item.id}/reconstruct`, { method: "POST" });
     const json = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) {
@@ -351,6 +387,8 @@ export function MarketplaceView() {
       setEditing(json.post);
       setPostOpen(true);
     }
+
+    } catch { setMessage(t("L’action a échoué. Réessaie dans un instant.", "The action failed. Please try again.", english)); } finally { setBusy(null); }
   }
 
   const wall = useTileScale();

@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "TikTok review demo",
   description:
     "Public ScrollShow mockup of Login Kit + Content Posting API: profile, stats, video.list, upload, and publish.",
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export default function ReviewPage() {

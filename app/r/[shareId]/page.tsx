@@ -1,3 +1,4 @@
+import { htmlSafeJson } from "@/lib/safe-json";
 import { findPostByShareId } from "@/lib/agent";
 import { BrandMark } from "@/components/BrandMark";
 import { SlidePreview } from "@/components/studio/SlidePreview";
@@ -90,7 +91,7 @@ export default async function Page({ params }: Params) {
         </ol>
         <pre>{JSON.stringify(payload, null, 2)}</pre>
       </section>
-      <script type="application/json" id="scrollshow-recipe" dangerouslySetInnerHTML={{ __html: JSON.stringify(payload) }} />
+      <script type="application/json" id="scrollshow-recipe" dangerouslySetInnerHTML={{ __html: htmlSafeJson(payload) }} />
     </main>
   );
 }

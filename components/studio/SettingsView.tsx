@@ -1,4 +1,5 @@
 "use client";
+import { checkedFetch } from "@/lib/client-request";
 
 import { BUSINESS_KINDS } from "@/lib/business-kinds";
 import { t } from "@/lib/i18n";
@@ -187,22 +188,32 @@ export function SettingsView() {
   }
 
   async function loadKeys() {
-    const res = await fetch("/api/keys");
+    try {
+
+    const res = await checkedFetch("/api/keys");
     const json = await res.json().catch(() => ({}));
     setKeys(json.keys || []);
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function copy(id: string, value: string) {
+    try {
+
     await navigator.clipboard.writeText(value);
     setCopied(id);
     window.setTimeout(() => setCopied((current) => (current === id ? "" : current)), 1400);
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function patch(payload: Record<string, unknown>) {
+    try {
+
     setBusy(String(payload.action));
     setError("");
     setNotice("");
-    const res = await fetch("/api/studio/settings", {
+    const res = await checkedFetch("/api/studio/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -228,6 +239,8 @@ export function SettingsView() {
     setConfirmPassword("");
     await reload();
     return true;
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); return false; } finally { setBusy(""); }
   }
 
   function applyTheme(next: "light" | "dark" | "system") {
@@ -285,7 +298,7 @@ export function SettingsView() {
   async function revokeGrant(grantId: string) {
     setBusy(`grant:${grantId}`);
     try {
-      const res = await fetch("/api/studio/connections", {
+      const res = await checkedFetch("/api/studio/connections", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ grantId }),
@@ -305,19 +318,25 @@ export function SettingsView() {
   }
 
   async function disconnect(id: string, platform: string) {
+    try {
+
     setBusy(id);
     // /api/tiktok/disconnect both revokes the token and removes the channel —
     // calling the generic DELETE first would remove the channel before it can
     // be looked up there, and the revoke would silently never fire.
-    if (platform === "tiktok") await fetch("/api/tiktok/disconnect", { method: "POST" });
-    else await fetch(`/api/studio/channels/${id}`, { method: "DELETE" });
+    if (platform === "tiktok") await checkedFetch("/api/tiktok/disconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channelId: id }) });
+    else await checkedFetch(`/api/studio/channels/${id}`, { method: "DELETE" });
     setBusy("");
     await reload();
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function createKey(name = keyName) {
+    try {
+
     setBusy("key");
-    const res = await fetch("/api/keys", {
+    const res = await checkedFetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -331,19 +350,27 @@ export function SettingsView() {
     setRevealed(typeof json.token === "string" && json.token.startsWith("ss_live_") ? json.token : "");
     setNotice(t("Clé créée. Copie-la maintenant, elle ne sera plus visible.", "Key created. Copy it now — it won’t be shown again.", english));
     await loadKeys();
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function revokeKey(id: string) {
+    try {
+
     setBusy(id);
-    await fetch(`/api/keys/${id}`, { method: "DELETE" });
+    await checkedFetch(`/api/keys/${id}`, { method: "DELETE" });
     setBusy("");
     if (revealed) setRevealed("");
     await loadKeys();
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function exportData() {
+    try {
+
     setBusy("export");
-    const res = await fetch("/api/studio/export");
+    const res = await checkedFetch("/api/studio/export");
     const json = await res.json();
     const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -354,35 +381,50 @@ export function SettingsView() {
     URL.revokeObjectURL(url);
     setBusy("");
     setNotice(t("Export téléchargé.", "Export downloaded.", english));
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function openPortal() {
+    try {
+
     setBusy("portal");
-    const res = await fetch("/api/stripe/portal", { method: "POST" });
+    const res = await checkedFetch("/api/stripe/portal", { method: "POST" });
     const json = await res.json().catch(() => ({}));
     setBusy("");
     if (json.url) window.location.href = json.url;
     else window.location.href = "/pricing";
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function signOut() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    try {
+
+    await checkedFetch("/api/auth/logout", { method: "POST" });
     router.push("/");
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   async function destroy() {
+    try {
+
     if (deleteConfirm !== user?.email) {
       setError(t("Tape ton email pour confirmer.", "Type your email to confirm.", english));
       return;
     }
     setBusy("delete");
-    const res = await fetch("/api/studio/settings", { method: "DELETE" });
+    const res = await checkedFetch("/api/studio/settings", { method: "DELETE" });
     setBusy("");
     if (!res.ok) {
       setError(t("Suppression impossible.", "Could not delete the account.", english));
       return;
     }
-    router.push("/");
+    const result = await res.json();
+    router.push(result.pending ? "/account-deletion?pending=1" : "/account-deletion");
+
+    } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
   if (!user) {
@@ -1035,37 +1077,33 @@ function StorageTab({
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/studio/storage");
-    const json = await res.json().catch(() => ({}));
-    setItems(json.items || []);
-    setTotals(json.totals || null);
-    setLoading(false);
+    try {
+      const res = await checkedFetch("/api/studio/storage");
+      const json = await res.json(); setItems(json.items || []); setTotals(json.totals || null);
+    } catch { onError(t("Impossible de charger le stockage.", "Could not load storage.", english)); }
+    finally { setLoading(false); }
   }
 
   async function removeItem(id: string) {
     setBusyId(id);
-    const res = await fetch(`/api/studio/media/${id}`, { method: "DELETE" });
-    setBusyId("");
-    if (!res.ok) {
-      onError(t("Ce média est utilisé par un post — retire-le du post d’abord.", "This media is used by a post — remove it from the post first.", english));
-      return;
-    }
-    setItems((current) => current.filter((item) => item.id !== id));
-    setTotals((current) => (current ? { ...current, count: current.count - 1 } : current));
-    onNotice(t("Média supprimé.", "Media deleted.", english));
+    try { await checkedFetch(`/api/studio/media/${id}`, { method: "DELETE" }); await load(); onNotice(t("Média supprimé.", "Media deleted.", english)); }
+    catch { onError(t("Suppression impossible : le média est peut-être utilisé.", "Could not delete: this media may be in use.", english)); }
+    finally { setBusyId(""); }
   }
 
   async function clearUnused() {
-    const unused = items.filter((item) => !item.inUse);
+    const unused = items.filter(item => !item.inUse);
     if (!unused.length) return;
     setBusyId("bulk");
-    const results = await Promise.all(unused.map((item) => fetch(`/api/studio/media/${item.id}`, { method: "DELETE" })));
-    setBusyId("");
-    const ok = results.filter((res) => res.ok).length;
-    setItems((current) => current.filter((item) => item.inUse));
-    onNotice(
-      t(`${ok} média${ok > 1 ? "s" : ""} supprimé${ok > 1 ? "s" : ""}.`, `${ok} file${ok === 1 ? "" : "s"} deleted.`, english),
-    );
+    let removed = 0;
+    try {
+      for (const item of unused) {
+        try { await checkedFetch(`/api/studio/media/${item.id}`, { method: "DELETE" }); removed++; }
+        catch { onError(t("Certains médias n’ont pas pu être supprimés.", "Some media could not be deleted.", english)); }
+      }
+      await load();
+      onNotice(t(`${removed} média(s) supprimé(s).`, `${removed} file(s) deleted.`, english));
+    } finally { setBusyId(""); }
   }
 
   const usedBytes = totals ? totals.knownBytes - totals.unusedBytes : 0;
@@ -1244,21 +1282,31 @@ function NotificationsTab({
   }, []);
 
   async function loadConfig() {
-    const res = await fetch("/api/push/config");
+    try {
+
+    const res = await checkedFetch("/api/push/config");
     const json = await res.json().catch(() => ({}));
     setConfigured(Boolean(json.configured));
     setPublicKey(json.publicKey || "");
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   async function loadDevices() {
+    try {
+
     setLoadingDevices(true);
-    const res = await fetch("/api/push/subscriptions");
+    const res = await checkedFetch("/api/push/subscriptions");
     const json = await res.json().catch(() => ({}));
     setDevices(json.subscriptions || []);
     setLoadingDevices(false);
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   async function checkSubscribed() {
+    try {
+
     try {
       const reg = await navigator.serviceWorker.getRegistration("/sw.js");
       const sub = await reg?.pushManager.getSubscription();
@@ -1266,6 +1314,8 @@ function NotificationsTab({
     } catch {
       setSubscribedHere(false);
     }
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   async function enable() {
@@ -1288,7 +1338,7 @@ function NotificationsTab({
         });
       }
       const json = sub.toJSON();
-      await fetch("/api/push/subscriptions", {
+      await checkedFetch("/api/push/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
@@ -1304,12 +1354,14 @@ function NotificationsTab({
   }
 
   async function disable() {
+    try {
+
     setBusy("disable");
     try {
       const reg = await navigator.serviceWorker.getRegistration("/sw.js");
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/push/subscriptions", {
+        await checkedFetch("/api/push/subscriptions", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),
@@ -1322,22 +1374,32 @@ function NotificationsTab({
     } finally {
       setBusy("");
     }
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   async function revoke(id: string) {
+    try {
+
     setBusy(id);
-    await fetch(`/api/push/subscriptions/${id}`, { method: "DELETE" });
+    await checkedFetch(`/api/push/subscriptions/${id}`, { method: "DELETE" });
     setBusy("");
     await loadDevices();
     await checkSubscribed();
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   async function sendTest() {
+    try {
+
     setBusy("test");
-    const res = await fetch("/api/push/test", { method: "POST" });
+    const res = await checkedFetch("/api/push/test", { method: "POST" });
     setBusy("");
     if (res.ok) onNotice(t("Notification de test envoyée.", "Test notification sent.", english));
     else onError(t("Active les notifications sur cet appareil d’abord.", "Enable notifications on this device first.", english));
+
+    } catch { onError(t("La demande a échoué. Réessaie.", "The request failed. Try again.", english)); } finally { setBusy(""); }
   }
 
   return (

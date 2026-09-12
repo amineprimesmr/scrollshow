@@ -2,7 +2,9 @@ import { sendPushToUser } from "./push";
 import { ensureRecipe, needsRasterize, photosOf } from "./recipe";
 import { rasterizeRecipe } from "./render-slide";
 import { resolveSettings } from "./settings";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
+const readStore = () => readStoreSlice(["posts", "channels"]);
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels"], fn);
 import { fetchPublishStatus } from "./tiktok";
 import { loadTikTokChannel } from "./tiktok-account";
 import { coerceOptions } from "./tiktok-compliance";
@@ -42,28 +44,6 @@ export function zonedToUtc(date: string, time: string, timeZone: string) {
 export function isDue(post: StudioPost, timeZone: string, now = Date.now()) {
   const due = zonedToUtc(post.date, post.time, timeZone);
   return Number.isNaN(due) ? false : due <= now;
-}
-
-async function publishPost(user: User, post: StudioPost) {
-  const recipe = ensureRecipe(post);
-  const photos = needsRasterize(recipe) ? await rasterizeRecipe(recipe) : photosOf(recipe);
-  if (!photos.length) throw new Error("photos_required");
-
-  // A scheduled post carries the choices the creator made on the Post to
-  // TikTok page. Without them we must not guess (no default privacy, no
-  // default disclosure) — the post stays scheduled with a clear error.
-  if (!post.tiktok?.privacy) throw new Error("tiktok_options_required");
-  const options = coerceOptions(post.tiktok, post.body || "");
-  const { publishId } = await directPostPhotos(user.id, {
-    photos,
-    description: (post.body || "").slice(0, 2200),
-    options,
-    // Le compte cible est celui du post, dans son projet : jamais « le premier
-    // compte » de l'utilisateur, qui peut appartenir a un autre business.
-    channelId: post.publishChannelId || post.channelIds[0],
-    projectId: post.projectId,
-  });
-  return publishId;
 }
 
 /** Publishes every scheduled post whose slot has passed. */
@@ -127,6 +107,10 @@ async function settlePost(user: User, post: StudioPost, accessToken: string): Pr
     } else if (state === "FAILED") {
       failReason = String(status.fail_reason || "failed").slice(0, 300);
       current.status = "draft";
+      current.previousPublishId = current.publishId;
+      current.publishId = undefined;
+      current.publishClaim = undefined;
+      current.publishLeaseUntil = undefined;
       current.publishError = failReason;
     }
   });

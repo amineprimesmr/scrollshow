@@ -2,7 +2,7 @@ import { setSessionCookie, verifyPassword } from "@/lib/auth";
 import { findUserByEmail, publicUser, readStoreSlice } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { consumeLimit } from "@/lib/rate-limit";
+import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   // change un mot de passe qui n'a jamais ete en cause.
   let data;
   try {
+    if (!await consumePublicAuthLimit(request, "login")) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
     if (!(await consumeLimit(`login:${parsed.data.email.toLowerCase()}`, 10, 900000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
     data = await readStoreSlice([]);
   } catch (error) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unavailable" }, { status: 503 });
   }
   const user = findUserByEmail(data, parsed.data.email);
-  if (!user) {
+  if (!user || user.deletionPendingAt || data.restoreReviewRequired) {
     return NextResponse.json({ error: "credentials" }, { status: 401 });
   }
   if (!user.passwordHash) {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { database, databaseEnabled } from "./database";
-import { updateStore } from "./store";
+import { updateStoreSlice } from "./store";
 
 /**
  * Compteur a fenetre glissante.
@@ -18,13 +18,7 @@ export async function consumeLimit(key: string, limit: number, windowMs: number)
   const hash = createHash("sha256").update(key).digest("hex");
 
   if (databaseEnabled()) {
-    try {
-      return await consumeInDatabase(hash, limit, windowMs, now);
-    } catch (error) {
-      // Un compteur en panne ne doit pas fermer l'application : on retombe sur
-      // le chemin complet, plus couteux mais eprouve.
-      console.error("rate_limit_sql_failed", { message: error instanceof Error ? error.message : String(error) });
-    }
+    return consumeInDatabase(hash, limit, windowMs, now);
   }
   return consumeInStore(hash, limit, windowMs, now);
 }
@@ -59,7 +53,7 @@ async function consumeInDatabase(hash: string, limit: number, windowMs: number, 
 
 /** Fichier local et blob : le transfert n'y coute rien, on garde le chemin simple. */
 export function consumeInStore(hash: string, limit: number, windowMs: number, now: number) {
-  return updateStore(data => {
+  return updateStoreSlice(["rateLimits"], data => {
     data.rateLimits ||= {};
     for (const [id, entry] of Object.entries(data.rateLimits)) if (entry.resetAt <= now) delete data.rateLimits[id];
     const entry = (data.rateLimits[hash] ||= { count: 0, resetAt: now + windowMs });
@@ -67,4 +61,12 @@ export function consumeInStore(hash: string, limit: number, windowMs: number, no
     entry.count++;
     return true;
   });
+}
+
+/** Public authentication endpoints need a stable budget independent of email,
+ * token or client_id supplied by the caller. Vercel supplies the forwarded IP. */
+export async function consumePublicAuthLimit(request: Request, purpose: string, limit = 30) {
+  const ip = (request.headers.get("x-vercel-forwarded-for") || request.headers.get("x-forwarded-for") || "local").split(",")[0].trim().slice(0, 80);
+  if (!await consumeLimit(`auth-global:${purpose}`, 300, 60000)) return false;
+  return consumeLimit(`auth-ip:${purpose}:${ip}`, limit, 900000);
 }

@@ -1,5 +1,6 @@
+import { enqueueRevenueCat, drainRevenueCatOutbox } from "@/lib/revenuecat-outbox";
 import { applyLifetime, applySubscription } from "@/lib/billing";
-import { declareStripePurchase, purchaseToDeclare } from "@/lib/revenuecat";
+import { purchaseToDeclare } from "@/lib/revenuecat";
 import { stripe } from "@/lib/stripe";
 import { updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
@@ -40,14 +41,16 @@ export async function POST(request: Request) {
       data.billingEvents.push(event.id);
       // Le compte ScrollShow est resolu ici, pendant qu'on tient la base : c'est
       // lui, et non le client Stripe, que RevenueCat doit voir comme client.
-      return purchaseToDeclare({
+      const purchase = purchaseToDeclare({
         subscription, checkout,
         userIdFor: customer => data.users.find(u => u.stripeCustomerId === customer)?.id,
       });
+      enqueueRevenueCat(data, purchase);
+      return purchase;
     });
     // Hors verrou, et sans pouvoir faire echouer le webhook : Stripe le
     // rejouerait, ce qui refait le travail deja fait sans reparer RevenueCat.
-    await declareStripePurchase(declare);
+    if (declare) await drainRevenueCatOutbox(1).catch(() => console.error("revenuecat_delivery_deferred"));
     return NextResponse.json({ received: true });
   } catch { return NextResponse.json({ error: "webhook_processing_failed" }, { status: 500 }); }
 }
