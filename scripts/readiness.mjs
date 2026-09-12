@@ -10,7 +10,7 @@ const checks = [
   ['Stripe webhook signature', Boolean(process.env.STRIPE_WEBHOOK_SECRET)],
   ['Cron authentication', Boolean(process.env.CRON_SECRET)],
   ['TikTok OAuth', Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET)],
-  ['Keyword discovery and detailed account metrics', Boolean(process.env.METRICS_API_KEY)],
+  ['Keyword discovery and detailed account metrics', Boolean(process.env.METRICS_API_KEY && process.env.METRICS_API_BASE)],
   ['Recovery email delivery', Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)],
   ['Encrypted backups', Boolean(process.env.BACKUP_ENCRYPTION_KEY && Buffer.from(process.env.BACKUP_ENCRYPTION_KEY, 'base64').length === 32)],
   ['Sales explicitly enabled after acceptance testing', process.env.SALES_ENABLED === '1'],
