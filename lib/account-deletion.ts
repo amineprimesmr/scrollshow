@@ -1,12 +1,12 @@
 import { readStoreSlice, updateStore, updateStoreSlice } from "./store";
 import { queueDeletedMedia } from "./media-cleanup";
 import { revokeAllForUser } from "./oauth";
-import { stripe } from "./stripe";
+import { stripeForResource } from "./stripe";
 import { revokeAccessToken, refreshAccessToken, TikTokApiError } from "./tiktok";
 
 type Providers = { cancelSubscription(id: string): Promise<void>; revokeToken(token: string): Promise<void>; refreshToken?: typeof refreshAccessToken };
 const providers: Providers = {
-  async cancelSubscription(id) { const item = await stripe().subscriptions.retrieve(id); if (item.status !== "canceled") await stripe().subscriptions.cancel(id); },
+  async cancelSubscription(id) { const billing = await stripeForResource("subscriptions", id); const item = await billing.subscriptions.retrieve(id); if (item.status !== "canceled") await billing.subscriptions.cancel(id); },
   revokeToken: revokeAccessToken,
   refreshToken: refreshAccessToken,
 };
