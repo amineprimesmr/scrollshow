@@ -178,6 +178,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const hideHeader =
     onMcp ||
     onCalendar ||
+    pathname.startsWith("/app/analytics") ||
+    pathname.startsWith("/app/business-connections") ||
     pathname.startsWith("/app/home") ||
     pathname.startsWith("/app/discover") ||
     pathname.startsWith("/app/unshadowban") ||
