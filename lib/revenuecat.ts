@@ -115,7 +115,7 @@ export function purchaseToDeclare(input: {
 export async function postStripePurchase(purchase: StripePurchase, timeoutMs = 8000) {
   const key = process.env.REVENUECAT_STRIPE_PUBLIC_KEY?.trim();
   if (!key) throw new RevenueCatError("no_key");
-  if (!/^strp_[A-Za-z0-9_]+$/.test(key)) throw new RevenueCatError("invalid_key");
+  if (!/^strp_[A-Za-z0-9_.-]+$/.test(key)) throw new RevenueCatError("invalid_key");
   let response: Response;
   try {
     response = await fetch(ENDPOINT, {

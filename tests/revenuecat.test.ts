@@ -147,7 +147,7 @@ test("l'appel respecte le contrat d'import RevenueCat", async () => {
     return new Response(JSON.stringify({ subscriber: {} }), { status: 200, headers: { "content-type": "application/json" } });
   }) as unknown as typeof fetch;
   try {
-    await withKey(" \tstrp_public_test\r\n", () => postStripePurchase({ appUserId: "u_1", fetchToken: "sub_1" }));
+    await withKey(" \tstrp_sb_public.test-key\r\n", () => postStripePurchase({ appUserId: "u_1", fetchToken: "sub_1" }));
   } finally {
     globalThis.fetch = original;
   }
@@ -156,7 +156,7 @@ test("l'appel respecte le contrat d'import RevenueCat", async () => {
   assert.equal(seen[0].init.method, "POST");
   const headers = seen[0].init.headers as Record<string, string>;
   assert.equal(headers["X-Platform"], "stripe", "sans cet en-tete RevenueCat ne sait pas que le jeton est un abonnement Stripe");
-  assert.equal(headers.Authorization, "Bearer strp_public_test");
+  assert.equal(headers.Authorization, "Bearer strp_sb_public.test-key");
   assert.deepEqual(JSON.parse(String(seen[0].init.body)), { app_user_id: "u_1", fetch_token: "sub_1" });
 });
 

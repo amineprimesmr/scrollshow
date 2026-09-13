@@ -10,7 +10,7 @@ const keys = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'NEXT_PUBLIC_STRIPE_
 for (const key of keys) if (!env[key]) throw new Error(`Missing ${key}`);
 if (Object.hasOwn(env, 'REVENUECAT_STRIPE_PUBLIC_KEY')) {
   env.REVENUECAT_STRIPE_PUBLIC_KEY = env.REVENUECAT_STRIPE_PUBLIC_KEY.trim();
-  if (!/^strp_[A-Za-z0-9_]+$/.test(env.REVENUECAT_STRIPE_PUBLIC_KEY)) throw new Error('Invalid REVENUECAT_STRIPE_PUBLIC_KEY: use the public strp_ key from the matching RevenueCat Stripe app');
+  if (!/^strp_[A-Za-z0-9_.-]+$/.test(env.REVENUECAT_STRIPE_PUBLIC_KEY)) throw new Error('Invalid REVENUECAT_STRIPE_PUBLIC_KEY: use the public strp_ key from the matching RevenueCat Stripe app');
   keys.push('REVENUECAT_STRIPE_PUBLIC_KEY');
 } else {
   console.warn('RevenueCat key omitted: its existing configuration will be preserved. Include REVENUECAT_STRIPE_PUBLIC_KEY when changing the Stripe account.');
