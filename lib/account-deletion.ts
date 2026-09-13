@@ -2,12 +2,13 @@ import { readStoreSlice, updateStore, updateStoreSlice } from "./store";
 import { queueDeletedMedia } from "./media-cleanup";
 import { revokeAllForUser } from "./oauth";
 import { stripe } from "./stripe";
-import { revokeAccessToken } from "./tiktok";
+import { revokeAccessToken, refreshAccessToken, TikTokApiError } from "./tiktok";
 
-type Providers = { cancelSubscription(id: string): Promise<void>; revokeToken(token: string): Promise<void> };
+type Providers = { cancelSubscription(id: string): Promise<void>; revokeToken(token: string): Promise<void>; refreshToken?: typeof refreshAccessToken };
 const providers: Providers = {
   async cancelSubscription(id) { const item = await stripe().subscriptions.retrieve(id); if (item.status !== "canceled") await stripe().subscriptions.cancel(id); },
   revokeToken: revokeAccessToken,
+  refreshToken: refreshAccessToken,
 };
 
 /** The persisted marker proves the owner requested deletion. Each provider
@@ -33,7 +34,25 @@ export async function processAccountDeletion(userId: string, requestDeletion = f
       await updateStoreSlice([], data => { const owner = data.users.find(u => u.id === userId && u.deletionClaim === claim); if (!owner) throw new Error("deletion_claim_lost"); owner.stripeSubscriptionId = undefined; });
     }
     for (const channel of prepared.channels) if (channel.accessToken) {
-      await external.revokeToken(channel.accessToken);
+      try { await external.revokeToken(channel.accessToken); }
+      catch (error) {
+        if (!(error instanceof TikTokApiError) || error.code !== "invalid_grant" || !channel.refreshToken || !external.refreshToken) throw error;
+        // An expired access token cannot be revoked. Refresh once and checkpoint
+        // rotation before revocation; a rejected refresh proves the grant is dead.
+        let tokens: Awaited<ReturnType<typeof refreshAccessToken>> | undefined;
+        try { tokens = await external.refreshToken(channel.refreshToken); }
+        catch (refreshError) { if (!(refreshError instanceof TikTokApiError) || refreshError.code !== "invalid_grant") throw refreshError; }
+        if (tokens) {
+          const fresh = tokens;
+          await updateStoreSlice(["channels"], data => {
+            const current = data.channels.find(c => c.id === channel.id && c.userId === userId);
+            if (!current || current.accessToken !== channel.accessToken) throw new Error("channel_changed_during_deletion");
+            current.accessToken = fresh.access_token; current.refreshToken = fresh.refresh_token || current.refreshToken; current.expiresAt = fresh.expires_at;
+          });
+          channel.accessToken = fresh.access_token;
+          await external.revokeToken(fresh.access_token);
+        }
+      }
       await updateStoreSlice(["channels"], data => {
         const current = data.channels.find(c => c.id === channel.id && c.userId === userId);
         if (!current) return;
@@ -66,6 +85,12 @@ export async function processAccountDeletion(userId: string, requestDeletion = f
     data.researchJobs = data.researchJobs?.filter(item => item.userId !== userId);
     data.formatStudies = data.formatStudies?.filter(item => item.userId !== userId);
     data.publicationText = data.publicationText?.filter(item => item.userId !== userId);
+    // Historical collections may remain in older snapshots after UI retirement.
+    const legacy = data as unknown as Record<string, unknown>;
+    for (const key of ["automations", "brands", "influencers"]) {
+      const items = legacy[key];
+      if (Array.isArray(items)) legacy[key] = items.filter(item => item?.userId !== userId);
+    }
   });
     return { pending: false };
   } catch {

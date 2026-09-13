@@ -209,7 +209,11 @@ export async function revokeAccessToken(accessToken: string) {
       signal: AbortSignal.timeout(10000),
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.error || (result.data?.error_code && result.data.error_code !== 0)) throw new Error("tiktok_revocation_failed");
+    const error = result.error;
+    const code = typeof error === "string" ? error : error?.code;
+    if (!response.ok || (code && code !== "ok") || (result.data?.error_code && result.data.error_code !== 0)) {
+      throw new TikTokApiError(code || "revocation_failed", "TikTok revocation failed");
+    }
   }
 }
 
