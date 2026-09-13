@@ -17,7 +17,9 @@ const checks = [
 ];
 for (const [label, ok] of checks) console.log(`${ok ? 'CONFIGURED' : 'MISSING'}  ${label}`);
 console.log(`${process.env.TIKTOK_PUBLISH_ENABLED === '1' ? 'ENABLED' : 'PENDING APPROVAL'}  TikTok publication (explicit activation required)`);
-console.log(`${process.env.REVENUECAT_STRIPE_PUBLIC_KEY ? 'CONFIGURED' : 'OPTIONAL / DISABLED'}  RevenueCat receipt delivery`);
+const revenueCatKey = process.env.REVENUECAT_STRIPE_PUBLIC_KEY?.trim();
+const revenueCatValid = !revenueCatKey || /^strp_[A-Za-z0-9_]+$/.test(revenueCatKey);
+console.log(`${!revenueCatKey ? 'OPTIONAL / DISABLED' : revenueCatValid ? 'CONFIGURED' : 'INVALID KEY (expected strp_)'}  RevenueCat receipt delivery`);
 if (!process.env.CONSUMER_MEDIATOR_NAME) console.log('LEGAL WARNING: consumer mediation deferred by owner; not a certification of compliance.');
 console.log('Presence checks only. Verify migrations, price amounts, provider approvals, webhooks, backup restore and real end-to-end publication in staging.');
-process.exitCode = checks.every(([,ok])=>ok) ? 0 : 1;
+process.exitCode = checks.every(([,ok])=>ok) && revenueCatValid ? 0 : 1;

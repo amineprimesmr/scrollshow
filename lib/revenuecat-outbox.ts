@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { StoreData } from "./types";
 import { readStoreSlice, updateStoreSlice } from "./store";
-import { postStripePurchase, revenueCatEnabled, type StripePurchase } from "./revenuecat";
+import { postStripePurchase, RevenueCatError, revenueCatEnabled, revenueCatErrorDetails, type StripePurchase } from "./revenuecat";
 
 export type RevenueCatDelivery = StripePurchase & { id: string; revision: string; attempts: number; nextAttemptAt: number; claim?: string; leaseUntil?: number; lastError?: string };
 export function enqueueRevenueCat(data: StoreData, purchase?: StripePurchase | null) {
@@ -13,7 +13,10 @@ export function enqueueRevenueCat(data: StoreData, purchase?: StripePurchase | n
   if (index < 0) queue.push(item); else queue[index] = item;
 }
 export async function drainRevenueCatOutbox(limit = 10) {
-  if (!revenueCatEnabled()) return { skipped: true, delivered: 0, failed: 0 };
+  if (!revenueCatEnabled()) {
+    console.error("revenuecat_delivery_disabled", revenueCatErrorDetails(new RevenueCatError("no_key")));
+    return { skipped: true, delivered: 0, failed: 0 };
+  }
   const now = Date.now();
   const candidates = (await readStoreSlice(["revenueCatOutbox"])).revenueCatOutbox?.filter(item => item.nextAttemptAt <= now).slice(0, limit) || [];
   let delivered = 0, failed = 0;
@@ -28,7 +31,11 @@ export async function drainRevenueCatOutbox(limit = 10) {
     if (!item) continue;
     let errorCode = "";
     try { await postStripePurchase(item); delivered++; }
-    catch (error) { errorCode = (error as { code?: string }).code || "unavailable"; failed++; }
+    catch (error) {
+      const details = revenueCatErrorDetails(error, "unavailable");
+      errorCode = details.code; failed++;
+      console.error("revenuecat_delivery_failed", details);
+    }
     await updateStoreSlice(["revenueCatOutbox"], data => {
       const entry = data.revenueCatOutbox?.find(e => e.id === item.id && e.revision === item.revision && e.claim === claim);
       if (!entry) return;

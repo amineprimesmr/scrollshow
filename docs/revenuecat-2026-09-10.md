@@ -1,5 +1,8 @@
 # ScrollShow : compte Stripe dédié + RevenueCat — 10 septembre 2026
 
+> État historique. Pour le diagnostic et la réparation du 13 septembre, ainsi
+> que le comportement actuel des scripts, voir [revenuecat-2026-09-13.md](revenuecat-2026-09-13.md).
+
 ## Décision
 
 ScrollShow facture depuis **son propre compte Stripe**, `Scrollshow`

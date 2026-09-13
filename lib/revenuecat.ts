@@ -18,18 +18,43 @@
 
 const ENDPOINT = "https://api.revenuecat.com/v1/receipts";
 
-export type RevenueCatErrorCode = "no_key" | "unauthorized" | "rejected" | "http" | "timeout";
+export type RevenueCatErrorCode = "no_key" | "invalid_key" | "unauthorized" | "rejected" | "http" | "timeout";
+
+const ERROR_MESSAGES: Record<RevenueCatErrorCode, string> = {
+  no_key: "REVENUECAT_STRIPE_PUBLIC_KEY manquante : renseigner la cle publique strp_ de l'app Stripe RevenueCat.",
+  invalid_key: "REVENUECAT_STRIPE_PUBLIC_KEY invalide : utiliser la cle publique strp_ de l'app Stripe RevenueCat, pas une cle Stripe ou une cle secrete RevenueCat v2.",
+  unauthorized: "RevenueCat a refuse la cle de l'app Stripe. Verifier la cle et le projet RevenueCat.",
+  rejected: "RevenueCat a refuse l'achat. Verifier le compte Stripe lie a l'app et l'environnement du paiement.",
+  http: "Le service RevenueCat a renvoye une erreur HTTP. La declaration sera retentee.",
+  timeout: "La requete RevenueCat a echoue ou depasse son delai. La declaration sera retentee.",
+};
 
 export class RevenueCatError extends Error {
   code: RevenueCatErrorCode;
-  constructor(code: RevenueCatErrorCode, message?: string) {
-    super(message || code);
+  status?: number;
+  constructor(code: RevenueCatErrorCode, message?: string, status?: number) {
+    super(message || ERROR_MESSAGES[code]);
     this.code = code;
+    this.status = status;
   }
 }
 
+/** Les messages fournisseur peuvent contenir le recu, le client ou une cle.
+ * Les journaux utilisent uniquement ces diagnostics controles, jamais error.message. */
+export function revenueCatErrorDetails(error: unknown, fallback: "unknown" | "unavailable" = "unknown") {
+  if (!(error instanceof RevenueCatError) || !Object.hasOwn(ERROR_MESSAGES, error.code)) {
+    return { code: fallback, message: "La declaration RevenueCat a echoue. Verifier la configuration et la disponibilite du service." };
+  }
+  const status = error.status;
+  return {
+    code: error.code,
+    message: ERROR_MESSAGES[error.code],
+    ...(typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {}),
+  };
+}
+
 export function revenueCatEnabled() {
-  return Boolean(process.env.REVENUECAT_STRIPE_PUBLIC_KEY);
+  return Boolean(process.env.REVENUECAT_STRIPE_PUBLIC_KEY?.trim());
 }
 
 /** Un achat tel que RevenueCat l'attend : le compte a qui il appartient, et le
@@ -88,8 +113,9 @@ export function purchaseToDeclare(input: {
 
 /** Envoie l'achat a RevenueCat. Leve : l'appelant decide si l'echec est grave. */
 export async function postStripePurchase(purchase: StripePurchase, timeoutMs = 8000) {
-  const key = process.env.REVENUECAT_STRIPE_PUBLIC_KEY;
+  const key = process.env.REVENUECAT_STRIPE_PUBLIC_KEY?.trim();
   if (!key) throw new RevenueCatError("no_key");
+  if (!/^strp_[A-Za-z0-9_]+$/.test(key)) throw new RevenueCatError("invalid_key");
   let response: Response;
   try {
     response = await fetch(ENDPOINT, {
@@ -99,14 +125,14 @@ export async function postStripePurchase(purchase: StripePurchase, timeoutMs = 8
       cache: "no-store",
       signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch (error) {
-    throw new RevenueCatError("timeout", error instanceof Error ? error.message : "fetch failed");
+  } catch {
+    throw new RevenueCatError("timeout");
   }
-  if (response.status === 401 || response.status === 403) throw new RevenueCatError("unauthorized", "RevenueCat a refuse la cle de l'app Stripe");
+  if (response.status === 401 || response.status === 403) throw new RevenueCatError("unauthorized", undefined, response.status);
   if (response.status === 400 || response.status === 404) {
-    throw new RevenueCatError("rejected", `RevenueCat a refuse l'achat (${response.status}) ${(await response.text().catch(() => "")).slice(0, 200)}`);
+    throw new RevenueCatError("rejected", undefined, response.status);
   }
-  if (!response.ok) throw new RevenueCatError("http", `revenuecat ${response.status}`);
+  if (!response.ok) throw new RevenueCatError("http", undefined, response.status);
   return response.json().catch(() => ({}) as unknown);
 }
 
@@ -117,17 +143,12 @@ export async function postStripePurchase(purchase: StripePurchase, timeoutMs = 8
  * vit dans Stripe : RevenueCat n'en est qu'un miroir, il ne doit jamais
  * bloquer un encaissement. La trace serveur est le rattrapage. */
 export async function declareStripePurchase(purchase: StripePurchase | null | undefined) {
-  if (!purchase || !revenueCatEnabled()) return false;
+  if (!purchase) return false;
   try {
     await postStripePurchase(purchase);
     return true;
   } catch (error) {
-    console.error("revenuecat_declare_failed", {
-      appUserId: purchase.appUserId,
-      fetchToken: purchase.fetchToken,
-      code: error instanceof RevenueCatError ? error.code : "unknown",
-      message: error instanceof Error ? error.message : String(error),
-    });
+    console.error("revenuecat_declare_failed", revenueCatErrorDetails(error));
     return false;
   }
 }
