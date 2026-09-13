@@ -1,6 +1,3 @@
-import { redirect } from "next/navigation";
+import { BusinessResultsView } from "@/components/studio/BusinessResultsView";
 
-// Analytics now live in the Overview account panel.
-export default function Page() {
-  redirect("/app/home");
-}
+export default function Page() { return <BusinessResultsView />; }

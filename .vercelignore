@@ -18,3 +18,5 @@ mcp.json
 
 .next-verify/
 .next-local/
+.next-business-dev/
+.next-business-debug/

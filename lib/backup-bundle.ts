@@ -4,13 +4,15 @@ import { restoreBackupMedia, type BackupMedia } from "./backup-media";
 import { emptyStore } from "./store";
 import { liveMediaNames } from "./media-cleanup";
 import type { StoreData } from "./types";
+import { validateBusinessBackupManifest, type BusinessBackupManifest } from "./business-backup";
 const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
-export type BackupManifest = { format: 2; createdAt: string; snapshot: StoreData; parts: Array<{ path: string; sha256: string; files: number }>; files: number };
+export type BackupManifest = { format: 2; createdAt: string; snapshot: StoreData; parts: Array<{ path: string; sha256: string; files: number }>; files: number; business?: BusinessBackupManifest };
 type BlobStorage = { write(path: string, bytes: Buffer): Promise<void>; read(path: string): Promise<Buffer | null> };
 
 export async function writeBackupBundle(snapshot: StoreData, key: string, prefix: string, storage: BlobStorage,
-  readMedia: (name: string) => Promise<{ bytes: Buffer; contentType: string } | null>, maxPartBytes = 24 * 1024 * 1024) {
-  const manifest: BackupManifest = { format: 2, createdAt: new Date().toISOString(), snapshot, parts: [], files: 0 };
+  readMedia: (name: string) => Promise<{ bytes: Buffer; contentType: string } | null>, maxPartBytes = 24 * 1024 * 1024, business?: BusinessBackupManifest) {
+  const manifest: BackupManifest = { format: 2, createdAt: new Date().toISOString(), snapshot, parts: [], files: 0, ...(business ? { business } : {}) };
+  if (business) validateBusinessBackupManifest(business);
   let batch: BackupMedia[] = [], size = 0, totalBytes = 0;
   const verifiedWrite = async (name: string, bytes: Buffer) => {
     await storage.write(name, bytes);
@@ -37,13 +39,14 @@ export async function writeBackupBundle(snapshot: StoreData, key: string, prefix
   // Commit point: no manifest exists until every encrypted part is verified.
   const manifestPath = `${prefix}/manifest.enc`;
   await verifiedWrite(manifestPath, encryptBackupPart(manifest, key));
-  return { manifestPath, parts: manifest.parts.length, mediaFiles: manifest.files, bytes: totalBytes };
+  return { manifestPath, parts: manifest.parts.length, mediaFiles: manifest.files, bytes: totalBytes, businessRows: business?.rows ?? 0, businessParts: business?.parts.length ?? 0, businessCovered: Boolean(business) };
 }
 
 export function readBackupManifest(bytes: Buffer, key: string): BackupManifest {
   const manifest = decryptBackupPart(bytes, key) as BackupManifest;
   if (manifest?.format !== 2 || !Array.isArray(manifest.parts) || !Number.isInteger(manifest.files) || manifest.files < 0) throw new Error("invalid_backup_manifest");
   validateSnapshot(manifest.snapshot);
+  if (manifest.business) validateBusinessBackupManifest(manifest.business);
   return manifest;
 }
 
