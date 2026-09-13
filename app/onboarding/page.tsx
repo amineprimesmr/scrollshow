@@ -5,6 +5,7 @@ import { HeroSkill } from "@/components/HeroSkill";
 import { AuthNav } from "@/components/AuthNav";
 import { OnboardingPayment } from "@/components/OnboardingPayment";
 import { hasStudioAccess } from "@/lib/plans";
+import { businessTikTokAccounts } from "@/lib/business-tiktok";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import { BUSINESS_KINDS } from "@/lib/business-kinds";
 import { prefersEnglish } from "@/lib/i18n";
@@ -136,6 +137,10 @@ function OnboardingInner() {
   const [manual, setManual] = useState(false);
   const [tiktokInput, setTiktokInput] = useState("");
   const [tiktokBusy, setTiktokBusy] = useState(false);
+  const [showTikTokInput, setShowTikTokInput] = useState(false);
+  const tiktokInputRef = useRef<HTMLInputElement>(null);
+  const tiktokAccounts = businessTikTokAccounts(business);
+  const tiktokInputVisible = !tiktokAccounts.length || showTikTokInput;
   const [revealed, setRevealed] = useState(false);
 
   // Step 2
@@ -283,25 +288,20 @@ function OnboardingInner() {
   }
 
   async function addTikTok() {
-    if (!business || !tiktokInput.trim()) return;
+    if (!business || !tiktokInput.trim() || tiktokBusy) return;
     setTiktokBusy(true);
     try {
-      const json = await post({ action: "tiktok", handle: tiktokInput, ...(projectMode ? { project: projectParam } : {}) });
+      const json = await post({ action: "tiktok", handle: tiktokInput, ...projectRef() });
       if (!json.tiktok) {
         setError(t("Compte TikTok introuvable.", "TikTok account not found."));
         return;
       }
-      const handle = json.tiktok.handle as string;
-      setBusiness({
-        ...business,
-        tiktok: json.tiktok,
-        socials: [
-          ...business.socials.filter((item) => item.platform !== "tiktok"),
-          { platform: "tiktok", url: `https://www.tiktok.com/@${handle}`, handle },
-        ],
-      });
+      setBusiness(json.business);
+      setShowTikTokInput(false);
       setTiktokInput("");
       setError("");
+    } catch {
+      setError(t("Impossible de lire ce compte. Vérifie le @ puis réessaie.", "Could not read this account. Check the @ and try again."));
     } finally {
       setTiktokBusy(false);
     }
@@ -356,7 +356,7 @@ function OnboardingInner() {
       ? [t("Nouveau projet", "New project"), t("Colle le lien de ce business. On remplit le reste pour toi.", "Paste this business link. We fill in the rest for you.")]
       : [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
     1: [t("On a rempli ce qu’on a trouvé", "We filled in what we found"), t("Vérifie, corrige si besoin. C’est tout ce qu’on te demande.", "Check it, fix anything that is off. That is all we ask.")],
-    2: [t("Ton compte TikTok", "Your TikTok account"), t("On lit tes stats publiques pour caler le ton et le rythme. Facultatif.", "We read your public stats to set the tone and rhythm. Optional.")],
+    2: [tiktokAccounts.length > 1 ? t("Tes comptes TikTok", "Your TikTok accounts") : t("Ton compte TikTok", "Your TikTok account"), t("On lit tes stats publiques pour caler le ton et le rythme. Facultatif.", "We read your public stats to set the tone and rhythm. Optional.")],
     3: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
     4: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
     5: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
@@ -532,47 +532,55 @@ function OnboardingInner() {
             <div className="ss-onb-form">
               <div className="ss-onb-tt__head">
                 <img src="/assets/platforms/tiktok.png" alt="" width="44" height="44" />
+                <button type="button" className="ss-onb-tt__add lg lg-press"
+                  aria-label={t("Ajouter un compte TikTok", "Add a TikTok account")}
+                  title={t("Ajouter un compte TikTok", "Add a TikTok account")}
+                  aria-controls="ss-onb-tiktok-add" aria-expanded={tiktokInputVisible}
+                  disabled={tiktokBusy || busy || !business}
+                  onClick={() => { setShowTikTokInput(true); requestAnimationFrame(() => tiktokInputRef.current?.focus()); }}>
+                  <span aria-hidden="true">+</span>
+                </button>
               </div>
 
-              {business?.tiktok ? (
-                <div className="ss-onb-tt">
+              {tiktokAccounts.map(account => (
+                <div className="ss-onb-tt" key={account.handle.toLowerCase()}>
                   <div className="ss-onb-tt__who">
-                    {business.tiktok.avatar ? <img src={business.tiktok.avatar} alt="" /> : null}
+                    {account.avatar ? <img src={account.avatar} alt="" /> : null}
                     <div>
-                      <b>{business.tiktok.nickname || `@${business.tiktok.handle}`}</b>
-                      <span>@{business.tiktok.handle}</span>
+                      <b>{account.nickname || `@${account.handle}`}</b>
+                      <span>@{account.handle}</span>
                     </div>
                   </div>
                   <div className="ss-onb-stats">
-                    <Stat label={t("abonnés", "followers")} value={business.tiktok.followers} active={revealed} />
-                    <Stat label={t("likes", "likes")} value={business.tiktok.likes} active={revealed} />
-                    <Stat label={t("posts", "posts")} value={business.tiktok.videos} active={revealed} />
-                    {business.tiktok.avgViews ? <Stat label={t("vues / post", "views / post")} value={business.tiktok.avgViews} active={revealed} /> : null}
+                    <Stat label={t("abonnés", "followers")} value={account.followers} active={revealed} />
+                    <Stat label={t("likes", "likes")} value={account.likes} active={revealed} />
+                    <Stat label={t("posts", "posts")} value={account.videos} active={revealed} />
+                    {account.avgViews ? <Stat label={t("vues / post", "views / post")} value={account.avgViews} active={revealed} /> : null}
                   </div>
-                  {business.tiktok.source === "api" ? (
+                  {account.source === "api" ? (
                     <p className="ss-onb-tt__note">
-                      {business.tiktok.photoShare >= 50
-                        ? t(`${business.tiktok.photoShare} % de tes derniers posts sont déjà des carrousels. On va les faire décoller.`, `${business.tiktok.photoShare}% of your recent posts are already carousels. We will make them fly.`)
-                        : t(`Seulement ${business.tiktok.photoShare} % de carrousels dans tes derniers posts. C’est là que ScrollShow change tout.`, `Only ${business.tiktok.photoShare}% carousels in your recent posts. That is where ScrollShow changes everything.`)}
+                      {account.photoShare >= 50
+                        ? t(`${account.photoShare} % de tes derniers posts sont déjà des carrousels. On va les faire décoller.`, `${account.photoShare}% of your recent posts are already carousels. We will make them fly.`)
+                        : t(`Seulement ${account.photoShare} % de carrousels dans tes derniers posts. C’est là que ScrollShow change tout.`, `Only ${account.photoShare}% carousels in your recent posts. That is where ScrollShow changes everything.`)}
                     </p>
                   ) : null}
                 </div>
-              ) : (
-                <div className="ss-onb-tt ss-onb-tt--empty">
+              ))}
+              {tiktokInputVisible ? (
+                <div id="ss-onb-tiktok-add" className="ss-onb-tt ss-onb-tt--empty">
                   <span>{t("Renseigne ton @ pour qu’on lise tes stats. Tu pourras le faire plus tard.", "Enter your @ so we can read your stats. You can also do this later.")}</span>
                   <div className="ss-onb-url">
-                    <input value={tiktokInput} onChange={(e) => setTiktokInput(e.target.value)} placeholder="@handle" onKeyDown={(e) => (e.key === "Enter" ? void addTikTok() : null)} />
+                    <input ref={tiktokInputRef} aria-label={t("Identifiant TikTok", "TikTok username")} autoFocus={showTikTokInput} disabled={tiktokBusy} value={tiktokInput} onChange={(e) => setTiktokInput(e.target.value)} placeholder="@handle" onKeyDown={(e) => (e.key === "Enter" ? void addTikTok() : null)} />
                     <button type="button" className="ss-onb-cta ss-onb-cta--inline ss-onb-cta--ghost" disabled={tiktokBusy || !tiktokInput.trim() || !business} onClick={() => void addTikTok()}>
                       {tiktokBusy ? <span className="ss-onb-spin" /> : t("Ajouter", "Add")}
                     </button>
                   </div>
                 </div>
-              )}
-
+              ) : null}
 
               {error ? <p className="ss-onb-error">{error}</p> : null}
 
-              <button type="button" className="ss-onb-cta" disabled={busy} onClick={() => (projectMode ? void finish() : go(3))}>
+              <button type="button" className="ss-onb-cta" disabled={busy || tiktokBusy} onClick={() => (projectMode ? void finish() : go(3))}>
                 {busy ? <span className="ss-onb-spin" /> : projectMode
                   ? t("Ouvrir le projet", "Open the project")
                   : business?.tiktok ? t("Continuer", "Continue") : t("Passer cette étape", "Skip this step")}

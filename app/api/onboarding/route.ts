@@ -1,4 +1,5 @@
 import { validateMediaInput } from "@/lib/media-permissions";
+import { withBusinessTikTok } from "@/lib/business-tiktok";
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { analyzeBusiness, AnalyzeError, enrichTikTok } from "@/lib/business-analyzer";
 import { savePublicImage } from "@/lib/media-files";
@@ -16,6 +17,11 @@ export const maxDuration = 60;
 const analyzeSchema = z.object({ action: z.literal("analyze"), url: z.string().trim().min(2).max(300) });
 
 const tiktokSchema = z.object({ project: z.string().optional(), action: z.literal("tiktok"), handle: z.string().trim().min(2).max(80) });
+const tiktokProfileSchema = z.object({
+  handle: z.string(), nickname: z.string(), avatar: z.string(),
+  followers: z.number(), likes: z.number(), videos: z.number(),
+  avgViews: z.number(), photoShare: z.number(), source: z.enum(["tiktok", "api"]),
+});
 
 const projectRef = z.string().trim().min(1).max(120).optional();
 
@@ -50,22 +56,10 @@ const businessSchema = z.object({
           handle: z.string().max(60),
         }),
       )
-      .max(8),
+      .max(100),
     signals: z.array(z.string().max(30)).max(10),
-    tiktok: z
-      .object({
-        handle: z.string(),
-        nickname: z.string(),
-        avatar: z.string(),
-        followers: z.number(),
-        likes: z.number(),
-        videos: z.number(),
-        avgViews: z.number(),
-        photoShare: z.number(),
-        source: z.enum(["tiktok", "api"]),
-      })
-      .nullable()
-      .optional(),
+    tiktok: tiktokProfileSchema.nullable().optional(),
+    tiktokAccounts: z.array(tiktokProfileSchema).optional(),
     goal: z.enum(["sell", "installs", "awareness", "traffic", "monetize", "leads"]).optional(),
     cadence: z.enum(["daily", "3w", "weekly", "unsure"]).optional(),
     analyzedAt: z.string(),
@@ -166,15 +160,17 @@ export async function POST(request: Request) {
 
 
   if (body.action === "tiktok") {
-    const tiktok = await enrichTikTok(body.handle);
-    await updateStore(data => {
+    const tiktok = await enrichTikTok(body.handle).catch(() => null);
+    if (!tiktok) return NextResponse.json({ error: "tiktok_profile_unavailable" }, { status: 422 });
+    const business = await updateStore(data => {
       const project = targetProject(data, session.id, body.project, projectCookie);
       if (!project?.business) throw new Error("project_business_required");
-      project.business.tiktok = tiktok;
+      project.business = withBusinessTikTok(project.business, tiktok);
       const user = data.users.find(item => item.id === session.id);
-      if (!projectMode && user?.business) user.business.tiktok = tiktok;
+      if (!projectMode && user?.business) user.business = withBusinessTikTok(user.business, tiktok);
+      return project.business;
     });
-    return NextResponse.json({ tiktok });
+    return NextResponse.json({ tiktok, business });
   }
 
   if (body.action === "profile") {

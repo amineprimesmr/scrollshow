@@ -49,6 +49,8 @@ export type BusinessProfile = {
     photoShare: number; // % of recent posts that are photo carousels
     source: "tiktok" | "api";
   } | null;
+  /** Public profiles supplied during onboarding; tiktok keeps the primary profile. */
+  tiktokAccounts?: NonNullable<BusinessProfile["tiktok"]>[];
   goal?: "sell" | "installs" | "awareness" | "traffic" | "monetize" | "leads";
   cadence?: "daily" | "3w" | "weekly" | "unsure";
   analyzedAt: string;
