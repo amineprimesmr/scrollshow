@@ -5,15 +5,15 @@ Les revenus du **business de chaque projet** sont distincts du paiement de l'abo
 ## Fonctionnalités livrées
 
 - `/app/analytics` : encaissements, taxes connues, remboursements, ventes, revenu attribué par publication à horizon identique, couverture, coûts, contribution, funnel, formats/accroches/CTA, expériences observationnelles et simulateur.
-- `/app/business-connections` : connexions chiffrées Stripe, RevenueCat, Lemon Squeezy et Paddle, synchronisation bornée, historique repris par curseur et webhooks authentifiés.
+- `/app/business-connections` : catalogue Stripe, RevenueCat et Shopify, secrets chiffrés, synchronisation bornée, historique repris par curseur et webhooks authentifiés. Les anciennes connexions Lemon Squeezy/Paddle et leur historique restent conservés ; elles ne sont plus proposées à la création.
 - Publications préparées avant leur diffusion, liens dédiés `/go/[slug]`, bio publique facultative `/b/[slug]`, métadonnées créatives et coûts par contenu réutilisable ou publication.
 - Signaux manuels séparés des événements serveur et des paiements confirmés. Import CSV avec aperçu, identifiants stables et remboursements. Exports distincts transactions/publications/ajustements, rapport Markdown et outils MCP.
 
 ## Démarrer un projet
 
 1. Dans **Réglages**, enregistrer le site HTTPS et la devise de lecture.
-2. Connecter le compte commercial du projet avec les droits de lecture minimum décrits dans l'interface. Vérifier son identité et choisir production ou test. Les ventes test restent hors des résultats réels.
-3. Cliquer **Synchroniser**. L'historique est limité et reprend lors des prochains appels ; son état reste partiel tant que la collecte n'est pas terminée. Configurer le webhook indiqué pour les nouveaux événements et leurs corrections.
+2. Connecter le compte commercial du projet : une clé Stripe, une clé secrète V2 RevenueCat, ou le domaine permanent de la boutique Shopify pour autoriser l'application. Le nom et les identifiants disponibles sont lus chez le prestataire. Stripe déduit test/production de la clé vérifiée ; RevenueCat utilise production par défaut, car sa clé ne distingue pas ces deux environnements. Les ventes test restent hors des résultats réels.
+3. Un premier lot est importé automatiquement. L'historique reprend ensuite lors des synchronisations suivantes ; son état reste partiel tant que la collecte n'est pas terminée. **Synchroniser** permet de le relancer. Les réglages manuels de webhooks Stripe/RevenueCat sont dans **Avancé** ; Shopify utilise les webhooks gérés par l'application.
 4. Préparer un contenu puis créer son lien avant la publication. Un lien de campagne commun ne prouve pas quel post a été vu ; une tuile bio mesure le lien sélectionné.
 5. Installer la transmission du clic vers le serveur du site, puis vers le client du prestataire de paiement. Envoyer un événement `visit` ou `signup` de test contrôlé pour vérifier cette transmission. Aucun paiement réel n'est nécessaire pour vérifier la collecte d'événements.
 6. Après publication, enregistrer sa date réelle, ou laisser l'historique du compte social connecté l'enregistrer. Ajouter les coûts connus. Attendre la maturité choisie pour comparer des durées égales.
@@ -68,7 +68,19 @@ La contribution n'est calculée que si les taxes, frais et coûts nécessaires s
 
 Le suivi commencé après la diffusion ne reconstitue pas la période antérieure. Un changement d'origine du site réinitialise sa vérification. Une connexion de paiement ne garantit pas que le suivi du site fonctionne. Les données historiques sont récupérables seulement dans les limites effectives de la source ; l'origine d'un paiement ancien reste inconnue sans preuve existante.
 
-Les quatre connecteurs utilisent actuellement des clés serveur. L'OAuth public nécessite l'enregistrement et, selon le prestataire, la revue de l'application ; aucun bouton ne simule une autorisation inexistante. RevenueCat exige un projet et des droits permettant les lectures nécessaires. Paddle exige un compte identifiable à partir d'une transaction retournée par son API. Shopify, Gumroad, l'attribution mobile spécialisée et les expériences réellement randomisées nécessitent des intégrations/protocoles supplémentaires et ne sont pas annoncés comme actifs.
+Stripe nécessite les lectures du compte, des paiements, remboursements et factures ; aucune permission d'écriture n'est demandée. RevenueCat nécessite Apps et Customers en lecture. La lecture Projects permet l'autodétection ; si plusieurs projets sont accessibles, l'utilisateur sélectionne le sien. Sans cette permission facultative, il peut coller l'URL du projet ou son identifiant. Les applications du projet sont chargées automatiquement : aucune liste d'app IDs n'est à saisir.
+
+Shopify utilise OAuth et `read_orders`, avec un historique borné aux commandes accessibles des 60 derniers jours. Les paiements manuels non vérifiables, informations de taxes/frais absentes et montants incomplets restent signalés. L'accès public dépend de la configuration, des permissions et de la validation Shopify : la présence du code ne vaut pas approbation par Shopify. Les exigences de revue, de protection des données et les accords applicables doivent être établis avant toute attestation correspondante.
+
+Shopify et une source Stripe ne peuvent pas contribuer simultanément aux totaux du même projet/environnement sans réconciliation. Dans **Avancé**, **Exclure des totaux** garde l'historique mais le retire des indicateurs ; cette action permet de choisir explicitement la source à utiliser. Une simple déconnexion efface ses secrets, tout en conservant son historique compté. Le même principe protège contre des achats Stripe déjà repris dans RevenueCat.
+
+Les anciennes connexions Lemon Squeezy/Paddle continuent d'avoir leurs lecteurs et leurs réglages de webhook. Gumroad, l'attribution mobile spécialisée et les expériences réellement randomisées ne sont pas implémentés.
+
+## Demandes de données Shopify
+
+Les demandes `customers/data_request` sont persistées par projet et accessibles dans **Avancé** de la connexion Shopify concernée. Le propriétaire peut télécharger un JSON des transactions, ajustements et parcours effectivement reliés au client. Ni les clés de connexion, ni les données d'autres projets ne sont exportées. Les emails et téléphones du webhook ne sont pas conservés. Un export trop volumineux échoue explicitement, sans présenter un fichier tronqué comme complet.
+
+`customers/redact` supprime les enregistrements associés et pose des barrières hachées contre le réimport des clients, commandes et visites effacés. `shop/redact` efface les données Shopify de la boutique et ses identifiants de connexion, en conservant les autres sources. Une notification d'ancienne installation ne doit pas supprimer une installation autorisée plus récemment. Ces traitements sont transactionnels ; une erreur n'est pas annoncée comme une suppression réussie. Les identifiants techniques hachés nécessaires à la non-résurrection sont conservés. Aucune durée globale de rétention ni aucun accord contractuel supplémentaire n'est attesté par cette implémentation.
 
 ## CSV
 
@@ -82,6 +94,7 @@ Une `publication_id` importée est une déclaration manuelle ; elle n'entre pas 
 
 - `BUSINESS_ANALYTICS_ENCRYPTION_KEY` : 32 octets aléatoires encodés en base64. AES-256-GCM lie chaque secret à son propriétaire, projet, connexion et usage. Ne pas remplacer cette clé sans migration des secrets déjà enregistrés.
 - `DATABASE_URL` : Postgres pour l'exécution. `DATABASE_URL_UNPOOLED` ou URL directe pour les migrations. Aucun repli fichier n'est autorisé en production.
+- `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` : application Shopify enregistrée. La connexion est disponible seulement quand l'application est configurée ; sa distribution/validation et les droits sur les données restent des prérequis externes. Aucun changement du schéma n'est nécessaire pour les trois fournisseurs et les registres internes de confidentialité.
 - Examiner `drizzle/business/`, tester sur une branche Neon, puis `npm run business:migrate -- --apply`. En production ajouter `--production` avec `VERCEL_ENV=production`. La migration est additive et journalisée.
 - `/api/cron/analytics` réconcilie un nombre borné de connexions à chaque passage, protégé par le secret d'exploitation existant.
 - Les nouvelles tables ne modifient pas le JSON du système de facturation de ScrollShow. La suppression du compte efface les données business. Une déconnexion supprime les secrets locaux tout en conservant le registre historique.

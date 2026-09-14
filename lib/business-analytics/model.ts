@@ -50,6 +50,9 @@ export type BusinessClick = OwnedEntity & {
 export type BusinessIdentity = OwnedEntity & {
   provider: string; externalId: string; customerId: string; visitorId?: string; externalAccountId?: string; environment?: BusinessEnvironment;
   firstSeenAt: string; clickId?: string; acquisitionAt?: string; acquisitionKnown?: boolean;
+  /** Internal privacy records never participate in customer attribution. */
+  privacy?: { kind: "data_request"; shopId: string; shopDomain: string; orderIds: string[]; status: "pending" | "exported"; exportedAt?: string } |
+    { kind: "customer_redaction" | "order_redaction" | "shop_redaction" | "visitor_redaction" | "request_redaction"; shopHash?: string };
 };
 export type BusinessEvent = OwnedEntity & {
   externalId?: string; kind: "visit" | "signup" | "activation" | "lead" | "trial" | "survey";

@@ -6,6 +6,7 @@ out
 .env.local
 .data
 .vercel
+.shopify/
 *.log
 .DS_Store
 *.tsbuildinfo

@@ -22,7 +22,7 @@ async function main() {
   const secret = randomBytes(32).toString("hex");
   const port = process.env.BUSINESS_SMOKE_PORT || "3110"; const base = `http://localhost:${port}`;
   const built = process.env.BUSINESS_SMOKE_BUILT === "1";
-  const env: NodeJS.ProcessEnv = { ...process.env, AUTH_SECRET: secret, NEXT_PUBLIC_SITE_URL: base, SCROLLSHOW_BUILD_DIR: built ? ".next-verify" : ".next-business-dev", NODE_ENV: built ? "production" : "development" };
+  const env: NodeJS.ProcessEnv = { ...process.env, AUTH_SECRET: secret, NEXT_PUBLIC_SITE_URL: base, SHOPIFY_CLIENT_ID: "isolated-qa-client", SHOPIFY_CLIENT_SECRET: "isolated-qa-secret-no-provider-access", SHOPIFY_PUBLIC_APPROVED: "0", SCROLLSHOW_BUILD_DIR: built ? ".next-verify" : ".next-business-dev", NODE_ENV: built ? "production" : "development" };
   const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", built ? "start" : "dev", "--hostname", "127.0.0.1", "--port", port], { env, stdio: ["ignore", "pipe", "pipe"] });
   let logs = ""; child.stdout.on("data", d => { logs = (logs + d).slice(-15000); }); child.stderr.on("data", d => { logs = (logs + d).slice(-15000); });
   let checks = 0;
@@ -38,6 +38,22 @@ async function main() {
       const result = await response.json(); return { response, result };
     }
     check((await fetch(base + "/api/business/dashboard")).status === 401, "anonymous business dashboard denied");
+    const capabilities = (await request("/api/business/connections")).result.capabilities;
+    check(capabilities.map((item: { provider: string }) => item.provider).join(",") === "stripe,revenuecat,shopify", "only the three requested providers are offered");
+    check(capabilities.find((item: { provider: string }) => item.provider === "shopify").reviewStatus === "pending", "configured Shopify credentials do not imply public approval");
+    for (const provider of ["lemonsqueezy", "paddle"]) check((await request("/api/business/connections", { provider, apiKey: "fixture-no-provider-call" })).response.status === 400, `${provider} cannot create a new connection`);
+    const shopifyAuthorization = await fetch(base + "/api/business/connectors/shopify/authorize?shop=scrollshow-integration-qa.myshopify.com", { headers, redirect: "manual" });
+    const shopifyTarget = new URL(shopifyAuthorization.headers.get("location") || base);
+    check(shopifyAuthorization.status === 307 && shopifyTarget.hostname === "scrollshow-integration-qa.myshopify.com" && shopifyTarget.searchParams.get("scope") === "read_orders" && shopifyTarget.searchParams.get("state")?.length === 43 && shopifyAuthorization.headers.get("set-cookie")?.includes("HttpOnly"), "Shopify authorization uses a scoped nonce and read-only permissions");
+    const invalidShop = await fetch(base + "/api/business/connectors/shopify/authorize?shop=example.com", { headers, redirect: "manual" });
+    const invalidShopTarget = new URL(invalidShop.headers.get("location") || base);
+    check(invalidShop.status === 307 && invalidShopTarget.origin === base && invalidShopTarget.searchParams.get("business_error") === "shopify_shop_invalid", "Shopify rejects arbitrary hosts and returns an actionable error to ScrollShow");
+    check((await request("/api/business/connectors/shopify/events", { id: 1 })).response.status === 401, "unsigned Shopify events are rejected");
+    check((await fetch(base + "/api/business/connectors/shopify/privacy")).status === 401, "Shopify privacy requests require an authenticated project");
+    for (const logo of ["stripe", "stripe-dark", "revenuecat", "revenuecat-dark", "shopify", "shopify-dark"]) {
+      const asset = await fetch(`${base}/logos/${logo}.svg`);
+      check(asset.ok && asset.headers.get("content-type")?.includes("image/svg+xml"), `${logo} official logo is served`);
+    }
     const createdProject = await request("/api/projects", { action: "create", name: "Smoke project creation" });
     check(createdProject.response.ok && createdProject.result.projects.some((item: { name: string }) => item.name === "Smoke project creation"), "existing project creation persists correctly");
     let dashboard = await request("/api/business/dashboard");

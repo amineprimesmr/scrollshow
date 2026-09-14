@@ -1,11 +1,13 @@
 .env*
 .data/
+.shopify/
 .next-qa/
 .claude/
 .cursor/
 .agents/
 docs/
 tests/
+scripts/verify-shopify-privacy.ts
 *.log
 
 .next-audit/

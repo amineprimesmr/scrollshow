@@ -7,6 +7,10 @@ type StripeRefund = { id: string; amount: number; currency: string; created: num
 type StripeList<T> = { object: "list"; data: T[]; has_more: boolean };
 type StripeInvoice = { billing_reason?: string; subscription?: string; parent?: { subscription_details?: { subscription?: string; metadata?: Record<string, string> } }; total?: number; total_taxes?: Array<{ amount: number }>; total_tax_amounts?: Array<{ amount: number }>; metadata?: Record<string, string> };
 export const STRIPE_BUSINESS_EVENTS = ["charge.succeeded", "charge.captured", "refund.created", "refund.updated"];
+export function stripeKeyEnvironment(apiKey: string) {
+  if (!/^(?:rk|sk)_(?:live|test)_[A-Za-z0-9]+$/.test(apiKey)) throw new ConnectorError("stripe_key_invalid");
+  return apiKey.startsWith("rk_test_") || apiKey.startsWith("sk_test_") ? "sandbox" as const : "production" as const;
+}
 function id(value: string | { id: string } | null | undefined): string | undefined { return typeof value === "string" ? value : value?.id; }
 export async function stripeGet<T>(credentials: BusinessCredentials, path: string): Promise<T> {
   if (!path.startsWith("/v1/") || path.includes("\\")) throw new ConnectorError("provider_path_invalid");
@@ -46,14 +50,14 @@ export function verifyStripeBusinessSignature(raw: string, signature: string | n
 }
 export const stripeBusinessConnector: BusinessConnector = {
   async verify(credentials, config) {
-    if (!/^(?:rk|sk)_(?:live|test)_[A-Za-z0-9]+$/.test(credentials.apiKey)) throw new ConnectorError("stripe_key_invalid");
-    const environment = credentials.apiKey.includes("_test_") ? "sandbox" : "production";
-    if (environment !== config.environment) throw new ConnectorError("provider_environment_mismatch");
+    const environment = stripeKeyEnvironment(credentials.apiKey);
     const account = await stripeGet<{ id: string; business_profile?: { name?: string | null }; settings?: { dashboard?: { display_name?: string | null } } }>(credentials, "/v1/account");
     if (!/^acct_[A-Za-z0-9]+$/.test(account.id)) throw new ConnectorError("provider_account_invalid");
     if (config.externalAccountId && config.externalAccountId !== account.id) throw new ConnectorError("provider_account_mismatch");
-    await stripeGet(credentials, "/v1/charges?limit=1");
+    const charges = await stripeGet<StripeList<StripeCharge>>(credentials, "/v1/charges?limit=1");
+    if (!Array.isArray(charges.data) || charges.data.some(charge => typeof charge.livemode !== "boolean" || charge.livemode !== (environment === "production"))) throw new ConnectorError("provider_environment_mismatch");
     await stripeGet(credentials, "/v1/refunds?limit=1");
+    await stripeGet(credentials, "/v1/invoices?limit=1");
     return { externalAccountId: account.id, name: account.business_profile?.name || account.settings?.dashboard?.display_name || account.id, environment };
   },
   async history(credentials, config, cursor, since): Promise<HistoryPage> {

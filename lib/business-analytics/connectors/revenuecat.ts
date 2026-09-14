@@ -6,15 +6,48 @@ type RCList<T> = { items: T[]; next_page?: string | null };
 type RCCustomer = { id: string };
 type RCHistoryEvent = { id: string; app_id?: string; type: string; body: Partial<RCEvent>; occurred_at?: number; created_at?: number };
 export const REVENUECAT_BUSINESS_EVENTS = ["INITIAL_PURCHASE", "RENEWAL", "NON_RENEWING_PURCHASE", "CANCELLATION", "REFUND_REVERSED"];
+export type RevenueCatProject = { id: string; name: string };
+export type RevenueCatDiscovery = { projects: RevenueCatProject[]; requiresProject: boolean; reason?: "multiple_projects" | "project_permission_missing" | "no_projects"; more?: boolean };
+function assertRevenueCatKey(credentials: BusinessCredentials) {
+  if (!/^sk_[A-Za-z0-9_.-]+$/.test(credentials.apiKey)) throw new ConnectorError("revenuecat_secret_key_required");
+}
+async function revenuecatRequest<T>(credentials: BusinessCredentials, path: string): Promise<T> {
+  let response: Response;
+  try { response = await fetch(`https://api.revenuecat.com${path}`, { headers: { Authorization: `Bearer ${credentials.apiKey}`, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000) }); }
+  catch { throw new ConnectorError("provider_request_failed", 502); }
+  if (!response.ok) throw new ConnectorError(response.status === 401 ? "provider_credentials_invalid" : response.status === 403 ? "provider_permissions_missing" : response.status === 404 ? "provider_resource_not_found" : response.status === 429 ? "provider_rate_limited" : "provider_request_failed", response.status === 429 ? 429 : 400);
+  return response.json() as Promise<T>;
+}
+/** Discovery is optional read access; a project URL/ID works without projects:read. */
+export async function discoverRevenueCatProjects(credentials: BusinessCredentials): Promise<RevenueCatDiscovery> {
+  assertRevenueCatKey(credentials);
+  try {
+    const list = await revenuecatRequest<RCList<RevenueCatProject>>(credentials, "/v2/projects?limit=100");
+    if (!Array.isArray(list.items) || list.items.some(project => !/^[A-Za-z0-9_-]{1,100}$/.test(project.id) || typeof project.name !== "string")) throw new ConnectorError("provider_response_invalid");
+    const projects = list.items.map(({ id, name }) => ({ id, name: name.slice(0,100) }));
+    const requiresProject = projects.length !== 1 || Boolean(list.next_page);
+    return { projects, requiresProject, ...(requiresProject ? { reason: projects.length ? "multiple_projects" as const : "no_projects" as const } : {}), ...(list.next_page ? { more: true } : {}) };
+  } catch (error) {
+    if (error instanceof ConnectorError && error.code === "provider_permissions_missing") return { projects: [], requiresProject: true, reason: "project_permission_missing" };
+    throw error;
+  }
+}
+export function revenuecatProjectId(value: string): string {
+  let id = value.trim();
+  if (/^https?:\/\//i.test(id)) {
+    let url: URL;
+    try { url = new URL(id); } catch { throw new ConnectorError("revenuecat_project_url_invalid"); }
+    if (url.protocol !== "https:" || url.hostname !== "app.revenuecat.com" || url.port || url.username || url.password) throw new ConnectorError("revenuecat_project_url_invalid");
+    id = /^\/projects\/([A-Za-z0-9_-]+)(?:\/|$)/.exec(url.pathname)?.[1] || "";
+  }
+  if (!/^(?:proj[A-Za-z0-9_-]+|[a-fA-F0-9]{8,32})$/.test(id)) throw new ConnectorError("revenuecat_project_id_required");
+  return id;
+}
 export async function revenuecatGet<T>(credentials: BusinessCredentials, path: string, projectId: string): Promise<T> {
   const prefix = `/v2/projects/${encodeURIComponent(projectId)}/`;
   // next_page is provider data: never follow arbitrary URLs or leak credentials to another host/project.
   if (!path.startsWith(prefix) || path.includes("\\") || path.includes("..") || path.includes("#")) throw new ConnectorError("provider_path_invalid");
-  let response: Response;
-  try { response = await fetch(`https://api.revenuecat.com${path}`, { headers: { Authorization: `Bearer ${credentials.apiKey}`, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000) }); }
-  catch { throw new ConnectorError("provider_request_failed", 502); }
-  if (!response.ok) throw new ConnectorError(response.status === 401 ? "provider_credentials_invalid" : response.status === 403 ? "provider_permissions_missing" : response.status === 429 ? "provider_rate_limited" : "provider_request_failed", response.status === 429 ? 429 : 400);
-  return response.json() as Promise<T>;
+  return revenuecatRequest<T>(credentials, path);
 }
 export async function listRevenueCatApps(credentials: BusinessCredentials, projectId: string): Promise<Array<{ id: string; name: string }>> {
   const list = await revenuecatGet<RCList<{ id: string; name: string }>>(credentials, `/v2/projects/${encodeURIComponent(projectId)}/apps?limit=100`, projectId);
@@ -64,12 +97,23 @@ export function normalizeRevenueCatEvent(event: RCEvent, config: ConnectorConfig
 }
 export const revenuecatBusinessConnector: BusinessConnector = {
   async verify(credentials, config) {
-    if (!/^sk_[A-Za-z0-9_.-]+$/.test(credentials.apiKey)) throw new ConnectorError("revenuecat_secret_key_required");
-    if (!config.externalAccountId || !/^proj[A-Za-z0-9]+$/.test(config.externalAccountId)) throw new ConnectorError("revenuecat_project_id_required");
-    const apps = await listRevenueCatApps(credentials, config.externalAccountId);
+    assertRevenueCatKey(credentials);
+    const requested = config.externalAccountId ? revenuecatProjectId(config.externalAccountId) : undefined;
+    const discovery = await discoverRevenueCatProjects(credentials);
+    if (!requested && discovery.requiresProject) throw new ConnectorError(discovery.reason === "multiple_projects" ? "revenuecat_project_selection_required" : "revenuecat_project_id_required", 409);
+    const project = requested ? discovery.projects.find(project => project.id === requested || project.id === `proj${requested}`) : discovery.projects[0];
+    if (requested && !project && discovery.reason !== "project_permission_missing" && !discovery.more) throw new ConnectorError("revenuecat_project_not_accessible", 400);
+    let projectId = project?.id || requested!;
+    let apps: Awaited<ReturnType<typeof listRevenueCatApps>>;
+    try { apps = await listRevenueCatApps(credentials, projectId); }
+    catch (error) {
+      // Older dashboard URLs use the short hexadecimal identifier. Membership is still verified by RevenueCat.
+      if (/^[a-fA-F0-9]{8,32}$/.test(projectId) && error instanceof ConnectorError && error.code === "provider_resource_not_found") { projectId = `proj${projectId}`; apps = await listRevenueCatApps(credentials, projectId); }
+      else throw error;
+    }
     if (config.revenuecatAppIds?.some(app => !apps.some(known => known.id === app))) throw new ConnectorError("revenuecat_app_not_in_project");
-    await revenuecatGet(credentials, `/v2/projects/${config.externalAccountId}/customers?limit=1`, config.externalAccountId);
-    return { externalAccountId: config.externalAccountId, name: `RevenueCat ${config.externalAccountId}`, environment: config.environment };
+    await revenuecatGet(credentials, `/v2/projects/${encodeURIComponent(projectId)}/customers?limit=1`, projectId);
+    return { externalAccountId: projectId, name: project?.name || apps[0]?.name || "RevenueCat", environment: config.environment, appIds: apps.map(app => app.id) };
   },
   async history(credentials, config, cursor, since): Promise<HistoryPage> {
     type State = { customerAfter?: string; pending?: string[]; customersMore?: boolean; eventsAfter?: string };

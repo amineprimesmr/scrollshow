@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { database } from "../lib/database";
+import { closeBusinessDatabase } from "../lib/business-analytics/database";
 import * as repository from "../lib/business-analytics/repository";
 async function main(){
   const host=new URL(process.env.DATABASE_URL||"").hostname;
@@ -9,6 +10,8 @@ async function main(){
   try{
     const input={provider:"stripe" as const,externalAccountId:"acct_isolated",environment:"test" as const,externalId:"charge_same",status:"paid" as const,kind:"initial" as const,amountMinor:1200,taxMinor:200,currency:"EUR",occurredAt:new Date().toISOString(),source:"provider" as const};
     const rows=await Promise.all(Array.from({length:5},()=>repository.saveTransaction(scope,input)));assert.equal(new Set(rows.map(r=>r.id)).size,1);assert.equal((await repository.listTransactions(scope)).length,1);
+    const legacyPayload={projects:[{id:scope.projectId,name:"Raw SQL after business analytics"}]};
+    const raw=database();assert.deepEqual((await raw`SELECT ${raw.json(legacyPayload)}::jsonb AS data`)[0].data,legacyPayload,"business reads must not break raw legacy JSON writes");
     await repository.saveTransaction(scope,{...input,status:"pending",amountMinor:0,taxMinor:0});assert.equal((await repository.getRecord(scope,"transactions",rows[0].id))!.amountMinor,1200);
     await repository.saveTransaction(other,input);assert.equal(await repository.getRecord(other,"transactions",rows[0].id),null);
     const link=await repository.saveLink(scope,{slug:randomUUID(),label:"Test",destinationUrl:"https://example.com",active:true});assert.equal((await repository.findPublicLink(link.slug))!.projectId,scope.projectId);
@@ -30,6 +33,6 @@ async function main(){
     assert.equal(concurrent[1].status,"fulfilled");assert.equal((await repository.readProject(other)).transactions.length,0);
     await assert.rejects(repository.saveTransaction({...scope,projectId:"new-scope-after-deletion"},input),/business_user_deleted/);
     console.log("PASS isolated SQL: 5 concurrent replays, paid/pending race protection, scope isolation, public slug uniqueness, sync leases, atomic concurrent CSV refunds/rollback, concurrent deletion and durable project/user resurrection fences.");
-  }finally{await repository.deleteUser(scope.userId);await database().end();}
+  }finally{try{await repository.deleteUser(scope.userId);}finally{await Promise.all([database().end(),closeBusinessDatabase()]);}}
 }
 main().catch(error=>{console.error(error instanceof Error?error.message:"Business SQL verification failed");process.exitCode=1;});
