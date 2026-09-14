@@ -46,7 +46,8 @@ async function main() {
     const shopifyTarget = new URL(shopifyAuthorization.headers.get("location") || base);
     check(shopifyAuthorization.status === 307 && shopifyTarget.hostname === "scrollshow-integration-qa.myshopify.com" && shopifyTarget.searchParams.get("scope") === "read_orders" && shopifyTarget.searchParams.get("state")?.length === 43 && shopifyAuthorization.headers.get("set-cookie")?.includes("HttpOnly"), "Shopify authorization uses a scoped nonce and read-only permissions");
     const invalidShop = await fetch(base + "/api/business/connectors/shopify/authorize?shop=example.com", { headers, redirect: "manual" });
-    check(invalidShop.status === 400, `Shopify authorization rejects arbitrary hosts (HTTP ${invalidShop.status})`);
+    const invalidShopTarget = new URL(invalidShop.headers.get("location") || base);
+    check(invalidShop.status === 307 && invalidShopTarget.origin === base && invalidShopTarget.searchParams.get("business_error") === "shopify_shop_invalid", "Shopify rejects arbitrary hosts and returns an actionable error to ScrollShow");
     check((await request("/api/business/connectors/shopify/events", { id: 1 })).response.status === 401, "unsigned Shopify events are rejected");
     check((await fetch(base + "/api/business/connectors/shopify/privacy")).status === 401, "Shopify privacy requests require an authenticated project");
     for (const logo of ["stripe", "stripe-dark", "revenuecat", "revenuecat-dark", "shopify", "shopify-dark"]) {

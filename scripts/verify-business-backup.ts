@@ -13,8 +13,10 @@ async function main() {
   const schemas = [`ss_backup_source_${suffix}`, `ss_backup_target_${suffix}`];
   const admin = postgres(url, { max: 1, prepare: false, onnotice: () => undefined });
   const clients = schemas.map(() => postgres(url, { max: 1, idle_timeout: 0, prepare: false, onnotice: () => undefined }));
-  const globalDb = globalThis as typeof globalThis & { ssSql?: ReturnType<typeof postgres> };
+  const globalDb = globalThis as typeof globalThis & { ssSql?: ReturnType<typeof postgres>; ssBusinessSql?: ReturnType<typeof postgres> };
   const previous = globalDb.ssSql;
+  const previousBusiness = globalDb.ssBusinessSql;
+  const businessSource = postgres(url, { max: 1, idle_timeout: 0, prepare: false, onnotice: () => undefined });
   try {
     for (const [index, schema] of schemas.entries()) {
       await admin.unsafe(`CREATE SCHEMA "${schema}"`);
@@ -30,6 +32,8 @@ async function main() {
     const snapshot = { users: [], accounts: [], runs: [], channels: [], posts: [], media: [], apiKeys: [] };
     await source`INSERT INTO scrollshow_state (id,data) VALUES (1,${source.json(snapshot)})`;
     globalDb.ssSql = source;
+    await businessSource.unsafe(`SET search_path TO "${schemas[0]}"`);
+    globalDb.ssBusinessSql = businessSource;
     const scope = { userId: "backup-test-owner", projectId: "backup-test-project" };
     const connection = await repository.saveConnection(scope, { provider: "stripe", name: "Backup fixture", externalAccountId: "acct_backup", environment: "test", status: "connected", encryptedCredentials: "encrypted-test-only", encryptedWebhookSecret: "encrypted-webhook-test-only", cursor: "private-customer-cursor", syncClaim: "claim" });
     await repository.saveTransaction(scope, { provider: "stripe", externalAccountId: "acct_backup", environment: "test", externalId: "payment", connectionId: connection.id, status: "paid", kind: "initial", amountMinor: 1200, taxMinor: 200, feeMinor: 20, currency: "EUR", occurredAt: new Date().toISOString(), source: "provider" });
@@ -69,7 +73,8 @@ async function main() {
     console.log("PASS isolated SQL backup: one consistent legacy/business snapshot; encrypted roundtrip; missing part rolls back legacy and every business table; deletion fences preserved; credentials, keys, links and bio quarantined; nonempty restore refused.");
   } finally {
     globalDb.ssSql = previous;
-    await Promise.all(clients.map(client => client.end()));
+    globalDb.ssBusinessSql = previousBusiness;
+    await Promise.all([...clients,businessSource].map(client => client.end()));
     for (const schema of schemas) await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     await admin.end();
   }

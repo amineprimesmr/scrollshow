@@ -5,6 +5,7 @@ import lockfile from "proper-lockfile";
 import { and, eq, desc, or, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { database, databaseEnabled } from "../database";
+import { businessDatabase } from "./database";
 import { businessProjects, businessDeletedUsers, businessTables } from "./schema";
 import { assertShopifyPrivacyWrite } from "./shopify-privacy-rules";
 import { assertBusinessConnectionNoOverlap } from "./monetary-source-rules";
@@ -103,13 +104,13 @@ function indexed(key: BusinessCollection, row: OwnedEntity) {
 export async function listRecords<K extends BusinessCollection>(scope: BusinessScope, key: K, options: { limit?: number; offset?: number } = {}): Promise<BusinessRecords[K][]> {
   assertScope(scope); assertCollection(key); const limit = Math.max(1, Math.min(SNAPSHOT_LIMIT + 1, options.limit || 500)); const offset = Math.max(0, options.offset || 0);
   if (!databaseEnabled()) return (await readLocal(scope))[key].filter(r => r.userId === scope.userId && r.projectId === scope.projectId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)).slice(offset, offset + limit) as BusinessRecords[K][];
-  const table = tableFor(key); const rows = await drizzle(database()).select({ data: table.data }).from(table).where(scopeWhere(key, scope)).orderBy(desc(table.createdAt), table.id).limit(limit).offset(offset);
+  const table = tableFor(key); const rows = await drizzle(businessDatabase()).select({ data: table.data }).from(table).where(scopeWhere(key, scope)).orderBy(desc(table.createdAt), table.id).limit(limit).offset(offset);
   return rows.map(r => r.data as BusinessRecords[K]);
 }
 export async function getRecord<K extends BusinessCollection>(scope: BusinessScope, key: K, id: string): Promise<BusinessRecords[K] | null> {
   assertScope(scope); assertCollection(key);
   if (!databaseEnabled()) return (await readLocal(scope))[key].find(r => r.id === id && r.userId === scope.userId && r.projectId === scope.projectId) as BusinessRecords[K] || null;
-  const table = tableFor(key); const rows = await drizzle(database()).select({ data: table.data }).from(table).where(and(scopeWhere(key, scope), eq(table.id, id))).limit(1); return rows[0]?.data as BusinessRecords[K] || null;
+  const table = tableFor(key); const rows = await drizzle(businessDatabase()).select({ data: table.data }).from(table).where(and(scopeWhere(key, scope), eq(table.id, id))).limit(1); return rows[0]?.data as BusinessRecords[K] || null;
 }
 export async function saveRecord<K extends BusinessCollection>(scope: BusinessScope, key: K, input: EntityInput<BusinessRecords[K]>): Promise<BusinessRecords[K]> {
   assertScope(scope); assertCollection(key); validateRecord(key, input as Record<string, unknown>);
@@ -124,7 +125,7 @@ export async function saveRecord<K extends BusinessCollection>(scope: BusinessSc
     if (lk && rows.some(r => r.id !== row.id && lookupKey(key, r as OwnedEntity & Record<string, unknown>) === lk)) throw new Error("business_lookup_conflict");
     if (existing) rows[rows.indexOf(existing)] = row; else rows.push(row); return row;
   });
-  return drizzle(database()).transaction(async tx => {
+  return drizzle(businessDatabase()).transaction(async tx => {
     // Shared user fence permits parallel projects; deletion takes its exclusive counterpart.
     await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended(${`ss-business-user:${scope.userId}`}, 0))`);
     if((await tx.select().from(businessDeletedUsers).where(eq(businessDeletedUsers.userId,scope.userId)).limit(1)).length)throw new Error("business_user_deleted");
@@ -148,7 +149,7 @@ export async function saveRecord<K extends BusinessCollection>(scope: BusinessSc
 export async function deleteRecord(scope: BusinessScope, key: BusinessCollection, id: string): Promise<boolean> {
   assertScope(scope); assertCollection(key);
   if (!databaseEnabled()) return mutateLocal(scope, data => { const index = data[key].findIndex(r => r.id === id); if (index < 0) return false; data[key].splice(index,1); return true; });
-  const table = tableFor(key); return (await drizzle(database()).delete(table).where(and(scopeWhere(key, scope), eq(table.id, id))).returning({ id: table.id })).length > 0;
+  const table = tableFor(key); return (await drizzle(businessDatabase()).delete(table).where(and(scopeWhere(key, scope), eq(table.id, id))).returning({ id: table.id })).length > 0;
 }
 export async function readProject(scope: BusinessScope): Promise<BusinessSnapshot> {
   const truncated: BusinessCollection[] = []; const pairs = await Promise.all(BUSINESS_COLLECTIONS.map(async key => {
@@ -158,7 +159,7 @@ export async function readProject(scope: BusinessScope): Promise<BusinessSnapsho
 export const readBusinessSnapshot = readProject;
 async function lookup<K extends BusinessCollection>(key: K, value: string, byId = false): Promise<BusinessRecords[K] | null> {
   if (!value || value.length > 300) return null;
-  if (databaseEnabled()) { const t = tableFor(key); const rows = await drizzle(database()).select({ data: t.data }).from(t).where(eq(byId ? t.id : t.lookupKey, value)).limit(2); return rows.length === 1 ? rows[0].data as BusinessRecords[K] : null; }
+  if (databaseEnabled()) { const t = tableFor(key); const rows = await drizzle(businessDatabase()).select({ data: t.data }).from(t).where(eq(byId ? t.id : t.lookupKey, value)).limit(2); return rows.length === 1 ? rows[0].data as BusinessRecords[K] : null; }
   const directory = localDir(); const files = await readdir(directory).catch(e => { if (e.code === "ENOENT") return []; throw e; }); let found: BusinessRecords[K] | null = null;
   for (const file of files.filter(f => f.endsWith(".json"))) { const data = JSON.parse(await readFile(path.join(directory,file),"utf8")) as LocalData;
     for (const row of data[key] || []) if ((byId ? row.id : lookupKey(key, row as OwnedEntity & Record<string, unknown>)) === value) { if (found) return null; found = row as BusinessRecords[K]; }
@@ -171,7 +172,7 @@ export async function findByTrackingKeyHash(hash: string) { const row = await lo
 export const lookupWebhookConnection = (id: string) => lookup("connections",id,true);
 export async function listActiveConnections(options: { limit?: number } = {}): Promise<BusinessConnection[]> {
   const limit = Math.min(100,Math.max(1,options.limit || 20));
-  if (databaseEnabled()) { const t = businessTables.connections; const rows = await drizzle(database()).select({ data: t.data }).from(t)
+  if (databaseEnabled()) { const t = businessTables.connections; const rows = await drizzle(businessDatabase()).select({ data: t.data }).from(t)
     .where(sql`(${t.data}->>'status' in ('connected','error') or (${t.data}->>'status' = 'syncing' and (${t.data}->>'syncLeaseUntil')::timestamptz < now()))`)
     .orderBy(sql`coalesce((${t.data}->>'lastSyncAttemptAt')::timestamptz, (${t.data}->>'lastSyncedAt')::timestamptz) asc nulls first`, t.id).limit(limit);
     return rows.map(r => r.data as BusinessConnection); }
@@ -182,12 +183,12 @@ export async function listActiveConnections(options: { limit?: number } = {}): P
 export async function findTransactionByExternalId(scope: BusinessScope, input: Pick<BusinessTransaction, "provider" | "externalAccountId" | "environment" | "externalId">) {
   assertScope(scope); const nk = naturalKey("transactions", input, "");
   if (!databaseEnabled()) return (await readLocal(scope)).transactions.find(t => naturalKey("transactions",t as BusinessTransaction & Record<string,unknown>,t.id) === nk) || null;
-  const t = businessTables.transactions; const rows = await drizzle(database()).select({data:t.data}).from(t).where(and(scopeWhere("transactions",scope),eq(t.naturalKey,nk))).limit(1); return rows[0]?.data as BusinessTransaction || null;
+  const t = businessTables.transactions; const rows = await drizzle(businessDatabase()).select({data:t.data}).from(t).where(and(scopeWhere("transactions",scope),eq(t.naturalKey,nk))).limit(1); return rows[0]?.data as BusinessTransaction || null;
 }
 async function mutateConnection(scope: BusinessScope,id: string,fn:(row:BusinessConnection)=>BusinessConnection|null):Promise<BusinessConnection|null> {
   assertScope(scope);
   if(!databaseEnabled()) return mutateLocal(scope,data=> {const at=data.connections.findIndex(c=>c.id===id); if(at<0)return null; const changed=fn(data.connections[at]); if(changed)data.connections[at]=changed; return changed;});
-  return drizzle(database()).transaction(async tx=>{const t=businessTables.connections; const rows=await tx.select({data:t.data}).from(t).where(and(scopeWhere("connections",scope),eq(t.id,id))).for("update"); if(!rows.length)return null; const changed=fn(rows[0].data as BusinessConnection); if(changed)await tx.update(t).set(indexed("connections",changed)).where(and(scopeWhere("connections",scope),eq(t.id,id))); return changed;});
+  return drizzle(businessDatabase()).transaction(async tx=>{const t=businessTables.connections; const rows=await tx.select({data:t.data}).from(t).where(and(scopeWhere("connections",scope),eq(t.id,id))).for("update"); if(!rows.length)return null; const changed=fn(rows[0].data as BusinessConnection); if(changed)await tx.update(t).set(indexed("connections",changed)).where(and(scopeWhere("connections",scope),eq(t.id,id))); return changed;});
 }
 export async function claimConnectionSync(scope:BusinessScope,id:string,ttlMs=180000) {
   return mutateConnection(scope,id,row=>{if(row.status==="disconnected" || (row.syncLeaseUntil && Date.parse(row.syncLeaseUntil)>Date.now()))return null; return {...row,status:"syncing",lastSyncAttemptAt:new Date().toISOString(),syncClaim:randomUUID(),syncLeaseUntil:new Date(Date.now()+Math.min(300000,ttlMs)).toISOString(),updatedAt:new Date().toISOString()};});
@@ -198,7 +199,7 @@ export async function releaseConnectionSync(scope:BusinessScope,id:string,claim:
 export async function deleteProject(scope:BusinessScope) {
   assertScope(scope);
   if(!databaseEnabled()){await mutateLocal(scope,data=>{for(const key of BUSINESS_COLLECTIONS)data[key]=[] as never;data.deleted=true;},true);return;}
-  await drizzle(database()).transaction(async tx=>{
+  await drizzle(businessDatabase()).transaction(async tx=>{
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`ss-business-user:${scope.userId}`}, 0))`);
     await tx.delete(businessProjects).where(and(eq(businessProjects.userId,scope.userId),eq(businessProjects.projectId,scope.projectId)));
     await tx.insert(businessProjects).values({...scope,deletedAt:new Date().toISOString()});
@@ -207,7 +208,7 @@ export async function deleteProject(scope:BusinessScope) {
 export async function deleteUser(userId:string) {
   if(!userId)throw new Error("business_scope_required");
   if(databaseEnabled()){
-    await drizzle(database()).transaction(async tx=>{
+    await drizzle(businessDatabase()).transaction(async tx=>{
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`ss-business-user:${userId}`}, 0))`);
       await tx.insert(businessDeletedUsers).values({userId}).onConflictDoNothing();
       await tx.delete(businessProjects).where(eq(businessProjects.userId,userId));
@@ -259,7 +260,7 @@ export async function touchTrackingKey(scope: BusinessScope, id: string, expecte
     const key = data.trackingKeys.find(k => k.id === id && k.hash === expectedHash && k.active);
     if (!key) return false; key.lastUsedAt = now; key.updatedAt = now; return true;
   });
-  return drizzle(database()).transaction(async tx => {
+  return drizzle(businessDatabase()).transaction(async tx => {
     const t=businessTables.trackingKeys;
     const rows=await tx.select({data:t.data}).from(t).where(and(scopeWhere("trackingKeys",scope),eq(t.id,id))).for("update");
     const key=rows[0]?.data as BusinessRecords["trackingKeys"] | undefined;
@@ -330,7 +331,7 @@ export async function importRecordsAtomically(scope:BusinessScope,batch:Business
     const plan=prepareImport(scope,batch,data.transactions,data.adjustments);
     data.transactions.push(...plan.newPayments);data.adjustments.push(...plan.newAdjustments);return {imported:plan.imported,skipped:plan.skipped};
   });
-  return drizzle(database()).transaction(async tx=>{
+  return drizzle(businessDatabase()).transaction(async tx=>{
     await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended(${`ss-business-user:${scope.userId}`},0))`);
     if((await tx.select().from(businessDeletedUsers).where(eq(businessDeletedUsers.userId,scope.userId)).limit(1)).length)throw new Error("business_user_deleted");
     await tx.insert(businessProjects).values(scope).onConflictDoNothing();
