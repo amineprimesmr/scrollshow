@@ -1,11 +1,11 @@
 import { businessEncryptionAvailable } from "./crypto";
-/** Public OAuth requires provider registration/review. Do not advertise a working redirect without it. */
+/** Shopify distribution/review remains a provider prerequisite; keys alone do not certify approval. */
 export function getConnectorCapabilities() {
   const keyAvailable = businessEncryptionAvailable();
+  const shopifySetup = [...(!keyAvailable ? ["BUSINESS_ANALYTICS_ENCRYPTION_KEY"] : []), ...(!process.env.SHOPIFY_CLIENT_ID ? ["SHOPIFY_CLIENT_ID"] : []), ...(!process.env.SHOPIFY_CLIENT_SECRET ? ["SHOPIFY_CLIENT_SECRET"] : [])];
   return [
     { provider: "stripe" as const, name: "Stripe", keyAvailable, oauthAvailable: false, webhook: true, setupRequired: keyAvailable ? [] : ["BUSINESS_ANALYTICS_ENCRYPTION_KEY"], history: "payments_and_refunds_bounded", documentationUrl: "https://docs.stripe.com/keys#limit-access" },
     { provider: "revenuecat" as const, name: "RevenueCat", keyAvailable, oauthAvailable: false, webhook: true, setupRequired: keyAvailable ? [] : ["BUSINESS_ANALYTICS_ENCRYPTION_KEY"], history: "customer_events_bounded_available_amounts", documentationUrl: "https://www.revenuecat.com/docs/projects/authentication" },
-    { provider: "lemonsqueezy" as const, name: "Lemon Squeezy", keyAvailable, oauthAvailable: false, webhook: true, setupRequired: keyAvailable ? [] : ["BUSINESS_ANALYTICS_ENCRYPTION_KEY"], history: "orders_and_subscription_invoices_bounded", documentationUrl: "https://docs.lemonsqueezy.com/guides/developer-guide/getting-started" },
-    { provider: "paddle" as const, name: "Paddle", keyAvailable, oauthAvailable: false, webhook: true, setupRequired: keyAvailable ? [] : ["BUSINESS_ANALYTICS_ENCRYPTION_KEY"], history: "captured_payments_and_adjustments_bounded", documentationUrl: "https://developer.paddle.com/api-reference/about/authentication" },
+    { provider: "shopify" as const, reviewStatus: process.env.SHOPIFY_PUBLIC_APPROVED === "1" ? "approved" : "pending", name: "Shopify", keyAvailable: false, oauthAvailable: shopifySetup.length === 0, webhook: true, setupRequired: shopifySetup, history: "successful_order_transactions_last_60_days", documentationUrl: "https://shopify.dev/docs/apps/build/authentication-authorization/authenticate-standalone-apps" },
   ];
 }

@@ -1,7 +1,8 @@
-export type SupportedBusinessProvider = "stripe" | "revenuecat" | "lemonsqueezy" | "paddle";
+/** Includes legacy readers so previously imported data and webhooks remain supported. */
+export type SupportedBusinessProvider = "stripe" | "revenuecat" | "shopify" | "lemonsqueezy" | "paddle";
 export type ConnectorEnvironment = "production" | "sandbox";
-export type BusinessCredentials = { apiKey: string; webhookSecret?: string };
-export type ConnectorConfig = { provider: SupportedBusinessProvider; externalAccountId: string; environment: ConnectorEnvironment; revenuecatAppIds?: string[]; excludeStripe?: boolean };
+export type BusinessCredentials = { apiKey: string; webhookSecret?: string; refreshToken?: string; expiresAt?: string; refreshExpiresAt?: string; issuedAt?: string };
+export type ConnectorConfig = { provider: SupportedBusinessProvider; externalAccountId: string; environment: ConnectorEnvironment; revenuecatAppIds?: string[]; excludeStripe?: boolean; shopDomain?: string; connectionId?: string };
 export type ProviderTransaction = {
   externalId: string;
   originalTransactionId?: string;
@@ -22,8 +23,8 @@ export type ProviderTransaction = {
   metadata?: Record<string, string | number | boolean | null>;
 };
 export type ProviderEvent = { externalId: string; type: string; occurredAt: string; transactions: ProviderTransaction[]; skipped?: string };
-export type HistoryPage = { transactions: ProviderTransaction[]; cursor: string | null; complete: boolean; warnings: string[]; scanned: number };
-export type VerifiedBusinessAccount = { externalAccountId: string; name: string; environment: ConnectorEnvironment };
+export type HistoryPage = { transactions: ProviderTransaction[]; cursor: string | null; complete: boolean; warnings: string[]; scanned: number; shopifyAcknowledgements?: Array<{ id: string; eventId: string }> };
+export type VerifiedBusinessAccount = { externalAccountId: string; name: string; environment: ConnectorEnvironment; appIds?: string[] };
 export interface BusinessConnector {
   verify(credentials: BusinessCredentials, config: Omit<ConnectorConfig, "externalAccountId"> & { externalAccountId?: string }): Promise<VerifiedBusinessAccount>;
   history(credentials: BusinessCredentials, config: ConnectorConfig, cursor: string | null, since: string): Promise<HistoryPage>;

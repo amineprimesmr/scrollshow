@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac, randomBytes } from "node:crypto";
 import { businessEncryptionAvailable, decryptBusinessSecret, encryptBusinessSecret } from "../lib/business-analytics/crypto";
 import { normalizeStripeCharge, normalizeStripeRefund, verifyStripeBusinessSignature, stripeBusinessConnector } from "../lib/business-analytics/connectors/stripe";
-import { normalizeRevenueCatEvent, revenuecatBusinessConnector, revenuecatGet } from "../lib/business-analytics/connectors/revenuecat";
+import { discoverRevenueCatProjects, normalizeRevenueCatEvent, revenuecatBusinessConnector, revenuecatGet, revenuecatProjectId } from "../lib/business-analytics/connectors/revenuecat";
 import { minorUnits, type ConnectorConfig } from "../lib/business-analytics/connectors/types";
 import { assertBusinessConnectionNoOverlap } from "../lib/business-analytics/connections";
 
@@ -75,8 +75,15 @@ test("RC webhook rejects missing auth before parsing and never follows provider 
   await assert.rejects(() => revenuecatGet({ apiKey: "private" }, "https://evil.example/", "proj123"), /provider_path_invalid/);
   await assert.rejects(() => revenuecatGet({ apiKey: "private" }, "/v2/projects/projOther/customers", "proj123"), /provider_path_invalid/);
 });
-test("Stripe key environment is checked before networking", async () => {
-  await assert.rejects(() => stripeBusinessConnector.verify({ apiKey: "rk_test_private" }, { provider: "stripe", environment: "production" }), /provider_environment_mismatch/);
+test("Stripe detects test/live from the authenticated key and API, never the caller's environment", async () => {
+  await mockFetch(url => url.pathname === "/v1/account" ? { id: "acct_test", business_profile: { name: "My shop" } } : { data: [], has_more: false }, async () => {
+    const verified = await stripeBusinessConnector.verify({ apiKey: "rk_test_private" }, { provider: "stripe", environment: "production" });
+    assert.equal(verified.environment, "sandbox"); assert.equal(verified.name, "My shop"); assert.equal(verified.externalAccountId, "acct_test");
+  });
+  await mockFetch(url => url.pathname === "/v1/account" ? { id: "acct_test" } : { data: [charge], has_more: false }, async () => {
+    await assert.rejects(stripeBusinessConnector.verify({ apiKey: "rk_test_private" }, { provider: "stripe", environment: "production" }), /provider_environment_mismatch/);
+  });
+  await assert.rejects(stripeBusinessConnector.verify({ apiKey: "pk_live_public" }, { provider: "stripe", environment: "production" }), /stripe_key_invalid/);
 });
 test("connector overlap is rejected, explicit RC Stripe exclusion permits separate native purchases", () => {
   const existing = { id: "rc", provider: "revenuecat", environment: "live", metadata: { excludeStripe: "false" }, status: "connected" } as never;
@@ -86,7 +93,8 @@ test("connector overlap is rejected, explicit RC Stripe exclusion permits separa
 
 import { lemonBusinessConnector, normalizeLemonResource, verifyLemonSignature } from "../lib/business-analytics/connectors/lemonsqueezy";
 import { paddleBusinessConnector, normalizePaddleTransaction, normalizePaddleAdjustment, verifyPaddleSignature } from "../lib/business-analytics/connectors/paddle";
-import { createBusinessConnection, disconnectBusinessConnection } from "../lib/business-analytics/connections";
+import { businessConnectionInput, createAndSyncBusinessConnection, createBusinessConnection, disconnectBusinessConnection, configForBusinessConnection } from "../lib/business-analytics/connections";
+import { businessConnector, SUPPORTED_BUSINESS_PROVIDERS } from "../lib/business-analytics/connectors";
 import { businessScopeIsActive, syncBusinessConnection } from "../lib/business-analytics/sync";
 import { listTransactions, listConnections } from "../lib/business-analytics/repository";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -161,6 +169,7 @@ test("bounded Stripe import, reconnection and replay preserve one sale and encry
       if (url.pathname === "/v1/account") return { id: "acct_example" };
       if (url.pathname === "/v1/charges") return { data: [charge], has_more: false };
       if (url.pathname === "/v1/refunds") return { data: [], has_more: false };
+      if (url.pathname === "/v1/invoices") return { data: [], has_more: false };
       throw new Error(`unexpected_path:${url.pathname}`);
     }, async () => {
       const created = await createBusinessConnection(scope, { provider: "stripe", apiKey: "rk_live_private" });
@@ -173,6 +182,75 @@ test("bounded Stripe import, reconnection and replay preserve one sale and encry
       await disconnectBusinessConnection(scope, created.connection.id);
       await assert.rejects(syncBusinessConnection(scope, created.connection.id), /connection_sync_busy/);
       const stored = (await listConnections(scope))[0]; assert.equal(stored.encryptedCredentials, undefined); assert.equal(stored.status, "disconnected");
+    });
+  } finally { for (const name of names) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } await rm(dir, { recursive: true, force: true }); }
+});
+test("new commerce catalog accepts Stripe/RevenueCat keys and keeps retired readers without accepting new keys", () => {
+  assert.deepEqual(SUPPORTED_BUSINESS_PROVIDERS, ["stripe", "revenuecat", "shopify"]);
+  for (const provider of ["lemonsqueezy", "paddle", "shopify"]) assert.equal(businessConnectionInput.safeParse({ provider, apiKey: "private_key_value" }).success, false);
+  assert.equal(businessConnector("lemonsqueezy"), lemonBusinessConnector);
+  assert.equal(businessConnector("paddle"), paddleBusinessConnector);
+  assert.equal(configForBusinessConnection({ ...lemonConfig, userId: "u", projectId: "p", id: "old", environment: "live" } as never).provider, "lemonsqueezy");
+});
+test("Shopify and Stripe cannot both count overlapping histories, including disconnected sources", () => {
+  const source = { id: "stripe", provider: "stripe", environment: "live", status: "disconnected" } as never;
+  assert.throws(() => assertBusinessConnectionNoOverlap({ id: "shopify", provider: "shopify", environment: "live" }, [source]), /stripe_shopify_overlap/);
+  assert.doesNotThrow(() => assertBusinessConnectionNoOverlap({ id: "shopify", provider: "shopify", environment: "test" }, [source]));
+  assert.doesNotThrow(() => assertBusinessConnectionNoOverlap({ id: "shopify", provider: "shopify", environment: "live" }, [{ ...source as object, monetarySource: false } as never]));
+});
+test("RevenueCat discovers one project and all its apps with read-only calls", async () => {
+  const paths: string[] = [];
+  await mockFetch((url, init) => {
+    assert.equal(url.origin, "https://api.revenuecat.com"); assert.equal(init?.method || "GET", "GET"); paths.push(url.pathname);
+    if (url.pathname === "/v2/projects") return { items: [{ id: "proj123", name: "My application" }] };
+    if (url.pathname.endsWith("/apps")) return { items: [{ id: "app123", name: "iOS" }, { id: "app456", name: "Android" }] };
+    return { items: [] };
+  }, async () => {
+    const verified = await revenuecatBusinessConnector.verify({ apiKey: "sk_private_v2" }, { provider: "revenuecat", environment: "production" });
+    assert.equal(verified.externalAccountId, "proj123"); assert.equal(verified.name, "My application"); assert.deepEqual(verified.appIds, ["app123", "app456"]); assert.equal(verified.environment, "production");
+    assert.deepEqual(paths, ["/v2/projects", "/v2/projects/proj123/apps", "/v2/projects/proj123/customers"]);
+  });
+});
+test("RevenueCat never guesses among projects and confines selection to credential-authorized projects", async () => {
+  await mockFetch(() => ({ items: [{ id: "proj123", name: "One" }, { id: "proj456", name: "Two" }] }), async () => {
+    const discovery = await discoverRevenueCatProjects({ apiKey: "sk_private_v2" }); assert.equal(discovery.requiresProject, true); assert.equal(discovery.reason, "multiple_projects");
+    await assert.rejects(revenuecatBusinessConnector.verify({ apiKey: "sk_private_v2" }, { provider: "revenuecat", environment: "production" }), /revenuecat_project_selection_required/);
+    await assert.rejects(revenuecatBusinessConnector.verify({ apiKey: "sk_private_v2" }, { provider: "revenuecat", environment: "production", externalAccountId: "projForeign" }), /revenuecat_project_not_accessible/);
+  });
+  await mockFetch(() => ({ items: [{ id: "proj123", name: "One" }], next_page: "/v2/projects?starting_after=proj123" }), async () => {
+    assert.equal((await discoverRevenueCatProjects({ apiKey: "sk_private_v2" })).requiresProject, true);
+  });
+});
+test("RevenueCat accepts a dashboard URL without discovery permission and rejects foreign URLs before networking", async () => {
+  assert.equal(revenuecatProjectId("https://app.revenuecat.com/projects/0d6bdeb6/overview"), "0d6bdeb6");
+  assert.throws(() => revenuecatProjectId("https://app.revenuecat.com.evil.example/projects/proj123"), /revenuecat_project_url_invalid/);
+  assert.throws(() => revenuecatProjectId("https://app.revenuecat.com@evil.example/projects/proj123"), /revenuecat_project_url_invalid/);
+  const paths: string[] = [];
+  await mockFetch(url => {
+    paths.push(url.pathname);
+    if (url.pathname === "/v2/projects") return new Response("", { status: 403 });
+    if (url.pathname === "/v2/projects/0d6bdeb6/apps") return new Response("", { status: 404 });
+    if (url.pathname.endsWith("/apps")) return { items: [{ id: "app123", name: "My application" }] };
+    return { items: [] };
+  }, async () => {
+    const verified = await revenuecatBusinessConnector.verify({ apiKey: "sk_private_v2" }, { provider: "revenuecat", environment: "production", externalAccountId: "https://app.revenuecat.com/projects/0d6bdeb6/overview" });
+    assert.equal(verified.externalAccountId, "proj0d6bdeb6"); assert.deepEqual(verified.appIds, ["app123"]);
+    await assert.rejects(revenuecatBusinessConnector.verify({ apiKey: "sk_private_v2" }, { provider: "revenuecat", environment: "production" }), /revenuecat_project_id_required/);
+    assert.ok(paths.every(path => path === "/v2/projects" || path.startsWith("/v2/projects/0d6bdeb6/") || path.startsWith("/v2/projects/proj0d6bdeb6/")));
+  });
+});
+test("key-only creation stores the detected environment and immediately imports a bounded first batch", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ss-create-connector-")); const names = ["DATABASE_URL", "BUSINESS_ANALYTICS_DATA_DIR", "BUSINESS_ANALYTICS_ENCRYPTION_KEY", "NODE_ENV", "VERCEL"];
+  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  delete process.env.DATABASE_URL; delete process.env.VERCEL; process.env.BUSINESS_ANALYTICS_DATA_DIR = dir; process.env.BUSINESS_ANALYTICS_ENCRYPTION_KEY = randomBytes(32).toString("base64"); Object.assign(process.env, { NODE_ENV: "test" });
+  const scope = { userId: "create_owner", projectId: "create_project" };
+  try {
+    await mockFetch(url => url.pathname === "/v1/account" ? { id: "acct_test", business_profile: { name: "Detected shop" } } : { data: url.pathname === "/v1/charges" ? [{ ...charge, livemode: false }] : [], has_more: false }, async () => {
+      const created = await createAndSyncBusinessConnection(scope, { provider: "stripe", apiKey: "rk_test_private" });
+      assert.equal(created.connection.name, "Detected shop"); assert.equal(created.connection.environment, "test"); assert.equal(created.initialSync.processed, 1); assert.equal(created.initialSync.complete, false);
+      const rows = await listTransactions(scope); assert.equal(rows.length, 1); assert.equal(rows[0].environment, "test");
+      assert.equal((await listTransactions({ ...scope, projectId: "foreign" })).length, 0);
+      assert.equal("encryptedCredentials" in created.connection, false);
     });
   } finally { for (const name of names) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } await rm(dir, { recursive: true, force: true }); }
 });

@@ -6,6 +6,9 @@ import { and, eq, desc, or, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { database, databaseEnabled } from "../database";
 import { businessProjects, businessDeletedUsers, businessTables } from "./schema";
+import { assertShopifyPrivacyWrite } from "./shopify-privacy-rules";
+import { assertBusinessConnectionNoOverlap } from "./monetary-source-rules";
+import type { TransactionSql } from "postgres";
 import type { BusinessScope, BusinessCollection, BusinessRecords, BusinessSnapshot, EntityInput, OwnedEntity, BusinessConnection, BusinessTransaction, PublicBusinessConnection, BusinessSettings } from "./model";
 
 export const BUSINESS_COLLECTIONS = Object.keys(businessTables) as BusinessCollection[];
@@ -23,7 +26,8 @@ function localDir() {
 function scopePath(scope: BusinessScope) { return path.join(localDir(), `${digest(`${scope.userId}\0${scope.projectId}`)}.json`); }
 const tableFor = (key: BusinessCollection): typeof businessTables.connections => businessTables[key];
 const scopeWhere = (key: BusinessCollection, scope: BusinessScope) => and(eq(businessTables[key].userId, scope.userId), eq(businessTables[key].projectId, scope.projectId));
-type LocalData = { [K in BusinessCollection]: BusinessRecords[K][] } & { deleted?: boolean };
+export type LocalBusinessData = { [K in BusinessCollection]: BusinessRecords[K][] } & { deleted?: boolean };
+type LocalData = LocalBusinessData;
 function empty(): LocalData { return Object.fromEntries(BUSINESS_COLLECTIONS.map(k => [k, []])) as unknown as LocalData; }
 async function readLocal(scope: BusinessScope): Promise<LocalData> {
   try { return { ...empty(), ...JSON.parse(await readFile(scopePath(scope), "utf8")) }; }
@@ -85,7 +89,7 @@ function makeRecord<K extends BusinessCollection>(scope: BusinessScope, key: K, 
     return previous;
   }
   if (key === "transactions" && (previous as BusinessTransaction | undefined)?.status === "paid" && (input as unknown as EntityInput<BusinessTransaction>).status === "pending") return previous!;
-  const row = { ...previous, ...input, ...scope, id: previous?.id || input.id || randomUUID(), createdAt: previous?.createdAt || input.createdAt || now, updatedAt: now } as BusinessRecords[K];
+  const row = { ...previous, ...input, userId:scope.userId, projectId:scope.projectId, id: previous?.id || input.id || randomUUID(), createdAt: previous?.createdAt || input.createdAt || now, updatedAt: now } as BusinessRecords[K];
   validateRecord(key, row); return row;
 }
 function indexed(key: BusinessCollection, row: OwnedEntity) {
@@ -110,10 +114,12 @@ export async function getRecord<K extends BusinessCollection>(scope: BusinessSco
 export async function saveRecord<K extends BusinessCollection>(scope: BusinessScope, key: K, input: EntityInput<BusinessRecords[K]>): Promise<BusinessRecords[K]> {
   assertScope(scope); assertCollection(key); validateRecord(key, input as Record<string, unknown>);
   const proposedId = input.id || randomUUID(); const nk = naturalKey(key, input as Record<string, unknown>, proposedId);
-  if (!databaseEnabled()) return mutateLocal(scope, data => {
+  if (!databaseEnabled()) return mutateLocal(scope, async data => {
+    await assertShopifyPrivacyWrite(key,input,async(collection,id)=>data[collection].find(row=>row.id===id)||null);
     const rows = data[key] as BusinessRecords[K][];
     const existing = rows.find(r => r.id === proposedId || naturalKey(key, r as OwnedEntity & Record<string, unknown>, r.id) === nk);
     const row = makeRecord(scope, key, { ...input, id: proposedId }, existing);
+    if(key==="connections")assertBusinessConnectionNoOverlap(row as BusinessConnection,data.connections);
     const lk = lookupKey(key, row as OwnedEntity & Record<string, unknown>);
     if (lk && rows.some(r => r.id !== row.id && lookupKey(key, r as OwnedEntity & Record<string, unknown>) === lk)) throw new Error("business_lookup_conflict");
     if (existing) rows[rows.indexOf(existing)] = row; else rows.push(row); return row;
@@ -125,9 +131,16 @@ export async function saveRecord<K extends BusinessCollection>(scope: BusinessSc
     await tx.insert(businessProjects).values(scope).onConflictDoNothing();
     const projects=await tx.select().from(businessProjects).where(and(eq(businessProjects.userId, scope.userId), eq(businessProjects.projectId, scope.projectId))).for("update");
     if(projects[0]?.deletedAt)throw new Error("business_project_deleted");
+    await assertShopifyPrivacyWrite(key,input,async(collection,id)=>{
+      const t=tableFor(collection);return (await tx.select({data:t.data}).from(t).where(and(scopeWhere(collection,scope),eq(t.id,id))).limit(1))[0]?.data||null;
+    });
     const table = tableFor(key);
     const existing = await tx.select({ data: table.data }).from(table).where(and(scopeWhere(key, scope), or(eq(table.id, proposedId), eq(table.naturalKey, nk)))).limit(1);
     const row = makeRecord(scope, key, { ...input, id: proposedId }, existing[0]?.data as BusinessRecords[K] | undefined);
+    if(key==="connections"){
+      const c=businessTables.connections,connections=await tx.select({data:c.data}).from(c).where(scopeWhere("connections",scope));
+      assertBusinessConnectionNoOverlap(row as BusinessConnection,connections.map(item=>item.data as BusinessConnection));
+    }
     const values = indexed(key, row);
     await tx.insert(table).values(values).onConflictDoUpdate({ target: [table.userId, table.projectId, table.id], set: values }); return row;
   });
@@ -180,7 +193,7 @@ export async function claimConnectionSync(scope:BusinessScope,id:string,ttlMs=18
   return mutateConnection(scope,id,row=>{if(row.status==="disconnected" || (row.syncLeaseUntil && Date.parse(row.syncLeaseUntil)>Date.now()))return null; return {...row,status:"syncing",lastSyncAttemptAt:new Date().toISOString(),syncClaim:randomUUID(),syncLeaseUntil:new Date(Date.now()+Math.min(300000,ttlMs)).toISOString(),updatedAt:new Date().toISOString()};});
 }
 export async function releaseConnectionSync(scope:BusinessScope,id:string,claim:string,patch:Partial<BusinessConnection>={}) {
-  return Boolean(await mutateConnection(scope,id,row=>row.syncClaim===claim?{...row,...patch,id:row.id,userId:row.userId,projectId:row.projectId,syncClaim:undefined,syncLeaseUntil:undefined,updatedAt:new Date().toISOString()}:null));
+  return Boolean(await mutateConnection(scope,id,row=>row.syncClaim===claim?{...row,...patch,metadata:{...row.metadata,...patch.metadata},id:row.id,userId:row.userId,projectId:row.projectId,syncClaim:undefined,syncLeaseUntil:undefined,updatedAt:new Date().toISOString()}:null));
 }
 export async function deleteProject(scope:BusinessScope) {
   assertScope(scope);
@@ -336,4 +349,19 @@ export async function importRecordsAtomically(scope:BusinessScope,batch:Business
     if(plan.newAdjustments.length)await tx.insert(a).values(plan.newAdjustments.map(row=>indexed("adjustments",row)));
     return {imported:plan.imported,skipped:plan.skipped};
   });
+}
+
+/** Internal maintenance uses the same write/deletion fences as ingestion. No public request can supply either callback. */
+export async function mutateBusinessProject<T>(scope:BusinessScope, local:(data:LocalBusinessData)=>Promise<T>|T, sqlMutation:(tx:TransactionSql)=>Promise<T>):Promise<T> {
+  assertScope(scope);
+  if(!databaseEnabled()) return mutateLocal(scope,local);
+  const wrapped=await database().begin(async tx=>{
+    await tx`SELECT pg_advisory_xact_lock_shared(hashtextextended(${`ss-business-user:${scope.userId}`},0))`;
+    if((await tx`SELECT 1 FROM ss_business_deleted_users WHERE user_id=${scope.userId}`).length)throw new Error("business_user_deleted");
+    const projects=await tx`SELECT deleted_at FROM ss_business_projects WHERE user_id=${scope.userId} AND project_id=${scope.projectId} FOR UPDATE`;
+    if(!projects.length || projects[0].deleted_at)throw new Error("business_project_deleted");
+    await tx`SET LOCAL statement_timeout = '12000ms'`;
+    return {value:await sqlMutation(tx)};
+  });
+  return (wrapped as {value:T}).value;
 }
