@@ -511,9 +511,9 @@ html.page-affiliate #affiliate-root {
 .af-ld-title-line:nth-child(1) { transition-delay: .08s; }
 .af-ld-title-line:nth-child(2) { transition-delay: .16s; }
 .af-ld-title-line:nth-child(3) { transition-delay: .24s; }
-.af-ld-stage__copy > .ss-heroskill { transition-delay: .32s; }
+.af-ld-stage__copy > .af-ld-hero-cta-wrap { transition-delay: .32s; }
 .af-ld-stage__copy > .af-ld-hero-sub { transition-delay: .36s; }
-.af-ld-stage__copy > .af-ld-hero-cta-wrap { transition-delay: .4s; }
+.af-ld-stage__copy > .ss-heroskill { transition-delay: .4s; }
 
 @media (prefers-reduced-motion: reduce) {
   .af-ld-title-line,

@@ -1,30 +1,30 @@
-/* Bloc d'installation du skill : chrome flottant sous le titre du hero. */
+/* Bloc d'installation du skill : chrome compact sous le CTA du hero. */
 .ss-heroskill {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin: clamp(30px, 5.4vh, 54px) auto clamp(20px, 3.4vh, 34px);
-  width: min(100%, 640px);
+  gap: 12px;
+  margin: clamp(24px, 4vh, 38px) auto clamp(16px, 2.8vh, 28px);
+  width: min(100%, 560px);
 }
 .ss-heroskill__label {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   color: #b9bdc9;
-  font-size: clamp(17px, 1.6vw, 21px);
+  font-size: clamp(15px, 1.4vw, 18px);
   letter-spacing: -.02em;
 }
-.ss-heroskill__agents { display: inline-flex; align-items: center; gap: 7px; }
-.ss-heroskill__agents img { width: 25px; height: 25px; opacity: .92; }
+.ss-heroskill__agents { display: inline-flex; align-items: center; gap: 6px; }
+.ss-heroskill__agents img { width: 22px; height: 22px; opacity: .92; }
 
 .ss-heroskill__box {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 14px 14px 14px 18px;
+  padding: 12px 12px 12px 16px;
   border: 1px solid #ffffff1c;
   border-radius: 14px;
   background: #08080b;
@@ -41,14 +41,14 @@
 .ss-heroskill__box:hover { border-color: #ffffff33; }
 .ss-heroskill__box:active { transform: scale(0.98); }
 .ss-heroskill__box:focus-visible { outline: 2px solid #8fa8ff; outline-offset: 3px; }
-.ss-heroskill__prompt { color: #6f8bff; font: 600 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ss-heroskill__prompt { color: #6f8bff; font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .ss-heroskill__box code {
   flex: 1;
   min-width: 0;
   overflow-x: auto;
   white-space: nowrap;
   color: #e9eaf2;
-  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -.01em;
   scrollbar-width: none;
 }
@@ -56,9 +56,9 @@
 .ss-heroskill__copy {
   display: grid;
   place-items: center;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   border-radius: 9px;
   background: #ffffff10;
   color: #c3c6d2;
@@ -69,8 +69,10 @@
 .ss-heroskill__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 620px) {
-  .ss-heroskill__box { padding: 12px 12px 12px 14px; gap: 9px; }
-  .ss-heroskill__box code { font-size: 12.5px; }
+  .ss-heroskill__label { gap: 6px; }
+  .ss-heroskill__agents { gap: 5px; }
+  .ss-heroskill__box { padding: 10px 10px 10px 12px; gap: 8px; }
+  .ss-heroskill__box code { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ss-heroskill__box { transition: none; }

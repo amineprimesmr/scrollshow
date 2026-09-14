@@ -80,18 +80,18 @@ function ViewsHero({ english, ctaHref }: { english: boolean; ctaHref: string }) 
       <div className="af-ld-stage">
         <div className="af-ld-stage__copy">
           <h1 className="af-ld-views__title">
-            <span className="af-ld-title-line">Crée et automatise tes</span>{" "}
-            <span className="af-ld-title-line">slideshows avec <span className="af-ld-title-accent">ton agent</span></span>
+            <span className="af-ld-title-line">Crée et automatise ta</span>{" "}
+            <span className="af-ld-title-line">distribution avec <span className="af-ld-title-accent">ton agent</span></span>
           </h1>
-          <HeroSkill english={english} />
           <div className="af-ld-hero-cta-wrap">
             <Metal preset="chromatic" strength={0.9} className="af-ld-metal-cta" normalizeHost>
               <Link href={ctaHref} className="af-ld-hero-cta">
-                <span className="af-ld-hero-cta__label">{t("Automatiser mes slideshows", "Automate my slideshows", english)}</span>
+                <span className="af-ld-hero-cta__label">{t("Commencer à créer", "Start creating", english)}</span>
                 <svg className="af-ld-hero-cta__sparkle" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.1 2.4a.6.6 0 0 0-1.14 0l-1.2 3.55a3.6 3.6 0 0 1-2.25 2.25l-3.55 1.2a.6.6 0 0 0 0 1.14l3.55 1.2a3.6 3.6 0 0 1 2.25 2.25l1.2 3.55a.6.6 0 0 0 1.14 0l1.2-3.55a3.6 3.6 0 0 1 2.25-2.25l3.55-1.2a.6.6 0 0 0 0-1.14l-3.55-1.2a3.6 3.6 0 0 1-2.25-2.25l-1.2-3.55Z" /><path d="M18.6 16.1a.36.36 0 0 0-.68 0l-.5 1.46a1.9 1.9 0 0 1-1.19 1.19l-1.46.5a.36.36 0 0 0 0 .68l1.46.5a1.9 1.9 0 0 1 1.19 1.19l.5 1.46a.36.36 0 0 0 .68 0l.5-1.46a1.9 1.9 0 0 1 1.19-1.19l1.46-.5a.36.36 0 0 0 0-.68l-1.46-.5a1.9 1.9 0 0 1-1.19-1.19l-.5-1.46Z" /></svg>
               </Link>
             </Metal>
           </div>
+          <HeroSkill english={english} />
           <LandingDemo />
         </div>
       </div>
