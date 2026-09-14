@@ -186,6 +186,20 @@ de 1 040 à 1 360 142 vues) qui doit rester « Aucun risque ».
 schéma collecteur) + routes `app/api/research/{route,jobs,studies,collector}` et
 `app/api/cron/research`. UI : `components/studio/ResearchView.tsx` + `research.css`.
 Doc de référence : `docs/research-engine-2026-09-09.md`.
+Refonte du mur et incident de livraison : `docs/research-search-2026-09-14.md`.
+- Le Studio passe par `startStudioResearch` : recherche directe de **photos**,
+  deux pages, aucun filtre implicite, aucun parcours des auteurs. Les filtres
+  min/max vues et dates sont locaux. L'analyse explicite `@compte` conserve
+  le mode comptes ; les valeurs historiques ci-dessous ne concernent que lui.
+- `readResearchJobs(user, id)` filtre côté SQL avant transfert. Ne pas revenir
+  à une lecture de toute la collection pour les sondages d'un seul job.
+- Le cache réutilise une recherche en cours ou terminée depuis moins de 15 min.
+  Actualiser contourne le cache terminé, jamais le verrou d'une tâche en cours.
+- Photos : délai 25 s/page, budget 60 s. Une pause/reprise garde les résultats et
+  réinitialise explicitement le début de tentative. Les anciens jobs sans mode
+  doivent être relancés via le Studio, pas repris par le cron des auteurs.
+- Une livraison doit être committée et intégrée dans `main`. Un snapshot CLI
+  non commité a été écrasé par le déploiement Git suivant le 13 septembre.
 - Une tâche avance **par étapes**, chacune sous bail exclusif de 180 s : une réponse
   tardive ne doit jamais écraser une pause ou une reprise. Garder cet invariant.
 - Distinguer toujours « valeur inconnue » et « zéro » dans les compteurs ; les

@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { AccountVideo } from "../types";
 
 export const filtersSchema = z.object({
-  days: z.number().int().min(1).max(365).default(30),
+  // Zero means all publication dates; it is not a zero-day window.
+  days: z.number().int().min(0).max(365).default(30),
   minSlideshowShare: z.number().min(0).max(1).default(.5),
   /** Plancher de vues d'un SEUL post. Les autres seuils sont des agregats par
    * compte ; celui-ci repond a « trouve-moi des carrousels qui ont marche ». */
@@ -14,6 +15,9 @@ export const filtersSchema = z.object({
 });
 export const startResearchSchema = z.object({
   kind: z.enum(["discover", "analyze"]).default("discover"),
+  // Keep existing account-research integrations compatible. The search wall
+  // requests posts explicitly and never needs to crawl each author's feed.
+  mode: z.enum(["posts", "accounts"]).default("accounts"),
   keywords: z.array(z.string().trim().min(2).max(100)).min(1).max(30),
   source: z.enum(["provider", "browser"]).default("provider"),
   target: z.number().int().min(1).max(50).default(10),
@@ -32,6 +36,8 @@ export type ResearchJob = {
   status: "queued" | "running" | "paused" | "needs_attention" | "done" | "stopped" | "error";
   phase: "search" | "measure"; createdAt: string; updatedAt: string; revision: number;
   keywordIndex: number; searchPage: number; searchCursor: number; searchId?: string;
+  searchPagesDone?: number; searchLimited?: boolean; runStartedAt?: string;
+  completionReason?: "search_exhausted" | "page_limit" | "pagination_stalled" | "result_limit";
   candidates: Candidate[]; processed: string[]; results: ResearchResult[];
   failures: Array<{ handle?: string; keyword?: string; error: string }>;
   events: Array<{ at: string; message: string }>; exhausted: boolean;

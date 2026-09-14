@@ -35,40 +35,64 @@ export async function consumeMetricsBudget() {
   const limit = Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 1000;
   if (!await consumeLimit(`metrics-provider:${new Date().toISOString().slice(0,10)}`, limit, 86400000)) throw new MetricsError("http", "metrics_provider_daily_limit");
 }
-export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>): Promise<any> {
-  await consumeMetricsBudget();
-  const deadline = AbortSignal.timeout(40000);
-  const res = await fetch(`${base()}/run`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({
-      provider: "tikhub",
-      endpoint,
-      input: { queryParams },
-    }),
-    cache: "no-store",
-    signal: deadline,
+function waitForPoll(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return; }
+    const abort = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, ms);
+    signal.addEventListener("abort", abort, { once: true });
   });
-  if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
-  if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
-  let body: any = await res.json().catch(() => ({}));
-  let output = body.output ?? body.result?.output ?? body.data?.output;
-  const runId = body.runId || body.id || body.run?.id;
-  if (!output && runId) {
-    // Async run: poll with a simple backoff, TikHub takes a few seconds.
-    for (let attempt = 0; attempt < 14 && !output; attempt += 1) {
-      await new Promise((r) => setTimeout(r, attempt === 0 ? 4000 : 2500));
-      const poll = await fetch(`${base()}/runs/${runId}`, { headers: headers(), cache: "no-store", signal: deadline });
-      if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
-      body = await poll.json().catch(() => ({}));
-      const status = String(body.status || "").toUpperCase();
-      if (status === "FAILED" || status === "ERROR") throw new MetricsError("http", body.error || "run failed");
-      output = body.output ?? body.result?.output ?? body.data?.output;
-    }
-    if (!output) throw new MetricsError("timeout", "run still pending");
+}
+
+function outputFromRun(body: any) {
+  const status = String(body?.status || "").toUpperCase();
+  if (["FAILED", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT"].includes(status)) {
+    throw new MetricsError("http", "metrics_provider_failed");
   }
-  if (!output) throw new MetricsError("http", "Missing provider result");
+  const output = body?.output ?? body?.result?.output ?? body?.data?.output;
+  if (!output && ["COMPLETED", "SUCCEEDED"].includes(status)) throw new MetricsError("empty", "metrics_provider_empty");
   return output;
+}
+
+export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>, options: { timeoutMs?: number } = {}): Promise<any> {
+  await consumeMetricsBudget();
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? Math.max(1, Math.min(40000, Math.floor(options.timeoutMs!))) : 40000;
+  const deadline = AbortSignal.timeout(timeoutMs);
+  try {
+    const res = await fetch(`${base()}/run`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        provider: "tikhub",
+        endpoint,
+        input: { queryParams },
+      }),
+      cache: "no-store",
+      signal: deadline,
+    });
+    if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
+    if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
+    let body: any = await res.json().catch(() => ({}));
+    let output = outputFromRun(body);
+    const runId = body.runId || body.id || body.run?.id;
+    if (!output && runId) {
+      // Check early for fast runs, then back off for slower ones. The shared
+      // deadline bounds submission, polling requests and the waits between them.
+      for (let attempt = 0; attempt < 16 && !output; attempt += 1) {
+        await waitForPoll(attempt === 0 ? 1000 : attempt === 1 ? 1500 : 2500, deadline);
+        const poll = await fetch(`${base()}/runs/${encodeURIComponent(String(runId))}`, { headers: headers(), cache: "no-store", signal: deadline });
+        if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
+        body = await poll.json().catch(() => ({}));
+        output = outputFromRun(body);
+      }
+      if (!output) throw new MetricsError("timeout", "metrics_provider_timeout");
+    }
+    if (!output) throw new MetricsError("http", "Missing provider result");
+    return output;
+  } catch (error) {
+    if (deadline.aborted) throw new MetricsError("timeout", "metrics_provider_timeout");
+    throw error;
+  }
 }
 
 async function runPage(handle: string, cursor: number): Promise<{ items: any[]; hasMore: boolean; cursor: number }> {

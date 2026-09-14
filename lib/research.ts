@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fetchTikTokProfile, normalizeHandle } from "./tiktok-profile";
 import { fetchAccountVideos, metricsEnabled } from "./metrics";
-import { readStore, updateStore } from "./store";
+import { readStore, readStoreSlice, updateStore } from "./store";
 import { consumeLimit } from "./rate-limit";
 import type { AccountVideo, SessionUser } from "./types";
 
@@ -12,7 +12,7 @@ export const researchSchema = z.object({
 });
 
 export { researchMetrics } from "./research/statistics";
-import { researchMetrics } from "./research/statistics";
+import { known, researchMetrics } from "./research/statistics";
 import { startResearch } from "./research/jobs";
 import { formatLibrary } from "./research/formats";
 import { inScope, resolveProject } from "./projects";
@@ -54,9 +54,19 @@ export async function discoverResearchAccounts(user: SessionUser, keywords: stri
 }
 
 export async function researchLibrary(user: SessionUser, query = "", days = 30, minPostViews = 0) {
-  const data = await readStore();
+  const data = await readStoreSlice(["accounts"], { videos: true });
   return data.accounts.filter(a => inScope(a, user) && `${a.handle} ${a.nickname || ""} ${a.bio || ""} ${a.niche} ${a.notes} ${(a.videos || []).flatMap(p => p.hashtags || []).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
     .map(account => ({ account, metrics: researchMetrics(account.videos || [], account.followers, Date.now(), days, minPostViews), measuredAt: account.videosFetchedAt || null }));
+}
+
+/** Apply the visible filters before the payload limit: old viral posts must not
+ * crowd recent matches out of the response. A zero-day window means all time. */
+export function researchWallPosts(videos: AccountVideo[], days: number, minPostViews: number, now = Date.now()) {
+  return videos.filter(post => post.kind === "photo"
+    && (minPostViews <= 0 || known(post, "views") && post.views >= minPostViews)
+    && !(post.createdAt > 0 && post.createdAt * 1000 > now)
+    && (days === 0 || post.createdAt > 0 && post.createdAt * 1000 >= now - days * 86400000))
+    .sort((a, b) => b.views - a.views).slice(0, 60);
 }
 
 export async function contentBrief(user: SessionUser) {
