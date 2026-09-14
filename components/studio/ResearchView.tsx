@@ -560,7 +560,6 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       });
       setLastRun(job.id);
       applyJobs([{ ...job, hasPostDetails: true }]);
-      setFilters({ ...ALL_FILTERS });
       setScope("run");
       setShown(PAGE);
       setNow(Date.now());
