@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(insights);
 }
 
-const fetchSchema = z.object({ key: z.string().min(4), action: z.literal("fetch_videos"), restart: z.boolean().optional(), days: z.union([z.number().int().min(1).max(3650), z.literal("all")]).optional() });
+const fetchSchema = z.object({ key: z.string().min(4), action: z.literal("fetch_videos"), restart: z.boolean().optional(), force: z.boolean().optional(), days: z.union([z.number().int().min(1).max(3650), z.literal("all")]).optional() });
 
 export async function POST(request: Request) {
   const user = await readSession();
@@ -36,10 +36,11 @@ export async function POST(request: Request) {
 
   if (!await consumeLimit(`account-sync:${user.id}`, 120, 60000)) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": "60" } });
   try {
-    await syncAccountPosts(user.id, parsed.data.key, parsed.data.restart);
+    await syncAccountPosts(user.id, parsed.data.key, parsed.data.restart, parsed.data.force);
   } catch (error) {
     const code = error instanceof Error ? error.message : "sync_failed";
-    return NextResponse.json({ error: code }, { status: code === "missing" ? 404 : 502 });
+    // Budget quotidien atteint : ce n'est pas une panne, c'est une limite (429).
+    return NextResponse.json({ error: code }, { status: code === "missing" ? 404 : code === "budget" ? 429 : 502 });
   }
   return NextResponse.json(await accountInsights(user, parsed.data.key, days));
 }

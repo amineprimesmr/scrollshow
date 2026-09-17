@@ -136,7 +136,7 @@ export function useKeepDrag({ english, onKeep }: { english: boolean; onKeep: (it
               aria-hidden
             >
               {drag.post.cover || drag.post.images?.[0] ? (
-                <img src={coverSrc(drag.post.images?.[0] || drag.post.cover)} alt="" />
+                <img src={coverSrc(drag.post.images?.[0] || drag.post.cover, 240)} alt="" />
               ) : null}
             </div>
             <div className={`ss-keep-target lg${drag.over ? " is-over" : ""}`} data-drop="library" role="presentation">

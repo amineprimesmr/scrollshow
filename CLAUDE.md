@@ -105,6 +105,57 @@ affichée uniquement. Garder ces invariants si on ajoute une vue.
   `tracked` (non connectés, brouillons seulement). Même liste dans le snapshot
   studio, `agentChannels` et le composeur ; `validatePost` accepte les deux.
 
+## Poster aux US — une seule méthode
+`lib/us-guide.ts` + `components/studio/views/PostUSView.tsx` +
+`components/studio/post-us.css` (namespace `.ss-us`). En-tête du shell masqué.
+- **Une seule méthode** : téléphone dédié, sans SIM, derrière un serveur Outline
+  personnel à Ashburn. L'ancienne « méthode A » (organique, sans VPN) a été
+  supprimée — elle ne forçait aucune géo. Ne pas la réintroduire.
+- **La page tient sur un écran** : une barre (titre, coût en une ligne,
+  progression), six étapes dépliables, une ligne de règle d'or. C'est tout.
+  Ont été retirés après coup, et ne doivent pas revenir : le paragraphe
+  d'introduction, la rangée de chiffres, la liste d'achats « ce qu'il te faut »,
+  la liste « à ne jamais faire », la phrase d'objectif sous chaque titre d'étape.
+  Chaque coût et chaque lien vit dans l'étape qui en a besoin.
+- Une tâche = un titre court + une ligne de détail (le chemin exact dans les
+  réglages). Pas de deuxième phrase.
+- **Les liens sont des liens** : bleus (`--ss-link`) et soulignés, jamais des
+  pastilles grises — sinon on ne voit pas qu'ils cliquent.
+- Les identifiants de tâche (`phone_reset`, `srv_agent`, …) sont **persistés**
+  dans `User.usChecklist` et validés par `US_CHECKLIST_IDS` : les renommer efface
+  la progression de tout le monde.
+- La page s'ouvre sur la première étape non finie et n'envoie un `PUT` que si la
+  liste a changé (comparaison de signature) : ouvrir la page n'écrit rien.
+- `US_LINKS` et `US_AGENT_PROMPT` restent copiés de
+  `useprocess/website/src/affiliate/us-guide.js` : les modifier des deux côtés.
+
+## Bibliothèque
+`components/studio/MarketplaceView.tsx` + `components/studio/library.css`
+(namespace `.ss-lib`). Route `/app/marketplace`, en-tête du shell masqué : la page
+porte sa propre barre collante.
+- Une barre (titre, recherche, onglets À moi / Publics, filtres de statut, import,
+  Nouveau) puis un mur de cartes. Pas de panneaux empilés.
+- **Les colonnes du mur font toutes la même largeur** : une seule mesure
+  (`useTileScale`, un `ResizeObserver` sur le `<ul>`) descend le facteur `--k` à
+  toutes les cartes. `SlidePreview` est rendu à `PREVIEW_WIDTH` puis mis à
+  l'échelle — l'étirer en CSS fausserait la taille des textes, calculée en px
+  depuis cette largeur. Ne pas repasser à `100cqw` : `calc(100cqw / 300)` n'est pas
+  un nombre et la transformation est ignorée sans erreur.
+- Une carte n'expose qu'une action principale (Modifier / Utiliser ce format) ;
+  tout le reste vit dans le menu `…`. Six boutons par carte, c'était la page d'avant.
+- Les libellés sont courts : un sous-titre de deux mots, un vide en deux lignes.
+  Le mur de couvertures est le contenu, le texte n'est que de la signalétique.
+
+## Comptes warmés — page verrouillée
+`components/studio/ComingSoon.tsx` + `coming-soon.css`, branché par
+`WarmedAccountsLocked` (`views/MoreViews.tsx`) sur `/app/warmed-accounts`.
+- Le catalogue reste rendu, **flouté et `inert`** (clavier, souris et lecteur
+  d'écran coupés d'un coup), sous une carte de verre « bientôt disponible ».
+- `.ss-soon` fait exactement la hauteur visible et coupe le débordement : une page
+  verrouillée n'a rien à faire défiler.
+- Rouvrir la page = rendre `WarmedAccountsView` directement depuis la route et
+  retirer `locked: true` de `lib/studio-nav.ts`. Rien n'a été supprimé côté API.
+
 ## Onboarding et profil business
 Après inscription (email ou Google) tout le monde passe par `/onboarding` :
 prénom + entreprise + logo, puis lien du business analysé côté serveur par
@@ -255,8 +306,83 @@ route touchant la base en 500).
 - Déjà passés en tranches : `/api/studio`, `/api/auth/login`, `lib/insights.ts`,
   `lib/account-sync.ts`. Toute nouvelle route sollicitée doit faire pareil.
 
+## Performance — ce qui rendait tout lent (audit du 18 septembre 2026)
+Détail et mesures : `docs/audit-performance-2026-09-18.md`. Tests : `tests/perf-regressions.test.ts`,
+`tests/metrics-blocked.test.ts`. À ne pas défaire :
+- **Le store se lit à travers un cache indexé sur sa version** (`lib/store.ts`) : `xmin` de la
+  ligne en base, date + taille du fichier en local. `readSession` ouvre chaque requête ;
+  sans ce cache chaque vignette relisait et re-décodait 8 à 13 Mo. Le cache garde du
+  **texte**, jamais un objet : chaque appelant reçoit sa copie. Toute nouvelle requête SQL de
+  lecture doit rendre `xmin::text` et passer par `cacheGet`/`cachePut`.
+- **Les compteurs de débit vivent dans leur table** `scrollshow_rate_limits` (créée à la
+  volée), en mémoire hors base. Ne jamais remettre un compteur dans le document JSONB :
+  `jsonb_set` réécrit la valeur TOAST entière et verrouille la ligne que tout le site lit.
+- **Une vignette est redimensionnée** : `coverSrc(url, largeurCSS)` → le proxy rend du WebP à
+  une largeur de `COVER_WIDTHS`, cache mémoire borné, clé = chemin CDN sans signature.
+  Écrire `<img src={url}>` ou `coverSrc(url)` sans largeur retélécharge la slide 1080 px.
+- **Un avatar TikTok se demande par handle** : `avatarSrc` / `rowAvatarSrc` →
+  `/api/studio/tiktok/avatar`. Les URL d'avatar sont signées et meurent en ~48 h (63 sur 89
+  étaient expirées : les photos de profil ne « chargeaient pas », elles n'existaient plus).
+  La réparation (relecture du profil public) se fait **en arrière-plan**, jamais pendant la
+  requête de l'image.
+- **Une requête d'image ne doit jamais attendre un tiers lent.** En HTTP/1.1 le navigateur
+  n'ouvre que six connexions par hôte : trente images en attente bloquent toutes les
+  requêtes de données de la page. Même règle pour les lots : la page Shadowban file ses
+  analyses par quatre (`analysisSlot`), elle n'en lance plus 72 d'un coup.
+- **Ouvrir un compte ne lit que SES vidéos** : `readRowVideos(collection, id)`.
+  `/api/accounts` ne renvoie jamais `videos` (5,1 Mo → 95 Ko).
+- **Fournisseur de métriques `BLOCKED`** (crédit épuisé) = échec immédiat + disjoncteur de
+  trois minutes (`lib/metrics.ts`). Il n'était pas reconnu comme état final : 40 s d'attente
+  puis « timeout » sur chaque synchro, analyse et recherche. Si tout « tourne dans le vide »,
+  regarder d'abord le log `metrics_provider_blocked` et le solde du portefeuille.
+- **Couvertures expirées ⇒ relecture depuis le début** (`AccountPanel`, `signedUrlExpired`) :
+  reprendre au curseur ne rafraîchit jamais les premières pages.
+- **Dev : toujours `npm run dev*`**, jamais `next dev` nu. `scripts/dev.mjs` comble un trou de
+  Next 15.5 + Turbopack (`scripts/dev-manifests.mjs`) : sans le
+  `react-loadable-manifest.json` d'un route handler, Next dev réessaie 3 × 100 ms — +200 ms
+  sur **chaque** appel API et chaque image (240 ms → 24 ms). La production n'est pas touchée.
+- `img-fx` tire three.js (~150 Ko) : import **dynamique** uniquement (`/app/home` 317 → 164 Ko).
+- `readSession` lit **un** utilisateur (`readUserScope`), jamais `readStoreSlice([])` : à mille
+  comptes c'était 1,6 Mo par requête.
+- Un cache partagé entre utilisateurs ne reçoit **jamais** une valeur fournie par le navigateur
+  (l'indice `url` de la route d'avatar ne sert que hors bibliothèque et n'est pas mis en cache).
+- Listes longues : pas de `backdrop-filter` par ligne, pas de `will-change` par enfant, dossiers
+  lointains de l'éventail réduits à une silhouette (`DETAIL_REACH`), composants de liste en `memo`.
+- **La limite restante est le store en document unique** : quelques centaines d'utilisateurs, pas
+  des milliers. Plan de migration dans `docs/audit-performance-2026-09-18.md`.
+
+## Gestion des comptes (Overview → « Gérer »)
+`lib/account-manage.ts` (logique pure, testée) + `app/api/studio/accounts/manage` +
+`components/studio/AccountsManager.tsx` + `accounts-manager.css` (namespace `.ss-am`).
+- Les pastilles « Comptes (n) / Abonnés / Likes / Posts » en haut à gauche de l'Overview ont
+  été **retirées** à la demande d'Amine : ne pas les remettre. Le tri vit dans le gestionnaire.
+- Deux gestes distincts : **masquer** (`hidden`, réversible, rien n'est effacé) et **supprimer**
+  (ligne + cache de vidéos effacés ; jeton révoqué chez la plateforme pour un compte connecté,
+  hors verrou du store). Les posts du calendrier ne sont jamais supprimés.
+- Un compte masqué n'apparaît **nulle part** sauf dans le gestionnaire : `ownedChannels` et
+  `GET /api/accounts` le filtrent (Overview, calendrier, composeur, agent). Un compte connecté
+  masqué continue d'éclipser son doublon suivi.
+- Une action = **une** écriture pour tout le lot (`updateStoreSlice`, 500 clés max). La suppression
+  de dix comptes ou d'un compte connecté exige de recopier SUPPRIMER.
+- Le gestionnaire est chargé en `dynamic()` et monté en portal : il reste hors du chemin critique.
+
+## Appels payants au fournisseur — garde-fous
+`lib/metrics-guard.ts` (tests : `tests/metrics-guard.test.ts`), comparatif et modèle de coût :
+`docs/couts-fournisseur-2026-09-18.md`.
+- Tout appel payant passe par `cachedProviderCall` : **cache partagé entre utilisateurs**, par
+  requête (compte + curseur, mot-clé + page + session). On met en cache le résultat normalisé.
+- Tout point d'entrée enveloppe son travail dans `withMetricsUser({ userId })` : sans lui, pas de
+  budget par utilisateur (`METRICS_USER_DAILY_LIMIT`, 120) ni de ligne dans le registre d'usage.
+- **Jamais de boucle « tant qu'il reste des pages » déclenchée par un affichage.** L'Overview lit
+  2 pages en automatique, 6 par clic. Ouvrir @nike aspirait tout l'historique, page payante
+  après page payante.
+- Avec postgres.js, un objet JSON s'insère par `sql.json(valeur)`, jamais `${texte}::jsonb` (la
+  colonne recevrait une chaîne JSON).
+- Les API officielles TikTok ne donnent que les vidéos du compte **connecté** : elles ne peuvent
+  pas remplacer le fournisseur pour des comptes tiers ni pour la recherche.
+
 ## Build et vérification
-`npm run typecheck`, `npm test` (124 tests), puis build isolé
+`npm run typecheck`, `npm test` (207 tests), puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 

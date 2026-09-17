@@ -4185,7 +4185,8 @@ a.ss-btn-ghost {
   border: 1px solid var(--ss-line);
   box-shadow: var(--ss-shadow);
   animation: ss-fade-up 0.5s var(--sb-out) both;
-  animation-delay: calc(var(--i, 0) * 60ms);
+  /* Plafonne : sans cela la 72e carte restait invisible 4,3 s, la 300e 18 s. */
+  animation-delay: calc(min(var(--i, 0), 11) * 60ms);
   transition: transform 0.4s var(--sb-ease), box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
@@ -5618,7 +5619,8 @@ a.ss-btn-ghost {
 .ss-fan__bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Plus de pastilles a gauche : le tri vit dans « Gerer ». */
+  justify-content: flex-end;
   gap: 12px;
   padding: 16px 18px 0;
   position: relative;
@@ -5736,7 +5738,8 @@ a.ss-btn-ghost {
   background: #000;
   opacity: 0;
   pointer-events: none;
-  will-change: opacity;
+  /* Pas de will-change ici : le dossier parent est deja une couche. Une couche
+     de plus par enfant, c'etait ~5 couches x 300 comptes pour le compositeur. */
 }
 
 .ss-folder__back {
@@ -5757,7 +5760,6 @@ a.ss-btn-ghost {
   position: absolute;
   opacity: 0;
   pointer-events: none;
-  will-change: opacity;
   transition: opacity 0.26s ease;
 }
 

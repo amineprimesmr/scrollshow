@@ -12,9 +12,14 @@ import { PostTile } from "./PostTile";
 import { PostViewer } from "./PostViewer";
 import { engagementOf } from "./post-meta";
 import { IconChevron } from "./icons";
-import { coverSrc } from "./cover";
+import { coverSrc, signedUrlExpired } from "./cover";
 import { useStudio } from "./StudioContext";
-import { FxImage } from "@/components/fx/FxImage";
+import dynamic from "next/dynamic";
+
+// `img-fx` embarque three.js (~150 Ko compresses). Il ne sert qu'a deux vignettes
+// hors de la vue par defaut : on ne le telecharge que si elles s'affichent, au
+// lieu de le mettre sur le chemin critique de l'Overview.
+const FxImage = dynamic(() => import("@/components/fx/FxImage").then((m) => m.FxImage), { ssr: false });
 import { LoadingOrb, Orb } from "@/components/fx/Orb";
 
 type Tab = "overview" | "videos" | "formats";
@@ -58,6 +63,8 @@ export function AccountPanel({
   function openPublication(id: string, slide = 0) { setOpenSlide(slide); setOpenPost(id); }
   const [openPost, setOpenPost] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  // Un compte supprime n'a plus d'avatar : on retombe sur ses initiales.
+  const [deadAvatar, setDeadAvatar] = useState<string | null>(null);
 
   const key = item?.id || null;
 
@@ -66,14 +73,24 @@ export function AccountPanel({
     setOpenPost(null);
   }, [key, range, kind, sort, query, hookOnly]);
 
+  // Dernieres stats lues, par compte et periode. Revenir sur un compte deja vu
+  // l'affiche tout de suite ; la lecture reseau le rafraichit derriere.
+  const seenInsights = useRef(new Map<string, AccountInsights>());
+  const firstLoad = useRef(true);
+
   useEffect(() => {
     if (!key) {
       setData(null);
       return;
     }
-    setData(null);
+    const cacheKey = `${key}:${range}`;
+    const cached = seenInsights.current.get(cacheKey) || null;
+    setData(cached);
     let active = true;
     // Scrubbing the fan changes the selection quickly: wait for it to settle.
+    // Le tout premier compte n'a rien a attendre : personne ne fait defiler.
+    const wait = firstLoad.current ? 0 : cached ? 500 : 220;
+    firstLoad.current = false;
     const handle = window.setTimeout(() => {
       abort.current?.abort();
       const controller = new AbortController();
@@ -84,13 +101,15 @@ export function AccountPanel({
         .then(async (res) => {
           const json = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(json.error || "failed");
+          seenInsights.current.set(cacheKey, json);
+          if (seenInsights.current.size > 40) seenInsights.current.delete(seenInsights.current.keys().next().value as string);
           if (active) setData(json);
         })
         .catch((err) => {
-          if (active && err?.name !== "AbortError") setError(t("Impossible de charger les statistiques.", "Could not load the stats.", en));
+          if (active && !cached && err?.name !== "AbortError") setError(t("Impossible de charger les statistiques.", "Could not load the stats.", en));
         })
         .finally(() => { if (active) setLoading(false); });
-    }, 260);
+    }, wait);
     return () => { active = false; window.clearTimeout(handle); abort.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, range]);
@@ -99,35 +118,48 @@ export function AccountPanel({
   useEffect(() => () => { selection.current = null; }, []);
   selection.current = `${key}:${range}`;
   const syncing = useRef(false);
-  const autoStarted = useRef<string | null>(null);
+  const autoStarted = useRef(new Set<string>());
 
-  async function fetchVideos() {
+  /**
+   * Chaque page lue est un appel PAYANT. Une ouverture automatique n'en lit que
+   * deux (les 100 posts les plus recents) ; l'historique complet d'un gros compte
+   * — des centaines de pages pour @nike — ne se charge que si l'utilisateur le
+   * demande, six pages par clic.
+   */
+  async function fetchVideos(fromStart = false, manual = false) {
     if (!key || syncing.current) return;
+    let pagesLeft = manual ? 6 : 2;
     const requestedKey = key;
     const requestedSelection = `${key}:${range}`;
     syncing.current = true;
     setFetching(true);
     setError(null);
-    let restart = Boolean(data?.sync?.complete);
+    let restart = fromStart || Boolean(data?.sync?.complete);
     try {
       // Each HTTP request commits one page. Switching account pauses this loop;
       // reopening it resumes from the persisted cursor.
       while (selection.current === requestedSelection) {
         const res = await fetch("/api/studio/insights", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: requestedKey, action: "fetch_videos", days: range, restart }),
+          body: JSON.stringify({ key: requestedKey, action: "fetch_videos", days: range, restart, force: manual && restart }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "sync_failed");
+        seenInsights.current.set(requestedSelection, json);
         if (selection.current !== requestedSelection) break;
         setData(json);
         restart = false;
-        if (!json.sync?.hasMore) break;
+        pagesLeft -= 1;
+        if (!json.sync?.hasMore || pagesLeft <= 0) break;
       }
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : "sync_failed";
       const reconnect = /scope|token|connection_required|unauthorized/.test(code);
-      if (selection.current === requestedSelection) setError(reconnect
+      if (selection.current === requestedSelection) setError(code === "budget"
+        ? t("Limite quotidienne de lecture de posts atteinte. Elle se réinitialise demain ; les posts déjà chargés restent affichés.", "Daily post-reading limit reached. It resets tomorrow; posts already loaded stay available.", en)
+        : code === "blocked"
+        ? t("La lecture des posts publics est suspendue côté ScrollShow. Les posts déjà chargés restent affichés.", "Reading public posts is paused on ScrollShow's side. Posts already loaded stay available.", en)
+        : reconnect
         ? t("Autorisation TikTok expirée ou incomplète. Reconnecte ce compte depuis Comptes. Les posts chargés sont conservés.", "TikTok permission expired or incomplete. Reconnect this account from Accounts. Loaded posts are preserved.", en)
         : t("Lecture interrompue par le service de données. Les posts chargés sont conservés ; reprends la synchronisation dans un moment.", "The data service interrupted the sync. Loaded posts are preserved; resume syncing in a moment.", en));
     } finally {
@@ -137,13 +169,32 @@ export function AccountPanel({
   }
 
   useEffect(() => {
-    if (!key || !data || data.key !== key || !data.canFetch || fetching || autoStarted.current === key || data.sync?.error) return;
-    if (!data.sync?.complete || (data.fetchedAt && Date.now() - Date.parse(data.fetchedAt) > 6 * 3600000)) {
-      autoStarted.current = key;
-      void fetchVideos();
+    // Une synchronisation appelle un fournisseur PAYANT. Elle ne part donc que pour
+    // un panneau ouvert (faire defiler l'eventail panneau replie ne coute rien) et
+    // une seule fois par compte et par visite — `autoStarted` retient tous les
+    // comptes deja tentes, pas seulement le dernier : A → B → A ne repaie pas A.
+    if (!expanded || !key || !data || data.key !== key || !data.canFetch || fetching || autoStarted.current.has(key)) return;
+    const age = data.fetchedAt ? Date.now() - Date.parse(data.fetchedAt) : Infinity;
+    // `fetchedAt` ne bouge qu'en cas de succes : l'anciennete d'un ECHEC se lit sur
+    // `sync.updatedAt`, sinon un compte qui echoue toujours etait retente a chaque fois.
+    const sinceAttempt = data.sync?.updatedAt ? Date.now() - Date.parse(data.sync.updatedAt) : Infinity;
+    // Les couvertures TikTok sont des URL signees qui expirent en quelques jours.
+    // Une galerie dont les images sont mortes doit etre relue DEPUIS LE DEBUT :
+    // reprendre au curseur ne rafraichit jamais les premieres pages, et c'est
+    // ainsi qu'un compte lu il y a une semaine affichait un mur de tuiles vides.
+    const dead = data.videos.slice(0, 12).filter(v => signedUrlExpired(v.images?.[0] || v.cover)).length;
+    const expired = dead > 0 && dead >= Math.min(3, data.videos.length);
+    // Une erreur ancienne ne doit pas bloquer a vie : on retente apres une heure.
+    if (data.sync?.error && sinceAttempt < 6 * 3600000) return;
+    // « Partiel » seul ne declenche rien : sinon chaque visite d'un gros compte
+    // relisait deux pages de plus, indefiniment. On relit si le compte n'a jamais
+    // ete lu, s'il date de plus de 24 h, ou si ses images sont mortes.
+    if (expired || !data.fetchedAt || age > 24 * 3600000) {
+      autoStarted.current.add(key);
+      void fetchVideos(expired);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, data, fetching]);
+  }, [key, data, fetching, expanded]);
 
   const metricValue = (value: number, metric = "views", suffix = "") => {
     const missing = !data || (data.source === "none" && !data.sync?.complete) || data.stats.missingMetrics?.includes(metric);
@@ -197,7 +248,7 @@ export function AccountPanel({
     <div className={`ss-acc ${expanded ? "is-open" : ""}`}>
       <button type="button" className="ss-acc__bar" onClick={() => onToggle(!expanded)} aria-expanded={expanded}>
         <div className="ss-acc__id">
-          {item.avatar ? <img src={item.avatar} alt="" /> : <span>{item.handle.slice(0, 2).toUpperCase()}</span>}
+          {item.avatar && deadAvatar !== item.avatar ? <img src={item.avatar} alt="" decoding="async" onError={() => setDeadAvatar(item.avatar)} /> : <span>{item.handle.slice(0, 2).toUpperCase()}</span>}
           <div>
             <b>{item.name}</b>
             <span>
@@ -276,7 +327,7 @@ export function AccountPanel({
             {" · "}{data.sync?.loaded ?? data.videos.length} {t("posts", "posts", en)}
             {data.fetchedAt ? ` · ${t("lu le", "read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}` : ""}
           </span>
-          {data.canFetch ? <button type="button" className="ss-fan__chip lg-press" disabled={fetching} onClick={() => void fetchVideos()}>
+          {data.canFetch ? <button type="button" className="ss-fan__chip lg-press" disabled={fetching} onClick={() => void fetchVideos(false, true)}>
             {fetching ? <Orb size={20} state="searching" /> : null}
             {fetching ? t("Chargement…", "Loading…", en) : data.sync?.complete ? t("Actualiser", "Refresh", en) : t("Reprendre", "Resume", en)}
           </button> : null}
@@ -300,7 +351,7 @@ export function AccountPanel({
             {data.timeline.length > 1 ? <Trend points={data.timeline} en={en} /> : null}
             {data.videos[0] ? (
               <a className="ss-acc__best" href={data.videos[0].url || undefined} target="_blank" rel="noreferrer">
-                {data.videos[0].cover ? <FxImage src={coverSrc(data.videos[0].cover)} width={56} height={74} radius={10} preset="pixels-mechanic" /> : <span />}
+                {data.videos[0].cover ? <FxImage src={coverSrc(data.videos[0].cover, 120)} width={56} height={74} radius={10} preset="pixels-mechanic" /> : <span />}
                 <div>
                   <small>{t("Meilleure vidéo", "Best video", en)}</small>
                   <b>{data.videos[0].title || t("Sans titre", "Untitled", en)}</b>
@@ -313,7 +364,7 @@ export function AccountPanel({
               <div className="ss-acc__best is-empty">
                 <b>{t("Pas encore de vidéos analysées", "No videos analysed yet", en)}</b>
                 {data.canFetch ? (
-                  <button type="button" className="ss-fan__chip is-on" disabled={fetching} onClick={() => void fetchVideos()}>
+                  <button type="button" className="ss-fan__chip is-on" disabled={fetching} onClick={() => void fetchVideos(false, true)}>
                     {fetching ? <Orb size={20} state="searching" invert /> : null}
                     {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les vidéos", "Analyse the videos", en)}
                   </button>
@@ -340,7 +391,7 @@ export function AccountPanel({
         {data && tab === "videos" ? (
           <div className="ss-acc__videos">
             <div className="ss-acc__toolbar">
-              <PublicationTextSearch key={`${key}:${range}`} accountKey={key!} range={range} videos={data.videos} query={query} onQuery={setQuery}
+              <PublicationTextSearch key={`${key}:${range}`} enabled={expanded} accountKey={key!} range={range} videos={data.videos} query={query} onQuery={setQuery}
                 hookOnly={hookOnly} onScope={setHookOnly} priorityPostId={openPost || undefined} en={en} onUpdate={(updates, hooks) => setData(previous => {
                   if (!previous || previous.key !== key) return previous;
                   const indexed = new Map(updates.map(v => [v.id, v.slideTexts]));
@@ -399,7 +450,7 @@ export function AccountPanel({
                     : t("Aucun post ne correspond à ce filtre.", "No post matches this filter.", en)
                   : t("Aucun post sur cette période.", "No post in this range.", en)}
                 {!data.videos.length && data.canFetch ? (
-                  <button type="button" className="ss-fan__chip is-on lg-press" disabled={fetching} onClick={() => void fetchVideos()}>
+                  <button type="button" className="ss-fan__chip is-on lg-press" disabled={fetching} onClick={() => void fetchVideos(false, true)}>
                     {fetching ? <Orb size={20} state="searching" invert /> : null}
                     {fetching ? t("Analyse…", "Analysing…", en) : t("Analyser les posts", "Analyse the posts", en)}
                   </button>
@@ -435,7 +486,7 @@ export function AccountPanel({
                   <li key={v.id}>
                     <span className="ss-acc__rank">{i + 1}</span>
                     {v.cover ? (
-                      <FxImage src={coverSrc(v.cover)} width={44} height={58} radius={8} preset={i % 2 ? "pixels-mechanic" : "pixels-organic"} className="ss-acc__thumb-fx" />
+                      <FxImage src={coverSrc(v.cover, 48)} width={44} height={58} radius={8} preset={i % 2 ? "pixels-mechanic" : "pixels-organic"} className="ss-acc__thumb-fx" />
                     ) : (
                       <span className="ss-acc__thumb" />
                     )}

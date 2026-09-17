@@ -1,6 +1,6 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { usedMediaUrls } from "@/lib/media-usage";
-import { updateStore } from "@/lib/store";
+import { updateStoreSlice } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
 import { inScope } from "@/lib/projects";
@@ -10,7 +10,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const outcome = await updateStore((data) => {
+  const outcome = await updateStoreSlice(["media", "posts", "mediaDeletionQueue"], (data) => {
     const item = data.media.find((entry) => entry.id === id && inScope(entry, session));
     if (!item) return "missing" as const;
     const used = usedMediaUrls(data.posts.filter((post) => inScope(post, session)));

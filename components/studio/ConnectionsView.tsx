@@ -1,5 +1,6 @@
 "use client";
 
+import { rowAvatarSrc } from "./cover";
 import { t } from "@/lib/i18n";
 import { PLATFORMS } from "@/lib/platforms";
 import { useState } from "react";
@@ -69,7 +70,7 @@ export function ConnectionsView() {
               <div className="ss-network-accounts">
                 {accounts.map((channel) => (
                   <div className="ss-network-account" key={channel.id}>
-                    <img src={channel.avatar || tiktok.logo} alt="" />
+                    <img src={rowAvatarSrc(channel, 40) || tiktok.logo} alt="" loading="lazy" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = tiktok.logo; }} />
                     <span>
                       <b>@{channel.handle}</b>
                       <span className="ss-network-account__sub">

@@ -1,5 +1,5 @@
 import { get } from "@vercel/blob";
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import lockfile from "proper-lockfile";
 import { database, databaseEnabled } from "./database";
@@ -34,20 +34,113 @@ function normalize(data: StoreData): StoreData {
   return data;
 }
 
-async function readLocal() {
+/**
+ * Cache de lecture indexe sur la VERSION du document.
+ *
+ * Chaque requete du studio commence par `readSession`, donc par une lecture du
+ * store : sans cache, ouvrir l'Overview relisait et re-decodait le document
+ * entier (8 a 13 Mo) des dizaines de fois — une fois par vignette. Ici une
+ * lecture ne coute plus qu'un controle de version : `xmin` de la ligne en base
+ * (change a chaque UPDATE, sans detoaster `data`), date + taille du fichier en
+ * local. Tant que la version n'a pas bouge, on ressert le JSON deja lu.
+ *
+ * On garde du TEXTE, jamais un objet : chaque appelant recoit sa propre copie
+ * et peut la modifier sans contaminer la requete voisine. Strictement coherent
+ * entre instances : toute ecriture change la version dans la meme transaction.
+ */
+type CacheEntry = { version: string; json: string };
+type Cache = { entries: Map<string, CacheEntry>; chars: number; maxChars: number; maxEntries: number };
+const globalCache = globalThis as typeof globalThis & { ssStoreCaches?: { main: Cache; rows: Cache } };
+/**
+ * Deux caches, bornes en TAILLE (caracteres ~ octets x2 au pire) et pas seulement
+ * en nombre : une tranche peut peser des Mo. Les videos d'une ligne (`rows`) ont
+ * leur propre cache : sinon ouvrir 32 comptes — ou la page Shadowban, qui en lit
+ * 72 — chassait les tranches chaudes (session, studio) que tout le monde relit.
+ */
+function caches() {
+  return globalCache.ssStoreCaches ||= {
+    main: { entries: new Map(), chars: 0, maxChars: 48_000_000, maxEntries: 400 },
+    rows: { entries: new Map(), chars: 0, maxChars: 16_000_000, maxEntries: 200 },
+  };
+}
+const cacheFor = (key: string) => (key.includes(":videos:") ? caches().rows : caches().main);
+function cacheGet(key: string, version: string) {
+  const cache = cacheFor(key);
+  const hit = cache.entries.get(key);
+  if (!hit || hit.version !== version) return null;
+  // Vrai LRU : une entree relue repasse en tete, sinon les plus utiles vieillissent
+  // et sortent comme les autres.
+  cache.entries.delete(key);
+  cache.entries.set(key, hit);
+  return hit.json;
+}
+function cachePut(key: string, version: string, json: string) {
+  const cache = cacheFor(key);
+  const previous = cache.entries.get(key);
+  if (previous) { cache.chars -= previous.json.length; cache.entries.delete(key); }
+  // Plus gros que le cache entier : le garder chasserait tout le reste pour rien.
+  if (json.length > cache.maxChars / 2) return;
+  cache.entries.set(key, { version, json });
+  cache.chars += json.length;
+  while ((cache.chars > cache.maxChars || cache.entries.size > cache.maxEntries) && cache.entries.size > 1) {
+    const oldest = cache.entries.keys().next().value as string;
+    cache.chars -= cache.entries.get(oldest)!.json.length;
+    cache.entries.delete(oldest);
+  }
+}
+/** Une ecriture de ce processus invalide tout de suite, sans attendre le controle de version. */
+export function invalidateStoreCache() {
+  for (const cache of Object.values(caches())) { cache.entries.clear(); cache.chars = 0; }
+}
+
+async function databaseVersion() {
+  const rows = await database()`SELECT xmin::text AS version FROM scrollshow_state WHERE id = 1`;
+  if (!rows.length) throw new Error("database_not_migrated");
+  return rows[0].version as string;
+}
+
+async function localVersion() {
   try {
-    return normalize(JSON.parse(await readFile(filePath(), "utf8")));
+    const info = await stat(filePath());
+    return `${info.mtimeMs}:${info.size}`;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyStore();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "missing";
     throw error;
   }
 }
 
+/** Texte du fichier local, relu seulement quand le fichier a change. */
+async function readLocalText(): Promise<string | null> {
+  const target = filePath();
+  const version = await localVersion();
+  if (version === "missing") return null;
+  const key = `local:${target}`;
+  const hit = cacheGet(key, version);
+  if (hit !== null) return hit;
+  try {
+    const text = await readFile(target, "utf8");
+    cachePut(key, version, text);
+    return text;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function readLocal() {
+  const text = await readLocalText();
+  return text === null ? emptyStore() : normalize(JSON.parse(text));
+}
+
 export async function readStore(_fresh = false): Promise<StoreData> {
   if (databaseEnabled()) {
-    const rows = await database()`SELECT data FROM scrollshow_state WHERE id = 1`;
+    const version = await databaseVersion();
+    const hit = cacheGet("db:full", version);
+    if (hit !== null) return normalize(JSON.parse(hit));
+    const rows = await database()`SELECT xmin::text AS version, data::text AS data FROM scrollshow_state WHERE id = 1`;
     if (!rows.length) throw new Error("database_not_migrated");
-    return normalize(rows[0].data);
+    cachePut("db:full", rows[0].version, rows[0].data);
+    return normalize(JSON.parse(rows[0].data));
   }
   if (process.env.SCROLLSHOW_USE_BLOB === "1") {
     if (process.env.VERCEL_ENV === "preview") throw new Error("preview_must_use_isolated_database");
@@ -75,6 +168,7 @@ export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): P
       if (JSON.stringify(data) !== before) await tx`UPDATE scrollshow_state SET data = ${tx.json(data as never)}, updated_at = now() WHERE id = 1`;
       return { output };
     });
+    invalidateStoreCache();
     return (result as { output: T }).output;
   }
   if (!localStoreEnabled()) throw new Error("database_migration_required");
@@ -87,6 +181,7 @@ export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): P
     const temp = target + "." + crypto.randomUUID() + ".tmp";
     await writeFile(temp, JSON.stringify(data), { encoding: "utf8", mode: 0o600 });
     await rename(temp, target);
+    invalidateStoreCache();
     return result;
   } finally {
     await release();
@@ -158,29 +253,133 @@ export async function readStoreSlice(
 ): Promise<StoreData> {
   const videos = options.videos === true;
   const wanted = [...new Set<string>([...ALWAYS_KEYS, ...(keys as readonly string[])])];
+  const sliceKey = `${[...wanted].sort().join(",")}|${videos ? "v" : "-"}`;
   let partial: Record<string, unknown>;
 
   if (databaseEnabled()) {
-    const rows = await database()`
-      SELECT COALESCE(jsonb_object_agg(kv.key, CASE
-        WHEN ${!videos} AND kv.key IN ('accounts', 'channels')
-          THEN (SELECT COALESCE(jsonb_agg(elem - 'videos'), '[]'::jsonb) FROM jsonb_array_elements(kv.value) elem)
-        ELSE kv.value END
-      ) FILTER (WHERE kv.key = ANY(${wanted}::text[])), '{}'::jsonb) AS data
-      FROM scrollshow_state s
-      LEFT JOIN LATERAL jsonb_each(s.data) kv ON true
-      WHERE s.id = 1
-      GROUP BY s.id`;
-    if (!rows.length) throw new Error("database_not_migrated");
-    partial = rows[0].data as Record<string, unknown>;
+    const cacheKey = `db:slice:${sliceKey}`;
+    const hit = cacheGet(cacheKey, await databaseVersion());
+    if (hit !== null) {
+      partial = JSON.parse(hit);
+    } else {
+      const rows = await database()`
+        SELECT s.xmin::text AS version, (
+          SELECT COALESCE(jsonb_object_agg(kv.key, CASE
+            WHEN ${!videos} AND kv.key IN ('accounts', 'channels')
+              THEN (SELECT COALESCE(jsonb_agg(elem - 'videos'), '[]'::jsonb) FROM jsonb_array_elements(kv.value) elem)
+            ELSE kv.value END), '{}'::jsonb)
+          FROM jsonb_each(s.data) kv WHERE kv.key = ANY(${wanted}::text[])
+        )::text AS data
+        FROM scrollshow_state s WHERE s.id = 1`;
+      if (!rows.length) throw new Error("database_not_migrated");
+      cachePut(cacheKey, rows[0].version, rows[0].data);
+      partial = JSON.parse(rows[0].data);
+    }
+  } else if (localStoreEnabled()) {
+    // Meme forme que le chemin base. Le document complet n'est decode qu'une
+    // fois par version du fichier ; ensuite seule la tranche, petite, l'est.
+    const target = filePath();
+    const version = await localVersion();
+    const cacheKey = `local:slice:${target}:${sliceKey}`;
+    const hit = cacheGet(cacheKey, version);
+    if (hit !== null) {
+      partial = JSON.parse(hit);
+    } else {
+      const text = await readLocalText();
+      const full = text === null ? emptyStore() : JSON.parse(text);
+      partial = projectSlice(full as Record<string, unknown>, wanted, videos);
+      const json = JSON.stringify(partial);
+      cachePut(cacheKey, version, json);
+      // `projectSlice` partage ses lignes avec `full` : on repart du texte pour
+      // que l'appelant ait une copie a lui.
+      partial = JSON.parse(json);
+    }
   } else {
-    // Hors base, le transfert ne coute rien : on lit tout puis on projette,
-    // pour que les deux chemins rendent exactement la meme forme.
     partial = projectSlice(await readStore() as unknown as Record<string, unknown>, wanted, videos);
   }
 
   for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
   return guardSlice(normalize(partial as unknown as StoreData), wanted);
+}
+
+/**
+ * La ligne d'UN utilisateur et ses projets : c'est tout ce dont `readSession` a
+ * besoin, et `readSession` ouvre CHAQUE requete (chaque vignette comprise).
+ *
+ * `readStoreSlice([])` rapporte `users` et `projects` de tout le monde : ~1,6 Ko
+ * par utilisateur, soit 1,6 Mo par requete a mille utilisateurs des que le cache
+ * est perime — et il l'est a la moindre ecriture de n'importe qui. Ici le filtre
+ * se fait dans Postgres ; le cache est par utilisateur.
+ */
+export async function readUserScope(userId: string): Promise<StoreData> {
+  let partial: Record<string, unknown>;
+  if (databaseEnabled()) {
+    const cacheKey = `db:user:${userId}`;
+    const hit = cacheGet(cacheKey, await databaseVersion());
+    if (hit !== null) {
+      partial = JSON.parse(hit);
+    } else {
+      const rows = await database()`
+        SELECT s.xmin::text AS version, jsonb_build_object(
+          'users', COALESCE((SELECT jsonb_agg(u) FROM jsonb_array_elements(COALESCE(s.data->'users', '[]'::jsonb)) u WHERE u->>'id' = ${userId}), '[]'::jsonb),
+          'projects', COALESCE((SELECT jsonb_agg(p) FROM jsonb_array_elements(COALESCE(s.data->'projects', '[]'::jsonb)) p WHERE p->>'userId' = ${userId}), '[]'::jsonb),
+          'restoreReviewRequired', COALESCE(s.data->'restoreReviewRequired', 'false'::jsonb)
+        )::text AS data
+        FROM scrollshow_state s WHERE s.id = 1`;
+      if (!rows.length) throw new Error("database_not_migrated");
+      cachePut(cacheKey, rows[0].version, rows[0].data);
+      partial = JSON.parse(rows[0].data);
+    }
+  } else {
+    const all = await readStoreSlice([]);
+    partial = {
+      users: all.users.filter(item => item.id === userId),
+      projects: (all.projects || []).filter(item => item.userId === userId),
+      restoreReviewRequired: all.restoreReviewRequired,
+    };
+  }
+  for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
+  return guardSlice(normalize(partial as unknown as StoreData), ALWAYS_KEYS);
+}
+
+/**
+ * Le cache `videos` d'UNE ligne (un compte suivi ou un compte connecte).
+ *
+ * Ouvrir un compte dans l'Overview lisait les videos des 72 comptes (5 a 6 Mo)
+ * pour n'en montrer qu'un. Ici seule la ligne demandee traverse le reseau ; le
+ * reste de la tranche se lit sans `videos`, et sort du cache.
+ */
+export async function readRowVideos(collection: "accounts" | "channels", id: string): Promise<unknown[]> {
+  const pick = (full: Record<string, unknown>) => {
+    const rows = Array.isArray(full[collection]) ? full[collection] as { id?: string; videos?: unknown[] }[] : [];
+    return rows.find(row => row.id === id)?.videos || [];
+  };
+  if (databaseEnabled()) {
+    const cacheKey = `db:videos:${collection}:${id}`;
+    const hit = cacheGet(cacheKey, await databaseVersion());
+    if (hit !== null) return JSON.parse(hit);
+    const rows = await database()`
+      SELECT s.xmin::text AS version, COALESCE((
+        SELECT elem->'videos' FROM jsonb_array_elements(COALESCE(s.data->(${collection}::text), '[]'::jsonb)) elem
+        WHERE elem->>'id' = ${id} LIMIT 1
+      ), '[]'::jsonb)::text AS videos
+      FROM scrollshow_state s WHERE s.id = 1`;
+    if (!rows.length) throw new Error("database_not_migrated");
+    const json = rows[0].videos === "null" ? "[]" : rows[0].videos;
+    cachePut(cacheKey, rows[0].version, json);
+    return JSON.parse(json);
+  }
+  if (localStoreEnabled()) {
+    const cacheKey = `local:videos:${filePath()}:${collection}:${id}`;
+    const version = await localVersion();
+    const hit = cacheGet(cacheKey, version);
+    if (hit !== null) return JSON.parse(hit);
+    const text = await readLocalText();
+    const json = JSON.stringify(text === null ? [] : pick(JSON.parse(text)));
+    cachePut(cacheKey, version, json);
+    return JSON.parse(json);
+  }
+  return pick(await readStore() as unknown as Record<string, unknown>);
 }
 
 /** Atomically update selected collections without transferring unrelated caches.
@@ -224,6 +423,7 @@ export async function updateStoreSlice<T>(
     }
     return { output };
   });
+  invalidateStoreCache();
   return (result as { output: T }).output;
 }
 

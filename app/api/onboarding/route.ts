@@ -2,6 +2,7 @@ import { validateMediaInput } from "@/lib/media-permissions";
 import { withBusinessTikTok } from "@/lib/business-tiktok";
 import { readSession, setSessionCookie } from "@/lib/auth";
 import { analyzeBusiness, AnalyzeError, enrichTikTok } from "@/lib/business-analyzer";
+import { withMetricsUser } from "@/lib/metrics-guard";
 import { savePublicImage } from "@/lib/media-files";
 import { createProject, findProject, publicProject, resolveProject } from "@/lib/projects";
 import { PROJECT_COOKIE, setProjectCookie } from "@/lib/project-context";
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
 
   if (body.action === "analyze") {
     try {
-      const business = await analyzeBusiness(body.url);
+      const business = await withMetricsUser({ userId: session.id }, () => analyzeBusiness(body.url));
       return NextResponse.json({ business });
     } catch (error) {
       const code = error instanceof AnalyzeError ? error.code : "unreachable";
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
 
 
   if (body.action === "tiktok") {
-    const tiktok = await enrichTikTok(body.handle).catch(() => null);
+    const tiktok = await withMetricsUser({ userId: session.id }, () => enrichTikTok(body.handle)).catch(() => null);
     if (!tiktok) return NextResponse.json({ error: "tiktok_profile_unavailable" }, { status: 422 });
     const business = await updateStore(data => {
       const project = targetProject(data, session.id, body.project, projectCookie);

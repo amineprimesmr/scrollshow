@@ -1,6 +1,7 @@
 import { canAddAccount } from "./auth";
 import { inScope } from "./projects";
-import { updateStore } from "./store";
+import { updateStoreSlice } from "./store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts"], fn);
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "./tiktok-profile";
 import type { SessionUser } from "./types";
 

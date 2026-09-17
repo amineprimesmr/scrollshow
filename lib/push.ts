@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
 
 export function pushConfigured() {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -29,7 +29,8 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   if (!pushConfigured()) return { sent: 0 };
   configureWebPush();
 
-  const targets = await updateStore((data) => (data.pushSubscriptions || []).filter((item) => item.userId === userId));
+  // Une lecture : pas de verrou ni de reecriture du document pour lister des abonnements.
+  const targets = ((await readStoreSlice(["pushSubscriptions"])).pushSubscriptions || []).filter((item) => item.userId === userId);
   if (!targets.length) return { sent: 0 };
 
   const dead: string[] = [];
@@ -56,7 +57,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   );
 
   if (dead.length) {
-    await updateStore((data) => {
+    await updateStoreSlice(["pushSubscriptions"], (data) => {
       data.pushSubscriptions = (data.pushSubscriptions || []).filter((item) => !dead.includes(item.id));
     });
   }

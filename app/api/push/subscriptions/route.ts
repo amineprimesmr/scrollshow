@@ -1,6 +1,6 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { labelUserAgent } from "@/lib/user-agent";
-import { readStore, updateStore } from "@/lib/store";
+import { readStoreSlice, updateStore } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inScope } from "@/lib/projects";
@@ -16,7 +16,7 @@ const schema = z.object({
 export async function GET() {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const data = await readStore();
+  const data = await readStoreSlice(["pushSubscriptions"]);
   const subs = (data.pushSubscriptions || [])
     .filter((item) => inScope(item, session))
     .map((item) => ({ id: item.id, label: item.label, createdAt: item.createdAt }));

@@ -177,23 +177,32 @@ export function CreatePostModal() {
 
   // Guideline 5e: after content/init, poll publish/status/fetch so the creator
   // sees PROCESSING → PUBLISH_COMPLETE / FAILED without leaving the page.
+  // L'effet ne depend que de l'identifiant de publication : dependre de `progress`
+  // relancait l'intervalle a chaque reponse et remettait `attempts` a zero — le
+  // plafond de 60 essais ne jouait jamais, un statut bloque sondait sans fin.
+  const publishId = progress?.publishId || "";
+  const publishDone = progress?.status === "PUBLISH_COMPLETE" || progress?.status === "FAILED";
   useEffect(() => {
-    if (!postOpen || !progress || progress.status === "PUBLISH_COMPLETE" || progress.status === "FAILED") return;
+    if (!postOpen || !publishId || publishDone) return;
     let cancelled = false;
     let attempts = 0;
+    let inFlight = false;
     const timer = setInterval(async () => {
+      // Onglet masque ou reponse precedente en attente : on saute ce battement.
+      if (document.hidden || inFlight) return;
       attempts += 1;
       if (attempts > 60) {
         clearInterval(timer);
         return;
       }
+      inFlight = true;
       try {
-        const res = await fetch(`/api/tiktok/publish/status?publish_id=${encodeURIComponent(progress.publishId)}`, { cache: "no-store" });
+        const res = await fetch(`/api/tiktok/publish/status?publish_id=${encodeURIComponent(publishId)}`, { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
         if (cancelled || !res.ok) return;
         const status = String(json.status || "");
         if (!status) return;
-        setProgress({ publishId: progress.publishId, status, tiktokId: json.tiktokId, failReason: json.failReason });
+        setProgress({ publishId, status, tiktokId: json.tiktokId, failReason: json.failReason });
         if (status === "PUBLISH_COMPLETE" || status === "FAILED") {
           clearInterval(timer);
           if (status === "PUBLISH_COMPLETE") sound.success();
@@ -202,13 +211,15 @@ export function CreatePostModal() {
         }
       } catch {
         // transient; next tick retries
+      } finally {
+        inFlight = false;
       }
     }, 4000);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [postOpen, progress, reload]);
+  }, [postOpen, publishId, publishDone, reload]);
 
   useEffect(() => {
     if (!postOpen) return;

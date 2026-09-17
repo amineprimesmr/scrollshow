@@ -1,4 +1,5 @@
 import { consumeLimit } from "./rate-limit";
+import { cachedProviderCall, consumeUserBudget, MetricsBudgetError, PROVIDER_TTL } from "./metrics-guard";
 import type { AccountVideo } from "./types";
 import { normalizePost } from "./research/normalize";
 
@@ -6,7 +7,7 @@ const base = () => process.env.METRICS_API_BASE || "";
 const ENDPOINT = "/api/v1/tiktok/app/v3/fetch_user_post_videos_v3";
 
 export class MetricsError extends Error {
-  code: "no_key" | "http" | "timeout" | "empty";
+  code: "no_key" | "http" | "timeout" | "empty" | "blocked" | "budget";
   constructor(code: MetricsError["code"], message?: string) {
     super(message || code);
     this.code = code;
@@ -35,40 +36,122 @@ export async function consumeMetricsBudget() {
   const limit = Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 1000;
   if (!await consumeLimit(`metrics-provider:${new Date().toISOString().slice(0,10)}`, limit, 86400000)) throw new MetricsError("http", "metrics_provider_daily_limit");
 }
-export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>): Promise<any> {
-  await consumeMetricsBudget();
-  const deadline = AbortSignal.timeout(40000);
-  const res = await fetch(`${base()}/run`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({
-      provider: "tikhub",
-      endpoint,
-      input: { queryParams },
-    }),
-    cache: "no-store",
-    signal: deadline,
+function waitForPoll(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return; }
+    const abort = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, ms);
+    signal.addEventListener("abort", abort, { once: true });
   });
-  if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
-  if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
-  let body: any = await res.json().catch(() => ({}));
-  let output = body.output ?? body.result?.output ?? body.data?.output;
-  const runId = body.runId || body.id || body.run?.id;
-  if (!output && runId) {
-    // Async run: poll with a simple backoff, TikHub takes a few seconds.
-    for (let attempt = 0; attempt < 14 && !output; attempt += 1) {
-      await new Promise((r) => setTimeout(r, attempt === 0 ? 4000 : 2500));
-      const poll = await fetch(`${base()}/runs/${runId}`, { headers: headers(), cache: "no-store", signal: deadline });
-      if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
-      body = await poll.json().catch(() => ({}));
-      const status = String(body.status || "").toUpperCase();
-      if (status === "FAILED" || status === "ERROR") throw new MetricsError("http", body.error || "run failed");
-      output = body.output ?? body.result?.output ?? body.data?.output;
-    }
-    if (!output) throw new MetricsError("timeout", "run still pending");
+}
+
+/**
+ * Le fournisseur refuse le run (credit epuise, compte suspendu) : il repond
+ * `BLOCKED` et ce statut ne changera plus. Il n'etait pas reconnu comme final :
+ * on sondait 40 s avant d'annoncer un « timeout », et chaque synchronisation,
+ * chaque analyse shadowban, chaque recherche se figeait d'autant. Mesure le
+ * 18 septembre 2026, portefeuille a 0,001 $. On echoue tout de suite, et on
+ * n'y retourne pas pendant trois minutes : inutile de payer 72 allers-retours
+ * pour apprendre 72 fois la meme chose.
+ */
+const BLOCK_MS = 180_000;
+const globalMetrics = globalThis as typeof globalThis & { ssMetricsBlockedUntil?: number };
+function blocked(reason?: unknown): never {
+  const text = String(reason || "").slice(0, 200);
+  // Le disjoncteur ne s'arme que pour un refus qui vaut pour TOUT le monde
+  // (credit, facturation, compte suspendu). Un run refuse pour sa propre entree
+  // echoue seul : il ne doit pas couper les metriques des autres utilisateurs.
+  if (/balance|wallet|credit|payment|billing|quota|suspend|402/i.test(text)) {
+    if (!globalMetrics.ssMetricsBlockedUntil || globalMetrics.ssMetricsBlockedUntil < Date.now()) console.error("metrics_provider_blocked", text);
+    globalMetrics.ssMetricsBlockedUntil = Date.now() + BLOCK_MS;
   }
-  if (!output) throw new MetricsError("http", "Missing provider result");
+  throw new MetricsError("blocked", "metrics_provider_blocked");
+}
+
+function outputFromRun(body: any) {
+  const status = String(body?.status || "").toUpperCase();
+  if (["BLOCKED", "REJECTED", "PAYMENT_REQUIRED", "INSUFFICIENT_FUNDS"].includes(status)) blocked(body?.reason || body?.error);
+  if (["FAILED", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT"].includes(status)) {
+    throw new MetricsError("http", "metrics_provider_failed");
+  }
+  const output = body?.output ?? body?.result?.output ?? body?.data?.output;
+  if (!output && ["COMPLETED", "SUCCEEDED"].includes(status)) throw new MetricsError("empty", "metrics_provider_empty");
   return output;
+}
+
+export async function runMetricsTool(endpoint: string, queryParams: Record<string, unknown>, options: { timeoutMs?: number } = {}): Promise<any> {
+  if ((globalMetrics.ssMetricsBlockedUntil || 0) > Date.now()) throw new MetricsError("blocked", "metrics_provider_blocked");
+  // Budget de l'utilisateur d'abord : un compte qui a epuise le sien ne doit pas
+  // entamer le plafond commun a tous.
+  try { await consumeUserBudget(); }
+  catch (error) { if (error instanceof MetricsBudgetError) throw new MetricsError("budget", "metrics_user_daily_limit"); throw error; }
+  await consumeMetricsBudget();
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? Math.max(1, Math.min(40000, Math.floor(options.timeoutMs!))) : 40000;
+  const deadline = AbortSignal.timeout(timeoutMs);
+  if (process.env.METRICS_API_MODE === "direct") return runDirect(endpoint, queryParams, deadline);
+  try {
+    const res = await fetch(`${base()}/run`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        provider: "tikhub",
+        endpoint,
+        input: { queryParams },
+      }),
+      cache: "no-store",
+      signal: deadline,
+    });
+    if (res.status === 401) throw new MetricsError("no_key", "provider rejected the key");
+    if (res.status === 402) blocked("http 402");
+    if (!res.ok && res.status !== 202) throw new MetricsError("http", `upstream ${res.status}`);
+    let body: any = await res.json().catch(() => ({}));
+    let output = outputFromRun(body);
+    const runId = body.runId || body.id || body.run?.id;
+    if (!output && runId) {
+      // Check early for fast runs, then back off for slower ones. The shared
+      // deadline bounds submission, polling requests and the waits between them.
+      for (let attempt = 0; attempt < 16 && !output; attempt += 1) {
+        await waitForPoll(attempt === 0 ? 1000 : attempt === 1 ? 1500 : 2500, deadline);
+        const poll = await fetch(`${base()}/runs/${encodeURIComponent(String(runId))}`, { headers: headers(), cache: "no-store", signal: deadline });
+        if (!poll.ok) throw new MetricsError("http", `upstream poll ${poll.status}`);
+        body = await poll.json().catch(() => ({}));
+        output = outputFromRun(body);
+      }
+      if (!output) throw new MetricsError("timeout", "metrics_provider_timeout");
+    }
+    if (!output) throw new MetricsError("http", "Missing provider result");
+    return output;
+  } catch (error) {
+    if (deadline.aborted) throw new MetricsError("timeout", "metrics_provider_timeout");
+    throw error;
+  }
+}
+
+/**
+ * Mode DIRECT (`METRICS_API_MODE=direct`) : la source est appelee sans
+ * l'intermediaire, en GET synchrone, avec `METRICS_API_BASE` = son origine et
+ * `METRICS_API_KEY` = sa cle. Memes endpoints, meme charge utile, ~33 % moins cher
+ * a l'appel (voir docs/couts-fournisseur-2026-09-18.md). Le mode par defaut
+ * (intermediaire, run asynchrone a sonder) reste inchange.
+ */
+async function runDirect(endpoint: string, queryParams: Record<string, unknown>, deadline: AbortSignal): Promise<any> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(queryParams)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+  try {
+    const res = await fetch(`${base()}${endpoint}?${query}`, { headers: headers(), cache: "no-store", signal: deadline });
+    if (res.status === 401 || res.status === 403) throw new MetricsError("no_key", "provider rejected the key");
+    if (res.status === 402) blocked("http 402");
+    const body: any = await res.json().catch(() => null);
+    if (!res.ok || !body) {
+      const reason = String(body?.detail?.message || body?.message || "");
+      if (/balance|credit|payment|insufficient/i.test(reason)) blocked(reason);
+      throw new MetricsError("http", `upstream ${res.status}`);
+    }
+    return body;
+  } catch (error) {
+    if (deadline.aborted) throw new MetricsError("timeout", "metrics_provider_timeout");
+    throw error;
+  }
 }
 
 async function runPage(handle: string, cursor: number): Promise<{ items: any[]; hasMore: boolean; cursor: number }> {
@@ -79,13 +162,28 @@ async function runPage(handle: string, cursor: number): Promise<{ items: any[]; 
   return { items: data.aweme_list, hasMore: data.has_more === true || data.has_more === 1, cursor: Number(data.max_cursor || 0) };
 }
 
+type VideoPage = { videos: AccountVideo[]; hasMore: boolean; cursor: number };
+
+/**
+ * Une page de posts d'un compte PUBLIC, servie par le cache partage : la meme
+ * page demandee par cent utilisateurs ne coute qu'un appel par fenetre de
+ * fraicheur (voir `metrics-guard.ts`). On met en cache le resultat normalise.
+ */
+function cachedPage(handle: string, cursor: number): Promise<VideoPage> {
+  const clean = handle.replace(/^@/, "").toLowerCase();
+  return cachedProviderCall("account_posts", { handle: clean, cursor }, cursor ? PROVIDER_TTL.accountOlderPage : PROVIDER_TTL.accountFirstPage, async () => {
+    const page = await runPage(clean, cursor);
+    return { videos: page.items.map(toVideo).filter((v): v is AccountVideo => v !== null), hasMore: page.hasMore, cursor: page.cursor };
+  });
+}
+
 export async function fetchAccountVideoPage(handle: string, cursor = 0) {
   if (!metricsEnabled()) throw new MetricsError("no_key");
-  const result = await runPage(handle, cursor);
+  const result = await cachedPage(handle, cursor);
   if (result.hasMore && (!Number.isFinite(result.cursor) || result.cursor <= 0 || (cursor > 0 && result.cursor >= cursor))) {
     throw new MetricsError("http", "Pagination did not advance");
   }
-  return { videos: result.items.map(toVideo).filter((v): v is AccountVideo => v !== null), hasMore: result.hasMore, cursor: result.hasMore ? result.cursor : undefined };
+  return { videos: result.videos, hasMore: result.hasMore, cursor: result.hasMore ? result.cursor : undefined };
 }
 
 /** Pulls up to `pages` × 50 recent posts of a public TikTok account. */
@@ -95,15 +193,14 @@ export async function fetchAccountVideos(handle: string, pages = 2): Promise<Acc
   const videos: AccountVideo[] = [];
   let cursor = 0;
   for (let page = 0; page < pages; page += 1) {
-    const result = await runPage(handle, cursor);
-    for (const item of result.items) {
-      const video = toVideo(item);
-      if (video && !seen.has(video.id)) {
+    const result = await cachedPage(handle, cursor);
+    for (const video of result.videos) {
+      if (!seen.has(video.id)) {
         seen.add(video.id);
         videos.push(video);
       }
     }
-    if (!result.hasMore || !result.items.length) break;
+    if (!result.hasMore || !result.videos.length) break;
     if (!result.cursor || result.cursor === cursor) throw new MetricsError("http", "Pagination did not advance");
     cursor = result.cursor;
   }

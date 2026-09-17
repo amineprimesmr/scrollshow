@@ -1,8 +1,10 @@
 import { mergeAccountVideo } from "./account-sync";
 import { fetchAccountVideos, MetricsError, metricsEnabled } from "./metrics";
+import { withMetricsUser } from "./metrics-guard";
 import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
 import { listRecentVideos, type TikTokVideo } from "./tiktok";
-import { updateStore } from "./store";
+import { updateStoreSlice } from "./store";
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts"], fn);
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "./tiktok-profile";
 import type { Account, AccountVideo, Channel } from "./types";
 
@@ -69,7 +71,9 @@ export async function checkConnectedAccount(channel: Channel): Promise<Shadowban
   };
 }
 
-const LIBRARY_TTL_MS = 12 * 60 * 60 * 1000;
+// 24 h : la page Shadowban relit un compte par visite. A 12 h, soixante-dix comptes
+// consultes matin et soir coutaient 140 appels par jour et par utilisateur.
+const LIBRARY_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Analyzes a library account (added by handle, no OAuth) from the public
@@ -96,7 +100,7 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
       });
     };
     try {
-      videos = await fetchAccountVideos(account.handle, 1);
+      videos = await withMetricsUser({ userId: account.userId }, () => fetchAccountVideos(account.handle, 1));
       await persist(videos);
     } catch (error) {
       if (error instanceof MetricsError && error.code === "empty") await persist([]);

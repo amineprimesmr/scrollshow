@@ -1,7 +1,7 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { resolveStoreUserId } from "@/lib/local-user";
 import { isLocalDemoToken, localDemoEnabled, localDemoProfile } from "@/lib/local-demo";
-import { readStore } from "@/lib/store";
+import { readStoreSlice } from "@/lib/store";
 import { loadTikTokChannel } from "@/lib/tiktok-account";
 import { fetchUserInfo } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const data = await readStore();
+  const data = await readStoreSlice([]);
   const userId = resolveStoreUserId(data, user);
   const channel = await loadTikTokChannel(userId, undefined, user.projectId);
   if (!channel?.accessToken) return NextResponse.json({ user: null, scopes: ["user.info.basic", "user.info.profile", "user.info.stats"] });

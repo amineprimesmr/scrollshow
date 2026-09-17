@@ -1,5 +1,6 @@
 "use client";
 
+import { rowAvatarSrc } from "../cover";
 import { t } from "@/lib/i18n";
 import type { ShadowbanReport, VideoPoint } from "@/lib/shadowban";
 import type { ShadowbanAccount } from "@/lib/shadowban-check";
@@ -163,7 +164,7 @@ export function ShadowbanDetail({ account, en, onClose }: { account: ShadowbanAc
     <section className="ss-sb-detail" data-level={level} aria-label={`${account.name} — ${en ? LEVEL_COPY[level].en : LEVEL_COPY[level].fr}`}>
       <header className="ss-sb-detail__head">
         <span className="ss-sb-avatar" style={{ width: 52, height: 52 }}>
-          {account.avatar ? <img src={account.avatar} alt="" width={52} height={52} /> : <b>{account.name.charAt(0).toUpperCase()}</b>}
+          {account.handle || account.avatar ? <img src={rowAvatarSrc(account, 52)} alt="" width={52} height={52} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <b>{account.name.charAt(0).toUpperCase()}</b>}
         </span>
         <div className="ss-sb-detail__who">
           <h2>

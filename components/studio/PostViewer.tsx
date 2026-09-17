@@ -87,7 +87,7 @@ export function PostViewer({
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             ) : video.cover ? (
-              <img src={coverSrc(video.cover)} alt="" />
+              <img src={coverSrc(video.cover, 480)} alt="" />
             ) : (
               <p className="ss-postview__muted">{t("Ce post n'a pas d'identifiant TikTok lisible.", "This post has no readable TikTok id.", en)}</p>
             )}

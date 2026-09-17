@@ -28,3 +28,26 @@ export function allowedCoverUrl(raw: string): URL | null {
     return null;
   }
 }
+
+/** Largeurs servies. Une liste fermee : un appelant ne peut pas faire fabriquer
+ * (et mettre en cache) mille variantes de la meme image. */
+export const COVER_WIDTHS = [96, 240, 480, 960] as const;
+
+/** La plus petite largeur servie qui couvre la demande ; `null` = image d'origine. */
+export function coverWidth(raw: string | null): number | null {
+  const wanted = Number(raw);
+  if (!raw || !Number.isFinite(wanted) || wanted <= 0) return null;
+  return COVER_WIDTHS.find((w) => w >= wanted) ?? COVER_WIDTHS[COVER_WIDTHS.length - 1];
+}
+
+/** L'image est identifiee par son chemin CDN : la signature et la date
+ * d'expiration de la requete changent a chaque lecture du compte, pas l'image. */
+export function coverCacheKey(url: URL, width: number | null) {
+  return `${url.hostname.toLowerCase()}${url.pathname}|${width ?? "raw"}`;
+}
+
+/** Les URL du CDN TikTok sont signees et datees (`x-expires`, en secondes). */
+export function coverExpired(url: URL, now = Date.now()) {
+  const expires = Number(url.searchParams.get("x-expires") || 0);
+  return expires > 0 && expires * 1000 <= now;
+}

@@ -63,16 +63,26 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [composeDate, setComposeDate] = useState<string | null>(null);
 
   const projectRef = useRef<string | undefined>(undefined);
+  const lastJson = useRef<Record<string, string>>({});
   const applySnapshot = useCallback((json: StudioSnapshot) => {
     if (projectRef.current && projectRef.current !== json.user.projectId) {
       setActiveChannel("all"); setEditing(null); setPostOpen(false); setAddOpen(false); setComposeDate(null);
     }
     projectRef.current = json.user.projectId;
-    setUser(json.user);
-    setChannels(json.channels || []);
-    setPosts(json.posts || []);
-    setMedia(json.media || []);
-    setAvailability(json.availability);
+    // Une reponse 200 ne change souvent qu'une collection. On garde la reference
+    // des autres : sinon chaque sondage re-rendait l'eventail, le calendrier, le
+    // mur et la bibliotheque, qui dependent tous de ces tableaux.
+    const keep = <T,>(name: string, next: T, set: (value: T) => void) => {
+      const text = JSON.stringify(next);
+      if (lastJson.current[name] === text) return;
+      lastJson.current[name] = text;
+      set(next);
+    };
+    keep("user", json.user, setUser);
+    keep("channels", json.channels || [], setChannels);
+    keep("posts", json.posts || [], setPosts);
+    keep("media", json.media || [], setMedia);
+    keep("availability", json.availability, setAvailability);
     setLoaded(true);
   }, []);
 
@@ -93,6 +103,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       onSuccess: () => setSyncError(null),
       onError: (error) => {
         if (error.message === "session_expired") {
+          lastJson.current = {};
           setUser(null); setPosts([]); setChannels([]); setMedia([]);
           setAvailability(null); setLoaded(false);
           setEditing(null); setPostOpen(false);
@@ -146,9 +157,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const patchPostLocal = useCallback((id: string, patch: Partial<StudioPost>) => {
+    // L'etat local s'ecarte du dernier instantane : le prochain doit s'appliquer
+    // meme s'il est identique au precedent (cas d'un deplacement refuse).
+    delete lastJson.current.posts;
     setPosts((list) => list.map((post) => (post.id === id ? { ...post, ...patch } : post)));
   }, []);
   const removePostLocal = useCallback((id: string) => {
+    delete lastJson.current.posts;
     setPosts((list) => list.filter((post) => post.id !== id));
   }, []);
 

@@ -2,9 +2,14 @@
 
 import { t } from "@/lib/i18n";
 import type { Account, Channel } from "@/lib/types";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { coverSrc } from "./cover";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { avatarSrc, coverSrc, retryAvatar } from "./cover";
 import { useStudio } from "./StudioContext";
+import { IconSettings } from "./icons";
+import dynamic from "next/dynamic";
+
+// Le gestionnaire ne s'ouvre qu'au clic : il reste hors du chemin critique.
+const AccountsManager = dynamic(() => import("./AccountsManager").then((m) => m.AccountsManager), { ssr: false });
 
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
@@ -34,7 +39,7 @@ function fromChannel(c: Channel): FanItem {
     platform: c.platform,
     handle: c.handle,
     name: c.name || c.handle,
-    avatar: coverSrc(c.avatar || ""),
+    avatar: c.platform === "tiktok" && c.handle ? avatarSrc(c.handle, c.avatar, 48) : coverSrc(c.avatar || "", 48),
     followers: c.followers || 0,
     likes: c.likes || 0,
     posts: c.videoCount || 0,
@@ -50,7 +55,7 @@ function fromAccount(a: Account): FanItem {
     platform: "tiktok",
     handle: a.handle,
     name: a.nickname || a.handle,
-    avatar: coverSrc(a.avatar || ""),
+    avatar: avatarSrc(a.handle, a.avatar, 48),
     followers: a.followers || 0,
     likes: a.likes || 0,
     posts: a.posts || 0,
@@ -90,6 +95,12 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
  * `TAIL` keeps a sliver of spread so a distant folder is still its own card.
  */
 const SPAN = 5.5;
+/** Nombre de crans, de part et d'autre du focus, dont l'avatar est rendu. */
+const AVATAR_REACH = 14;
+/** Au-dela, un dossier n'est qu'une tranche de la pile : il garde sa silhouette
+ * (dos, poche, ombre) mais perd ses ~25 noeuds de detail. 300 comptes faisaient
+ * ~9 000 noeuds ; ils en font ~1 500. */
+const DETAIL_REACH = 22;
 const TAIL = 0.07;
 
 function spread(d: number, g: Geo) {
@@ -128,7 +139,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   /** Clic sur la scene hors dossier, sans glisser : le parent peut replier le panneau. */
   onBlankClick?: () => void;
 }) {
-  const { channels, english: en, setAddOpen } = useStudio();
+  const { channels, english: en, setAddOpen, reload, loaded } = useStudio();
+  const [managing, setManaging] = useState(false);
   const [clippers, setClippers] = useState<Account[]>([]);
   const [sort, setSort] = useState<SortKey>("followers");
   const [selected, setSelected] = useState(0);
@@ -136,12 +148,23 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"deck" | "grid">("deck");
 
-  useEffect(() => {
+  const [libraryState, setLibraryState] = useState<"loading" | "ready" | "error">("loading");
+  const loadClippers = useCallback(() => {
     fetch("/api/accounts")
-      .then((res) => res.json())
-      .then((json) => setClippers(json.accounts || []))
-      .catch(() => {});
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "failed");
+        setClippers(json.accounts || []);
+        setLibraryState("ready");
+      })
+      // Une lecture ratee n'est pas « aucun compte » : on le dit, et on garde
+      // la liste precedente s'il y en avait une.
+      .catch(() => setLibraryState("error"));
   }, []);
+  useEffect(loadClippers, [loadClippers]);
+  // Le gestionnaire a masque ou supprime des comptes : l'eventail et le reste du
+  // studio (calendrier, composeur) relisent leur liste.
+  const onManaged = useCallback(() => { loadClippers(); void reload(); }, [loadClippers, reload]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 720px)");
@@ -196,9 +219,16 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }, []);
 
+  // Taille de la scene, relevee par le ResizeObserver : la lire dans `paint()`
+  // (quatre fois par image, apres des ecritures de style) forcait une mise en page.
+  const stageSize = useRef({ w: 0, h: 0 });
+  const painted = useRef<{ z: string; o: string; s: string }[]>([]);
+
   const paint = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
+    if (!stageSize.current.w) stageSize.current = { w: stage.clientWidth, h: stage.clientHeight };
+    const { w: stageW, h: stageH } = stageSize.current;
     const g = narrowRef.current ? MOBILE : DESKTOP;
     const n = countRef.current;
     const pivot = Math.round(clamp(target.current, 0, Math.max(0, n - 1)));
@@ -209,8 +239,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     // folders grow and shrink smoothly instead of jumping with the layout.
     // Deux contraintes : la hauteur de la scene (le panneau de compte la reduit)
     // et sa largeur, qui devient la contrainte des qu'il y a beaucoup de comptes.
-    const fitH = (stage.clientHeight - 70) / (narrowRef.current ? 300 : 400);
-    const fitW = (stage.clientWidth - 36) / fanExtent(n, g);
+    const fitH = (stageH - 70) / (narrowRef.current ? 300 : 400);
+    const fitW = (stageW - 36) / fanExtent(n, g);
     kTarget.current = clamp(Math.min(fitH, fitW), 0.5, 1);
     if (kCur.current == null) kCur.current = kTarget.current;
     const k = kCur.current;
@@ -218,8 +248,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     // depends on where the opened folder sits, so recentre from that.
     const first = layout(0 - f, g).x * k;
     const last = layout(Math.max(0, n - 1) - f, g).x * k;
-    const cx = stage.clientWidth / 2 - (first + last) / 2;
-    const cy = stage.clientHeight * 0.56 + 18;
+    const cx = stageW / 2 - (first + last) / 2;
+    const cy = stageH * 0.56 + 18;
     for (let i = 0; i < nodes.current.length; i += 1) {
       const el = nodes.current[i];
       if (!el) continue;
@@ -236,10 +266,19 @@ export function AccountsFan({ onSelect, onBlankClick }: {
       // Flat stacking: the folder nearest the focus is always on top and the
       // order never changes — a hovered folder lifts and comes forward but
       // stays in its slot of the pile.
-      el.style.zIndex = String(1000 - Math.round(ad * 10));
-      el.style.opacity = String(clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1));
-      const shade = el.lastElementChild as HTMLElement | null;
-      if (shade) shade.style.opacity = String(clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h));
+      // On n'ecrit que ce qui change : au repos de la vague, la plupart des
+      // dossiers gardent leur rang, leur opacite et leur ombre.
+      const seen = (painted.current[i] ||= { z: "", o: "", s: "" });
+      const zi = String(1000 - Math.round(ad * 10));
+      if (seen.z !== zi) { el.style.zIndex = zi; seen.z = zi; }
+      const o = clamp(1 - Math.max(0, ad - 5) * 0.08, 0.3, 1).toFixed(3);
+      if (seen.o !== o) { el.style.opacity = o; seen.o = o; }
+      const sh = (clamp((ad - 0.6) * 0.06, 0, 0.36) * (1 - h)).toFixed(3);
+      if (seen.s !== sh) {
+        const shade = el.lastElementChild as HTMLElement | null;
+        if (shade) shade.style.opacity = sh;
+        seen.s = sh;
+      }
     }
   }, []);
 
@@ -339,7 +378,12 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     if (!stage) return;
     // A resized stage changes the target scale: paint it, then let the loop
     // ease the folders to their new size.
-    const ro = new ResizeObserver(() => { paint(); kick(); });
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      stageSize.current = { w: box?.width || stage.clientWidth, h: box?.height || stage.clientHeight };
+      paint();
+      kick();
+    });
     ro.observe(stage);
     return () => ro.disconnect();
   }, [paint, kick]);
@@ -466,6 +510,14 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   }
 
 
+  const register = useCallback((index: number, el: HTMLDivElement | null) => {
+    nodes.current[index] = el;
+    // Un noeud neuf n'a aucun style : on oublie ce qu'on croyait avoir ecrit.
+    painted.current[index] = { z: "", o: "", s: "" };
+  }, []);
+  // Un dossier qui change de forme (detail <-> tranche) est un nouveau noeud.
+  useLayoutEffect(() => { paint(); }, [selected, paint]);
+
   const current = items[selected] || null;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -481,16 +533,6 @@ export function AccountsFan({ onSelect, onBlankClick }: {
   return (
     <section className="ss-fan" aria-label={t("Tous les comptes", "All accounts", en)}>
       <div className="ss-fan__bar">
-        <div className="ss-fan__chips">
-          <span className="ss-fan__chip is-static">
-            {t("Comptes", "Accounts", en)} ({count})
-          </span>
-          {(["followers", "likes", "posts"] as const).map((key) => (
-            <button key={key} type="button" className={`ss-fan__chip ${sort === key ? "is-on" : ""}`} onClick={() => setSort(key)}>
-              {key === "followers" ? t("Abonnés", "Followers", en) : key === "likes" ? "Likes" : "Posts"}
-            </button>
-          ))}
-        </div>
         <div className="ss-fan__actions">
           {many ? (
             <>
@@ -513,6 +555,10 @@ export function AccountsFan({ onSelect, onBlankClick }: {
               </div>
             </>
           ) : null}
+          <button type="button" className="ss-fan__chip ss-fan__manage" onClick={() => setManaging(true)}>
+            <IconSettings size={15} />
+            {t("Gérer", "Manage", en)}
+          </button>
           <button type="button" className="ss-fan__chip ss-fan__connect" onClick={() => setAddOpen(true)}>
             <span aria-hidden>+</span>
             <img src="/assets/platforms/tiktok.png" alt="" width={16} height={16} />
@@ -536,7 +582,7 @@ export function AccountsFan({ onSelect, onBlankClick }: {
                   clicked.current = false;
                 }}
               >
-                {item.avatar ? <img src={item.avatar} alt="" loading="lazy" /> : <span className="ss-fan-card__ph" aria-hidden />}
+                {item.avatar ? <img src={item.avatar} alt="" loading="lazy" decoding="async" onError={retryAvatar} /> : <span className="ss-fan-card__ph" aria-hidden />}
                 <span className="ss-fan-card__id">
                   <b>{item.name || `@${item.handle}`}</b>
                   <span>@{item.handle}</span>
@@ -565,61 +611,31 @@ export function AccountsFan({ onSelect, onBlankClick }: {
         onKeyDown={onKeyDown}
       >
 
-        {items.map((item, i) => {
-          const isSel = i === selected;
-          return (
-            <div
-              key={item.id}
-              id={`fan-${item.id}`}
-              data-index={i}
-              ref={(el) => {
-                nodes.current[i] = el;
-              }}
-              role="option"
-              aria-selected={isSel}
-              className={`ss-folder ${isSel ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
-            >
-              <div className="ss-folder__glow" aria-hidden />
-              <div className="ss-folder__back" />
-              <div className="ss-folder__back-green" aria-hidden />
-              <div className="ss-folder__tab" />
-              <div className="ss-folder__docs" aria-hidden>
-                <div className="ss-folder__doc">
-                  <i style={{ width: "62%" }} />
-                  <i style={{ width: "84%" }} />
-                  <i style={{ width: "48%" }} />
-                </div>
-                <div className="ss-folder__doc">
-                  <i style={{ width: "70%" }} />
-                  <i style={{ width: "54%" }} />
-                  <i style={{ width: "78%" }} />
-                </div>
-                <div className="ss-folder__doc">
-                  <i style={{ width: "58%" }} />
-                  <i style={{ width: "80%" }} />
-                  <i style={{ width: "44%" }} />
-                </div>
-              </div>
-              <div className="ss-folder__front">
-                <div className="ss-folder__front-green" aria-hidden />
-                {item.avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" loading="lazy" draggable={false} /> : null}
-                <div className="ss-folder__count">
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
-                    <circle cx="9" cy="8" r="3.4" />
-                    <circle cx="16.5" cy="9.5" r="2.6" />
-                    <path d="M3 18.5c0-3 2.7-5 6-5s6 2 6 5v.5H3z" />
-                    <path d="M15.5 19v-.5c0-1.6-.6-3-1.6-4 .8-.4 1.7-.6 2.6-.6 2.6 0 4.5 1.6 4.5 4.1v1z" />
-                  </svg>
-                  <span>{compact(item.followers)}</span>
-                </div>
-                <div className="ss-folder__label">@{item.handle}</div>
-              </div>
-              <i className="ss-folder__shade" aria-hidden />
-            </div>
-          );
-        })}
+        {items.map((item, i) => (
+          <Folder
+            key={item.id}
+            item={item}
+            index={i}
+            selected={i === selected}
+            detail={Math.abs(i - selected) <= DETAIL_REACH}
+            avatar={Math.abs(i - selected) <= AVATAR_REACH}
+            register={register}
+          />
+        ))}
 
-        {!count ? (
+        {!count && (!loaded || libraryState === "loading") ? (
+          <div className="ss-fan__empty" role="status">
+            <span>{t("Lecture de tes comptes…", "Loading your accounts…", en)}</span>
+          </div>
+        ) : !count && libraryState === "error" && !all.length ? (
+          <div className="ss-fan__empty" role="alert">
+            <b>{t("Impossible de lire tes comptes", "Could not load your accounts", en)}</b>
+            <span>{t("Rien n'est perdu : c'est la lecture qui a échoué.", "Nothing is lost: the read failed.", en)}</span>
+            <button type="button" className="ss-btn-purple" onClick={() => { setLibraryState("loading"); loadClippers(); }}>
+              {t("Réessayer", "Try again", en)}
+            </button>
+          </div>
+        ) : !count ? (
           <div className="ss-fan__empty">
             <b>{all.length ? t("Aucun compte ne correspond", "No account matches", en) : t("Aucun compte pour l'instant", "No account yet", en)}</b>
             <span>
@@ -635,6 +651,8 @@ export function AccountsFan({ onSelect, onBlankClick }: {
       </div>
       )}
 
+      {managing ? <AccountsManager open onClose={() => setManaging(false)} sort={sort} onSort={setSort} onChanged={onManaged} en={en} /> : null}
+
       {view === "deck" && count > 1 ? (
         <p className="ss-fan__pos" role="status">
           {selected + 1} / {count}
@@ -644,3 +662,75 @@ export function AccountsFan({ onSelect, onBlankClick }: {
     </section>
   );
 }
+
+/**
+ * Un dossier de l'eventail. Memoise : faire defiler change `selected` a chaque
+ * cran, et sans cela les N dossiers etaient re-rendus a chaque pas du geste.
+ */
+const Folder = memo(function Folder({ item, index, selected, detail, avatar, register }: {
+  item: FanItem;
+  index: number;
+  selected: boolean;
+  /** Proche du focus : dossier complet. Sinon une simple tranche de la pile. */
+  detail: boolean;
+  avatar: boolean;
+  register: (index: number, el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      id={`fan-${item.id}`}
+      data-index={index}
+      ref={(el) => register(index, el)}
+      role="option"
+      aria-selected={selected}
+      aria-label={`@${item.handle}`}
+      className={`ss-folder ${selected ? "is-selected" : ""} ${item.connected ? "is-live" : ""}`}
+    >
+      {detail ? <div className="ss-folder__glow" aria-hidden /> : null}
+      <div className="ss-folder__back" />
+      {detail ? (
+        <>
+          <div className="ss-folder__back-green" aria-hidden />
+          <div className="ss-folder__tab" />
+          <div className="ss-folder__docs" aria-hidden>
+            <div className="ss-folder__doc">
+              <i style={{ width: "62%" }} />
+              <i style={{ width: "84%" }} />
+              <i style={{ width: "48%" }} />
+            </div>
+            <div className="ss-folder__doc">
+              <i style={{ width: "70%" }} />
+              <i style={{ width: "54%" }} />
+              <i style={{ width: "78%" }} />
+            </div>
+            <div className="ss-folder__doc">
+              <i style={{ width: "58%" }} />
+              <i style={{ width: "80%" }} />
+              <i style={{ width: "44%" }} />
+            </div>
+          </div>
+        </>
+      ) : <div className="ss-folder__tab" />}
+      <div className="ss-folder__front">
+        {detail ? (
+          <>
+            <div className="ss-folder__front-green" aria-hidden />
+            {/* Au-dela d'une quinzaine de crans l'avatar est invisible : inutile de le telecharger. */}
+            {item.avatar && avatar ? <img className="ss-folder__avatar" src={item.avatar} alt="" decoding="async" draggable={false} onError={retryAvatar} /> : null}
+            <div className="ss-folder__count">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
+                <circle cx="9" cy="8" r="3.4" />
+                <circle cx="16.5" cy="9.5" r="2.6" />
+                <path d="M3 18.5c0-3 2.7-5 6-5s6 2 6 5v.5H3z" />
+                <path d="M15.5 19v-.5c0-1.6-.6-3-1.6-4 .8-.4 1.7-.6 2.6-.6 2.6 0 4.5 1.6 4.5 4.1v1z" />
+              </svg>
+              <span>{compact(item.followers)}</span>
+            </div>
+            <div className="ss-folder__label">@{item.handle}</div>
+          </>
+        ) : null}
+      </div>
+      <i className="ss-folder__shade" aria-hidden />
+    </div>
+  );
+});

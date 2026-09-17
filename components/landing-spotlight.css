@@ -218,6 +218,28 @@
   color: inherit;
 }
 
+/* Mot qui se désagrège en poussière (components/fx/DustSwap.tsx). Les deux
+   versions restent dans le DOM : celle qui n'est pas affichée sort du flux. */
+.af-ld-spot__title .af-dust { position: relative; display: block; cursor: default; }
+.af-ld-spot__title .af-dust span { display: inline; }
+.af-dust__word { position: relative; display: inline-block; white-space: nowrap; }
+.af-dust__base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+.af-ld-spot__title .af-dust__word span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease;
+}
+.af-ld-spot__title .af-dust__word span.is-shown { position: static; visibility: visible; }
+.af-ld-spot__title .af-dust.is-dusting .af-dust__word span { opacity: 0; transition: none; }
+.af-ld-spot__title .af-dust__rest { display: inline-block; will-change: transform; }
+.af-dust__canvas {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .af-ld-spot__lede {
   margin: clamp(0.95rem, 2.4vh, 1.25rem) 0 0;
   max-width: 36rem;

@@ -1,7 +1,7 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { sizesOf } from "@/lib/media-size";
 import { usedMediaUrls } from "@/lib/media-usage";
-import { readStore } from "@/lib/store";
+import { readStoreSlice } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { inScope } from "@/lib/projects";
 
@@ -9,7 +9,7 @@ export async function GET() {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const data = await readStore();
+  const data = await readStoreSlice(["posts", "media", "apiKeys"]);
   const posts = data.posts.filter((item) => inScope(item, session));
   const media = data.media.filter((item) => inScope(item, session));
   const used = usedMediaUrls(posts);

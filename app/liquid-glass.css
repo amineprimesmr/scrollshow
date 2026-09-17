@@ -359,7 +359,9 @@ html.lg-refract .ss-segment button.is-active {
 .ss-onboard,
 .ss-mobile-backdrop,
 .ss-upsell {
-  background: rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 2.2));
+  /* Plafonne : en sombre --lg-shade-a vaut .55, et .55 x 2,2 depasse 1 — le voile
+     devenait un noir OPAQUE et son flou ne montrait plus rien derriere la feuille. */
+  background: rgb(var(--lg-shade) / min(0.62, calc(var(--lg-shade-a) * 2.2)));
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
   backdrop-filter: blur(10px) saturate(1.1);
 }
@@ -503,4 +505,15 @@ html.lg-refract .ss-setup__pill {
   background: rgb(var(--lg-shade) / 0.32);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+}
+
+/* ── Listes longues : pas de flou par ligne ────────────────────────────────
+   Un bouton fantome est en verre. Dans une liste (comptes suivis : trois boutons
+   par ligne, 300 lignes = 900 surfaces de flou) c'est du CONTENU repete, pas du
+   chrome : fond opaque, memes reflets. */
+.ss-clipper .ss-btn-ghost,
+.ss-am__row .ss-btn-ghost {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--ss-soft);
 }

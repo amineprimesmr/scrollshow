@@ -17,10 +17,14 @@ const schema = z.object({
 export async function GET() {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const { readStore } = await import("@/lib/store");
-  const data = await readStore();
+  // Sans le cache `videos` : il pese 98 % de la collection (5 Mo pour 72
+  // comptes) et aucun ecran ne le lit ici — l'Overview l'obtient compte par
+  // compte via /api/studio/insights.
+  const { readStoreSlice } = await import("@/lib/store");
+  const data = await readStoreSlice(["accounts"]);
   return NextResponse.json({
-    accounts: data.accounts.filter((item) => inScope(item, user)),
+    // Les comptes masques ne se voient que dans le gestionnaire de comptes.
+    accounts: data.accounts.filter((item) => inScope(item, user) && !item.hidden),
   });
 }
 

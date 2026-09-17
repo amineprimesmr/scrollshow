@@ -1,5 +1,5 @@
 import { accountInsights } from "./insights";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
 import { publicationImages, publicationTextProgress } from "./publication-text";
 import { allowedCoverUrl } from "./tiktok-cover";
 import { safeFetchBytes } from "./safe-fetch";
@@ -20,7 +20,7 @@ export function indexPublicationText(user: SessionUser, key: string, days: numbe
 async function advance(user: SessionUser, key: string, days: number | null, retryFailed: boolean, priorityPostId?: string) {
   const insights = await accountInsights(user, key, days);
   if (!insights) throw new Error("missing");
-  if (retryFailed) await updateStore(store => {
+  if (retryFailed) await updateStoreSlice(["publicationText"], store => {
     const ids = new Set(insights.videos.map(v => v.id));
     store.publicationText = store.publicationText?.filter(s => !(inScope(s, user) && ids.has(s.postId) && s.status === "failed"));
   });
@@ -35,7 +35,7 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
       if (allowedCoverUrl(image)) file = await safeFetchBytes(image, { maxBytes: 8000000, timeoutMs: 12000, headers: { Referer: "https://www.tiktok.com/" } });
       else {
         // Non-TikTok images must belong to the user's own published recipe.
-        const data = await readStore();
+        const data = await readStoreSlice(["posts"]);
         const owned = data.posts.some(p => inScope(p, user) && p.status === "published" && (p.id === video.id || p.tiktokId === video.id) &&
           (p.image === image || p.recipe?.slides.some(s => s.image === image)));
         if (!owned) throw new Error("invalid_image");
@@ -47,9 +47,13 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
       if (error instanceof Error && error.message === "text_reader_busy") throw error;
       result = { text: "", confidence: null, status: "failed" };
     }
-    await updateStore(data => {
-      const target = key.startsWith("ch:") ? data.channels : data.accounts;
-      if (!target.some(a => a.id === key.slice(3) && inScope(a, user))) return;
+    // Un texte de slide lu = une ecriture. Elle ne porte que sur `publicationText` :
+    // l'ancienne verrouillait et reecrivait le document ENTIER a chaque slide.
+    // L'existence du compte se verifie par une lecture (sans videos), hors verrou.
+    const owners = await readStoreSlice(["accounts", "channels"]);
+    const target = key.startsWith("ch:") ? owners.channels : owners.accounts;
+    if (!target.some(a => a.id === key.slice(3) && inScope(a, user))) continue;
+    await updateStoreSlice(["publicationText"], data => {
       const entries = data.publicationText ||= [];
       const previous = entries.findIndex(s => inScope(s, user) && s.postId === video.id && s.index === slide.index);
       const entry = { userId: user.id, projectId: user.projectId, postId: video.id, index: slide.index, imageKey: slide.imageKey, ...result, updatedAt: new Date().toISOString() };

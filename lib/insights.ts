@@ -1,5 +1,5 @@
 import { metricsEnabled } from "./metrics";
-import { readStoreSlice } from "./store";
+import { readRowVideos, readStoreSlice } from "./store";
 import { withPublicationText } from "./publication-text";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
 import { inScope } from "./projects";
@@ -42,7 +42,8 @@ export type AccountInsights = {
   formats: InsightFormat[];
   hooks: InsightHook[];
   studio: { posts: number; published: number; scheduled: number; views: number; best: AccountVideo | null };
-  sync: { complete: boolean; hasMore: boolean; error?: string; loaded: number; source: "tiktok" | "api" } | null;
+  /** `updatedAt` = derniere tentative, reussie ou non. `fetchedAt` ne bouge qu'en cas de succes. */
+  sync: { complete: boolean; hasMore: boolean; error?: string; loaded: number; source: "tiktok" | "api"; updatedAt?: string } | null;
   source: "tiktok" | "api" | "none";
   canFetch: boolean;
   fetchedAt: string | null;
@@ -205,20 +206,27 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
   if (!parsed) return null;
   // Les insights ont besoin du cache de videos, mais pas des recherches :
   // c'est 3 Mo de moins transferes a chaque ouverture d'un compte.
-  const store = await readStoreSlice(["accounts", "channels", "posts", "publicationText"], { videos: true });
+  // seule la ligne ouverte apporte son cache de videos (voir `readRowVideos`).
+  const store = await readStoreSlice(["accounts", "channels", "posts", "publicationText"]);
   const channels = store.channels.filter((c) => inScope(c, user));
   const accounts = store.accounts.filter((a) => inScope(a, user));
+  // La propriete se verifie AVANT de lire les videos : un identifiant invente ne
+  // doit ni parcourir le document en base ni occuper une place du cache.
+  const owned = parsed.kind === "clipper" ? accounts.some((a) => a.id === parsed.id) : channels.some((c) => c.id === parsed.id);
+  if (!owned) return null;
+  const rowVideos = await readRowVideos(parsed.kind === "clipper" ? "accounts" : "channels", parsed.id) as AccountVideo[];
   const networkFollowers =
     channels.reduce((n, c) => n + (c.followers || 0), 0) + accounts.reduce((n, a) => n + (a.followers || 0), 0);
 
   if (parsed.kind === "clipper") {
     const account = accounts.find((a) => a.id === parsed.id);
     if (!account) return null;
-    return clipperInsights({ ...account, videos: account.videos?.map(v => withPublicationText(v, user.id, store)) }, networkFollowers, days);
+    return clipperInsights({ ...account, videos: rowVideos.map(v => withPublicationText(v, user.id, store)) }, networkFollowers, days);
   }
 
-  const channel = channels.find((c) => c.id === parsed.id);
-  if (!channel) return null;
+  const found = channels.find((c) => c.id === parsed.id);
+  if (!found) return null;
+  const channel = { ...found, videos: rowVideos };
   const result = await channelInsights(user, channel, store.posts.filter((p) => inScope(p, user)), networkFollowers, days);
   result.videos = result.videos.map(v => withPublicationText(v, user.id, store));
   result.hooks = buildHooks(result.videos);
@@ -253,7 +261,7 @@ function clipperInsights(account: Account, networkFollowers: number, days: numbe
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: { posts: 0, published: 0, scheduled: 0, views: 0, best: null },
-    sync: account.videoSync ? { complete: account.videoSync.complete, hasMore: account.videoSync.hasMore, error: account.videoSync.error, loaded: all.length, source: account.videoSync.source } : null,
+    sync: account.videoSync ? { complete: account.videoSync.complete, hasMore: account.videoSync.hasMore, error: account.videoSync.error, loaded: all.length, source: account.videoSync.source, updatedAt: account.videoSync.updatedAt } : null,
     source: all.length ? "api" : "none",
     canFetch: metricsEnabled(),
     fetchedAt: account.videosFetchedAt || null,
@@ -355,7 +363,7 @@ async function channelInsights(
     formats: buildFormats(videos),
     hooks: buildHooks(videos),
     studio: studioSummary(mine),
-    sync: channel.videoSync ? { complete: channel.videoSync.complete, hasMore: channel.videoSync.hasMore, error: channel.videoSync.error, loaded: all.length, source: channel.videoSync.source } : null,
+    sync: channel.videoSync ? { complete: channel.videoSync.complete, hasMore: channel.videoSync.hasMore, error: channel.videoSync.error, loaded: all.length, source: channel.videoSync.source, updatedAt: channel.videoSync.updatedAt } : null,
     source,
     canFetch: channel.platform === "tiktok" && (Boolean(channel.accessToken && channel.connected !== false) || (metricsEnabled() && Boolean(channel.handle))),
     fetchedAt: channel.videosFetchedAt || null,

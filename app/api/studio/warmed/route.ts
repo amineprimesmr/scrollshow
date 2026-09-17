@@ -1,5 +1,5 @@
 import { readStudioSession as readSession } from "@/lib/auth";
-import { readStore, updateStore } from "@/lib/store";
+import { readStoreSlice, updateStore } from "@/lib/store";
 import { findListing, WARMED_CATALOG } from "@/lib/warmed";
 import type { WarmedOrder } from "@/lib/types";
 import { randomUUID } from "node:crypto";
@@ -28,7 +28,7 @@ function ordersOf(orders: WarmedOrder[] | undefined, userId: string) {
 export async function GET() {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const data = await readStore();
+  const data = await readStoreSlice(["warmedOrders"]);
   return NextResponse.json({ catalog: WARMED_CATALOG, orders: ordersOf(data.warmedOrders, session.id) });
 }
 

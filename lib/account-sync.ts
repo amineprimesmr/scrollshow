@@ -3,6 +3,7 @@ import { fetchTikTokProfile } from "./tiktok-profile";
 import { loadTikTokChannel } from "./tiktok-account";
 import { fetchUserInfo, profileFieldsForScopes, listVideoPage, type TikTokVideo } from "./tiktok";
 import { readStoreSlice, updateStoreSlice } from "./store";
+import { withMetricsUser } from "./metrics-guard";
 const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts", "channels"], fn);
 import type { AccountVideo, StoreData, VideoSync } from "./types";
 
@@ -27,19 +28,20 @@ function targetIn(data: StoreData, userId: string, key: string) {
 
 const pending = new Map<string, Promise<void>>();
 /** Persist each page independently so a failed request can resume without losing older posts. */
-export async function syncAccountPosts(userId: string, key: string, restart = false) {
+/** `force` = l'utilisateur a clique « Actualiser » : on n'accepte qu'un cache tres recent. */
+export async function syncAccountPosts(userId: string, key: string, restart = false, force = false) {
   const lock = `${userId}:${key}`;
   const existing = pending.get(lock);
   if (existing) return existing;
-  const task = syncPage(userId, key, restart).finally(() => pending.delete(lock));
+  const task = withMetricsUser({ userId, maxAgeMs: force ? 10 * 60_000 : undefined }, () => syncPage(userId, key, restart)).finally(() => pending.delete(lock));
   pending.set(lock, task);
   return task;
 }
 
 async function syncPage(userId: string, key: string, restart: boolean) {
-  // Le cache de videos est garde (la synchronisation s'appuie dessus), mais ni
-  // les recherches ni le texte des slides ne sont transferes.
-  const target = targetIn(await readStoreSlice(["accounts", "channels"], { videos: true }), userId, key);
+  // Seules les metadonnees de la ligne servent ici (handle, curseur, projet) :
+  // inutile de rapatrier les videos de tous les comptes pour en synchroniser un.
+  const target = targetIn(await readStoreSlice(["accounts", "channels"]), userId, key);
   if (!target) throw new Error("missing");
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;

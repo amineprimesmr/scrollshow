@@ -3,7 +3,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { isPaidPlan, type Plan } from "./plans";
 import { PROJECT_COOKIE, resolveProject, withProject } from "./projects";
-import { publicUser, readStoreSlice } from "./store";
+import { publicUser, readUserScope } from "./store";
 import type { SessionUser } from "./types";
 
 const COOKIE = "ss_session";
@@ -46,7 +46,8 @@ export async function readSession({ allowPendingDeletion = false }: { allowPendi
   if (!payload.sub || typeof payload.email !== "string") return null;
   // A database outage is a service failure, not an invalid session. Preserve
   // the cookie and let the boundary offer retry instead of signing users out.
-  const data = await readStoreSlice([]);
+  // Seulement la ligne de cet utilisateur et ses projets (voir `readUserScope`).
+  const data = await readUserScope(String(payload.sub));
   if (data.restoreReviewRequired) return null;
   const stored = data.users.find(item => item.id === payload.sub);
   if (!stored || (stored.deletionPendingAt && !allowPendingDeletion) || (stored.sessionVersion || 0) !== (payload.sv || 0)) return null;

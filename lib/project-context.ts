@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { readStore } from "./store";
+import { readStoreSlice } from "./store";
 import { PROJECT_COOKIE, resolveProject } from "./projects";
 import type { Project } from "./types";
 
@@ -23,6 +23,6 @@ export async function setProjectCookie(projectId: string) {
  * validation de propriete se fait en base, un identifiant etranger retombe
  * sur un projet du demandeur. */
 export async function activeProject(userId: string): Promise<Project | null> {
-  const data = await readStore();
+  const data = await readStoreSlice([]);
   return resolveProject(data, userId, await readProjectCookie());
 }

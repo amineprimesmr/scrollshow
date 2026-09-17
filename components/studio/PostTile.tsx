@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import type { AccountVideo } from "@/lib/types";
 import { compact } from "./AccountsFan";
-import { coverSrc } from "./cover";
+import { avatarSrc, coverSrc } from "./cover";
 import { TikTokSlides } from "./TikTokSlides";
 import "./account-gallery.css";
 import "./post-tile.css";
@@ -60,7 +60,8 @@ export function PostTile({
             </span>
             {post.cover ? (
               <img
-                src={coverSrc(post.cover)}
+                src={coverSrc(post.cover, 240)}
+                decoding="async"
                 alt=""
                 loading="lazy"
                 onError={(event) => {
@@ -80,7 +81,7 @@ export function PostTile({
           target="_blank"
           rel="noreferrer"
         >
-          {author.avatar ? <img src={coverSrc(author.avatar)} alt="" loading="lazy" /> : <span aria-hidden />}
+          {author.avatar ? <img src={avatarSrc(author.handle, author.avatar, 32, true)} alt="" loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <span aria-hidden />}
           <b>@{author.handle}</b>
         </a>
       ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { rowAvatarSrc } from "./cover";
 import { dateInTimeZone } from "@/lib/settings";
 import type { StudioPost } from "@/lib/types";
 import Link from "next/link";
@@ -377,7 +378,7 @@ export function CalendarView() {
 
   const filterChip = activeChannelRow ? (
     <button type="button" className="ss-cal-filter lg--lens lg-press" onClick={() => setActiveChannel("all")} title={t("Afficher tous les comptes", "Show all channels")}>
-      <img src={activeChannelRow.avatar || "/logo.png"} alt="" />
+      <img src={rowAvatarSrc(activeChannelRow, 20) || "/logo.png"} alt="" onError={(event) => { event.currentTarget.src = "/logo.png"; }} />
       <span>{activeChannelRow.name}</span>
       <IconX size={12} />
     </button>

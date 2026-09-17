@@ -1,7 +1,7 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { resolveStoreUserId } from "@/lib/local-user";
 import { isLocalDemoToken, localDemoEnabled, localDemoVideos } from "@/lib/local-demo";
-import { readStore } from "@/lib/store";
+import { readStoreSlice } from "@/lib/store";
 import { loadTikTokChannel } from "@/lib/tiktok-account";
 import { listVideoPage } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const data = await readStore();
+  const data = await readStoreSlice([]);
   const userId = resolveStoreUserId(data, user);
   const url = new URL(request.url);
   const channelId = url.searchParams.get("channelId") || undefined;

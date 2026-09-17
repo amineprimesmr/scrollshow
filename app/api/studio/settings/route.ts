@@ -1,7 +1,7 @@
 import { processAccountDeletion } from "@/lib/account-deletion";
 import { clearSessionCookie, hashPassword, readSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { isValidTimezone, resolveSettings } from "@/lib/settings";
-import { findUserByEmail, publicUser, updateStore } from "@/lib/store";
+import { findUserByEmail, publicUser, updateStore, updateStoreSlice } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { stripe } from "@/lib/stripe";
@@ -57,7 +57,7 @@ export async function PATCH(request: Request) {
   if (body.action === "profile") {
     const email = body.email.toLowerCase();
     if (email !== session.email.toLowerCase()) return NextResponse.json({ error: "email_change_requires_verification" }, { status: 400 });
-    const updated = await updateStore((data) => {
+    const updated = await updateStoreSlice([], (data) => {
       const user = data.users.find((item) => item.id === session.id);
       if (!user) return null;
       const taken = findUserByEmail(data, email);
@@ -95,7 +95,7 @@ export async function PATCH(request: Request) {
 
   if (body.action === "unlink_google" || body.action === "unlink_github") {
     const unlinkGoogle = body.action === "unlink_google";
-    const updated = await updateStore((data) => {
+    const updated = await updateStoreSlice([], (data) => {
       const user = data.users.find((item) => item.id === session.id);
       if (!user) return null;
       // Never leave an account with no way back in.
@@ -114,7 +114,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  const updated = await updateStore((data) => {
+  const updated = await updateStoreSlice([], (data) => {
     const user = data.users.find((item) => item.id === session.id);
     if (!user) return null;
     user.settings = {

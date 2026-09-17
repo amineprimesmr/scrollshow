@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
+
+// Le sondage QR tourne toutes les deux secondes : il ne lit et n'ecrit que la
+// collection des tentatives, jamais le document entier (il faisait une lecture
+// complete et deux ecritures completes par battement).
+const readStore = () => readStoreSlice(["tiktokQrAttempts", "channels"]);
+const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["tiktokQrAttempts"], fn);
 import { checkQrCode, createQrCode, exchangeCode, TikTokApiError } from "./tiktok";
 import { saveTikTokAccount, type TikTokTokens } from "./tiktok-link";
 import { ticketedScanUrl, validQrConfirmation } from "./tiktok-qr";
@@ -94,12 +100,20 @@ export async function pollTikTokQr(user: SessionUser, id: string): Promise<Progr
   const acquired = await updateStore(data => {
     const entry = find(data, user, id);
     if (!entry) return { progress: { status: "expired" } as Progress };
+    // `connected` se confirme contre `channels`, hors de cette tranche : on le
+    // laisse a la relecture ci-dessous plutot que de verrouiller les comptes.
+    if (entry.status === "connected") return { recheck: true };
     const done = storedProgress(data, entry);
     if (done) return { progress: done };
     if ((entry.leaseUntil || 0) > Date.now()) return { progress: { status: entry.status, expiresAt: entry.expiresAt } as Progress };
     entry.claim = claim; entry.leaseUntil = Date.now() + LEASE;
     return { entry: { ...entry } };
   });
+  if (acquired.recheck) {
+    const fresh = await readStore();
+    const current = find(fresh, user, id);
+    return (current && storedProgress(fresh, current)) || { status: "expired" };
+  }
   if (acquired.progress) return acquired.progress;
   const entry = acquired.entry!;
   let stage = "check";

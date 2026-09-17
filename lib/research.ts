@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { fetchTikTokProfile, normalizeHandle } from "./tiktok-profile";
 import { fetchAccountVideos, metricsEnabled } from "./metrics";
-import { readStore, updateStore } from "./store";
+import { readStoreSlice, updateStoreSlice } from "./store";
 import { consumeLimit } from "./rate-limit";
+import { withMetricsUser } from "./metrics-guard";
 import type { AccountVideo, SessionUser } from "./types";
 
 export const researchSchema = z.object({
@@ -12,7 +13,7 @@ export const researchSchema = z.object({
 });
 
 export { researchMetrics } from "./research/statistics";
-import { researchMetrics } from "./research/statistics";
+import { known, researchMetrics } from "./research/statistics";
 import { startResearch } from "./research/jobs";
 import { formatLibrary } from "./research/formats";
 import { inScope, resolveProject } from "./projects";
@@ -25,11 +26,11 @@ export async function analyzeResearchAccount(user: SessionUser, query: string, n
   let videos: AccountVideo[] | undefined;
   let warning = metricsEnabled() ? "" : "Detailed post metrics are unavailable here. Profile statistics only.";
   if (metricsEnabled()) {
-    try { videos = await fetchAccountVideos(handle, 3); }
+    try { videos = await withMetricsUser({ userId: user.id }, () => fetchAccountVideos(handle, 3)); }
     catch { warning = "Post metrics unavailable. Existing measurements, if any, are retained with their original date."; }
   }
   const now = new Date().toISOString();
-  const account = await updateStore(data => {
+  const account = await updateStoreSlice(["accounts"], data => {
     let a = data.accounts.find(a => inScope(a, user) && a.handle.toLowerCase() === profile.handle.toLowerCase());
     if (!a) {
       a = { id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, handle: profile.handle, niche, followers: 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now };
@@ -54,13 +55,23 @@ export async function discoverResearchAccounts(user: SessionUser, keywords: stri
 }
 
 export async function researchLibrary(user: SessionUser, query = "", days = 30, minPostViews = 0) {
-  const data = await readStore();
+  const data = await readStoreSlice(["accounts"], { videos: true });
   return data.accounts.filter(a => inScope(a, user) && `${a.handle} ${a.nickname || ""} ${a.bio || ""} ${a.niche} ${a.notes} ${(a.videos || []).flatMap(p => p.hashtags || []).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
     .map(account => ({ account, metrics: researchMetrics(account.videos || [], account.followers, Date.now(), days, minPostViews), measuredAt: account.videosFetchedAt || null }));
 }
 
+/** Apply the visible filters before the payload limit: old viral posts must not
+ * crowd recent matches out of the response. A zero-day window means all time. */
+export function researchWallPosts(videos: AccountVideo[], days: number, minPostViews: number, now = Date.now()) {
+  return videos.filter(post => post.kind === "photo"
+    && (minPostViews <= 0 || known(post, "views") && post.views >= minPostViews)
+    && !(post.createdAt > 0 && post.createdAt * 1000 > now)
+    && (days === 0 || post.createdAt > 0 && post.createdAt * 1000 >= now - days * 86400000))
+    .sort((a, b) => b.views - a.views).slice(0, 60);
+}
+
 export async function contentBrief(user: SessionUser) {
-  const data = await readStore();
+  const data = await readStoreSlice(["posts"]);
   return {
     business: resolveProject(data, user.id, user.projectId)?.business || data.users.find(u => u.id === user.id)?.business || null,
     evidence: (await researchLibrary(user)).sort((a,b) => (b.metrics.medianViews ?? -1) - (a.metrics.medianViews ?? -1)).slice(0,30),

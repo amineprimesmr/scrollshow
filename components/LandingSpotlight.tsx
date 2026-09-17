@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { DustSwap } from "@/components/fx/DustSwap";
 import "./landing-spotlight.css";
 
 function t(fr: string, en: string, english: boolean) {
@@ -316,9 +317,11 @@ export function LandingSpotlight({ english }: { english: boolean }) {
               />
               {t("Process Debloat fait", "Process Debloat does", english)}
             </span>
-            <span>
-              <em>{t("2,7M de vues", "2.7M views", english)}</em> {t("par mois", "a month", english)}
-            </span>
+            <DustSwap
+              from={t("2,7M de vues", "2.7M views", english)}
+              to={t("5\u00a0000\u00a0$ de CA", "$5,000 in revenue", english)}
+              rest={t("par mois", "a month", english)}
+            />
           </h2>
 
           <figure className="af-ld-spot__lede" data-i="2">

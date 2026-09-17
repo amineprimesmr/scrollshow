@@ -1,6 +1,13 @@
 "use client";
 
-import { ImageGeneration } from "img-fx";
+import dynamic from "next/dynamic";
+
+// Un etat de chargement ne doit pas attendre 150 Ko de three.js pour s'afficher :
+// les cartes CSS apparaissent tout de suite, l'effet les rejoint s'il arrive.
+const ImageGeneration = dynamic(() => import("img-fx").then((m) => m.ImageGeneration), {
+  ssr: false,
+  loading: () => <div className="ss-loading-skel__card" />,
+});
 import { Orb } from "./Orb";
 import { useAppTheme, useReducedMotion } from "./useFx";
 

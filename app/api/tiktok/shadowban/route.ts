@@ -1,9 +1,10 @@
 import { readStudioSession as readSession } from "@/lib/auth";
 import { checkConnectedAccount, checkLibraryAccount, checkPublicAccount, ShadowbanLookupError } from "@/lib/shadowban-check";
-import { readStoreSlice } from "@/lib/store";
+import { readRowVideos, readStoreSlice } from "@/lib/store";
 import { loadTikTokChannels } from "@/lib/tiktok-account";
 import { NextResponse } from "next/server";
 import { consumeLimit } from "@/lib/rate-limit";
+import { withMetricsUser } from "@/lib/metrics-guard";
 import { inScope } from "@/lib/projects";
 
 function errorCode(error: unknown) {
@@ -21,15 +22,20 @@ export async function GET(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!await consumeLimit(`shadowban-read:${user.id}`, 100, 3600000)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  // Une visite = une lecture par compte. A 100 par heure, un projet de 72 comptes
+  // se faisait refuser des sa deuxieme visite. L'appel couteux (le fournisseur de
+  // metriques) a deja son propre budget quotidien ; ici on borne l'abus seulement.
+  if (!await consumeLimit(`shadowban-read:${user.id}`, 1200, 3600000)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   const key = new URL(request.url).searchParams.get("key") || "";
   const [kind, id] = key.includes(":") ? key.split(":", 2) : ["", ""];
 
   const channels = kind === "ac" ? [] : (await loadTikTokChannels(user.id, user.projectId)).filter((c) => !id || c.id === id);
   // Cette page lance une requete par compte : lire le document entier a chaque
   // fois ferait passer des centaines de Mo pour analyser 46 comptes.
-  const store = await readStoreSlice(["accounts"], { videos: true });
+  // Un seul compte demande : seules SES videos sont lues (voir `readRowVideos`).
+  const store = await readStoreSlice(["accounts"], { videos: !id });
   const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (!id || a.id === id));
+  if (id) for (const account of accounts) account.videos = await readRowVideos("accounts", account.id) as typeof account.videos;
   if (key && !channels.length && !accounts.length) return NextResponse.json({ error: "missing" }, { status: 404 });
 
   const jobs = [
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const handle = typeof body?.handle === "string" ? body.handle : "";
   try {
-    return NextResponse.json({ account: await checkPublicAccount(handle) });
+    return NextResponse.json({ account: await withMetricsUser({ userId: user.id }, () => checkPublicAccount(handle)) });
   } catch (error) {
     if (error instanceof ShadowbanLookupError) {
       const status = error.code === "not_found" ? 404 : error.code === "invalid_handle" ? 400 : 503;

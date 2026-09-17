@@ -27,13 +27,17 @@ export function FxImage({ src, alt = "", width, height, radius = 12, preset = "p
   const reduced = useReducedMotion();
   const [fallback, setFallback] = useState(false);
   const [shown, setShown] = useState(false);
+  // Lu par le minuteur de secours : une fermeture sur `shown` restait a `false`,
+  // et TOUTE image basculait sur le <img> simple a 6 s, en la retelechargeant.
+  const shownRef = useRef(false);
 
   useEffect(() => {
     if (reduced || !src) return;
     let alive = true;
     setShown(false);
+    shownRef.current = false;
     setFallback(false);
-    const timer = window.setTimeout(() => alive && !shown && setFallback(true), 6000);
+    const timer = window.setTimeout(() => alive && !shownRef.current && setFallback(true), 6000);
     loadImage(src)
       .then(() => alive && ref.current?.triggerReveal({ hold: "manual" }))
       .catch(() => alive && setFallback(true));
@@ -58,7 +62,7 @@ export function FxImage({ src, alt = "", width, height, radius = 12, preset = "p
       borderRadius={radius}
       revealFadeOutMs={0}
       onCycle={(event) => {
-        if (event.phase === "visible" || event.phase === "reveal") setShown(true);
+        if (event.phase === "visible" || event.phase === "reveal") { shownRef.current = true; setShown(true); }
       }}
       className={className}
       style={{ display: "block", flex: "none", ...style }}

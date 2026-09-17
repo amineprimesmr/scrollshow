@@ -1,5 +1,6 @@
 "use client";
 
+import { rowAvatarSrc } from "../cover";
 import { t } from "@/lib/i18n";
 import type { ShadowbanAccount, ShadowbanLevel } from "@/lib/shadowban-check";
 import type { Account } from "@/lib/types";
@@ -88,11 +89,24 @@ function reducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** File d'attente des analyses : au plus `MAX_ANALYSES` requêtes en vol. */
+const MAX_ANALYSES = 4;
+let analysesInFlight = 0;
+const analysesWaiting: (() => void)[] = [];
+function analysisSlot(): Promise<() => void> {
+  const release = () => { analysesInFlight -= 1; analysesWaiting.shift()?.(); };
+  return new Promise((resolve) => {
+    const start = () => { analysesInFlight += 1; resolve(release); };
+    if (analysesInFlight < MAX_ANALYSES) start(); else analysesWaiting.push(start);
+  });
+}
+
 function Avatar({ src, name, size = 44 }: { src: string; name: string; size?: number }) {
+  const [dead, setDead] = useState(false);
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
     <span className="ss-sb-avatar" style={{ width: size, height: size }}>
-      {src ? <img src={src} alt="" width={size} height={size} loading="lazy" /> : <b>{initial}</b>}
+      {src && !dead ? <img src={src} alt="" width={size} height={size} loading="lazy" onError={() => setDead(true)} /> : <b>{initial}</b>}
     </span>
   );
 }
@@ -184,7 +198,7 @@ function AccountCard({
     >
       <button type="button" className="ss-sb-card__hit" onClick={onSelect} disabled={card.status !== "done"} aria-pressed={selected}>
         <header className="ss-sb-card__who">
-          <Avatar src={identity.avatar} name={identity.name} />
+          <Avatar src={rowAvatarSrc(identity, 44)} name={identity.name} />
           <div>
             <b>{identity.name}</b>
             <span>
@@ -310,32 +324,44 @@ export function ShadowbanView() {
   // instead of aborted, so nothing ever rejects into the dev overlay.
   const generation = useRef<Map<string, number>>(new Map());
   const detailRef = useRef<HTMLDivElement>(null);
+  const inFlight = useRef(new Set<AbortController>());
 
   const analyze = useCallback((target: Identity) => {
     const gen = (generation.current.get(target.key) || 0) + 1;
     generation.current.set(target.key, gen);
     const fresh = () => generation.current.get(target.key) === gen;
     setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "loading" } }));
-    // Une requête qui ne revient jamais laisserait la carte tourner sans fin, et
-    // « Relancer » reste désactivé tant qu'une analyse est en cours : au-delà de
-    // deux minutes on rend la main avec un bouton Réessayer.
-    const timeout = window.setTimeout(() => {
-      if (!fresh()) return;
-      generation.current.set(target.key, gen + 1);
-      setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: "timeout" } }));
-    }, 120_000);
-    fetch(`/api/tiktok/shadowban?key=${encodeURIComponent(target.key)}`)
-      .then(async (res) => {
-        window.clearTimeout(timeout);
-        const json = await res.json().catch(() => ({}));
-        const account = json.accounts?.[0];
-        if (!res.ok || !account || account.error) throw new Error(account?.error || json.error || "shadowban_failed");
-        if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { key: target.key, status: "done", account } }));
-      })
-      .catch((error) => {
-        window.clearTimeout(timeout);
-        if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: error instanceof Error ? error.message : "shadowban_failed" } }));
-      });
+    // Quatre analyses a la fois. La page en lancait une par compte d'un coup —
+    // 72 requetes dont chacune peut attendre le fournisseur 40 s — alors que le
+    // navigateur n'ouvre que six connexions par hote : le reste du studio
+    // (navigation, donnees, images) restait bloque derriere.
+    void analysisSlot().then((release) => {
+      if (!fresh()) { release(); return; }
+      // Une requête qui ne revient jamais laisserait la carte tourner sans fin :
+      // au-delà de deux minutes on rend la main avec un bouton Réessayer. Le
+      // délai part quand la requête part, pas quand elle entre dans la file.
+      // Quitter la page ou depasser le delai COUPE la requete : sinon elle gardait
+      // sa place dans la file (jusqu'a 40 s) et la visite suivante attendait derriere.
+      const controller = new AbortController();
+      inFlight.current.add(controller);
+      const timeout = window.setTimeout(() => {
+        controller.abort();
+        if (!fresh()) return;
+        generation.current.set(target.key, gen + 1);
+        setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: "timeout" } }));
+      }, 120_000);
+      fetch(`/api/tiktok/shadowban?key=${encodeURIComponent(target.key)}`, { signal: controller.signal })
+        .then(async (res) => {
+          const json = await res.json().catch(() => ({}));
+          const account = json.accounts?.[0];
+          if (!res.ok || !account || account.error) throw new Error(account?.error || json.error || "shadowban_failed");
+          if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { key: target.key, status: "done", account } }));
+        })
+        .catch((error) => {
+          if (fresh()) setCards((prev) => ({ ...prev, [target.key]: { ...target, status: "error", error: error instanceof Error ? error.message : "shadowban_failed" } }));
+        })
+        .finally(() => { window.clearTimeout(timeout); inFlight.current.delete(controller); release(); });
+    });
   }, []);
 
   // Landing on the page starts every account's analysis at once; accounts
@@ -357,7 +383,12 @@ export function ShadowbanView() {
   // Seul le démontage périme les réponses encore en vol.
   useEffect(() => {
     const gens = generation.current;
-    return () => gens.forEach((value, key) => gens.set(key, value + 1));
+    const flying = inFlight.current;
+    return () => {
+      gens.forEach((value, key) => gens.set(key, value + 1));
+      flying.forEach((controller) => controller.abort());
+      flying.clear();
+    };
   }, []);
 
   const ordered: CardState[] = useMemo(

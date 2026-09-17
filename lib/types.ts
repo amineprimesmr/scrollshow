@@ -198,6 +198,8 @@ export type Account = {
   videosFetchedAt?: string;
   videoSync?: VideoSync;
   researchCoverage?: { complete: boolean; pages: number; windowDays: number; measuredAt: string; reason: string; loaded?: number };
+  /** Masque : le compte reste dans ScrollShow mais n'apparait plus que dans le gestionnaire de comptes. */
+  hidden?: boolean;
 };
 
 export type Run = {
@@ -225,6 +227,8 @@ export type Channel = {
   connected?: boolean;
   /** Compte suivi (collection accounts) expose comme compte du projet, sans jeton : brouillons seulement. */
   tracked?: boolean;
+  /** Masque : le compte reste dans ScrollShow mais n'apparait plus que dans le gestionnaire de comptes. */
+  hidden?: boolean;
   accessToken?: string;
   refreshToken?: string;
   scopes?: string;

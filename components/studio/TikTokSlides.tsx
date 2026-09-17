@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { coverSrc } from "./cover";
 
 export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false, initialIndex = 0 }: {
   images: string[];
@@ -13,7 +14,14 @@ export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false,
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(Math.min(initialIndex, images.length - 1));
   const drag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null);
-  const [failed, setFailed] = useState<Record<number, boolean>>({});
+  // Par URL et non par position : une resynchronisation remplace les URL
+  // expirees, et la slide ne doit pas rester marquee « indisponible ».
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
+  // Un mur de 24 tuiles ne charge que la slide visible de chacune. Les voisines
+  // ne sont demandees que lorsque la tuile est approchee (survol, focus, doigt),
+  // sinon chaque galerie telechargeait deux fois plus d'images que ce qu'elle montre.
+  const [armed, setArmed] = useState(large || initialIndex > 0);
+  const arm = () => setArmed(true);
   useEffect(() => { onSlideChange?.(index); }, [index, onSlideChange]);
   useLayoutEffect(() => {
     if (track.current) track.current.scrollLeft = initialIndex * track.current.clientWidth;
@@ -23,10 +31,10 @@ export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false,
     setIndex(at);
     track.current?.scrollTo({ left: at * track.current.clientWidth, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
-  return <div className={`ss-slides ${large ? "ss-slides--large" : ""}`}>
+  return <div className={`ss-slides ${large ? "ss-slides--large" : ""}`} onPointerEnter={arm} onFocusCapture={arm} onTouchStart={arm}>
     <div ref={track} className="ss-slides__track" role="region" aria-roledescription={en ? "carousel" : "carrousel"}
       aria-label={en ? "Post slides" : "Slides de la publication"} tabIndex={0}
-      onScroll={() => { if (track.current?.clientWidth) setIndex(Math.round(track.current.scrollLeft / track.current.clientWidth)); }}
+      onScroll={() => { arm(); if (track.current?.clientWidth) setIndex(Math.round(track.current.scrollLeft / track.current.clientWidth)); }}
       onKeyDown={e => {
         if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); move(index + (e.key === "ArrowRight" ? 1 : -1)); }
         if (e.key === "Home" || e.key === "End") { e.preventDefault(); move(e.key === "Home" ? 0 : images.length - 1); }
@@ -53,8 +61,8 @@ export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false,
         <button type="button" className="ss-slides__image" aria-disabled={!onOpen} tabIndex={onOpen && i === index ? 0 : -1}
           aria-label={en ? `Open slide ${i + 1}` : `Agrandir la slide ${i + 1}`}
           onClick={() => { if (!drag.current?.moved) onOpen?.(i); drag.current = null; }}>
-          {failed[i] ? <span className="ss-slides__unavailable">{en ? "Image unavailable · refresh the account" : "Image indisponible · actualise le compte"}</span> : Math.abs(i - index) <= 1 ?
-            <img src={url.startsWith("/") ? url : `/api/studio/tiktok/cover?url=${encodeURIComponent(url)}`} alt={en ? `Slide ${i + 1} of ${images.length}` : `Slide ${i + 1} sur ${images.length}`} draggable={false} loading="lazy" onError={() => setFailed(prev => ({ ...prev, [i]: true }))} /> : null}
+          {failed[url] ? <span className="ss-slides__unavailable">{en ? "Image unavailable · refresh the account" : "Image indisponible · actualise le compte"}</span> : Math.abs(i - index) <= (armed ? 1 : 0) ?
+            <img src={coverSrc(url, large ? 480 : 240)} decoding="async" alt={en ? `Slide ${i + 1} of ${images.length}` : `Slide ${i + 1} sur ${images.length}`} draggable={false} loading="lazy" onError={() => setFailed(prev => ({ ...prev, [url]: true }))} /> : null}
         </button>
       </div>)}
     </div>

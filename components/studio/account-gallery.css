@@ -50,3 +50,12 @@
 .ss-postview__transcript { padding: 14px; border: 1px solid var(--ss-line); border-radius: 14px; }
 .ss-postview__transcript p { margin: 8px 0 0; white-space: pre-wrap; font-size: 14px; }
 .ss-postview__transcript small { color: var(--ss-muted); }
+
+/* Dans un MUR de tuiles la pastille n'est pas en verre : une surface de flou par
+   tuile (24 a 48 par page) coute cher au defilement. Le verre reste sur le grand
+   lecteur, ou elle est seule. */
+.ss-posttile .ss-slides__controls.lg {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgb(var(--lg-rgb) / 0.9);
+}

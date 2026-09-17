@@ -1,5 +1,6 @@
 "use client";
 
+import { rowAvatarSrc } from "./cover";
 import { BrandMark } from "@/components/BrandMark";
 import { GOOGLE_FONTS_HREF } from "@/lib/recipe";
 import { t } from "@/lib/i18n";
@@ -271,7 +272,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
               aria-pressed={activeChannel === channel.id}
               title={activeChannel === channel.id ? t("Afficher tous les comptes", "Show all channels", english) : t("Afficher seulement ce compte", "Show only this channel", english)}
             >
-              <img src={channel.avatar || platformById(channel.platform)?.logo || "/logo.png"} alt="" />
+              <img src={rowAvatarSrc(channel, 28) || platformById(channel.platform)?.logo || "/logo.png"} alt="" loading="lazy" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = platformById(channel.platform)?.logo || "/logo.png"; }} />
               <span>
                 <b>{channel.name}</b>
                 <span>

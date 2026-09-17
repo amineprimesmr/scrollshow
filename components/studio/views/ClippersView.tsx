@@ -1,4 +1,5 @@
 "use client";
+import { rowAvatarSrc } from "../cover";
 import { checkedFetch } from "@/lib/client-request";
 
 import { t } from "@/lib/i18n";
@@ -212,7 +213,7 @@ export function ClippersView() {
             return (
               <article key={account.id} className="ss-clipper">
                 <div className="ss-clipper__id">
-                  {account.avatar ? <img src={account.avatar} alt="" /> : <span className="ss-clipper__avatar-fallback">@</span>}
+                  <ClipperAvatar account={account} />
                   <div>
                     <a href={`https://www.tiktok.com/@${account.handle}`} target="_blank" rel="noreferrer">
                       <b>@{account.handle}</b>
@@ -320,4 +321,12 @@ export function ClippersView() {
       </div>
     </div>
   );
+}
+
+/** Avatar par handle ; un compte supprime retombe sur la pastille « @ ». */
+function ClipperAvatar({ account }: { account: { handle: string; avatar?: string } }) {
+  const [dead, setDead] = useState(false);
+  const src = rowAvatarSrc(account, 40);
+  if (!src || dead) return <span className="ss-clipper__avatar-fallback">@</span>;
+  return <img src={src} alt="" loading="lazy" decoding="async" onError={() => setDead(true)} />;
 }
