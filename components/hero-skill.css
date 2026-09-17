@@ -1,32 +1,32 @@
-/* Bloc d'installation du skill : chrome flottant sous le titre du hero. */
+/* Bloc d'installation du skill, sous le titre du hero. */
 .ss-heroskill {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin: clamp(30px, 5.4vh, 54px) auto clamp(20px, 3.4vh, 34px);
-  width: min(100%, 640px);
+  gap: 14px;
+  margin: clamp(40px, 6.5vh, 64px) auto clamp(20px, 3.2vh, 34px);
+  width: min(100%, 650px);
 }
 .ss-heroskill__label {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   color: #b9bdc9;
   font-size: clamp(17px, 1.6vw, 21px);
   letter-spacing: -.02em;
 }
-.ss-heroskill__agents { display: inline-flex; align-items: center; gap: 7px; }
-.ss-heroskill__agents img { width: 25px; height: 25px; opacity: .92; }
+.ss-heroskill__agents { display: inline-flex; align-items: center; gap: 6px; }
+.ss-heroskill__agents img { width: 26px; height: 26px; opacity: .92; }
 
 .ss-heroskill__box {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 14px 14px 14px 18px;
+  padding: 15px 15px 15px 20px;
   border: 1px solid #ffffff1c;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #08080b;
   color: #edeef4;
   cursor: pointer;
@@ -41,14 +41,14 @@
 .ss-heroskill__box:hover { border-color: #ffffff33; }
 .ss-heroskill__box:active { transform: scale(0.98); }
 .ss-heroskill__box:focus-visible { outline: 2px solid #8fa8ff; outline-offset: 3px; }
-.ss-heroskill__prompt { color: #6f8bff; font: 600 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ss-heroskill__prompt { color: #6f8bff; font: 600 15px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .ss-heroskill__box code {
   flex: 1;
   min-width: 0;
   overflow-x: auto;
   white-space: nowrap;
   color: #e9eaf2;
-  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -.01em;
   scrollbar-width: none;
 }
@@ -59,18 +59,32 @@
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: 10px;
   background: #ffffff10;
   color: #c3c6d2;
   transition: background .2s ease, color .2s ease;
 }
-.ss-heroskill__copy svg { width: 16px; height: 16px; }
+.ss-heroskill__copy svg { width: 18px; height: 18px; }
 .ss-heroskill__copy.is-copied { background: #00e58326; color: #63e7ae; }
 .ss-heroskill__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 620px) {
-  .ss-heroskill__box { padding: 12px 12px 12px 14px; gap: 9px; }
-  .ss-heroskill__box code { font-size: 12.5px; }
+  .ss-heroskill__label { gap: 6px; }
+  .ss-heroskill__agents { gap: 5px; }
+  .ss-heroskill__agents img { width: 24px; height: 24px; }
+  .ss-heroskill__box { padding: 12px 10px 12px 14px; gap: 8px; }
+  .ss-heroskill__box code,
+  .ss-heroskill__prompt { font-size: 12.5px; }
+  .ss-heroskill__copy { flex-basis: 30px; width: 30px; height: 30px; }
+}
+/* Sur téléphone la commande doit se lire en entier : le bloc mord un peu sur
+   la marge de la page plutôt que de rogner l'URL. */
+@media (max-width: 420px) {
+  .ss-heroskill { width: calc(100% + 28px); margin-inline: -14px; }
+  .ss-heroskill__box { padding: 12px 8px 12px 12px; gap: 6px; }
+  .ss-heroskill__box code,
+  .ss-heroskill__prompt { font-size: 12px; }
+  .ss-heroskill__copy { flex-basis: 28px; width: 28px; height: 28px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ss-heroskill__box { transition: none; }

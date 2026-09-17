@@ -1,14 +1,15 @@
 import { researchCapabilities } from "@/lib/research/provider";
 import { workResearch } from "@/lib/research/jobs";
 import { readStudioSession } from "@/lib/auth";
-import { analyzeResearchAccount, discoverResearchAccounts, researchLibrary, researchSchema } from "@/lib/research";
+import { analyzeResearchAccount, discoverResearchAccounts, researchLibrary, researchSchema, researchWallPosts } from "@/lib/research";
 import { after, NextResponse } from "next/server";
 export const maxDuration = 300;
 export async function GET(request: Request) {
   const user = await readStudioSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const params = new URL(request.url).searchParams;
-  const days = Math.min(365, Math.max(1, Number(params.get("days")) || 30));
+  const requestedDays = Number(params.get("days") ?? 30);
+  const days = requestedDays === 0 ? 0 : Number.isFinite(requestedDays) ? Math.min(365, Math.max(1, Math.floor(requestedDays))) : 30;
   // Plancher de vues par post : la bibliotheque se relit avec le meme reglage
   // que la recherche, sinon les resultats affiches ne repondent plus au filtre.
   const minPostViews = Math.min(1e10, Math.max(0, Number(params.get("minPostViews")) || 0));
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
       videosFetchedAt: account.videosFetchedAt,
       // Les carrousels les plus vus d'abord, bornes : c'est la charge utile la
       // plus lourde de la page, et le mur n'en affiche jamais autant.
-      videos: (account.videos || []).filter(v => v.kind === "photo").sort((a, b) => b.views - a.views).slice(0, 60)
+      videos: researchWallPosts(account.videos || [], days, minPostViews)
         .map(v => ({ id: v.id, url: v.url, kind: v.kind, cover: v.cover, images: v.images, views: v.views, likes: v.likes,
           comments: v.comments, shares: v.shares, caption: v.caption, title: v.title, hashtags: v.hashtags,
           missingMetrics: v.missingMetrics, createdAt: v.createdAt, measuredAt: v.measuredAt, slideTexts: v.slideTexts,

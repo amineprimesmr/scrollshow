@@ -1,0 +1,120 @@
+{
+  "auditDate": "2026-09-12",
+  "scope": "local code, isolated tests, read-only GitHub/Vercel/public HTTP",
+  "localHead": "6edeb91",
+  "remoteMainObserved": "628713943d140aede3e0cbe4d919048af38e24ea",
+  "localCommitsAheadOfRemoteMain": 12,
+  "inventory": {
+    "pages": 37,
+    "routeFiles": 88,
+    "mcpTools": 38,
+    "testFiles": 20
+  },
+  "checks": {
+    "unitTests": {
+      "passed": 133,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "isolatedProductionBuild": "passed with jose Edge runtime warnings",
+    "httpMcpSmoke": {
+      "passed": 38,
+      "failed": 0
+    },
+    "npmAuditProductionKnownVulnerabilities": 0,
+    "additionalIntegrationReproductions": 10,
+    "browserFullJourney": "not completed: local server stopped responding, then Chrome extension UI blocked automation"
+  },
+  "publicHttp": {
+    "home": 200,
+    "pricing": 200,
+    "healthWithoutSecret": 401
+  },
+  "productionDeployment": {
+    "id": "dpl_6UxFZxrACuGbZcxK4E9Xq3SZVdyV",
+    "state": "READY",
+    "createdAtUTC": "2026-09-10T17:15:14.167000+00:00",
+    "deployedGitRevision": "not established"
+  },
+  "productionErrors": [
+    {
+      "atUTC": "2026-09-12T13:37:02.961000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:36:58.435000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:36:53.951000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:36:36.709000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:36:36.329000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:35:34.551000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:35:31.720000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    },
+    {
+      "atUTC": "2026-09-12T13:35:31.395000+00:00",
+      "path": "/api/oauth/token",
+      "status": 500,
+      "postgresCode": "53000",
+      "cause": "data_transfer_quota_exceeded"
+    }
+  ],
+  "github": {
+    "productionAutomationsEnabled": true,
+    "last15ScheduledRunsObserved": "all failed",
+    "publicationAndResearch": {
+      "runId": 34694867701,
+      "url": "https://github.com/amineprimesmr/scrollshow/actions/runs/34694867701",
+      "createdAtUTC": "2026-09-12T12:52:30Z",
+      "publishHttp": 500,
+      "researchHttp": 500
+    },
+    "maintenance": {
+      "runId": 34681908761,
+      "url": "https://github.com/amineprimesmr/scrollshow/actions/runs/34681908761",
+      "createdAtUTC": "2026-09-12T07:54:14Z",
+      "http": 503
+    },
+    "lastQualityObserved": {
+      "runId": 34477001458,
+      "conclusion": "success",
+      "sha": "628713943d140aede3e0cbe4d919048af38e24ea"
+    }
+  },
+  "mutations": "Only audit artifacts; no source fix, production write, deployment, payment, email or publication"
+}

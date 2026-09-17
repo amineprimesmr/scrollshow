@@ -4,6 +4,7 @@ import { LandingFAQ, LandingFooter } from "@/components/LandingBottom";
 import { PricingCards } from "@/components/PricingCards";
 import { HeroSkill } from "@/components/HeroSkill";
 import { LandingDemo } from "@/components/LandingDemo";
+import { LandingPrompts } from "@/components/LandingPrompts";
 import { LandingConnections } from "@/components/LandingConnections";
 import { LandingSpotlight } from "@/components/LandingSpotlight";
 import { LandingNavigation } from "@/components/LandingNavigation";
@@ -11,7 +12,6 @@ import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Beam } from "@/components/fx/Beam";
-import { Metal } from "@/components/fx/Metal";
 
 function prefersEnglish() {
   if (typeof navigator === "undefined") return false;
@@ -36,7 +36,7 @@ function CtaDot() {
   return <span className="af-ld-cta-dot" aria-hidden />;
 }
 
-function ViewsHero({ english, ctaHref }: { english: boolean; ctaHref: string }) {
+function ViewsHero({ english }: { english: boolean }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [phase, setPhase] = useState("boot");
 
@@ -80,18 +80,11 @@ function ViewsHero({ english, ctaHref }: { english: boolean; ctaHref: string }) 
       <div className="af-ld-stage">
         <div className="af-ld-stage__copy">
           <h1 className="af-ld-views__title">
-            <span className="af-ld-title-line">Crée et automatise tes</span>{" "}
-            <span className="af-ld-title-line">slideshows avec <span className="af-ld-title-accent">ton agent</span></span>
+            <span className="af-ld-title-line">Automatise la distribution de</span>{" "}
+            <span className="af-ld-title-line">ton app mobile avec <span className="af-ld-title-accent">ton agent</span></span>
           </h1>
           <HeroSkill english={english} />
-          <div className="af-ld-hero-cta-wrap">
-            <Metal preset="chromatic" strength={0.9} className="af-ld-metal-cta" normalizeHost>
-              <Link href={ctaHref} className="af-ld-hero-cta">
-                <span className="af-ld-hero-cta__label">{t("Automatiser mes slideshows", "Automate my slideshows", english)}</span>
-                <svg className="af-ld-hero-cta__sparkle" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.1 2.4a.6.6 0 0 0-1.14 0l-1.2 3.55a3.6 3.6 0 0 1-2.25 2.25l-3.55 1.2a.6.6 0 0 0 0 1.14l3.55 1.2a3.6 3.6 0 0 1 2.25 2.25l1.2 3.55a.6.6 0 0 0 1.14 0l1.2-3.55a3.6 3.6 0 0 1 2.25-2.25l3.55-1.2a.6.6 0 0 0 0-1.14l-3.55-1.2a3.6 3.6 0 0 1-2.25-2.25l-1.2-3.55Z" /><path d="M18.6 16.1a.36.36 0 0 0-.68 0l-.5 1.46a1.9 1.9 0 0 1-1.19 1.19l-1.46.5a.36.36 0 0 0 0 .68l1.46.5a1.9 1.9 0 0 1 1.19 1.19l.5 1.46a.36.36 0 0 0 .68 0l.5-1.46a1.9 1.9 0 0 1 1.19-1.19l1.46-.5a.36.36 0 0 0 0-.68l-1.46-.5a1.9 1.9 0 0 1-1.19-1.19l-.5-1.46Z" /></svg>
-              </Link>
-            </Metal>
-          </div>
+          <LandingPrompts english={english} />
           <LandingDemo />
         </div>
       </div>
@@ -114,7 +107,7 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
       <LandingNavigation english={english} signedIn={signedIn} />
 
       <main>
-        <ViewsHero english={english} ctaHref={ctaHref} />
+        <ViewsHero english={english} />
 
         <LandingSpotlight english={english} />
 

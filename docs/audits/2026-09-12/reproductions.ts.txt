@@ -1,0 +1,109 @@
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+import { emptyStore, readStore } from '/Users/amine/Desktop/scrollshow/lib/store';
+import { agentForkPost, agentGetRecipe, findPostByShareId, agentRasterizePost, agentCreatePost } from '/Users/amine/Desktop/scrollshow/lib/agent';
+import { assertEditable } from '/Users/amine/Desktop/scrollshow/lib/post-validation';
+import { syncAccountPosts } from '/Users/amine/Desktop/scrollshow/lib/account-sync';
+import { checkLibraryAccount } from '/Users/amine/Desktop/scrollshow/lib/shadowban-check';
+import { dispatchPost } from '/Users/amine/Desktop/scrollshow/lib/publication-jobs';
+import { reconcilePublishId } from '/Users/amine/Desktop/scrollshow/lib/publish-queue';
+import { applyResearchStep } from '/Users/amine/Desktop/scrollshow/lib/research/jobs';
+import { startResearchSchema } from '/Users/amine/Desktop/scrollshow/lib/research/model';
+import { recipeFromPhotos } from '/Users/amine/Desktop/scrollshow/lib/recipe';
+import { savePublicImage, readSlideBytes } from '/Users/amine/Desktop/scrollshow/lib/media-files';
+
+async function main() {
+  for (const key of ['DATABASE_URL','SCROLLSHOW_USE_BLOB','VERCEL','VERCEL_ENV','BLOB_READ_WRITE_TOKEN','BLOB_STORE_ID']) delete process.env[key];
+  const dir=await mkdtemp(join(tmpdir(),'scrollshow-audit-fixture-'));
+  process.env.SCROLLSHOW_DATA_DIR=dir;
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>{throw Error('UNMOCKED_NETWORK_FORBIDDEN');};
+  const results:any[]=[];
+  const user:any={id:'owner',email:'audit@example.invalid',name:'Audit',plan:'pro',projectId:'project-b'};
+  const photo:any={id:'1234567890000000001',kind:'photo',title:'Example',caption:'Example',views:10000,likes:100,comments:10,shares:5,createdAt:Math.floor(Date.now()/1000)-86400*3,url:'',cover:'https://p16.tiktokcdn.com/test.jpg',matchedKeywords:['sleepmaxing']};
+  const base:any={id:'source',userId:'owner',projectId:'project-b',body:'Original caption',channelIds:[],date:'2026-09-12',time:'18:00',status:'published',image:'/test.jpg',views:123,likes:12,comments:1,shares:1,origin:'manual',visibility:'private',shareEnabled:true,shareId:'oldshare',recipe:recipeFromPhotos(['/test.jpg'],'manual'),publishId:'pub_source',publishState:'PUBLISH_COMPLETE',publishedAt:'2026-09-11T00:00:00Z',tiktokId:'source-tiktok'};
+  try {
+    let data=emptyStore();data.posts=[base];
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    const clone=await agentForkPost(user,'source');
+    const stored=(await readStore()).posts.find(p=>p.id===clone.id)!;
+    assert.throws(()=>assertEditable(stored),/publication_locked/);
+    const shared=await findPostByShareId(stored.shareId!);
+    results.push({case:'fork_published',status:stored.status,publishId:stored.publishId,publishState:stored.publishState,tiktokId:stored.tiktokId,editable:false,privateCloneShareAccessible:Boolean(shared)});
+
+    data=emptyStore();data.posts=[{...base,projectId:'project-a'}];
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    const leaked=await agentGetRecipe(user,'source');
+    results.push({case:'recipe_cross_project',callerProject:user.projectId,sourceProject:'project-a',returnedCaption:leaked.caption});
+
+    data=emptyStore();data.accounts=[{id:'account-a',userId:'owner',projectId:'project-a',handle:'creator',niche:'a',notes:'',verdict:'watch',followers:2000,avgViews:0,posts:0,createdAt:new Date().toISOString()}];
+    const input=startResearchSchema.parse({keywords:['sleepmaxing'],filters:{minTotalViews:0,minPosts:1}});
+    const j:any={id:'job',userId:'owner',projectId:'project-b',input,status:'running',phase:'measure',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),revision:1,keywordIndex:0,searchPage:0,searchCursor:0,candidates:[{handle:'creator',keyword:'sleepmaxing',posts:[photo],sourceUrl:''}],processed:[],results:[],failures:[],events:[],exhausted:true,lease:{token:'lease',until:Date.now()+180000}};
+    applyResearchStep(data,j,{jobId:'job',token:'lease',kind:'measure',candidate:j.candidates[0],source:'provider',filters:input.filters,maxPages:3},{kind:'measure',posts:[photo],followers:5000,hasMore:false});
+    results.push({case:'research_cross_project',researchProject:j.projectId,accountCount:data.accounts.length,updatedAccountProject:data.accounts[0].projectId,newFollowers:data.accounts[0].followers,resultAccountId:j.results[0].accountId});
+
+    data=emptyStore();data.accounts=[{...data.accounts[0],id:'account',userId:'owner',projectId:'project-b',handle:'creator',niche:'a',notes:'',verdict:'watch',followers:2000,avgViews:0,posts:2,createdAt:new Date().toISOString(),videos:[photo,{...photo,id:'older',matchedKeywords:['older-match']}]}];
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    process.env.METRICS_API_KEY='fixture';process.env.METRICS_API_BASE='https://metrics.example.invalid';
+    globalThis.fetch=async(url:any)=>{
+      if(String(url)==='https://metrics.example.invalid/run')return Response.json({output:{data:{aweme_list:[{aweme_id:photo.id,image_post_info:{},statistics:{play_count:12000,digg_count:100,comment_count:10,share_count:5},create_time:photo.createdAt}],has_more:0,max_cursor:0}}});
+      throw Error('UNMOCKED_NETWORK_FORBIDDEN');
+    };
+    await syncAccountPosts('owner','ac:account');
+    let synced=(await readStore()).accounts[0];
+    results.push({case:'sync_keywords',before:['sleepmaxing','older-match'],after:synced.videos?.map(v=>({id:v.id,matchedKeywords:v.matchedKeywords??null}))});
+    data.accounts[0].videosFetchedAt='2020-01-01T00:00:00Z';
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    await checkLibraryAccount(data.accounts[0]);
+    synced=(await readStore()).accounts[0];
+    results.push({case:'shadowban_cache',beforeVideos:2,afterVideos:synced.videos?.length,remainingTags:synced.videos?.[0]?.matchedKeywords??null});
+
+    const missing=await checkLibraryAccount({...data.accounts[0],videosFetchedAt:new Date().toISOString(),videos:Array.from({length:10},(_,i)=>({...photo,id:String(i),views:0,likes:0,comments:0,shares:0,missingMetrics:['views','likes','comments','shares'],createdAt:Math.floor(Date.now()/1000)-(i+3)*86400}))});
+    results.push({case:'shadowban_unknown_views',knownViewCounters:0,verdict:missing.report.verdict,signals:missing.report.signals});
+
+    data=emptyStore();data.users=[{id:'owner',email:'audit@example.invalid',name:'Audit',plan:'pro',emailVerifiedAt:new Date().toISOString(),createdAt:new Date().toISOString()} as any];
+    data.channels=[{id:'channel',userId:'owner',projectId:'project-b',platform:'tiktok',handle:'creator',name:'Creator',avatar:'',connected:true,accessToken:'fake',expiresAt:Date.now()+3600000}];
+    data.posts=[{...base,id:'to-publish',status:'draft',channelIds:['channel'],publishId:undefined,publishState:undefined,tiktok:{title:'Title',privacy:'INVALID_PRIVACY',allowComment:false,commercial:false,brandOrganic:false,brandContent:false}}];
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    let initCalls=0;
+    globalThis.fetch=async(url:any)=>{
+      if(String(url).includes('creator_info'))return Response.json({data:{privacy_level_options:['SELF_ONLY']},error:{code:'ok'}});
+      initCalls++;throw Error('UNMOCKED_NETWORK_FORBIDDEN');
+    };
+    await assert.rejects(dispatchPost('owner','to-publish'),/privacy_not_allowed/);
+    const failed=(await readStore()).posts.find(p=>p.id==='to-publish')!;
+    results.push({case:'preflight_failure_permanent_lock',error:failed.publishError,publishState:failed.publishState,initCalls});
+
+    data.posts[0].publishId='pub-terminal';data.posts[0].publishState='PROCESSING';data.posts[0].status='scheduled';
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    globalThis.fetch=async(url:any)=>{
+      if(String(url).includes('status/fetch'))return Response.json({data:{status:'FAILED',fail_reason:'photo_pull_failed'},error:{code:'ok'}});
+      throw Error('UNMOCKED_NETWORK_FORBIDDEN');
+    };
+    await reconcilePublishId('owner','pub-terminal');
+    const terminal=(await readStore()).posts[0];
+    assert.throws(()=>assertEditable(terminal),/publication_locked/);
+    results.push({case:'terminal_failure_permanent_lock',status:terminal.status,publishId:terminal.publishId,publishState:terminal.publishState,editable:false});
+
+    const secretBytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jqS8AAAAASUVORK5CYII=','base64');
+    const privateUrl=await savePublicImage(secretBytes,'image/png');
+    data=emptyStore();data.media=[{id:'private-a',userId:'user-a',projectId:'a',url:privateUrl,name:'Private A',createdAt:new Date().toISOString()}];
+    data.posts=[{...base,id:'owned-by-b',userId:'user-b',projectId:'b',status:'draft',publishId:undefined,publishState:undefined,shareEnabled:false}];
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    const userB:any={id:'user-b',email:'b@example.invalid',name:'B',plan:'pro',projectId:'b'};
+    const mediaAccess=(s:any,u:string)=>s.posts.some((p:any)=>(p.userId===u||p.visibility==='public'||p.shareEnabled)&&JSON.stringify(p).includes(privateUrl))||s.media.some((m:any)=>m.userId===u&&m.url===privateUrl);
+    const accessBefore=mediaAccess(data,userB.id);
+    const rasterized=await agentRasterizePost(userB,'owned-by-b',recipeFromPhotos([privateUrl],'manual'));
+    const afterMedia=await readStore();
+    const leakedFile=await readSlideBytes(rasterized.photo_images[0]);
+    assert.equal(accessBefore,false);assert.equal(mediaAccess(afterMedia,userB.id),true);assert.deepEqual(leakedFile?.bytes,secretBytes);
+    results.push({case:'private_media_cross_user_rasterize',beforeAccessibleByB:accessBefore,afterAccessibleByB:mediaAccess(afterMedia,userB.id),returnedOriginalPrivateUrl:rasterized.photo_images[0]===privateUrl,privateBytesRecovered:leakedFile?.bytes.equals(secretBytes)});
+    await writeFile(join(dir,'store.json'),JSON.stringify(data));
+    await agentCreatePost(userB,{caption:'Owned by B',image:privateUrl});
+    results.push({case:'private_media_cross_user_create',beforeAccessibleByB:false,afterAccessibleByB:mediaAccess(await readStore(),userB.id)});
+    console.log(JSON.stringify(results,null,2));
+  } finally {globalThis.fetch=originalFetch;await rm(dir,{recursive:true,force:true});}
+}
+main().catch(e=>{console.error(e);process.exitCode=1;});

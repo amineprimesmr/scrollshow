@@ -511,9 +511,9 @@ html.page-affiliate #affiliate-root {
 .af-ld-title-line:nth-child(1) { transition-delay: .08s; }
 .af-ld-title-line:nth-child(2) { transition-delay: .16s; }
 .af-ld-title-line:nth-child(3) { transition-delay: .24s; }
-.af-ld-stage__copy > .ss-heroskill { transition-delay: .32s; }
+.af-ld-stage__copy > .af-ld-hero-cta-wrap { transition-delay: .32s; }
 .af-ld-stage__copy > .af-ld-hero-sub { transition-delay: .36s; }
-.af-ld-stage__copy > .af-ld-hero-cta-wrap { transition-delay: .4s; }
+.af-ld-stage__copy > .ss-heroskill { transition-delay: .4s; }
 
 @media (prefers-reduced-motion: reduce) {
   .af-ld-title-line,
@@ -1447,7 +1447,34 @@ html.page-affiliate #affiliate-root {
   background: #000;
 }
 
-.af-ld-title-accent { color: #687fff; }
+/* The accent drifts from solid orange to a violet-to-blue vertical gradient and
+   back. Registered colours are what make a gradient animatable; without
+   @property support the text simply stays orange. */
+@property --af-accent-top {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #d97757;
+}
+@property --af-accent-bottom {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #d97757;
+}
+.af-ld-title-accent {
+  color: #d97757;
+  background: linear-gradient(180deg, var(--af-accent-top), var(--af-accent-bottom));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: af-ld-accent-shift 7s ease-in-out 1.2s infinite alternate;
+}
+@keyframes af-ld-accent-shift {
+  0%, 22% { --af-accent-top: #d97757; --af-accent-bottom: #d97757; }
+  78%, 100% { --af-accent-top: #a7a1f5; --af-accent-bottom: #3c47f3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .af-ld-title-accent { animation: none; }
+}
 @media (max-width: 700px) {
   .af-ld-views__title { font-size: clamp(1rem, 5.65vw, 2.5rem); }
 }

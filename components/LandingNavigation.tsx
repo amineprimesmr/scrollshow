@@ -4,6 +4,7 @@ import Link from "next/link";
 import localFont from "next/font/local";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Metal } from "@/components/fx/Metal";
 
 const wordmarkFont = localFont({
   src: "../node_modules/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2",
@@ -85,14 +86,13 @@ export function LandingNavigation({ english, signedIn = false }: { english: bool
     <div className={`sn-scrim lg ${panel ? "is-open" : ""}`} aria-hidden="true" onClick={() => open(null)} />
     <header ref={ref} className={`sn-header ${wordmarkFont.variable}`} data-scrolled={scrolled} data-open={!!panel} onClick={e => { if ((e.target as HTMLElement).closest("a")) open(null); }}>
       <div className="sn-rail lg">
-        <div className="sn-announcement"><div><a href="#comment">{t("Tes idées deviennent des carrousels. Découvre ScrollShow.", "Turn your ideas into carousels. Discover ScrollShow.")} <span aria-hidden>›</span></a></div></div>
         <div className="sn-bar"><div className="sn-left">
           <button className="sn-toggle" aria-label={panel ? t("Fermer le menu", "Close menu") : t("Ouvrir le menu", "Open menu")} aria-expanded={!!panel} aria-controls="sn-surface" onClick={e => open(panel ? null : "more", e.currentTarget)}><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden><g className="sn-line sn-line-top"><path d="M7.5 15.5h17" /></g><g className="sn-line sn-line-bottom"><path d="M7.5 15.5h17" /></g></svg></button>
           <Link className="sn-mobile-logo" href="/" aria-label="ScrollShow"><img src="/logo.png" alt="" width="32" height="32" /><span aria-hidden>SCROLLSHOW</span></Link>
           <nav className="sn-primary" aria-label={t("Navigation principale", "Main navigation")}>{groups.map(g => <button key={g.id} id={`sn-trigger-${g.id}`} className="sn-trigger" aria-controls={`sn-panel-${g.id}`} aria-expanded={panel === g.id} onClick={e => open(panel === g.id ? null : g.id, e.currentTarget)}><span>{g.label}</span></button>)}<Link className="sn-trigger" href="/#offre" onClick={goToPricing}><span>{t("Tarifs", "Pricing")}</span></Link></nav>
         </div>
         <Link className="sn-wordmark" href="/" aria-label="ScrollShow"><img src="/logo.png" alt="" width="28" height="28" /><span aria-hidden>SCROLLSHOW</span></Link>
-        <div className="sn-right">{signedIn ? null : <Link className="sn-login" href="/signup?mode=signin">{t("Connexion", "Log in")}</Link>}<Link className="sn-support" href="/support" aria-label={t("Assistance", "Support")}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden><path d="M5 14v-3a7 7 0 0 1 14 0v3M5 12H3v6h4v-6H5Zm14 0h2v6h-4v-6h2Zm0 6c0 3-3 3-6 3" /></svg></Link><Link className="sn-download" href={signedIn ? "/app" : "/signup"}>{signedIn ? t("Mon espace", "My workspace") : t("Commencer", "Get started")}</Link></div></div>
+        <div className="sn-right">{signedIn ? null : <Link className="sn-login" href="/signup?mode=signin">{t("Connexion", "Log in")}</Link>}<Link className="sn-support" href="/support" aria-label={t("Assistance", "Support")}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden><path d="M5 14v-3a7 7 0 0 1 14 0v3M5 12H3v6h4v-6H5Zm14 0h2v6h-4v-6h2Zm0 6c0 3-3 3-6 3" /></svg></Link><Metal preset="chromatic" strength={0.9} className="sn-metal-cta" normalizeHost><Link className="sn-download" href={signedIn ? "/app" : "/signup"}><span>{signedIn ? t("Mon espace", "My workspace") : t("Commencer", "Get started")}</span><svg className="sn-download__sparkle" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.1 2.4a.6.6 0 0 0-1.14 0l-1.2 3.55a3.6 3.6 0 0 1-2.25 2.25l-3.55 1.2a.6.6 0 0 0 0 1.14l3.55 1.2a3.6 3.6 0 0 1 2.25 2.25l1.2 3.55a.6.6 0 0 0 1.14 0l1.2-3.55a3.6 3.6 0 0 1 2.25-2.25l3.55-1.2a.6.6 0 0 0 0-1.14l-3.55-1.2a3.6 3.6 0 0 1-2.25-2.25l-1.2-3.55Z" /><path d="M18.6 16.1a.36.36 0 0 0-.68 0l-.5 1.46a1.9 1.9 0 0 1-1.19 1.19l-1.46.5a.36.36 0 0 0 0 .68l1.46.5a1.9 1.9 0 0 1 1.19 1.19l.5 1.46a.36.36 0 0 0 .68 0l.5-1.46a1.9 1.9 0 0 1 1.19-1.19l1.46-.5a.36.36 0 0 0 0-.68l-1.46-.5a1.9 1.9 0 0 1-1.19-1.19l-.5-1.46Z" /></svg></Link></Metal></div></div>
       </div>
       <div className="sn-surface lg" id="sn-surface" inert={!panel}><div className="sn-clip">
         <div className="sn-more" hidden={panel !== "more"}>
