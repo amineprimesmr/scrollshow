@@ -8,6 +8,7 @@ import { AI_CLIENTS } from "@/lib/ai-clients";
 import { formatEuro, isPaidPlan, PLAN } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
 import { formatInTimeZone, TIMEZONES } from "@/lib/settings";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -23,6 +24,7 @@ import {
   IconPlug,
   IconSettings,
   IconUser,
+  NavIcon,
 } from "./icons";
 import { useStudio } from "./StudioContext";
 import { ProjectSettings } from "./ProjectSettings";
@@ -38,7 +40,16 @@ type Tab =
   | "api"
   | "accounts"
   | "plan"
+  | "revenue"
+  | "agents"
+  | "tracked"
   | "danger";
+
+// Anciennes pages du menu, devenues des onglets : chargees a la demande pour
+// ne pas alourdir l'ouverture des Reglages.
+const RevenueTab = dynamic(() => import("./BusinessConnectionsView").then((m) => m.BusinessConnectionsView));
+const AgentsTab = dynamic(() => import("./McpView").then((m) => m.McpView));
+const TrackedTab = dynamic(() => import("./views/ClippersView").then((m) => m.ClippersView));
 
 type ApiKeyRow = {
   id: string;
@@ -81,6 +92,9 @@ const TABS: { id: Tab; fr: string; en: string; icon: ReactNode }[] = [
   { id: "api", fr: "API", en: "API", icon: <IconKey size={16} /> },
   { id: "accounts", fr: "Comptes liés", en: "Connected", icon: <IconPlug size={16} /> },
   { id: "plan", fr: "Facturation", en: "Billing", icon: <IconCard size={16} /> },
+  { id: "revenue", fr: "Revenus", en: "Revenue", icon: <NavIcon name="plug" size={16} /> },
+  { id: "agents", fr: "Agents", en: "Agents", icon: <NavIcon name="mcp" size={16} /> },
+  { id: "tracked", fr: "Comptes suivis", en: "Tracked accounts", icon: <NavIcon name="user" size={16} /> },
   { id: "danger", fr: "Danger", en: "Danger", icon: <IconAlert size={16} /> },
 ];
 
@@ -484,6 +498,9 @@ export function SettingsView() {
         {error ? <p className="ss-flash is-error">{error}</p> : null}
 
         {tab === "project" ? <ProjectSettings /> : null}
+        {tab === "revenue" ? <RevenueTab /> : null}
+        {tab === "agents" ? <AgentsTab /> : null}
+        {tab === "tracked" ? <TrackedTab /> : null}
 
         {tab === "account" ? (
           <form key="account" className="ss-set-card ss-form ss-tabpanel" onSubmit={saveProfile}>

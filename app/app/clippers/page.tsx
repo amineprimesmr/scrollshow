@@ -1,5 +1,11 @@
-import { ClippersView } from "@/components/studio/views/ClippersView";
+import { redirect } from "next/navigation";
 
-export default function ClippersPage() {
-  return <ClippersView />;
+// Cette page vit maintenant dans Reglages > Comptes suivis. La route reste pour les
+// anciens liens et les retours OAuth : les parametres sont conserves.
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = new URLSearchParams({ tab: "tracked" });
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (key !== "tab" && typeof value === "string") query.set(key, value);
+  }
+  redirect(`/app/settings?${query}`);
 }

@@ -11,6 +11,7 @@ import { LandingNavigation } from "@/components/LandingNavigation";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { HeroAtmosphere } from "@/components/HeroAtmosphere";
 import { Beam } from "@/components/fx/Beam";
 
 function prefersEnglish() {
@@ -69,14 +70,7 @@ function ViewsHero({ english }: { english: boolean }) {
 
   return (
     <section ref={sectionRef} id="vues" className={`af-ld-views is-${phase}`}>
-      <div className="af-ld-atmosphere" aria-hidden="true">
-        <div className="af-ld-atmosphere__light af-ld-atmosphere__light--cobalt" />
-        <div className="af-ld-atmosphere__light af-ld-atmosphere__light--ice" />
-        <div className="af-ld-atmosphere__wave af-ld-atmosphere__wave--near" />
-        <div className="af-ld-atmosphere__wave af-ld-atmosphere__wave--far" />
-        <div className="af-ld-atmosphere__shade" />
-        <div className="af-ld-atmosphere__grain" />
-      </div>
+      <HeroAtmosphere />
       <div className="af-ld-stage">
         <div className="af-ld-stage__copy">
           <h1 className="af-ld-views__title">

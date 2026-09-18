@@ -107,7 +107,7 @@ button.ss-btn-ghost:active {
 
 .ss-studio {
   --ss-radius: 22px;
-  --ss-sidebar: 196px;
+  --ss-sidebar: 88px;
   display: grid;
   grid-template-columns: var(--ss-sidebar) minmax(0, 1fr);
   height: 100dvh;
@@ -5605,8 +5605,10 @@ a.ss-btn-ghost {
   position: relative;
   margin: 0 0 24px;
   border-radius: 26px;
+  /* Scene toujours sombre (texte blanc). En theme sombre elle devient
+     transparente pour laisser voir l'atmosphere de la page (regle plus bas) ;
+     en clair elle garde son fond noir a points. Plus de lueur verte. */
   background:
-    radial-gradient(70% 55% at 22% -10%, rgb(34 197 94 / 0.2), transparent 62%),
     radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1.2px) 0 0 / 14px 14px,
     #050505;
   border: 1px solid rgb(255 255 255 / 0.08);
@@ -5615,6 +5617,20 @@ a.ss-btn-ghost {
   overflow: hidden;
   contain: layout paint;
   color-scheme: dark;
+}
+
+html[data-theme="dark"] .ss-fan {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .ss-fan {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
 }
 
 .ss-fan__bar {
@@ -6146,7 +6162,8 @@ a.ss-btn-ghost {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #000;
+  /* Pas de fond : c'est .ss-main qui porte l'atmosphere et les points. */
+  background: transparent;
 }
 
 .ss-overview__fan { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -7322,7 +7339,6 @@ a.ss-btn-ghost {
 /* Panneau replie : l'eventail remplit la page, les dossiers sont grands.
    Panneau ouvert : la scene se compacte pour garder les publications a portee,
    y compris sur un petit ecran de portable. */
-.ss-overview { background: var(--ss-bg); }
 .ss-overview.is-open { height: auto; min-height: 100%; }
 .ss-overview.is-open .ss-overview__fan,
 .ss-overview.is-open .ss-fan,

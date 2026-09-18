@@ -2,6 +2,7 @@ import { GoogleOneTap } from "@/components/GoogleOneTap";
 import { Landing } from "@/components/Landing";
 import { hasSession } from "@/lib/auth";
 import "./landing.css";
+import "./atmosphere.css";
 import "./landing-navigation.css";
 import "./liquid-glass.css";
 

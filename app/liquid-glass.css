@@ -67,32 +67,61 @@ html.lg-refract .lg--lens {
   }
 }
 
-/* ── Ambient ground ──────────────────────────────────────────────────────
-   Glass needs something to refract. Faint colour fields behind the studio,
-   fixed, so the sidebar and bars read as glass instead of flat grey. */
+/* La page est un panneau pose sur le fond du menu : ses angles gauches sont
+   arrondis et laissent voir ce fond, le menu et le cadre ne font qu'un. Sur le
+   calendrier c'est le rail des comptes qui touche le menu, donc lui qui porte
+   les angles. Hors mobile seulement : le menu y devient un tiroir. */
 .ss-studio {
-  background:
-    radial-gradient(60% 55% at 0% 0%, rgb(124 58 237 / 0.07), transparent 65%),
-    radial-gradient(50% 45% at 100% 0%, rgb(196 59 115 / 0.06), transparent 60%),
-    radial-gradient(45% 40% at 55% 100%, rgb(37 99 235 / 0.06), transparent 60%),
-    var(--ss-bg);
+  --ss-side-bg: #000;
+  --ss-page-radius: 20px;
+  background: var(--ss-side-bg);
 }
 
-html[data-theme="dark"] .ss-studio {
-  background:
-    radial-gradient(60% 55% at 0% 0%, rgb(124 58 237 / 0.16), transparent 65%),
-    radial-gradient(50% 45% at 100% 0%, rgb(196 59 115 / 0.12), transparent 60%),
-    radial-gradient(45% 40% at 55% 100%, rgb(37 99 235 / 0.12), transparent 60%),
-    var(--ss-bg);
+/* Fond de toutes les pages : l'atmosphere bleue de la landing
+   (components/Atmosphere.tsx, app/atmosphere.css) sous la trame de points de
+   l'Overview. */
+.ss-main {
+  --ss-dot: color-mix(in srgb, var(--ss-ink) 10%, transparent);
+  position: relative;
+  isolation: isolate;
+  background: var(--ss-bg);
 }
 
+/* L'atmosphere de la landing n'existe qu'en sombre : ses degrades descendent
+   vers le noir, sur une page claire ils la saliraient. En clair, points seuls. */
+.ss-main__atmosphere { display: none; }
+html[data-theme="dark"] .ss-main__atmosphere { display: block; }
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .ss-studio {
+  html:not([data-theme="light"]) .ss-main__atmosphere { display: block; }
+}
+
+/* Les points passent au-dessus de l'atmosphere (meme z-index, plus tard dans
+   l'ordre de peinture), sinon sa base opaque les recouvre en haut de page. */
+.ss-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(var(--ss-dot) 1px, transparent 1.2px) 0 0 / 14px 14px;
+}
+
+@media (min-width: 901px) {
+  .ss-studio:not(.is-calendar) .ss-main,
+  .ss-studio.is-calendar .ss-channels {
+    border-radius: var(--ss-page-radius) 0 0 var(--ss-page-radius);
+    /* Filet clair : en theme sombre la page est noire elle aussi, c'est lui
+       qui dessine le panneau sur le rail. */
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12);
+  }
+
+  .ss-studio.is-calendar .ss-channels {
     background:
-      radial-gradient(60% 55% at 0% 0%, rgb(124 58 237 / 0.16), transparent 65%),
-      radial-gradient(50% 45% at 100% 0%, rgb(196 59 115 / 0.12), transparent 60%),
-      radial-gradient(45% 40% at 55% 100%, rgb(37 99 235 / 0.12), transparent 60%),
+      radial-gradient(color-mix(in srgb, var(--ss-ink) 10%, transparent) 1px, transparent 1.2px) 0 0 / 14px 14px,
       var(--ss-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-right: 1px solid var(--ss-line);
   }
 }
 
@@ -110,31 +139,105 @@ html[data-theme="dark"] .ss-studio {
    clair) : elle ne recouvre jamais de contenu, donc un flou plein-hauteur ne
    montrait rien et coutait une passe GPU a chaque image. */
 .ss-sidebar {
-  --ss-side-hover: color-mix(in srgb, var(--ss-ink) 4%, transparent);
-  --ss-side-active: color-mix(in srgb, var(--ss-ink) 7%, transparent);
-  /* Blanche dans les DEUX themes (demande d'Amine) : on re-pose ici les jetons
-     clairs de theme.css, tout ce qui vit dans la barre (liens, profil, menu)
-     suit sans regle par theme. A tenir en phase avec le bloc :root. */
-  --ss-card: #fff;
-  --ss-soft: #f4f4f5;
-  --ss-ink: #0a0a0a;
-  --ss-on-ink: #fff;
-  --ss-muted: #52525b;
-  --ss-muted-2: #a1a1aa;
-  --ss-line: #ececec;
-  --ss-err-fg: #b91c1c;
-  --ss-warn-fg: #b45309;
-  --lg-rgb: 255 255 255;
-  --lg-alpha: 0.58;
+  --ss-side-hover: color-mix(in srgb, var(--ss-ink) 6%, transparent);
+  --ss-side-active: color-mix(in srgb, var(--ss-ink) 11%, transparent);
+  /* Noire dans les DEUX themes (demande d'Amine) : on re-pose ici les jetons
+     sombres de theme.css, tout ce qui vit dans la barre (liens, profil, menu)
+     suit sans regle par theme. A tenir en phase avec le bloc sombre. */
+  --ss-card: #0b0b0d;
+  --ss-soft: #141416;
+  --ss-ink: #fafafa;
+  --ss-on-ink: #000;
+  --ss-muted: #8e8e96;
+  --ss-muted-2: #6b6b73;
+  --ss-line: #1f1f23;
+  --ss-err-fg: #f87171;
+  --ss-warn-fg: #fbbf24;
+  --lg-rgb: 26 26 30;
+  --lg-alpha: 0.55;
   --lg-hi: 255 255 255;
-  --lg-hi-a: 0.85;
-  --lg-shade: 12 12 16;
-  --lg-shade-a: 0.1;
-  --lg-knob: rgb(255 255 255 / 0.92);
-  color-scheme: light;
+  --lg-hi-a: 0.22;
+  --lg-shade: 0 0 0;
+  --lg-shade-a: 0.55;
+  --lg-knob: rgb(255 255 255 / 0.14);
+  color-scheme: dark;
   color: var(--ss-ink);
-  background: var(--ss-card);
-  border-right: 1px solid var(--ss-line);
+  background: var(--ss-side-bg);
+  border-right: 0;
+}
+
+/* Rail etroit : icone au-dessus du libelle, entrees espacees. Hors mobile
+   seulement — le tiroir mobile garde sa liste en lignes. */
+@media (min-width: 901px) {
+  .ss-sidebar {
+    overflow: visible;
+  }
+
+  .ss-sidebar__head {
+    justify-content: center;
+    padding: 14px 0 10px;
+  }
+
+  .ss-sidebar .ss-project { flex: 0 0 auto; }
+  .ss-sidebar .ss-project__btn { padding: 6px; }
+  .ss-sidebar .ss-project__name,
+  .ss-sidebar .ss-project__chevron { display: none; }
+  .ss-sidebar .ss-project__mark { width: 34px; height: 34px; border-radius: 10px; }
+
+  .ss-sidebar__nav {
+    padding: 14px 6px;
+    gap: 24px;
+    scrollbar-width: none;
+  }
+  .ss-sidebar__nav::-webkit-scrollbar { display: none; }
+
+  .ss-sidebar__bottom {
+    padding: 8px 6px 12px;
+    gap: 18px;
+    border-top: 0;
+  }
+
+  .ss-sidebar-link {
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 2px 9px;
+    border-radius: 14px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .ss-sidebar-link svg:first-child { width: 21px; height: 21px; }
+  .ss-sidebar-link.is-active { font-weight: 650; }
+
+  .ss-sidebar-lock,
+  .ss-sidebar-dot {
+    position: absolute;
+    top: 7px;
+    right: 16px;
+    margin: 0;
+  }
+  .ss-sidebar-link.is-locked { opacity: 0.55; }
+
+  .ss-sidebar-profile {
+    padding: 8px 0 14px;
+    border-top: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .ss-sidebar-profile__btn { width: auto; padding: 6px; }
+  .ss-sidebar-profile__meta { display: none; }
+  .ss-sidebar-avatar { width: 36px; height: 36px; border-radius: 50%; }
+
+  .ss-sidebar-menu {
+    left: 10px;
+    right: auto;
+    width: 220px;
+  }
 }
 
 .ss-sidebar-link.is-active {
@@ -143,6 +246,43 @@ html[data-theme="dark"] .ss-studio {
 
 .ss-sidebar-link:hover:not(.is-active) {
   background: var(--ss-side-hover);
+}
+
+/* ── Inspiration : onglets Recherche / Bibliotheque ──────────────────────── */
+.ss-insp-tabs {
+  display: flex;
+  width: fit-content;
+  gap: 2px;
+  margin: 18px auto 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgb(var(--lg-rgb) / var(--lg-alpha));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    0 1px 2px rgb(var(--lg-shade) / var(--lg-shade-a));
+}
+
+.ss-insp-tabs a {
+  padding: 7px 16px;
+  border-radius: 999px;
+  color: var(--ss-muted);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: color 0.12s ease, background 0.12s ease, transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.ss-insp-tabs a:hover { color: var(--ss-ink); }
+.ss-insp-tabs a:active { transform: scale(0.96); }
+
+.ss-insp-tabs a.is-on {
+  color: var(--ss-ink);
+  background: var(--lg-knob);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
+    0 1px 2px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.5));
 }
 
 /* ── Sticky top bar: content scrolls under it ──────────────────────────── */

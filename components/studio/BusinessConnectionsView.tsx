@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { PublicBusinessConnection } from "@/lib/business-analytics/model";
 import { useStudio } from "./StudioContext";
-import { IconChart } from "./icons";
 import { ProviderLogo } from "./ProviderLogo";
 import { BusinessField, BusinessModal, CopyButton, businessError, businessRequest } from "./business-ui";
 import "./business-results.css";
@@ -136,8 +134,7 @@ export function BusinessConnectionsView() {
 
   return <div className="ss-br ss-br-page ss-commerce">
     <header className="ss-br__header">
-      <div><p className="ss-br__eyebrow">{tr("CONNEXIONS", "CONNECTIONS")}</p><h1>{tr("Connecte tes ventes.", "Connect your sales.")}</h1><p className="ss-br__subtitle">{tr("Retrouve les revenus de ton activité dans les résultats de tes contenus.", "Bring your business revenue into your content results.")}</p></div>
-      <Link className="ss-br__button lg lg--lens lg-press" href="/app/analytics"><IconChart size={15} />{tr("Voir les résultats", "View results")}</Link>
+      <div><p className="ss-br__eyebrow">{tr("CONNEXIONS", "CONNECTIONS")}</p><h1>{tr("Connecte tes ventes.", "Connect your sales.")}</h1><p className="ss-br__subtitle">{tr("Retrouve les revenus de ton activité dans ScrollShow.", "Bring your business revenue into ScrollShow.")}</p></div>
     </header>
     {error && <div className="ss-br__notice is-error" role="alert"><span>{error}</span>{!data && <button className="ss-br__button" onClick={() => void load()}>{tr("Réessayer", "Retry")}</button>}</div>}
     {notice && <div className={`ss-br__notice${noticeError ? " is-error" : ""}`} role={noticeError ? "alert" : "status"}><span>{notice}</span><button className="ss-commerce__dismiss" onClick={() => setNotice("")} aria-label={tr("Fermer le message", "Dismiss message")}>×</button></div>}
@@ -190,7 +187,7 @@ export function BusinessConnectionsView() {
         </section>;
       })}
     </div>
-    <div className="ss-commerce__footer"><p>{tr("Pour savoir quel contenu a généré une vente, ajoute le suivi à ton site.", "To identify which content led to a sale, add tracking to your website.")} <Link href="/app/analytics?tab=settings">{tr("Installer le suivi", "Set up tracking")} →</Link></p><p>{tr("Ces comptes concernent ton activité. Ton abonnement ScrollShow reste dans les réglages du compte.", "These accounts belong to your business. Your ScrollShow subscription stays in account settings.")}</p></div>
+    <div className="ss-commerce__footer"><p>{tr("Ces comptes concernent ton activité. Ton abonnement ScrollShow reste dans les réglages du compte.", "These accounts belong to your business. Your ScrollShow subscription stays in account settings.")}</p></div>
     {provider && <ConnectionSetup provider={provider} initialShop={initialShop} english={en} onClose={() => setProvider(null)} onSuccess={async next => {
       setProvider(null); setIssued(previous => ({ ...previous, [next.connection.id]: next })); await load();
       setNoticeError(false);

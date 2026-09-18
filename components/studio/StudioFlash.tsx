@@ -37,6 +37,8 @@ export function StudioFlash() {
     access_denied: t("Connexion TikTok refusée.", "TikTok connection was denied.", english),
     missing_code: t("Connexion TikTok incomplète. Réessaie.", "TikTok connection was incomplete. Try again.", english),
     state_mismatch: t("Connexion TikTok interrompue. Réessaie.", "TikTok connection was interrupted. Try again.", english),
+    state_expired: t("La connexion TikTok a pris plus de 30 minutes. Clique à nouveau sur Connecter.", "The TikTok connection took more than 30 minutes. Click Connect again.", english),
+    state_other_user: t("Cette connexion TikTok a été lancée depuis un autre compte ScrollShow. Relance-la depuis celui-ci.", "This TikTok connection was started from another ScrollShow account. Start it again from this one.", english),
     tiktok_not_configured: t("TikTok n’est pas encore configuré sur le serveur.", "TikTok is not configured on the server yet.", english),
     meta_not_configured: t("Meta n’est pas encore configuré. Ajoute META_APP_ID et META_APP_SECRET.", "Meta is not configured yet. Add META_APP_ID and META_APP_SECRET.", english),
     meta_denied: t("Connexion Meta annulée.", "Meta connection was cancelled.", english),

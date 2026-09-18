@@ -246,7 +246,19 @@ export function IconDatabase(props: IconProps) {
   );
 }
 
+export function IconTools(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2" {...stroke} />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="2" {...stroke} />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="2" {...stroke} />
+      <path d="M17 14v6M14 17h6" {...stroke} />
+    </Svg>
+  );
+}
+
 const NAV_ICON_MAP: Record<string, (p: IconProps) => ReactNode> = {
+  tools: IconTools,
   home: IconHome,
   unshadowban: IconEyeOff,
   media: IconMedia,

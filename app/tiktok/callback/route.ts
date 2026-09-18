@@ -1,4 +1,5 @@
 import { readSession } from "@/lib/auth";
+import { verifyOAuthState } from "@/lib/oauth-state";
 import { TikTokApiError } from "@/lib/tiktok";
 import { linkTikTokAccount } from "@/lib/tiktok-link";
 import { cookies } from "next/headers";
@@ -16,9 +17,16 @@ export async function GET(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.redirect(`${site}/signup?mode=signin&next=/app`);
 
+  // Preuve portee par le `state` lui-meme : signature, expiration, et compte
+  // ScrollShow identique a celui de la session. Le cookie n'est plus requis —
+  // il expirait ou etait ecrase par un second clic, et bloquait des connexions
+  // parfaitement legitimes. Il reste accepte pour un aller parti avant ce deploiement.
   const expected = (await cookies()).get("ss_oauth_state")?.value || "";
-  if (!expected || !state || expected !== state) {
-    return NextResponse.redirect(`${site}/app/integrations?error=state_mismatch`);
+  const verdict = verifyOAuthState(state, user.id, process.env.AUTH_SECRET || "");
+  const legacy = verdict === "malformed" && Boolean(expected) && expected === state;
+  if (verdict !== "ok" && !legacy) {
+    console.warn(JSON.stringify({ event: "tiktok_oauth_state_rejected", verdict, hadCookie: Boolean(expected) }));
+    return NextResponse.redirect(`${site}/app/integrations?error=${verdict === "expired" ? "state_expired" : verdict === "other_user" ? "state_other_user" : "state_mismatch"}`);
   }
 
   (await cookies()).delete("ss_oauth_state");

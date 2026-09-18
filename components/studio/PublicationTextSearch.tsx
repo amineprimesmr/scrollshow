@@ -59,7 +59,9 @@ export function PublicationTextSearch({ accountKey, range, videos, query, onQuer
   // Chercher du texte, c'est demander la lecture : elle reprend, sans plafond.
   useEffect(() => { if (searching && paused && hasWork) { budget.current = Infinity; setPaused(false); } }, [searching, paused, hasWork]);
   const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
-  const showStatus = Boolean(error) || progress.pending > 0 || progress.failed > 0;
+  // La lecture des slides tourne en fond : sa progression n'interesse que
+  // celui qui cherche du texte. Sans recherche, la barre reste un simple champ.
+  const showStatus = searching && (Boolean(error) || progress.pending > 0 || progress.failed > 0);
   return <div className="ss-text-search">
     <div className="ss-text-search__field">
       <svg className="ss-text-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">

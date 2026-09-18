@@ -6,7 +6,7 @@ import { GOOGLE_FONTS_HREF } from "@/lib/recipe";
 import { t } from "@/lib/i18n";
 import { isPaidPlan } from "@/lib/plans";
 import { platformById, platformName } from "@/lib/platforms";
-import { navActive, PAGE_TITLES, STUDIO_NAV } from "@/lib/studio-nav";
+import { INSPIRATION_TABS, navActive, onInspiration, PAGE_TITLES, STUDIO_NAV } from "@/lib/studio-nav";
 import { sound } from "@/lib/sound";
 import { setStoredTheme } from "@/lib/theme";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icon
 import { carriesPost, keepInLibrary, readDragPayload } from "./library-drop";
 import { StudioProvider, useStudio } from "./StudioContext";
 import ProjectSwitcher from "./ProjectSwitcher";
+import { HeroAtmosphere } from "@/components/HeroAtmosphere";
 import { LiquidGlassDefs } from "@/components/LiquidGlassDefs";
 import { NavPill } from "@/components/fx/NavPill";
 import { Metal } from "@/components/fx/Metal";
@@ -117,7 +118,7 @@ function NavLink({ entry, pathname, english, onGo }: { entry: (typeof STUDIO_NAV
   // La Bibliotheque accepte les carrousels glisses depuis la Recherche : c'est
   // la seule cible visible depuis les deux pages, la barre laterale ne bougeant
   // jamais. Le bouton de la tuile fait la meme chose sans glisser.
-  const droppable = entry.href === "/app/marketplace";
+  const droppable = entry.href === "/app/discover";
   const [over, setOver] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -186,7 +187,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const hideHeader =
     onMcp ||
     onCalendar ||
-    pathname.startsWith("/app/analytics") ||
     pathname.startsWith("/app/business-connections") ||
     pathname.startsWith("/app/home") ||
     pathname.startsWith("/app/discover") ||
@@ -314,6 +314,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <section className="ss-main">
+        <HeroAtmosphere className="ss-main__atmosphere" />
         <VerifyBanner />
         <TrialBanner />
         <div className="ss-main__body ss-page-enter" key={pathname}>
@@ -321,6 +322,29 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             <header className="ss-top">
               <h1>{title}</h1>
             </header>
+          ) : null}
+          {onInspiration(pathname) ? (
+            <nav className="ss-insp-tabs" aria-label="Inspiration">
+              {INSPIRATION_TABS.map((tab) => {
+                const on = navPath === tab.href || navPath.startsWith(`${tab.href}/`);
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    className={on ? "is-on" : ""}
+                    aria-current={on ? "page" : undefined}
+                    onClick={(event) => {
+                      if (on || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                      event.preventDefault();
+                      sound.nav();
+                      go(tab.href);
+                    }}
+                  >
+                    {english ? tab.en : tab.fr}
+                  </Link>
+                );
+              })}
+            </nav>
           ) : null}
           <Suspense fallback={null}>
             <StudioFlash />

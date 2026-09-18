@@ -12,7 +12,7 @@ import { TikTokScanLine } from "./TikTokScan";
 import { IconCheck } from "./icons";
 import { keepErrorLabel, keepInLibrary } from "./library-drop";
 import { useKeepDrag } from "./useKeepDrag";
-import { filterResearchPosts, mergeResearchJobs, researchDateBounds, researchHistogram, type ResearchPostRow } from "./research-state";
+import { filterResearchPosts, mergeResearchJobs, type ResearchPostRow } from "./research-state";
 import { Metal } from "@/components/fx/Metal";
 import { Orb } from "@/components/fx/Orb";
 import "./research.css";
@@ -24,8 +24,7 @@ type Row = ResearchPostRow & { metrics: Metrics | null };
 
 const LIVE = new Set(["queued", "running"]);
 const PAGE = 24;
-type DisplayFilters = { minPostViews: number; maxPostViews: number | null; days: number; dateFrom: string; dateTo: string };
-const ALL_FILTERS: DisplayFilters = { minPostViews: 0, maxPostViews: null, days: 0, dateFrom: "", dateTo: "" };
+type WallOrder = "views" | "likes" | "comments" | "shares" | "recent";
 type CachedResearch = { jobs: Job[]; items: Item[]; available: boolean; at: number };
 const researchCache = new Map<string, CachedResearch>();
 const cachedResearch = (key: string) => {
@@ -71,108 +70,6 @@ function liftOf(post: AccountVideo, metrics: Metrics | null) {
   if (!metrics?.medianViews || metrics.medianViews <= 0 || metrics.measuredSlideshowPosts < 5) return null;
   const lift = post.views / metrics.medianViews;
   return lift >= 2 ? lift : null;
-}
-
-function Histogram({ data, date = false, english, bounds }: { data: ReturnType<typeof researchHistogram>; date?: boolean; english: boolean; bounds?: { min: number; max: number | null } }) {
-  const label = (value: number) => date ? new Intl.DateTimeFormat(english ? "en-GB" : "fr-FR", { day: "numeric", month: "short", year: "2-digit" }).format(value) : shortNumber(value);
-  const peak = Math.max(1, ...data.bins.map((bin) => bin.count));
-  return (
-    <div className="ss-rs__histogram">
-      {data.known ? (
-        <>
-          <svg viewBox="0 0 288 56" preserveAspectRatio="none" role="img" aria-label={english ? `Distribution of ${data.known} measured carousels` : `Répartition de ${data.known} carrousels mesurés`}>
-            {data.bins.map((bin, index) => {
-              const width = 288 / data.bins.length;
-              const height = bin.count ? Math.max(2, bin.count / peak * 52) : 0;
-              const included = !bounds || (bin.max >= bounds.min && (bounds.max == null || bin.min <= bounds.max));
-              return <rect key={index} x={index * width + 1} y={56 - height} width={Math.max(1, width - 3)} height={height} rx="2" style={{ opacity: included ? 0.72 : 0.16 }}><title>{label(bin.min)} – {label(bin.max)} : {bin.count}</title></rect>;
-            })}
-          </svg>
-          <div className="ss-rs__histogram-axis"><span>{label(data.min!)}</span><span>{label(data.max!)}</span></div>
-        </>
-      ) : <p>{english ? "No measured values yet" : "Aucune mesure pour le moment"}</p>}
-      <small>{data.known} {english ? "measured carousels" : "carrousels mesurés"}{data.unknown ? ` · ${data.unknown} ${english ? "unknown" : "inconnus"}` : ""}</small>
-    </div>
-  );
-}
-
-function ResearchFilters({ rows, value, onChange, english }: {
-  rows: Row[]; value: DisplayFilters; onChange: (value: DisplayFilters) => void; english: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const tr = (fr: string, en: string) => english ? en : fr;
-  const views = useMemo(() => researchHistogram(rows, "views"), [rows]);
-  const dates = useMemo(() => researchHistogram(rows, "date"), [rows]);
-  const logLow = Math.log10((views.min ?? 0) + 1);
-  const logSpan = Math.log10((views.max ?? 0) + 1) - logLow;
-  const position = (number: number) => logSpan > 0 ? Math.round(Math.max(0, Math.min(1, (Math.log10(number + 1) - logLow) / logSpan)) * 1000) : 0;
-  const minimumPosition = position(value.minPostViews);
-  const maximumPosition = value.maxPostViews == null ? 1000 : position(value.maxPostViews);
-  const active = Number(value.minPostViews > 0 || value.maxPostViews != null) + Number(value.days > 0 || Boolean(value.dateFrom || value.dateTo));
-  useEffect(() => {
-    if (!open) return;
-    const down = (event: PointerEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
-    document.addEventListener("pointerdown", down);
-    document.addEventListener("keydown", key);
-    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key); };
-  }, [open]);
-  return (
-    <div className="ss-rs__filter" ref={box}>
-      <button type="button" ref={trigger} className={`ss-rs__filter-button lg lg--lens lg-press${active ? " is-on" : ""}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((current) => !current)}>
-        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
-        {tr("Filtres", "Filters")}{active ? <b>{active}</b> : null}
-      </button>
-      {open ? (
-        <div className="ss-rs__filter-panel lg" role="dialog" aria-label={tr("Filtrer les carrousels", "Filter carousels")}>
-          <div className="ss-rs__filter-heading"><strong>{tr("Filtres", "Filters")}</strong><button type="button" onClick={() => onChange({ ...ALL_FILTERS })}>{tr("Réinitialiser", "Reset")}</button></div>
-          <section>
-            <h2>{tr("Nombre de vues", "View count")}</h2>
-            <Histogram data={views} english={english} bounds={{ min: value.minPostViews, max: value.maxPostViews }} />
-            <div className="ss-rs__view-range" style={{ "--range-from": `${minimumPosition / 10}%`, "--range-to": `${maximumPosition / 10}%` } as CSSProperties}>
-              <span aria-hidden="true" />
-              <input type="range" min="0" max="1000" step="1" disabled={!logSpan} value={minimumPosition} aria-label={tr("Minimum vues graphique", "Graph minimum views")} aria-valuetext={shortNumber(value.minPostViews)} onChange={(event) => {
-                const next = Math.min(Number(event.target.value), maximumPosition);
-                const min = next === 0 ? 0 : Math.ceil(10 ** (logLow + logSpan * next / 1000) - 1);
-                onChange({ ...value, minPostViews: min, maxPostViews: value.maxPostViews != null && value.maxPostViews < min ? min : value.maxPostViews });
-              }} />
-              <input type="range" min="0" max="1000" step="1" disabled={!logSpan} value={maximumPosition} aria-label={tr("Maximum vues graphique", "Graph maximum views")} aria-valuetext={value.maxPostViews == null ? tr("Illimité", "No limit") : shortNumber(value.maxPostViews)} onChange={(event) => {
-                const next = Math.max(Number(event.target.value), minimumPosition);
-                const max = next === 1000 ? null : Math.floor(10 ** (logLow + logSpan * next / 1000) - 1);
-                onChange({ ...value, maxPostViews: max, minPostViews: max != null && value.minPostViews > max ? max : value.minPostViews });
-              }} />
-            </div>
-            <div className="ss-rs__filter-inputs">
-              <label>{tr("Minimum", "Minimum")}<input type="number" inputMode="numeric" min="0" step="100" aria-label={tr("Vues minimum", "Minimum views")} placeholder="0" value={value.minPostViews || ""} onChange={(event) => {
-                const min = Math.max(0, Number(event.target.value) || 0);
-                onChange({ ...value, minPostViews: min, maxPostViews: value.maxPostViews != null && value.maxPostViews < min ? min : value.maxPostViews });
-              }} /></label>
-              <span aria-hidden="true">—</span>
-              <label>{tr("Maximum", "Maximum")}<input type="number" inputMode="numeric" min="0" step="100" aria-label={tr("Vues maximum", "Maximum views")} placeholder={tr("Illimité", "No limit")} value={value.maxPostViews ?? ""} onChange={(event) => {
-                const max = event.target.value === "" ? null : Math.max(0, Number(event.target.value) || 0);
-                onChange({ ...value, maxPostViews: max, minPostViews: max != null && value.minPostViews > max ? max : value.minPostViews });
-              }} /></label>
-            </div>
-          </section>
-          <section>
-            <h2>{tr("Période de publication", "Publication dates")}</h2>
-            <Histogram data={dates} date english={english} />
-            <div className="ss-rs__periods" role="group" aria-label={tr("Périodes rapides", "Date presets")}>
-              {[0, 7, 30, 90, 365].map((days) => <button key={days} type="button" aria-pressed={value.days === days && !value.dateFrom && !value.dateTo} onClick={() => onChange({ ...value, days, dateFrom: "", dateTo: "" })}>{days === 0 ? tr("Tout", "All") : days === 365 ? tr("1 an", "1 year") : `${days} ${tr("j", "d")}`}</button>)}
-            </div>
-            <div className="ss-rs__filter-inputs">
-              <label>{tr("Du", "From")}<input type="date" aria-label={tr("Date de début", "Start date")} max={value.dateTo || inputDate(Date.now())} value={value.dateFrom} onChange={(event) => onChange({ ...value, days: 0, dateFrom: event.target.value, dateTo: value.dateTo && event.target.value > value.dateTo ? event.target.value : value.dateTo })} /></label>
-              <span aria-hidden="true">—</span>
-              <label>{tr("Au", "To")}<input type="date" aria-label={tr("Date de fin", "End date")} min={value.dateFrom || undefined} max={inputDate(Date.now())} value={value.dateTo} onChange={(event) => onChange({ ...value, days: 0, dateTo: event.target.value, dateFrom: value.dateFrom && event.target.value && event.target.value < value.dateFrom ? event.target.value : value.dateFrom })} /></label>
-            </div>
-          </section>
-          <button type="button" className="ss-btn-purple lg-press ss-rs__filter-done" onClick={() => setOpen(false)}>{tr("Afficher les résultats", "Show results")}</button>
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 type Study = { id: string; status: string; slides: { index: number; text: string; status: string }[] };
@@ -253,8 +150,10 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
   const tr = useCallback((fr: string, en: string) => t(fr, en, english), [english]);
 
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<DisplayFilters>({ ...ALL_FILTERS });
-  const { minPostViews, maxPostViews, days, dateFrom, dateTo } = filters;
+  // Plus de filtres d'affichage (retires a la demande d'Amine) : le mur montre
+  // tout ce que la recherche a trouve. Le tri n'apparait qu'une fois la
+  // recherche terminee — trier un mur qui se remplit ferait sauter les tuiles.
+  const [order, setOrder] = useState<WallOrder>("views");
   const [scope, setScope] = useState<"run" | "all">("all");
   const [items, setItems] = useState<Item[]>(() => cachedResearch(cacheKey)?.items || []);
   const [jobs, setJobs] = useState<Job[]>(() => cachedResearch(cacheKey)?.jobs || []);
@@ -378,7 +277,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
     setScope(job ? "run" : "all");
     setLastRun(job?.id || null);
     setQuery(job ? job.input.keywords.map((word) => job.input.kind === "analyze" ? `@${word.replace(/^@/, "")}` : word).join(", ") : "");
-    setFilters({ ...ALL_FILTERS });
+    setOrder("views");
     setShown(PAGE);
     setSyncError("");
     setError("");
@@ -476,25 +375,20 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
     return rows.sort((a, b) => b.post.views - a.post.views);
   }, [items, jobs, scope, run, runHandles]);
 
-  const selection = useMemo(() => filterResearchPosts(sourceRows, {
-    minPostViews, maxPostViews, days, ...researchDateBounds(dateFrom, dateTo), keptIds, leaving, gone,
-  }), [sourceRows, minPostViews, maxPostViews, days, dateFrom, dateTo, keptIds, leaving, gone]);
-  const wall = selection.posts;
+  const selection = useMemo(() => filterResearchPosts(sourceRows, { days: 0, minPostViews: 0, keptIds, leaving, gone }), [sourceRows, keptIds, leaving, gone]);
 
-  const histogramRows = useMemo(() => filterResearchPosts(sourceRows, { days: 0, minPostViews: 0, keptIds, leaving, gone }).posts, [sourceRows, keptIds, leaving, gone]);
-  const activeFilters = minPostViews > 0 || maxPostViews != null || days > 0 || Boolean(dateFrom || dateTo);
-  const accounts = new Set(wall.map((row) => row.account.handle)).size;
   const hunting = Boolean(run && LIVE.has(run.status));
+  const sortable = !hunting && selection.posts.length > 1;
+  const wall = useMemo(() => {
+    if (hunting || order === "views") return selection.posts;
+    const rank = (row: ResearchPostRow) => order === "recent" ? row.post.createdAt || 0 : Number(row.post[order]) || 0;
+    return [...selection.posts].sort((a, b) => rank(b) - rank(a));
+  }, [selection.posts, order, hunting]);
   const stalled = hunting && Boolean(run) && now - Date.parse(run!.updatedAt) > 100_000;
   const disconnected = Boolean(syncError || loadError) || stalled;
   const found = run?.input.mode === "posts" ? run.progress.postsFound : selection.total;
   const elapsedSeconds = run ? Math.max(0, Math.floor(((hunting ? now : Date.parse(run.updatedAt)) - Date.parse(run.createdAt)) / 1000)) : 0;
   const elapsed = elapsedSeconds < 60 ? `${elapsedSeconds} s` : `${Math.floor(elapsedSeconds / 60)} min ${elapsedSeconds % 60} s`;
-  const summary = loading ? tr("Chargement…", "Loading…")
-    : wall.length ? `${wall.length} ${plural(wall.length, tr("carrousel", "carousel"), tr("carrousels", "carousels"))} · ${accounts} ${plural(accounts, tr("compte", "account"), tr("comptes", "accounts"))}`
-    : hunting ? tr("Les carrousels apparaissent dès qu'ils sont trouvés", "Carousels appear as soon as they are found")
-    : run && scope === "run" ? tr("Aucun carrousel affiché pour cette recherche", "No carousels displayed for this search")
-    : tr("Les carrousels TikTok, directement par mot-clé", "TikTok carousels, directly by keyword");
   const hiddenFilters = selection.hidden.views + selection.hidden.unknownViews + selection.hidden.date + selection.hidden.unknownDate;
   const filterDetails = [
     selection.hidden.views ? tr(`${selection.hidden.views} hors plage de vues`, `${selection.hidden.views} outside the view range`) : "",
@@ -515,6 +409,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       invalid_handle: tr("Ce @compte n'est pas valide.", "That @account is not valid."),
       research_cursor_stalled: tr("TikTok a interrompu la pagination. Relance.", "TikTok stopped paginating. Try again."),
       profile_posts_unavailable: tr("Les publications de ce compte sont illisibles.", "That account's posts are unreadable."),
+      search_keyword_refused: tr("TikTok ne renvoie aucun carrousel pour ce mot-clé : il fait partie des termes qu'il restreint. Essaie un synonyme (« glow up », « jawline », « skincare »…).", "TikTok returns no carousels for this keyword: it is one of the terms it restricts. Try a synonym (\"glow up\", \"jawline\", \"skincare\"…)."),
       search_provider_rejected: tr("TikTok a refusé la recherche. Réessaie.", "TikTok refused the search. Try again."),
       search_time_limit: tr("Le délai de recherche a été atteint. Les résultats trouvés sont conservés.", "The search time limit was reached. Results found so far are kept."),
       search_version_changed: tr("Cette ancienne recherche doit être relancée avec le nouveau moteur.", "Restart this older search with the new search engine."),
@@ -695,11 +590,6 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
   return (
     <div className="ss-rs ss-page-enter">
       <div className="ss-rs__bar">
-        <div className="ss-rs__title">
-          <h1>{tr("Recherche", "Research")}</h1>
-          <p className="ss-rs__summary" key={summary}>{summary}</p>
-        </div>
-
         <div className="ss-rs__tools">
         <form className="ss-rs__field lg lg--lens" onSubmit={(event) => void start(event)} role="search">
           <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
@@ -727,7 +617,6 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
             </button>
           </Metal>
         </form>
-        <ResearchFilters rows={histogramRows} value={filters} onChange={(next) => { setFilters(next); setShown(PAGE); }} english={english} />
         </div>
 
         <nav className="ss-rs__history" role="tablist" aria-label={tr("Historique des recherches", "Search history")} onKeyDown={(event) => {
@@ -796,10 +685,19 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
           </div>
         ) : null}
 
+        {sortable ? (
+          <div className="ss-rs__sort lg" role="group" aria-label={tr("Trier par", "Sort by")}>
+            {(["views", "likes", "comments", "shares", "recent"] as const).map((id) => (
+              <button key={id} type="button" aria-pressed={order === id} className={order === id ? "is-on" : ""} onClick={() => { setOrder(id); setShown(PAGE); }}>
+                {id === "views" ? tr("Vues", "Views") : id === "likes" ? "Likes" : id === "comments" ? tr("Commentaires", "Comments") : id === "shares" ? tr("Partages", "Shares") : tr("Récents", "Recent")}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {filterDetails ? (
           <p className="ss-rs__filters-note">
             {filterDetails}
-            {hiddenFilters > 0 && activeFilters ? <button type="button" onClick={() => { setFilters({ ...ALL_FILTERS }); setShown(PAGE); }}>{tr("Effacer les filtres", "Clear filters")}</button> : null}
           </p>
         ) : null}
 

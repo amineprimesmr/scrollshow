@@ -1122,115 +1122,6 @@ html.page-affiliate #affiliate-root {
   background: #000;
 }
 
-/* The mask is stationary: drifting light never exposes the bottom edge. */
-.af-ld-atmosphere {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  contain: strict;
-  background: #01040c;
-  opacity: .68;
-  -webkit-mask-image: linear-gradient(#000 0%, #000 16%, rgb(0 0 0 / .88) 36%, rgb(0 0 0 / .48) 59%, rgb(0 0 0 / .12) 78%, transparent 97%);
-  mask-image: linear-gradient(#000 0%, #000 16%, rgb(0 0 0 / .88) 36%, rgb(0 0 0 / .48) 59%, rgb(0 0 0 / .12) 78%, transparent 97%);
-}
-
-.af-ld-atmosphere__light,
-.af-ld-atmosphere__shade {
-  position: absolute;
-  inset: -40%;
-  will-change: transform, opacity;
-}
-
-.af-ld-atmosphere__light--cobalt {
-  background: radial-gradient(ellipse 62% 65% at 38% 29%,
-    #1555e8 0%, #0a3295 24%, #041632 49%, transparent 74%);
-  animation: ss-light-cobalt 14s ease-in-out infinite;
-}
-
-.af-ld-atmosphere__light--ice {
-  background: radial-gradient(ellipse 56% 60% at 68% 30%,
-    #0787bc 0%, #075487 22%, #031c3e 46%, transparent 72%);
-  animation: ss-light-ice 14s ease-in-out infinite;
-}
-
-.af-ld-atmosphere__shade {
-  background:
-    radial-gradient(ellipse 32% 70% at 48% 55%, rgb(0 2 9 / .85), transparent 76%),
-    linear-gradient(0deg, #000 10%, transparent 67%);
-  animation: ss-light-shade 14s ease-in-out infinite;
-}
-
-.af-ld-atmosphere__wave {
-  position: absolute;
-  inset: -35%;
-  will-change: transform, opacity;
-  pointer-events: none;
-}
-
-.af-ld-atmosphere__wave--near {
-  background: radial-gradient(ellipse 72% 74% at 48% 80%,
-    transparent 46%, rgb(2 13 42 / .9) 49%,
-    rgb(10 49 157 / .72) 53%, rgb(25 100 255 / .88) 57%,
-    rgb(59 153 255 / .78) 59%, rgb(13 64 180 / .35) 63%, transparent 69%);
-  filter: blur(14px);
-  animation: ss-blue-wave-near 12s ease-in-out infinite alternate;
-}
-
-.af-ld-atmosphere__wave--far {
-  background: radial-gradient(ellipse 88% 80% at 58% 90%,
-    transparent 48%, rgb(0 5 23 / .85) 51%,
-    rgb(4 42 139 / .72) 56%, rgb(6 120 220 / .9) 59%,
-    rgb(19 161 239 / .55) 61%, transparent 68%);
-  filter: blur(20px);
-  animation: ss-blue-wave-far 15s ease-in-out -6s infinite alternate;
-}
-
-.af-ld-atmosphere__grain {
-  position: absolute;
-  inset: 0;
-  /* Regular halftone dots, matching the reference instead of film noise. */
-  background-image: radial-gradient(circle, rgb(181 201 234 / .3) 1px, transparent 1.5px);
-  background-size: 7px 7px;
-  opacity: .32;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(#000 8%, #000 66%, transparent 100%);
-  mask-image: linear-gradient(#000 8%, #000 66%, transparent 100%);
-}
-
-@keyframes ss-blue-wave-near {
-  0% { transform: translate(-8%, -10%) scale(1.02); opacity: .95; }
-  50% { opacity: .65; }
-  100% { transform: translate(12%, 9%) scale(1.14); opacity: 1; }
-}
-
-@keyframes ss-blue-wave-far {
-  0% { transform: translate(12%, 8%) scale(1.08); opacity: .45; }
-  50% { opacity: .95; }
-  100% { transform: translate(-12%, -12%) scale(.98); opacity: .65; }
-}
-
-/* Distinct cobalt and icy-blue phases, with a dark interval between them. */
-@keyframes ss-light-cobalt {
-  0%, 100% { transform: translate(-5%, -3%) scale(1); opacity: 1; }
-  25% { transform: translate(3%, 1%) scale(1.05); opacity: .72; }
-  50% { transform: translate(10%, -4%) scale(.96); opacity: .08; }
-  75% { transform: translate(-8%, 3%) scale(1.02); opacity: .35; }
-}
-
-@keyframes ss-light-ice {
-  0%, 100% { transform: translate(8%, -2%) scale(.96); opacity: .04; }
-  25% { transform: translate(3%, 2%) scale(1); opacity: .25; }
-  50% { transform: translate(-8%, -2%) scale(1.06); opacity: 1; }
-  75% { transform: translate(4%, -4%) scale(1); opacity: .5; }
-}
-
-@keyframes ss-light-shade {
-  0%, 100% { transform: translate(9%, 0); opacity: .7; }
-  50% { transform: translate(-10%, -3%); opacity: 1; }
-}
-
 @keyframes ss-film-grain {
   0%, 100% { transform: translate(0, 0); }
   20% { transform: translate(-19px, 11px); }
@@ -1245,18 +1136,6 @@ html.page-affiliate #affiliate-root {
 
 .af-ld .sn-header:not([data-scrolled="true"]):not([data-open="true"]) {
   background: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .af-ld-atmosphere > div {
-    animation: none;
-    will-change: auto;
-  }
-  .af-ld-atmosphere__wave--near { opacity: .8; }
-  .af-ld-atmosphere__wave--far { opacity: .45; }
-  .af-ld-atmosphere__light--cobalt { opacity: .8; }
-  .af-ld-atmosphere__light--ice { opacity: .12; }
-  .af-ld-atmosphere__shade { opacity: .55; }
 }
 
 

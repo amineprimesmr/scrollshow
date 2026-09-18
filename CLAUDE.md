@@ -19,14 +19,44 @@ Barres collantes, sidebars/rails, menus et popovers, feuilles/modales et leur
 scrim, contrôles segmentés, boutons fantômes, interrupteurs, pilules
 flottantes, bannières, chrome mobile fixe.
 
-**Exception : la sidebar du studio (`.ss-sidebar`) est opaque**, fond
-blanc **dans les deux thèmes** (les jetons clairs sont re-posés sur `.ss-sidebar` dans `liquid-glass.css`), 196 px (`--ss-sidebar`), à la demande d'Amine.
-Elle ne recouvre aucun contenu : le flou plein-hauteur ne montrait rien et
-coûtait une passe GPU. Ses états passent par `--ss-side-hover` /
-`--ss-side-active` (`color-mix` sur `--ss-ink`) — `--lg-knob` est blanc, donc
-invisible sur ce fond. Le rail des comptes et le tiroir mobile gardent leurs règles.
+**Exception : la sidebar du studio (`.ss-sidebar`) est un rail opaque noir**
+(`--ss-side-bg: #000`) **dans les deux thèmes**, à la demande d'Amine : les jetons
+sombres sont re-posés sur `.ss-sidebar` dans `liquid-glass.css`. Rail étroit de
+88 px (`--ss-sidebar`), icône au-dessus du libellé, entrées espacées ; projet et
+profil réduits à leur pastille. Le tiroir mobile garde la liste en lignes.
+États via `--ss-side-hover` / `--ss-side-active` (`color-mix` sur `--ss-ink`).
+La page est un **panneau aux angles gauches arrondis** (`--ss-page-radius`) posé
+sur ce noir : `.ss-main` porte la trame de points et un filet clair ;
+sur le calendrier c'est `.ss-channels` qui porte les angles.
 L'entrée active suit **le clic** (`useOptimistic` + `router.push` dans une
 transition, `StudioShell`), pas `pathname` qui n'arrive qu'à la fin du chargement.
+
+**Fond de toutes les pages** : l'atmosphère bleue de la landing, à l'identique
+(`components/HeroAtmosphere.tsx` + `app/atmosphere.css` — à ne pas confondre avec
+`components/Atmosphere.tsx`, la couche fixe de l'inscription et de l'onboarding —
+partagés par `Landing` et
+`StudioShell` — la modifier change les deux), sous la trame de points de
+l'Overview (`.ss-main::after`). Amine a refusé une lueur verte : ne pas y revenir.
+Animée en `transform`/`opacity` seulement ; ne jamais animer un dégradé ou un
+`background-position` (repaint de toute la page). Sombre uniquement : en thème
+clair il ne reste que les points. Une page ne doit pas peindre de fond opaque
+plein cadre par-dessus.
+
+**Inspiration = Recherche + Bibliothèque** : une seule entrée de menu
+(`/app/discover`), deux onglets `.ss-insp-tabs` rendus par le shell
+(`INSPIRATION_TABS`, `onInspiration` dans `lib/studio-nav.ts`). Les deux routes
+restent telles quelles ; c'est l'entrée Inspiration qui reçoit le glisser-déposer
+d'un carrousel. La page Résultats (`/app/analytics`) a été supprimée : ne pas la remettre.
+
+**Menu réduit à six entrées** : Overview, Calendrier, Inspiration, Outils, puis
+Comptes et Réglages en bas. **Outils** (`/app/tools`, `views/ToolsView.tsx` +
+`tools.css`) est une page de cartes opaques vers Poster aux US, Shadowban et
+Comptes warmés (`STUDIO_TOOLS`) ; leurs routes ne changent pas et n'ont pas
+d'onglets (post-us et la page verrouillée tiennent sur un écran exact).
+**Revenus, Agents et Comptes suivis sont des onglets des Réglages**
+(`?tab=revenue|agents|tracked`, vues chargées en `dynamic()`) ;
+`/app/business-connections`, `/app/mcp` et `/app/clippers` y redirigent en
+conservant la query — les retours OAuth Shopify en dépendent, ne pas les supprimer.
 
 ### Où ne PAS en mettre (contenu)
 Cartes de contenu, tableaux, formulaires, listes, cartes de post, images.
@@ -67,6 +97,19 @@ vérifier dans Chrome que `html.lg-refract` est présent et que
 montre ses posts TikTok réels, filtrables (recherche, type, tri, galerie ou
 liste) et lisibles en entier dans le studio via l'embed officiel
 `https://www.tiktok.com/embed/v2/<id>` (vidéo comme carrousel).
+- **Le panneau ouvert est une seule vue** : les onglets Aperçu / Publications /
+  Formats, la vue Liste, la ligne de statut, le bouton Calendrier et les libellés
+  TYPE / TRI / AFFICHAGE ont été supprimés à la demande d'Amine (« trois
+  interfaces, on ne comprend rien ») — ne pas les remettre. Il reste : une rangée
+  de commandes en verre (champ de recherche de texte, période, **Filtres**,
+  Actualiser / Charger plus avec sa pastille d'état, lien TikTok), sept chiffres
+  sans cadre (`.ss-acc__kpis`, calculés sur les posts **filtrés**), puis le mur.
+  Tri, type, vues min., engagement min., performance (top 50 % / top 10 %) et
+  portée de la recherche vivent tous dans le menu « Filtres ». La progression de la
+  lecture OCR ne s'affiche que pendant une recherche de texte.
+- Logique des filtres pure et testée dans `lib/account-filters.ts` : un compteur
+  inconnu ne passe aucun filtre de vues et sort des moyennes (jamais compté comme
+  zéro). Tout est local : aucun filtre ne déclenche d'appel payant.
 - Trois sources fusionnées par id de post : API TikTok (prioritaire, compte
   connecté), fournisseur de métriques publiques par handle (`fetchAccountVideos`,
   cache dans `Channel.videos` / `Account.videos`), et le calendrier ScrollShow.
@@ -87,8 +130,23 @@ carrousels est le contenu, le compte n'est qu'une attribution.
 - Les vignettes passent **obligatoirement** par `PostTile`, partagé avec
   l'Overview. Écrire une vignette à la main fait diverger les deux pages.
 - Le direct passe par `TikTokScan` / `TikTokScanLine` (logo TikTok + radar).
-- Trois paramètres visibles, pas plus : mots-clés (le champ), vues minimum par
-  post, période de publication. Tout le reste garde ses défauts.
+- **Pas de bandeau** : ni titre « Recherche », ni compteur « X carrousels · X
+  comptes », ni fond derrière le champ (retirés à la demande d'Amine). Les onglets
+  Inspiration sont centrés, le champ centré dessous (680 px max), l'historique
+  centré dessous. La barre **défile avec la page** : sans fond, une barre collante
+  laisserait le mur passer sous les pastilles.
+- **Aucun filtre** : le menu Filtres (vues min/max, période, histogramme) a été
+  supprimé à la demande d'Amine, ne pas le remettre. Le mur montre tout ce que la
+  recherche a trouvé. Un **tri** (`.ss-rs__sort` : vues, likes, commentaires,
+  partages, récents) n'apparaît qu'une fois la recherche **terminée** — trier un
+  mur qui se remplit ferait sauter les tuiles.
+- **Mot-clé refusé par TikTok** : toute la famille « looksmax » renvoie 400 chez le
+  fournisseur alors que « glow up » passe au même instant (vérifié le 18 septembre
+  2026). `searchPhotos` réessaie une fois (non facturé) puis lève
+  `search_keyword_refused` ; `applyResearchStep` **termine** alors la recherche avec
+  ce motif au lieu de la mettre « en pause » — « Reprendre » échouait à l'infini et
+  faisait croire à une panne du moteur. Avant de déboguer une recherche à zéro
+  résultat, tester le mot-clé directement chez le fournisseur.
 - **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
   `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq
   carrousels au-dessus de 100k — porte bien trop étroite. La pastille pilote
@@ -187,6 +245,17 @@ objectif ni rythme : par défaut `goal = "sell"` et `cadence = "daily"`.
   shadowban). Ne jamais nommer le fournisseur dans le code, l'UI ou la doc.
 - L'analyseur n'utilise aucun LLM : métadonnées, signaux concrets, réseaux
   détectés. Ne pas ajouter d'appel IA côté serveur sans clé dédiée.
+
+## Connexion TikTok (OAuth) — `state` signé
+`lib/oauth-state.ts` (testé) + `app/api/tiktok/oauth/start` + `app/tiktok/callback`.
+Le `state` porte sa propre preuve : compte ScrollShow, aléa, expiration 30 min,
+HMAC `AUTH_SECRET`. Le retour vérifie la signature **et** que le compte du `state`
+est celui de la session (c'est la garantie anti-CSRF). Ne pas revenir à un simple
+cookie comparé : il expirait en dix minutes — connecter un *nouveau* compte
+(déconnexion TikTok, reconnexion, code SMS) dépasse souvent ce délai — et un
+second clic sur « Connecter » l'écrasait ; les deux donnaient « Connexion TikTok
+interrompue » (`state_mismatch`). Un rejet est tracé `tiktok_oauth_state_rejected`
+avec son verdict (`expired`, `other_user`, `bad_signature`, `malformed`).
 
 ## Dev local
 Le serveur de dev tourne souvent déjà sur le port 3000 depuis une autre

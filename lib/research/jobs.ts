@@ -192,6 +192,9 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
   j.lease=undefined;
   if(result.kind==="error") {
     j.error=result.error; j.failures.push({...task.kind==="search"?{keyword:task.keyword}:{handle:task.candidate.handle},error:result.error});j.failures=j.failures.slice(-100);
+    // Un mot-cle refuse par TikTok ne passera pas mieux au prochain essai : la
+    // recherche se termine (avec son motif) au lieu de rester « en pause ».
+    if(result.error==="search_keyword_refused") { j.status="done"; j.exhausted=true; event(j,"keyword_refused"); return; }
     // Transient failures retain the exact cursor and unprocessed candidate.
     j.status=result.needsAttention?"needs_attention":"paused";event(j,"step_failed");return;
   }
