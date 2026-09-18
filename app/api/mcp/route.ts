@@ -43,6 +43,9 @@ import { readStore } from "@/lib/store";
 import { consumeLimit } from "@/lib/rate-limit";
 import { scrollshowStarterPrompt } from "@/lib/assistant-prompts";
 import { inScope } from "@/lib/projects";
+import { businessDashboard, registerLink, registerCost, registerExperiment } from "@/lib/business-analytics/service";
+import { linkSchema, costSchema, experimentSchema } from "@/lib/business-analytics/validation";
+import { scopeFor } from "@/lib/business-analytics/api";
 
 export const maxDuration = 300;
 
@@ -495,6 +498,30 @@ const handler = createMcpHandler(
         }
       },
     );
+
+    server.registerTool("get_business_results", {
+      title: "Content revenue and business results",
+      description: "Read scoped business sales, refunds, revenue per mature publication, attribution coverage, production costs, funnel and creative formats. Payment sources are independent of the user's ScrollShow subscription. Unknown is null. Never infer causality from an attributed sale, or present a partial cohort as complete. Contains no connector credentials or customer identity.",
+      inputSchema: z.object({ days: z.number().int().min(1).max(365).optional(), horizonDays: z.number().int().min(1).max(365).optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional() }),
+    }, async (args, ctx) => { try { return text(await businessDashboard(userFrom(ctx), args)); } catch { return fail(new Error("business_results_unavailable")); } });
+
+    server.registerTool("create_tracking_link", {
+      title: "Create a tracked business link",
+      description: "Create a stable HTTPS link for a publication or campaign in the active business project. A shared bio link proves a campaign click, not the original social post viewed. A sale requires the provider integration and customer/click join. Do not use this to publish content.",
+      inputSchema: linkSchema,
+    }, async (args, ctx) => { try { const link = await registerLink(scopeFor(userFrom(ctx)), args); return text({ link, url: `https://scrollshow.io/go/${link.slug}` }); } catch { return fail(new Error("tracking_link_invalid")); } });
+
+    server.registerTool("record_content_cost", {
+      title: "Record a content production cost",
+      description: "Record an explicit user-provided cost in integer currency minor units, for one publication OR a reusable content item. Never invent costs; unknown costs are not zero. This does not charge or transfer money.",
+      inputSchema: costSchema,
+    }, async (args, ctx) => { try { return text({ cost: await registerCost(userFrom(ctx), args) }); } catch { return fail(new Error("content_cost_invalid")); } });
+
+    server.registerTool("plan_growth_experiment", {
+      title: "Plan a content growth experiment",
+      description: "Save a hypothesis, metric and selected publication IDs. All these content comparisons are observational; this does not randomize audiences or prove incremental lift. Use get_business_results first to ground recommendations in observed evidence, then existing create_post to prepare user-requested drafts.",
+      inputSchema: experimentSchema,
+    }, async (args, ctx) => { try { return text({ experiment: await registerExperiment(scopeFor(userFrom(ctx)), args) }); } catch { return fail(new Error("growth_experiment_invalid")); } });
 
     server.registerTool(
       "get_report",

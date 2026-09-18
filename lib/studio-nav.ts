@@ -13,6 +13,7 @@ export type NavItem = {
 
 export const STUDIO_NAV: NavItem[] = [
   { href: "/app/home", fr: "Overview", en: "Overview", icon: "home", section: "main" },
+  { href: "/app/analytics", fr: "Résultats", en: "Results", icon: "chart", section: "main" },
   { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
   { href: "/app/discover", fr: "Recherche", en: "Research", icon: "globe", section: "main" },
   { href: "/app/marketplace", fr: "Bibliothèque", en: "Library", icon: "media", section: "main" },
@@ -22,6 +23,7 @@ export const STUDIO_NAV: NavItem[] = [
   // sidebar doit dire la même chose que la carte « bientôt disponible ».
   { href: "/app/warmed-accounts", fr: "Comptes warmés", en: "Warmed Accounts", icon: "warmed", locked: true, section: "main" },
   { href: "/app/integrations", fr: "Comptes", en: "Accounts", icon: "tiktok", section: "bottom" },
+  { href: "/app/business-connections", fr: "Revenus", en: "Revenue", icon: "plug", section: "bottom" },
   { href: "/app/mcp", fr: "Agents", en: "Agents", icon: "mcp", section: "bottom" },
   { href: "/app/support", fr: "Support", en: "Support", icon: "support", section: "menu" },
   { href: "/app/clippers", fr: "Comptes suivis", en: "Tracked accounts", icon: "user", section: "bottom" },

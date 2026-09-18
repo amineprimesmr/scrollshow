@@ -6,6 +6,7 @@ out
 .env.local
 .data
 .vercel
+.shopify/
 *.log
 .DS_Store
 *.tsbuildinfo
@@ -14,6 +15,8 @@ out
 .next-local
 
 .next-verify
+.next-business-dev
+.next-business-debug
 artifacts/
 
 .claude/buzz/

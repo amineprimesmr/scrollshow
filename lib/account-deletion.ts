@@ -3,6 +3,7 @@ import { queueDeletedMedia } from "./media-cleanup";
 import { revokeAllForUser } from "./oauth";
 import { stripeForResource } from "./stripe";
 import { revokeAccessToken, refreshAccessToken, TikTokApiError } from "./tiktok";
+import { deleteUser as deleteBusinessAnalyticsUser } from "./business-analytics/repository";
 
 type Providers = { cancelSubscription(id: string): Promise<void>; revokeToken(token: string): Promise<void>; refreshToken?: typeof refreshAccessToken };
 const providers: Providers = {
@@ -60,6 +61,8 @@ export async function processAccountDeletion(userId: string, requestDeletion = f
         current.accessToken = undefined; current.refreshToken = undefined; current.connected = false;
       });
     }
+  // Checkpoint before removing the owner marker: an analytics deletion failure remains retryable.
+  await deleteBusinessAnalyticsUser(userId);
   await updateStore((data) => {
     const owner = data.users.find(u => u.id === userId);
     if (owner?.deletionClaim !== claim) throw new Error("deletion_claim_lost");

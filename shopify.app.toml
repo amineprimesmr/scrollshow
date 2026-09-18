@@ -1,0 +1,24 @@
+# Public app configuration. Merchant access tokens and the client secret stay server-side.
+client_id = "b883efdc265f8176aab0ee94d4d1b83b"
+name = "ScrollShow"
+application_url = "https://scrollshow.io/api/business/connectors/shopify/launch"
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = false
+
+[access_scopes]
+scopes = "read_orders"
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = ["https://scrollshow.io/api/business/connectors/shopify/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+# Standalone OAuth registers order/uninstall subscriptions per shop after authorization.
+# Shopify does not permit global order subscriptions with the legacy installation flow.
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://scrollshow.io/api/business/connectors/shopify/events"

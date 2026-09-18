@@ -1,6 +1,7 @@
 "use client";
 
 import { rowAvatarSrc } from "./cover";
+import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { PLATFORMS } from "@/lib/platforms";
 import { useState } from "react";
@@ -27,6 +28,7 @@ export function ConnectionsView() {
 
   return (
     <div className="ss-connect">
+      <div className="ss-network-card" style={{ marginBottom: 20 }}><div className="ss-network-card__head"><div><h2>{t("Connexions business", "Business connections", english)}</h2><p>{t("Relie tes revenus aux contenus avec tes comptes de paiement.", "Link revenue to content using your payment accounts.", english)}</p></div><Link href="/app/business-connections" className="ss-btn-ghost lg lg--lens">{t("Configurer les revenus", "Set up revenue", english)} →</Link></div></div>
       <div className="ss-network-list">
         <article className={`ss-network-card${connected ? " is-live" : ""}`}>
           <div className="ss-network-card__head">

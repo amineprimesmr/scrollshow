@@ -23,7 +23,9 @@ test("landing acquisition links lead to signup; checkout requires completed onbo
   // Le CTA passe par une variable depuis que le hero est enveloppé dans <Metal> :
   // ce qui compte est qu'un visiteur déconnecté atterrisse sur /signup.
   assert.match(landing, /const ctaHref = signedIn \? "\/app" : "\/signup"/);
-  assert.match(landing, /href=\{ctaHref\} className="af-ld-hero-cta"/);
+  // Depuis le 17 septembre le hero porte le bloc « prompts » et le CTA principal
+  // vit dans la section methode (`af-ld-dark-cta`) : l'un ou l'autre doit y mener.
+  assert.match(landing, /href=\{ctaHref\} className="af-ld-(?:hero|dark)-cta"/);
   const checkout = await readFile("app/api/stripe/checkout/route.ts", "utf8");
   assert.match(checkout, /!user\.onboarded/);
   assert.match(checkout, /cancel_url:.*onboarding\?step=payment/);

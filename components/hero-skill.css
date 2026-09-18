@@ -13,7 +13,7 @@
   gap: 8px;
   margin: 0;
   color: #b9bdc9;
-  font-size: clamp(17px, 1.6vw, 21px);
+  font-size: clamp(15px, 1.4vw, 18px);
   letter-spacing: -.02em;
 }
 .ss-heroskill__agents { display: inline-flex; align-items: center; gap: 6px; }
