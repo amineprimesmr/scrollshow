@@ -34,6 +34,15 @@ utilisateur actif ; mur dur ~255 Mo. Il tient quelques centaines de comptes, pas
   réafficher), création et suppression de post, shadowban, recherche — lectures ~40 ms, écritures ~100 ms.
 
 ## Bascule en production — pas à pas
+
+> Neon n'accepte que les connexions de Vercel (liste d'IP) : depuis un poste, `npm run db:rows`
+> échoue en `ECONNRESET`. La même logique est exposée par la route d'administration
+> `POST /api/admin/store-rows` (secret des crons), à appeler **après** déploiement du code :
+> ```bash
+> curl -s -X POST https://scrollshow.io/api/admin/store-rows -H "Authorization: Bearer $CRON_SECRET" \
+>   -H "Content-Type: application/json" -d '{"action":"dry-run"}'      # puis "apply", "status", "back"
+> ```
+
 Aucune fenêtre de maintenance nécessaire : la migration tient le verrou du document pendant toute la
 copie (quelques secondes), la table n'apparaît qu'au commit, déjà complète et **vérifiée** ligne à ligne.
 Les instances basculent à leur requête suivante. `scrollshow_state` n'est ni modifié ni supprimé.
