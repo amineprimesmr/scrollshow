@@ -20,6 +20,44 @@ Replis anonymes essayés, tous insuffisants :
 Les API officielles TikTok (comptes connectés par OAuth) n'ont aucune recherche par
 mot-clé : on ne peut pas « chercher via le compte connecté de l'utilisateur ».
 
+## La vraie cause (mesurée le 18 septembre 2026, navigateur anonyme)
+TikTok **ne refuse pas** ces mots-clés à un visiteur anonyme. Son API de recherche
+photos rend douze carrousels dans les trois cas — seul le champ `status_code` change :
+
+| Mot-clé | HTTP | `status_code` | Carrousels rendus |
+| --- | --- | --- | --- |
+| jawline | 200 | 0 | 12 |
+| glow up | 200 | 0 | 12 |
+| looksmax | 200 | **403** | 12 |
+| mewing | 200 | **203** | 12 |
+
+Le fournisseur traite tout `status_code` non nul comme un échec : il répond `400` et
+**jette des résultats valides**. C'est un défaut de son côté, pas une restriction de
+TikTok ni un bug du moteur ScrollShow. (Première explication donnée, « TikTok
+restreint ces termes aux comptes connectés » : fausse.) Notre `parseSearch` avait le
+même défaut — corrigé : un code non nul n'est un refus que si la liste est vide.
+
+Conséquences :
+- le correctif définitif est chez le fournisseur → ticket de support ci-dessous ;
+- la session de service reste un contournement plausible (connecté, TikTok rend
+  `status_code: 0`), non vérifié ;
+- le collecteur Chrome local lit TikTok lui-même et n'est donc pas concerné.
+
+## Ticket de support à envoyer au fournisseur
+> **Endpoint**: `GET /api/v1/tiktok/web/fetch_search_photo` (same on
+> `web/fetch_general_search` and `web/fetch_search_video`).
+> **Bug**: the endpoint returns HTTP 400 "Request failed" for some keywords although
+> TikTok returns valid results. Reproduced 100 % of the time on 2026-09-18 with
+> `keyword=looksmax`, `looksmaxxing`, `healthmaxing`, `mewing`; at the same moment
+> `jawline`, `glow up`, `softmaxxing` return 20 items.
+> **Cause**: for these keywords TikTok's `/api/search/photo/full/` answers HTTP 200 with
+> a populated `item_list` (12 items) but a non-zero `status_code` (403 for
+> `looksmax`, 203 for `mewing`). Your wrapper seems to treat any non-zero
+> `status_code` as a failure and discards the items. Please return the items when
+> `item_list` is non-empty.
+> **Failed request ids**: `117fd0ec-f5cb-46e4-a3a1-f685a8bf02ad`,
+> `1b43f88e-4f19-4382-9092-80f9970e03b4`.
+
 ## La solution
 La doc du fournisseur prévoit le cas : le paramètre `cookie` — « provide the cookie
 yourself if you encounter an interface error ». `lib/research/provider.ts` l'envoie

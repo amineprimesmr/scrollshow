@@ -58,8 +58,14 @@ export function unwrap(raw: any): Raw {
 }
 export function parseSearch(raw: unknown, keyword: string): { candidates: Candidate[]; hasMore: boolean; cursor: number; searchId?: string } {
   const d=unwrap(raw);
-  if(d.status_code && Number(d.status_code)!==0) throw new Error("search_provider_rejected");
   const items=d.item_list ?? d.aweme_list ?? d.itemList ?? d.data;
+  // TikTok rend parfois ses resultats AVEC un `status_code` non nul : mesure le
+  // 18 septembre 2026 en navigateur anonyme, « looksmax » revient avec douze
+  // carrousels et `status_code: 403`, « mewing » avec douze et `203`, « jawline »
+  // avec douze et `0`. Le code n'est donc un refus que si la liste est vide —
+  // jeter des resultats valides sur ce seul code est precisement le defaut du
+  // fournisseur, qui repond 400 pour ces mots-cles.
+  if(d.status_code && Number(d.status_code)!==0 && !(Array.isArray(items)&&items.length)) throw new Error("search_provider_rejected");
   if(!Array.isArray(items)) throw new Error("search_response_invalid");
   const found=new Map<string,Candidate>();
   for(const row of items) {

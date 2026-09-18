@@ -42,3 +42,11 @@ test("one malformed search row cannot discard the rest of a photo page", () => {
   assert.equal(parseSearch({ item_list: [photo()], has_more: "1" }, "sleepmaxing").hasMore, true);
   assert.equal(parseSearch({ item_list: [photo()], has_more: "0" }, "sleepmaxing").hasMore, false);
 });
+
+test("results delivered with a non-zero status_code are kept; only an empty list is a refusal", () => {
+  const item = { id: "7551320035566832927", desc: "looksmax", createTime: 1750000000, author: { uniqueId: "looksmaxagent", nickname: "Agent" }, stats: { playCount: 142777, diggCount: 8533, commentCount: 10, shareCount: 5 }, imagePost: { images: [{ imageURL: { urlList: ["https://p16-sign.tiktokcdn.com/a.jpeg"] } }] } };
+  const kept = parseSearch({ status_code: 403, item_list: [item], has_more: 1, cursor: 12 }, "looksmax");
+  assert.equal(kept.candidates.length, 1);
+  assert.equal(kept.candidates[0].posts[0].views, 142777);
+  assert.throws(() => parseSearch({ status_code: 403, item_list: [] }, "looksmax"), /search_provider_rejected/);
+});

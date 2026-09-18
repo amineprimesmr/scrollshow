@@ -144,7 +144,13 @@ carrousels est le contenu, le compte n'est qu'une attribution.
   sur tout ce qui contient looksmax, healthmaxing, mewing, alors que softmaxxing,
   jawline, glow up rendent 20 carrousels par page au même instant (mesuré le
   18 septembre 2026). TikTok **connecté** sert des centaines de résultats pour ces
-  mots : c'est la collecte **anonyme** du fournisseur qui casse (ses autres recherches
+  mots. **Cause mesurée en navigateur anonyme** : TikTok rend bien douze carrousels
+  pour ces mots, mais avec un `status_code` non nul (403 pour looksmax, 203 pour
+  mewing, 0 pour jawline) ; le fournisseur prend ce code pour un échec et jette des
+  résultats valides. Ce n'est ni une restriction TikTok ni un besoin de connexion
+  (explications données d'abord, fausses). `parseSearch` avait le même défaut, corrigé :
+  un code non nul n'est un refus que si la liste est vide. Ticket de support prêt dans
+  `docs/recherche-session-service-2026-09-18.md`. C'est donc la collecte du fournisseur qui casse (ses autres recherches
   web échouent pareil ; la forme `#mot` répond 200 mais vide). Ce n'est pas un bug du
   moteur ScrollShow, et aucun repli anonyme ne donne de volume : hashtags = 2 à 4
   carrousels, recherche générale de l'application = 7 uniques (elle **répète** les
