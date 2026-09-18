@@ -140,19 +140,20 @@ carrousels est le contenu, le compte n'est qu'une attribution.
   recherche a trouvé. Un **tri** (`.ss-rs__sort` : vues, likes, commentaires,
   partages, récents) n'apparaît qu'une fois la recherche **terminée** — trier un
   mur qui se remplit ferait sauter les tuiles.
-- **La recherche « photos » du fournisseur échoue pour certains mots-clés** :
-  400 sur healthmaxing, looksmax, mewing alors que sleepmaxing et glow up passent au
-  même instant, et que TikTok affiche bien des résultats (mesuré le 18 septembre
-  2026). Ce n'est **pas** un terme restreint par TikTok — cette première explication
-  était fausse — c'est la collecte web du fournisseur qui casse ; ses autres
-  recherches web échouent pareil, la forme `#mot` répond 200 mais vide.
-  `searchPhotos` réessaie une fois (non facturé) puis se replie sur
-  `searchPhotosByHashtag` : hashtags du mot-clé via l'API applicative
-  (`fetch_hashtag_search_result` → `fetch_hashtag_video_list`, 4 hashtags × 2 pages,
-  9 appels au plus), `parseSearch` ne garde que les carrousels. Rendement faible
-  (4 carrousels pour « looksmax ») mais jamais zéro par défaut. `search_keyword_refused`
-  ne subsiste que si le repli lui-même est impossible ; il **termine** la recherche
-  au lieu de la laisser « en pause » avec un « Reprendre » qui échouait à l'infini.
+- **La recherche « photos » du fournisseur échoue pour certains mots-clés** : 400
+  sur tout ce qui contient looksmax, healthmaxing, mewing, alors que softmaxxing,
+  jawline, glow up rendent 20 carrousels par page au même instant (mesuré le
+  18 septembre 2026). TikTok **connecté** sert des centaines de résultats pour ces
+  mots : c'est la collecte **anonyme** du fournisseur qui casse (ses autres recherches
+  web échouent pareil ; la forme `#mot` répond 200 mais vide). Ce n'est pas un bug du
+  moteur ScrollShow, et aucun repli anonyme ne donne de volume : hashtags = 2 à 4
+  carrousels, recherche générale de l'application = 7 uniques (elle **répète** les
+  mêmes posts à chaque page). `searchPhotos` réessaie une fois puis se replie sur
+  `searchPhotosInApp`, qui s'arrête dès qu'une page n'apporte rien de neuf.
+  Les API officielles TikTok (comptes connectés par OAuth) n'ont **aucune** recherche :
+  on ne peut pas « chercher via le compte connecté ». Le seul chemin connecté est le
+  collecteur Chrome local (`npm run research:browser`), qui lit tiktok.com dans un
+  profil Chrome dédié où l'utilisateur s'est connecté lui-même.
   Avant de déboguer un zéro résultat, tester le mot-clé directement chez le fournisseur.
 - **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
   `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq
