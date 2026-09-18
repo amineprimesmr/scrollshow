@@ -282,6 +282,28 @@ Doc de référence : `docs/research-engine-2026-09-09.md`.
 Toute route qui fait de l'OCR doit être ajoutée à `outputFileTracingIncludes` dans
 `next.config.ts`, sinon le binaire manque en production.
 
+## Store : une ligne par enregistrement, portée par utilisateur
+`lib/store-rows.ts` (moteur) + `lib/store.ts` (aiguillage, API inchangée) + `scripts/migrate-to-rows.ts`
+(`npm run db:rows`) + `scripts/test-store-rows.mts` (test différentiel et de concurrence sur un vrai
+Postgres). Runbook : `docs/migration-store-lignes-2026-09-18.md`.
+- Dès que `scrollshow_rows` existe, tout passe par le moteur lignes ; le document `scrollshow_state`
+  n'est plus lu. La bascule est atomique et **vérifiée** avant commit ; retour arrière : `--back`.
+- **Toute lecture ou écriture sur un chemin sollicité porte un `userId`** :
+  `readStoreSlice(keys, { userId })`, `updateStoreSlice(keys, fn, { userId })`. Sans lui la
+  collection entière est lue et verrouillée — réservé au cron, aux webhooks, à la sauvegarde, à la
+  suppression de compte. Une écriture portée qui touche la ligne d'un autre lève
+  `store_scope_violation_*` ; une valeur globale (`operations`, `rateLimits`, `mediaDeletionQueue`,
+  `videoStats`…) ne se modifie que sans portée (`store_scope_unsupported_*`). Les moteurs fichier et
+  document appliquent la **même** sémantique : les tests attrapent une portée mal posée.
+- Recherches par valeur : `findStoreRows("apiKeys", "hash", h)`, `findStoreRows("users", "email", e)`
+  (index partiels). Ne jamais relire toute une collection pour trouver une ligne.
+- L'ordre n'a de sens qu'**au sein d'un utilisateur** (`channels[0]` = son premier compte) ;
+  l'entrelacement entre utilisateurs est arbitraire.
+- `safeJson` : Postgres refuse un demi-caractère (emoji coupé par un `slice`) et le caractère nul ;
+  le moteur nettoie. Ne jamais insérer `${texte}::jsonb` avec postgres.js (double encodage).
+- Modules qui écrivent leur propre SQL contre le store : `lib/research/storage.ts` et le repli de
+  `lib/rate-limit.ts` testent `usingRowsEngine()`. Tout nouveau SQL direct doit faire pareil.
+
 ## Store : lire par tranches, jamais tout
 `lib/store.ts`. Le store est **un seul document JSONB** : `readStore()` le
 transfère **en entier** à chaque appel. Mesuré à 7,9 Mo, dont 98 % de caches
@@ -348,8 +370,8 @@ Détail et mesures : `docs/audit-performance-2026-09-18.md`. Tests : `tests/perf
   (l'indice `url` de la route d'avatar ne sert que hors bibliothèque et n'est pas mis en cache).
 - Listes longues : pas de `backdrop-filter` par ligne, pas de `will-change` par enfant, dossiers
   lointains de l'éventail réduits à une silhouette (`DETAIL_REACH`), composants de liste en `memo`.
-- **La limite restante est le store en document unique** : quelques centaines d'utilisateurs, pas
-  des milliers. Plan de migration dans `docs/audit-performance-2026-09-18.md`.
+- Le document unique était la limite (quelques centaines d'utilisateurs) : le moteur lignes la lève,
+  voir la section « Store : une ligne par enregistrement ».
 
 ## Gestion des comptes (Overview → « Gérer »)
 `lib/account-manage.ts` (logique pure, testée) + `app/api/studio/accounts/manage` +
@@ -382,7 +404,7 @@ Détail et mesures : `docs/audit-performance-2026-09-18.md`. Tests : `tests/perf
   pas remplacer le fournisseur pour des comptes tiers ni pour la recherche.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (207 tests), puis build isolé
+`npm run typecheck`, `npm test` (207 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 

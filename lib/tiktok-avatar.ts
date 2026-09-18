@@ -102,7 +102,7 @@ export async function freshAvatarUrl(handle: string): Promise<string | null> {
 
 /** L'avatar stocke pour ce handle dans le projet de l'utilisateur (compte suivi ou connecte). */
 export async function storedAvatarUrl(user: SessionUser, handle: string) {
-  const data = await readStoreSlice(["accounts", "channels"]);
+  const data = await readStoreSlice(["accounts", "channels"], { userId: user.id });
   const match = (row: { handle?: string }) => normalizeHandle(row.handle || "") === handle;
   const row = data.channels.find(c => inScope(c, user) && c.platform === "tiktok" && match(c))
     || data.accounts.find(a => inScope(a, user) && match(a));
@@ -122,14 +122,21 @@ export function queueAvatarWrite(userId: string, handle: string, url: string) {
       const batch = new Map(writes());
       writes().clear();
       if (!batch.size) return;
-      await updateStoreSlice(["accounts", "channels"], data => {
-        for (const [key, avatar] of batch) {
-          const [owner, name] = key.split("\n");
+      // Une ecriture PORTEE par utilisateur : deux utilisateurs ne s'attendent pas.
+      const byOwner = new Map<string, Map<string, string>>();
+      for (const [key, avatar] of batch) {
+        const [owner, name] = key.split("\n");
+        if (!byOwner.has(owner)) byOwner.set(owner, new Map());
+        byOwner.get(owner)!.set(name, avatar);
+      }
+      for (const [owner, names] of byOwner) {
+        await updateStoreSlice(["accounts", "channels"], data => {
           for (const row of [...data.accounts, ...data.channels]) {
-            if (row.userId === owner && normalizeHandle(row.handle || "") === name && row.avatar !== avatar) row.avatar = avatar;
+            const avatar = names.get(normalizeHandle(row.handle || ""));
+            if (avatar && row.userId === owner && row.avatar !== avatar) row.avatar = avatar;
           }
-        }
-      });
+        }, { userId: owner }).catch(() => {});
+      }
     })
     .catch(() => { globalAvatars.ssAvatarFlush = null; }));
 }

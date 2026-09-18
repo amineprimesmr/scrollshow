@@ -21,7 +21,8 @@ export async function GET(request: Request) {
     // Tranche : le studio n'a besoin ni des recherches, ni du texte des slides,
     // ni des caches de videos (98 % du poids de `accounts` et `channels`).
     // `ownedChannels` ne lit que des compteurs, jamais `videos`.
-    let data = await readStoreSlice(["channels", "accounts", "posts", "media"]);
+    // Portee : seules les lignes de cet utilisateur traversent le reseau.
+    let data = await readStoreSlice(["channels", "accounts", "posts", "media"], { userId: user.id });
     // Demo initialization is local only, and runs once when actually needed.
     // Normal studio reads must never lock and rewrite the whole database.
     if (localAutoSeedEnabled() && (needsDemoWorkspace(data, user.id, user.projectId) || !data.media.some(item => inScope(item, user)))) {

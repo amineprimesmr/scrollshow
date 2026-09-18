@@ -21,7 +21,7 @@ export async function GET() {
   // comptes) et aucun ecran ne le lit ici — l'Overview l'obtient compte par
   // compte via /api/studio/insights.
   const { readStoreSlice } = await import("@/lib/store");
-  const data = await readStoreSlice(["accounts"]);
+  const data = await readStoreSlice(["accounts"], { userId: user.id });
   return NextResponse.json({
     // Les comptes masques ne se voient que dans le gestionnaire de comptes.
     accounts: data.accounts.filter((item) => inScope(item, user) && !item.hidden),

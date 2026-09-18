@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   // Cette page lance une requete par compte : lire le document entier a chaque
   // fois ferait passer des centaines de Mo pour analyser 46 comptes.
   // Un seul compte demande : seules SES videos sont lues (voir `readRowVideos`).
-  const store = await readStoreSlice(["accounts"], { videos: !id });
+  const store = await readStoreSlice(["accounts"], { videos: !id, userId: user.id });
   const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (!id || a.id === id));
   if (id) for (const account of accounts) account.videos = await readRowVideos("accounts", account.id) as typeof account.videos;
   if (key && !channels.length && !accounts.length) return NextResponse.json({ error: "missing" }, { status: 404 });

@@ -22,7 +22,7 @@ const schema = z.object({
 export async function GET() {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
-  const data = await readStoreSlice(["accounts", "channels", "posts"]);
+  const data = await readStoreSlice(["accounts", "channels", "posts"], { userId: user.id });
   return NextResponse.json({ accounts: listManagedAccounts(data, user) }, { headers: privateHeaders });
 }
 
@@ -42,9 +42,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { ...privateHeaders, "Retry-After": "60" } });
   }
 
-  // Une seule ecriture pour tout le lot, limitee aux collections touchees.
-  const result = await updateStoreSlice(["accounts", "channels", "videoStats", "channelStats"], (data) =>
-    applyManageAction(data, user, parsed.data.action, parsed.data.keys));
+  // Une seule ecriture pour tout le lot, portee par l'utilisateur. Les instantanes
+  // quotidiens (sans proprietaire) d'un compte connecte supprime partent ensuite.
+  const result = await updateStoreSlice(["accounts", "channels"], (data) =>
+    applyManageAction(data, user, parsed.data.action, parsed.data.keys), { userId: user.id });
+  if (result.removedChannels.length) {
+    const gone = new Set(result.removedChannels.map((row) => row.id));
+    await updateStoreSlice(["videoStats", "channelStats"], (data) => {
+      data.videoStats = data.videoStats?.filter((row) => !gone.has(row.channelId));
+      data.channelStats = data.channelStats?.filter((row) => !gone.has(row.channelId));
+    });
+  }
 
   // Hors verrou : « supprime » doit aussi vouloir dire que la plateforme ne fait
   // plus confiance a ScrollShow pour ce compte. Au mieux : une revocation qui
@@ -57,7 +65,7 @@ export async function POST(request: Request) {
     }
   }));
 
-  const data = await readStoreSlice(["accounts", "channels", "posts"]);
+  const data = await readStoreSlice(["accounts", "channels", "posts"], { userId: user.id });
   return NextResponse.json({
     ok: true, changed: result.changed, missing: result.missing, revoked,
     accounts: listManagedAccounts(data, user),

@@ -4,6 +4,7 @@ import path from "node:path";
 import lockfile from "proper-lockfile";
 import { database, databaseEnabled } from "./database";
 import { backfillProjects } from "./projects";
+import { findRows, ownerOf, readRowVideosFromRows, readRows, rowsTableExists, writeRows } from "./store-rows";
 import { resolveSettings } from "./settings";
 import type { Account, Run, StoreData, User } from "./types";
 
@@ -132,7 +133,91 @@ async function readLocal() {
   return text === null ? emptyStore() : normalize(JSON.parse(text));
 }
 
+/* ------------------------------------------------------------------ */
+/* Moteur : document unique (historique) ou une ligne par enregistrement */
+/* ------------------------------------------------------------------ */
+
+const globalEngine = globalThis as typeof globalThis & { ssRowsEngine?: boolean };
+
+/**
+ * Le moteur « lignes » (`lib/store-rows.ts`) prend la main des que sa table existe.
+ * La bascule est ATOMIQUE : `npm run db:rows -- --apply` cree la table et y eclate
+ * le document dans UNE transaction qui tient le verrou du document ; la table
+ * n'apparait qu'au commit, deja complete. Un ecrivain en mode document attend ce
+ * verrou, voit la table, et rejoue son ecriture sur les lignes : aucune ecriture
+ * n'est perdue, sans fenetre de maintenance. Une fois vu, c'est definitif pour
+ * l'instance ; le document d'origine reste intact (sauvegarde, retour arriere).
+ */
+async function rowsEngine(): Promise<boolean> {
+  if (!databaseEnabled()) return false;
+  if (globalEngine.ssRowsEngine) return true;
+  if (!(await rowsTableExists())) return false;
+  globalEngine.ssRowsEngine = true;
+  invalidateStoreCache();
+  return true;
+}
+
+/** Le moteur lignes est-il actif ? (pour les rares modules qui ecrivent leur propre SQL) */
+export const usingRowsEngine = () => rowsEngine();
+
+class EngineSwitched extends Error { constructor() { super("store_engine_switched"); } }
+
+export type StoreScope = {
+  /** Ne lire / n'ecrire que les lignes de cet utilisateur. Deux utilisateurs ne se
+   * bloquent alors plus, et rien de ce qui appartient aux autres ne traverse le
+   * reseau. A utiliser sur tout chemin sollicite. Sans lui : toute la collection. */
+  userId?: string;
+};
+
+/** Collections dont chaque ligne porte son proprietaire (`userId`, ou `id` pour `users`). */
+const SCOPABLE = new Set(["users", "projects", "accounts", "runs", "channels", "posts", "media", "apiKeys", "pushSubscriptions", "warmedOrders", "tiktokQrAttempts", "publicationText", "researchJobs", "formatStudies", "oauthTokens", "oauthCodes"]);
+/** Valeurs globales qu'une portee utilisateur peut LIRE (jamais modifier). */
+const SCOPE_READABLE = new Set(["restoreReviewRequired"]);
+
+function assertScopable(keys: readonly string[]) {
+  for (const key of keys) if (!SCOPABLE.has(key) && !SCOPE_READABLE.has(key)) throw new Error(`store_scope_unsupported_${key}`);
+}
+
+/** Moteurs fichier et document : meme semantique de portee que le moteur lignes,
+ * pour que les tests (fichier local) attrapent une portee mal posee. */
+function scopeDown(full: Record<string, unknown>, keys: readonly string[], userId: string) {
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    const value = full[key];
+    out[key] = Array.isArray(value) ? value.filter(row => ownerOf(key, row as Record<string, unknown>) === userId) : value;
+  }
+  return out;
+}
+function scopeMerge(full: Record<string, unknown>, scoped: Record<string, unknown>, keys: readonly string[], userId: string, before: Map<string, string>) {
+  for (const key of keys) {
+    const mine = scoped[key];
+    if (!SCOPABLE.has(key)) {
+      if (JSON.stringify(mine) !== before.get(key)) throw new Error(`store_scope_unsupported_${key}`);
+      continue;
+    }
+    const list = Array.isArray(mine) ? mine as Record<string, unknown>[] : [];
+    for (const row of list) if (ownerOf(key, row) !== userId) throw new Error(`store_scope_violation_${key}`);
+    const others = Array.isArray(full[key]) ? (full[key] as Record<string, unknown>[]).filter(row => ownerOf(key, row) !== userId) : [];
+    if (list.length || others.length || Array.isArray(full[key])) full[key] = [...list, ...others];
+  }
+}
+
+/** Ligne(s) d'une collection par la valeur d'un champ (cle API par empreinte, compte
+ * par email) : le moteur lignes a un index, les autres filtrent la collection. */
+export async function findStoreRows<K extends keyof StoreData>(collection: K, field: string, value: string): Promise<NonNullable<StoreData[K]> extends (infer R)[] ? R[] : never> {
+  type Out = NonNullable<StoreData[K]> extends (infer R)[] ? R[] : never;
+  if (await rowsEngine()) return await findRows(collection as string, field, value) as Out;
+  const data = await readStoreSlice([collection]);
+  const list = data[collection];
+  return (Array.isArray(list) ? list.filter(row => (row as unknown as Record<string, unknown>)[field] === value) : []) as Out;
+}
+
 export async function readStore(_fresh = false): Promise<StoreData> {
+  if (await rowsEngine()) {
+    const all = await readRows(null, { videos: true });
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(all[key])) all[key] = [];
+    return normalize(all as unknown as StoreData);
+  }
   if (databaseEnabled()) {
     const version = await databaseVersion();
     const hit = cacheGet("db:full", version);
@@ -158,10 +243,29 @@ export async function readStore(_fresh = false): Promise<StoreData> {
  * Callbacks must not recursively call updateStore.
  */
 export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): Promise<T> {
+  if (await rowsEngine()) return updateAllRows(fn);
   if (databaseEnabled()) {
+    try { return await updateDocument(fn); }
+    catch (error) { if (error instanceof EngineSwitched) return updateAllRows(fn); throw error; }
+  }
+  return updateLocal(fn);
+}
+
+/** Tout le store sous verrou global : couteux, reserve aux taches transverses. */
+function updateAllRows<T>(fn: (data: StoreData) => T | Promise<T>): Promise<T> {
+  return writeRows(null, {}, async partial => {
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
+    return fn(normalize(partial as unknown as StoreData));
+  });
+}
+
+async function updateDocument<T>(fn: (data: StoreData) => T | Promise<T>): Promise<T> {
+  {
     const result = await database().begin(async tx => {
       const rows = await tx`SELECT data FROM scrollshow_state WHERE id = 1 FOR UPDATE`;
       if (!rows.length) throw new Error("database_not_migrated");
+      // La migration tient ce meme verrou : si la table est la, elle est complete.
+      if (await rowsTableExists(tx)) { globalEngine.ssRowsEngine = true; throw new EngineSwitched(); }
       const data = normalize(rows[0].data);
       const before = JSON.stringify(data);
       const output = await fn(data);
@@ -171,6 +275,9 @@ export async function updateStore<T>(fn: (data: StoreData) => T | Promise<T>): P
     invalidateStoreCache();
     return (result as { output: T }).output;
   }
+}
+
+async function updateLocal<T>(fn: (data: StoreData) => T | Promise<T>): Promise<T> {
   if (!localStoreEnabled()) throw new Error("database_migration_required");
   const target = filePath();
   await mkdir(path.dirname(target), { recursive: true });
@@ -249,14 +356,20 @@ function guardSlice(data: StoreData, keys: readonly string[]): StoreData {
  */
 export async function readStoreSlice(
   keys: readonly (keyof StoreData)[],
-  options: { videos?: boolean } = {},
+  options: { videos?: boolean } & StoreScope = {},
 ): Promise<StoreData> {
   const videos = options.videos === true;
   const wanted = [...new Set<string>([...ALWAYS_KEYS, ...(keys as readonly string[])])];
   const sliceKey = `${[...wanted].sort().join(",")}|${videos ? "v" : "-"}`;
   let partial: Record<string, unknown>;
+  if (options.userId) assertScopable(wanted);
+  const onRowsEngine = await rowsEngine();
 
-  if (databaseEnabled()) {
+  if (onRowsEngine) {
+    // Une lecture portee est une petite requete indexee : pas de cache a tenir
+    // coherent entre instances, la base est la verite.
+    partial = await readRows(wanted, { videos, userId: options.userId });
+  } else if (databaseEnabled()) {
     const cacheKey = `db:slice:${sliceKey}`;
     const hit = cacheGet(cacheKey, await databaseVersion());
     if (hit !== null) {
@@ -298,6 +411,8 @@ export async function readStoreSlice(
     partial = projectSlice(await readStore() as unknown as Record<string, unknown>, wanted, videos);
   }
 
+  // Moteurs fichier et document : meme resultat qu'une lecture portee du moteur lignes.
+  if (options.userId && !onRowsEngine) partial = scopeDown(partial, wanted, options.userId);
   for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
   return guardSlice(normalize(partial as unknown as StoreData), wanted);
 }
@@ -313,7 +428,9 @@ export async function readStoreSlice(
  */
 export async function readUserScope(userId: string): Promise<StoreData> {
   let partial: Record<string, unknown>;
-  if (databaseEnabled()) {
+  if (await rowsEngine()) {
+    return readStoreSlice([], { userId });
+  } else if (databaseEnabled()) {
     const cacheKey = `db:user:${userId}`;
     const hit = cacheGet(cacheKey, await databaseVersion());
     if (hit !== null) {
@@ -354,6 +471,7 @@ export async function readRowVideos(collection: "accounts" | "channels", id: str
     const rows = Array.isArray(full[collection]) ? full[collection] as { id?: string; videos?: unknown[] }[] : [];
     return rows.find(row => row.id === id)?.videos || [];
   };
+  if (await rowsEngine()) return readRowVideosFromRows(collection, id);
   if (databaseEnabled()) {
     const cacheKey = `db:videos:${collection}:${id}`;
     const hit = cacheGet(cacheKey, await databaseVersion());
@@ -389,42 +507,63 @@ export async function readRowVideos(collection: "accounts" | "channels", id: str
 export async function updateStoreSlice<T>(
   keys: readonly (keyof StoreData)[],
   fn: (data: StoreData) => T | Promise<T>,
+  scope: StoreScope = {},
 ): Promise<T> {
   const wanted = [...new Set<string>([...ALWAYS_KEYS, ...keys])];
+  const userId = scope.userId;
+  if (userId) assertScopable(wanted);
+
+  /** Fichier et document : `collections` porte les collections COMPLETES ; avec une
+   * portee, `fn` n'en voit que la part de l'utilisateur, refusionnee ensuite. */
+  const runOn = async (collections: Record<string, unknown>) => {
+    const view = userId ? scopeDown(collections, wanted, userId) : collections;
+    const before = new Map(wanted.map(key => [key, JSON.stringify(view[key])]));
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(view[key])) view[key] = [];
+    const output = await fn(guardSlice(normalize(view as unknown as StoreData), wanted));
+    if (userId) scopeMerge(collections, view, wanted, userId, before);
+    return output;
+  };
+  const onRows = () => writeRows(wanted, { userId }, async partial => {
+    for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
+    return fn(guardSlice(normalize(partial as unknown as StoreData), wanted));
+  });
+
+  if (await rowsEngine()) return onRows();
+
   if (!databaseEnabled()) return updateStore(async full => {
     const partial = projectSlice(full as unknown as Record<string, unknown>, wanted, true);
     // Clone: a failed callback must not modify collections by shared reference.
-    const raw = structuredClone(partial) as unknown as StoreData;
-    for (const key of REQUIRED_KEYS) if (!Array.isArray(raw[key])) (raw[key] as unknown[]) = [];
-    const output = await fn(guardSlice(normalize(raw), wanted));
-    for (const key of wanted) {
-      (full as unknown as Record<string, unknown>)[key] = (raw as unknown as Record<string, unknown>)[key];
-    }
+    const raw = structuredClone(partial);
+    const output = await runOn(raw);
+    for (const key of wanted) (full as unknown as Record<string, unknown>)[key] = raw[key];
     return output;
   });
-  const result = await database().begin(async tx => {
-    const rows = await tx`
-      SELECT (SELECT COALESCE(jsonb_object_agg(kv.key, kv.value), '{}'::jsonb)
-        FROM jsonb_each(s.data) kv WHERE kv.key = ANY(${wanted}::text[])) AS data
-      FROM scrollshow_state s WHERE s.id = 1 FOR UPDATE`;
-    if (!rows.length) throw new Error("database_not_migrated");
-    const partial = rows[0].data as Record<string, unknown>;
-    const before = new Map(wanted.map(key => [key, JSON.stringify(partial[key])]));
-    for (const key of REQUIRED_KEYS) if (!Array.isArray(partial[key])) partial[key] = [];
-    const raw = normalize(partial as unknown as StoreData);
-    const output = await fn(guardSlice(raw, wanted));
-    const patch: Record<string, unknown> = {};
-    for (const key of wanted) {
-      const value = (raw as unknown as Record<string, unknown>)[key];
-      if (JSON.stringify(value) !== before.get(key)) patch[key] = value ?? null;
-    }
-    if (Object.keys(patch).length) {
-      await tx`UPDATE scrollshow_state SET data = data || ${tx.json(patch as never)}, updated_at = now() WHERE id = 1`;
-    }
-    return { output };
-  });
-  invalidateStoreCache();
-  return (result as { output: T }).output;
+
+  try {
+    const result = await database().begin(async tx => {
+      const rows = await tx`
+        SELECT (SELECT COALESCE(jsonb_object_agg(kv.key, kv.value), '{}'::jsonb)
+          FROM jsonb_each(s.data) kv WHERE kv.key = ANY(${wanted}::text[])) AS data
+        FROM scrollshow_state s WHERE s.id = 1 FOR UPDATE`;
+      if (!rows.length) throw new Error("database_not_migrated");
+      // La migration tient ce meme verrou : si la table est la, elle est complete.
+      if (await rowsTableExists(tx)) { globalEngine.ssRowsEngine = true; throw new EngineSwitched(); }
+      const partial = rows[0].data as Record<string, unknown>;
+      const before = new Map(wanted.map(key => [key, JSON.stringify(partial[key])]));
+      const output = await runOn(partial);
+      const patch: Record<string, unknown> = {};
+      for (const key of wanted) if (JSON.stringify(partial[key]) !== before.get(key)) patch[key] = partial[key] ?? null;
+      if (Object.keys(patch).length) {
+        await tx`UPDATE scrollshow_state SET data = data || ${tx.json(patch as never)}, updated_at = now() WHERE id = 1`;
+      }
+      return { output };
+    });
+    invalidateStoreCache();
+    return (result as { output: T }).output;
+  } catch (error) {
+    if (error instanceof EngineSwitched) { invalidateStoreCache(); return onRows(); }
+    throw error;
+  }
 }
 
 export function seedAccounts(userId: string): Account[] {

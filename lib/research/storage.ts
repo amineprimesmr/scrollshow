@@ -1,14 +1,15 @@
 import { database, databaseEnabled } from "../database";
 import { backfillProjects, inScope } from "../projects";
-import { emptyStore, readStoreSlice } from "../store";
+import { emptyStore, readStoreSlice, usingRowsEngine } from "../store";
 import type { SessionUser } from "../types";
 import type { ResearchJob } from "./model";
 
 /** A detail poll transfers only the requested user's job, not historical
  * account samples belonging to every research job in the store. */
 export async function readResearchJobs(user: SessionUser, id?: string): Promise<ResearchJob[]> {
-  if (!databaseEnabled()) {
-    const data = await readStoreSlice(["researchJobs"]);
+  if (!databaseEnabled() || await usingRowsEngine()) {
+    // Moteur lignes : lecture portee, indexee par proprietaire.
+    const data = await readStoreSlice(["researchJobs"], { userId: user.id });
     return (data.researchJobs || []).filter(job => inScope(job, user) && (id === undefined || job.id === id));
   }
 

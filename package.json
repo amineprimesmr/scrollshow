@@ -7,6 +7,7 @@
     "test:smoke": "node scripts/smoke-local.mjs",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate-store.mjs",
+    "db:rows": "tsx scripts/migrate-to-rows.ts",
     "readiness": "node scripts/readiness.mjs",
     "billing:provision": "node scripts/provision-billing.mjs",
     "dev": "node scripts/dev.mjs --turbopack",

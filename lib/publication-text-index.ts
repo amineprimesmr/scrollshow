@@ -23,7 +23,7 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
   if (retryFailed) await updateStoreSlice(["publicationText"], store => {
     const ids = new Set(insights.videos.map(v => v.id));
     store.publicationText = store.publicationText?.filter(s => !(inScope(s, user) && ids.has(s.postId) && s.status === "failed"));
-  });
+  }, { userId: user.id });
   const work = insights.videos.flatMap(video => (video.slideTexts || []).filter(slide => slide.status === "pending" || (retryFailed && slide.status === "failed"))
     .map(slide => ({ video, slide, image: publicationImages(video)[slide.index] })))
     .sort((a, b) => Number(b.video.id === priorityPostId) - Number(a.video.id === priorityPostId) || a.slide.index - b.slide.index || b.video.views - a.video.views).slice(0, 2);
@@ -50,7 +50,7 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
     // Un texte de slide lu = une ecriture. Elle ne porte que sur `publicationText` :
     // l'ancienne verrouillait et reecrivait le document ENTIER a chaque slide.
     // L'existence du compte se verifie par une lecture (sans videos), hors verrou.
-    const owners = await readStoreSlice(["accounts", "channels"]);
+    const owners = await readStoreSlice(["accounts", "channels"], { userId: user.id });
     const target = key.startsWith("ch:") ? owners.channels : owners.accounts;
     if (!target.some(a => a.id === key.slice(3) && inScope(a, user))) continue;
     await updateStoreSlice(["publicationText"], data => {
@@ -58,7 +58,7 @@ async function advance(user: SessionUser, key: string, days: number | null, retr
       const previous = entries.findIndex(s => inScope(s, user) && s.postId === video.id && s.index === slide.index);
       const entry = { userId: user.id, projectId: user.projectId, postId: video.id, index: slide.index, imageKey: slide.imageKey, ...result, updatedAt: new Date().toISOString() };
       if (previous < 0) entries.push(entry); else entries[previous] = entry;
-    });
+    }, { userId: user.id });
   }
   const fresh = await accountInsights(user, key, days);
   if (!fresh) throw new Error("missing");

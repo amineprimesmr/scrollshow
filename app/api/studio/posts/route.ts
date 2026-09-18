@@ -2,7 +2,8 @@ import { assertMediaReferences } from "@/lib/media-permissions";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { coverOf, newShareId, recipeFromPhotos, recipeInputSchema } from "@/lib/recipe";
 import { updateStoreSlice } from "@/lib/store";
-const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media", "mediaDeletionQueue"], fn);
+// Ecriture PORTEE : un post ne touche que les lignes de son auteur.
+const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media"], fn, { userId });
 import type { StudioPost } from "@/lib/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       : [parsed.data.image || ""];
   const recipe = recipeFromPhotos(photos, origin, parsed.data.recipe);
 
-  const post = await updateStore((data) => {
+  const post = await updateStore(user.id, (data) => {
     assertMediaReferences(data, parsed.data, user);
     const created: StudioPost = {
       id: crypto.randomUUID(),

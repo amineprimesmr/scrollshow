@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { publicUser, readStoreSlice, updateStoreSlice } from "./store";
+import { findStoreRows, publicUser, readStoreSlice, readUserScope, updateStoreSlice } from "./store";
 import { findProject, resolveProject, withProject } from "./projects";
 import type { ApiKey, SessionUser } from "./types";
 
@@ -31,7 +31,7 @@ export async function createApiKey(userId: string, name: string, projectId?: str
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
   };
-  const created = await updateStore((data) => {
+  const created = await updateStoreSlice(["apiKeys"], (data) => {
     // Sans projet demande, la cle suit le projet actif du compte.
     const project = item.projectId ? findProject(data, userId, item.projectId) : resolveProject(data, userId, null);
     if (!project || data.restoreReviewRequired) return null;
@@ -41,13 +41,13 @@ export async function createApiKey(userId: string, name: string, projectId?: str
     data.apiKeys = data.apiKeys || [];
     data.apiKeys.unshift(item);
     return item;
-  });
+  }, { userId });
   if (!created) return null;
   return { token, key: publicApiKey(created) };
 }
 
 export async function listApiKeys(userId: string, projectId?: string) {
-  const data = await readStoreSlice(["apiKeys"]);
+  const data = await readStoreSlice(["apiKeys"], { userId });
   return (data.apiKeys || [])
     .filter((key) => key.userId === userId && (!projectId || key.projectId === projectId))
     .map(publicApiKey);
@@ -79,21 +79,24 @@ export async function resolveApiKey(token: string): Promise<SessionUser | null> 
   const value = token.trim();
   if (!value.startsWith(PREFIX)) return null;
   const hash = hashApiKey(value);
-  const data = await readStoreSlice(["apiKeys"]);
+  // Par empreinte, via l'index du moteur lignes : un appel d'agent ne parcourt
+  // plus toutes les cles de tous les comptes.
+  const candidates = await findStoreRows("apiKeys", "hash", hash);
+  const found = candidates.find((key) => hashesEqual(key.hash, hash));
+  if (!found) return null;
+  if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) return null;
+  const data = await readUserScope(found.userId);
     if (data.restoreReviewRequired) return null;
-    const found = (data.apiKeys || []).find((key) => hashesEqual(key.hash, hash));
-    if (!found) return null;
-    if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) return null;
     const user = data.users.find((item) => item.id === found.userId);
     if (!user || user.deletionPendingAt || !user.emailVerifiedAt) return null;
     const project = found.projectId ? findProject(data, user.id, found.projectId) : null;
     if (!project) return null;
     // Activity is informational: coalesce writes to at most once per hour.
     if (!found.lastUsedAt || Date.now() - Date.parse(found.lastUsedAt) >= 3600000) {
-      await updateStore(current => {
+      await updateStoreSlice(["apiKeys"], current => {
         const key = current.apiKeys.find(item => item.id === found.id && item.hash === hash);
         if (key && (!key.lastUsedAt || Date.now() - Date.parse(key.lastUsedAt) >= 3600000)) key.lastUsedAt = new Date().toISOString();
-      });
+      }, { userId: found.userId });
     }
     return withProject(publicUser(user), project);
 }

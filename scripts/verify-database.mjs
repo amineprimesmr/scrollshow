@@ -5,7 +5,11 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required");
 const sql = postgres(process.env.DATABASE_URL, { max: 5, prepare: false, connect_timeout: 10 });
 const table = "scrollshow_restore_test_" + randomUUID().replaceAll("-", "");
 try {
-  const rows = await sql`SELECT data FROM scrollshow_state WHERE id = 1`;
+  // Moteur lignes actif : le document se reconstitue depuis scrollshow_rows.
+  const [{ rowsMode }] = await sql`SELECT to_regclass('scrollshow_rows') IS NOT NULL AS "rowsMode"`;
+  const rows = rowsMode
+    ? [{ data: Object.fromEntries((await sql`SELECT collection, jsonb_agg(data ORDER BY ord, seq) AS list FROM scrollshow_rows WHERE collection <> '@meta' GROUP BY collection`).map(r => [r.collection, r.list])) }]
+    : await sql`SELECT data FROM scrollshow_state WHERE id = 1`;
   assert.equal(rows.length,1);
   for (const key of ["users","accounts","posts","channels","media","apiKeys","runs"]) assert.ok(Array.isArray(rows[0].data[key]));
   // Dedicated scratch table only. Neither the active document nor users change.
@@ -17,5 +21,5 @@ try {
   await assert.rejects(sql.begin(async tx => {await tx`UPDATE ${tx(table)} SET counter=100 WHERE id=1`;throw rollback;}),error=>error===rollback);
   await Promise.all(Array.from({length:20},()=>sql.begin(async tx=>{await tx`SELECT id FROM ${tx(table)} WHERE id=1 FOR UPDATE`;await tx`UPDATE ${tx(table)} SET counter=counter+1 WHERE id=1`;})));
   assert.equal((await sql`SELECT counter FROM ${sql(table)} WHERE id=1`)[0].counter,20);
-  console.log("PASS PostgreSQL connectivity, snapshot restore, rollback and 20 concurrent transactions. Active data unchanged.");
+  console.log((rowsMode ? "[moteur lignes] " : "[document] ") + "PASS PostgreSQL connectivity, snapshot restore, rollback and 20 concurrent transactions. Active data unchanged.");
 } finally {await sql`DROP TABLE IF EXISTS ${sql(table)}`;await sql.end();}

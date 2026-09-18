@@ -1,5 +1,5 @@
 import { setSessionCookie, verifyPassword } from "@/lib/auth";
-import { findUserByEmail, publicUser, readStoreSlice } from "@/lib/store";
+import { findStoreRows, findUserByEmail, publicUser, readUserScope } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { consumeLimit, consumePublicAuthLimit } from "@/lib/rate-limit";
@@ -22,7 +22,9 @@ export async function POST(request: Request) {
   try {
     if (!await consumePublicAuthLimit(request, "login")) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
     if (!(await consumeLimit(`login:${parsed.data.email.toLowerCase()}`, 10, 900000))) return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
-    data = await readStoreSlice([]);
+    // Par email, via l'index du moteur lignes : jamais la liste de tous les comptes.
+    const [match] = await findStoreRows("users", "email", parsed.data.email.toLowerCase());
+    data = await readUserScope(match?.id || "-");
   } catch (error) {
     console.error("auth_store_unavailable", { route: "login", message: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "unavailable" }, { status: 503 });

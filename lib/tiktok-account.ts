@@ -32,7 +32,7 @@ function connectedChannels(data: { channels: Channel[] }, userId: string, projec
 }
 
 export async function loadTikTokChannel(userId: string, channelId?: string, projectId?: string): Promise<Channel | null> {
-  const data = await readStoreSlice(["channels"]);
+  const data = await readStoreSlice(["channels"], { userId });
   const channels = connectedChannels(data, userId, projectId);
   if (!channelId && channels.length > 1) throw new Error("channel_required");
   const channel = channelId ? channels.find(item => item.id === channelId) : channels[0];
@@ -47,7 +47,7 @@ export async function loadTikTokChannel(userId: string, channelId?: string, proj
  * other connected account's videos and views.
  */
 export async function loadTikTokChannels(userId: string, projectId?: string): Promise<Channel[]> {
-  const data = await readStoreSlice(["channels"]);
+  const data = await readStoreSlice(["channels"], { userId });
   const channels = connectedChannels(data, userId, projectId);
   return Promise.all(channels.map((channel) => refreshChannelIfNeeded(channel)));
 }

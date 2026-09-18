@@ -1,7 +1,9 @@
 import { updateStoreSlice } from "../store";
 import { readResearchJobs } from "./storage";
 // Claiming, resuming and starting a search never need the full account media cache.
-const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["researchJobs"], fn);
+// Toute tache appartient a un utilisateur : ecritures PORTEES, deux recherches de
+// deux utilisateurs ne se verrouillent plus l'une l'autre.
+const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["researchJobs"], fn, { userId });
 import { consumeLimit } from "../rate-limit";
 import { fetchAccountVideoPage } from "../metrics";
 import { withMetricsUser } from "../metrics-guard";
@@ -89,7 +91,7 @@ export async function startResearch(user: SessionUser,raw: unknown, options: { r
   if(input.requestId || options.reuseRecent) { const existing=reuse(await readResearchJobs(user)); if(existing)return {...publicJob(existing),reused:true,cachedAt:existing.updatedAt}; }
   if(input.source==="provider"&&!researchCapabilities().detailedMetrics) throw new Error("research_provider_not_configured");
   if(!await consumeLimit(`research-start:${user.id}`,30,86400000)) throw new Error("daily_research_limit");
-  return updateStore(data=>{
+  return updateStore(user.id,data=>{
     const jobs=data.researchJobs ||= [];
     const existing=reuse(jobs); if(existing)return {...publicJob(existing),reused:true,cachedAt:existing.updatedAt};
     for (const job of jobs) if (inScope(job,user) && isLegacySearch(job) && ["queued","running"].includes(job.status)) {
@@ -130,7 +132,7 @@ function choosePhase(j:ResearchJob) {
 }
 export type ResearchTask = { jobId:string; token:string; source:ResearchInput["source"]; filters:ResearchFilters; maxPages:number } & ({kind:"search";keyword:string;cursor:number;searchId?:string}|{kind:"measure";candidate:Candidate});
 export async function claimResearch(user:SessionUser,id:string, source:ResearchInput["source"]):Promise<ResearchTask|null> {
-  return updateStore(data=>{
+  return updateStore(user.id,data=>{
     const j=data.researchJobs?.find(j=>j.id===id&&inScope(j, user));if(!j)throw new Error("research_not_found");
     if(j.input.source!==source)throw new Error("research_source_mismatch");
     if(isLegacySearch(j) && ["queued","running"].includes(j.status)) {
@@ -273,7 +275,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
   legacy.accountIds=j.results.filter(r=>r.accepted).map(r=>r.accountId);legacy.found=legacy.accountIds.length;legacy.status=j.status==="done"?"done":"queued";
 }
 export async function completeResearch(user:SessionUser,task:ResearchTask,result:StepResult) {
-  return updateStoreSlice(["researchJobs","accounts","runs"],data=>{const j=data.researchJobs?.find(j=>j.id===task.jobId&&inScope(j, user));if(!j)throw new Error("research_not_found");applyResearchStep(data,j,task,result);return publicJob(j);});
+  return updateStoreSlice(["researchJobs","accounts","runs"],data=>{const j=data.researchJobs?.find(j=>j.id===task.jobId&&inScope(j, user));if(!j)throw new Error("research_not_found");applyResearchStep(data,j,task,result);return publicJob(j);},{userId:user.id});
 }
 export async function advanceResearch(user:SessionUser,id:string) {
   const task=await claimResearch(user,id,"provider");if(!task)return getResearchJob(user,id);
@@ -294,7 +296,7 @@ export async function workResearch(user:SessionUser,id:string,budgetMs=180000) {
   return getResearchJob(user,id);
 }
 export async function controlResearch(user:SessionUser,id:string,action:"pause"|"resume"|"stop",filters?:Partial<ResearchFilters>) {
-  return updateStore(data=>{
+  return updateStore(user.id,data=>{
     const j=data.researchJobs?.find(j=>j.id===id&&inScope(j, user));if(!j)throw new Error("research_not_found");
     if(j.status==="stopped")throw new Error("research_stopped");
     if(filters) {

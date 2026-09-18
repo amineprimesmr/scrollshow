@@ -4,7 +4,7 @@ import { withMetricsUser } from "./metrics-guard";
 import { analyzeShadowban, type ShadowbanReport } from "./shadowban";
 import { listRecentVideos, type TikTokVideo } from "./tiktok";
 import { updateStoreSlice } from "./store";
-const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts"], fn);
+const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts"], fn, { userId });
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "./tiktok-profile";
 import type { Account, AccountVideo, Channel } from "./types";
 
@@ -89,7 +89,7 @@ export async function checkLibraryAccount(account: Account): Promise<ShadowbanAc
   if (stale && metricsEnabled()) {
     const persist = async (list: AccountVideo[]) => {
       const fetched = new Date().toISOString();
-      await updateStore((data) => {
+      await updateStore(account.userId, (data) => {
         const found = data.accounts.find((a) => a.id === account.id);
         if (!found) return;
         const cache = new Map((found.videos || []).map(v => [v.id, v]));

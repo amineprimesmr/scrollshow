@@ -207,7 +207,7 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
   // Les insights ont besoin du cache de videos, mais pas des recherches :
   // c'est 3 Mo de moins transferes a chaque ouverture d'un compte.
   // seule la ligne ouverte apporte son cache de videos (voir `readRowVideos`).
-  const store = await readStoreSlice(["accounts", "channels", "posts", "publicationText"]);
+  const store = await readStoreSlice(["accounts", "channels", "posts", "publicationText"], { userId: user.id });
   const channels = store.channels.filter((c) => inScope(c, user));
   const accounts = store.accounts.filter((a) => inScope(a, user));
   // La propriete se verifie AVANT de lire les videos : un identifiant invente ne

@@ -2,7 +2,9 @@ import { assertMediaReferences } from "@/lib/media-permissions";
 import { readStudioSession as readSession } from "@/lib/auth";
 import { applyRecipePatch, coverOf, ensureRecipe, newShareId, recipeInputSchema } from "@/lib/recipe";
 import { updateStoreSlice } from "@/lib/store";
-const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media", "mediaDeletionQueue"], fn);
+// Ecriture PORTEE : un post ne touche que les lignes de son auteur. La file de
+// suppression des medias est globale : elle s'ecrit a part, apres.
+const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media"], fn, { userId });
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
@@ -41,7 +43,7 @@ export async function PATCH(
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
-  const post = await updateStore((data) => {
+  const post = await updateStore(user.id, (data) => {
     assertMediaReferences(data, parsed.data, user);
     const found = data.posts.find((item) => item.id === id && inScope(item, user));
     if (!found) return null;
@@ -91,12 +93,13 @@ export async function DELETE(
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
-  const result = await updateStore((data) => {
+  const result = await updateStore(user.id, (data) => {
     const post = data.posts.find(item => item.id === id && inScope(item, user));
     if (post) assertEditable(post);
     data.posts = data.posts.filter((item) => !(item.id === id && inScope(item, user)));
-    if (post) queueDeletedMedia(data, post);
+    return post || null;
   }).catch(postErrorResponse);
   if (result instanceof Response) return result;
+  if (result) await updateStoreSlice(["mediaDeletionQueue"], (data) => { queueDeletedMedia(data, result); });
   return NextResponse.json({ ok: true });
 }

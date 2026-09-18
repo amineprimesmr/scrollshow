@@ -4,7 +4,7 @@ import { loadTikTokChannel } from "./tiktok-account";
 import { fetchUserInfo, profileFieldsForScopes, listVideoPage, type TikTokVideo } from "./tiktok";
 import { readStoreSlice, updateStoreSlice } from "./store";
 import { withMetricsUser } from "./metrics-guard";
-const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts", "channels"], fn);
+const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts", "channels"], fn, { userId });
 import type { AccountVideo, StoreData, VideoSync } from "./types";
 
 export function officialAccountVideo(v: TikTokVideo, handle: string): AccountVideo {
@@ -41,7 +41,7 @@ export async function syncAccountPosts(userId: string, key: string, restart = fa
 async function syncPage(userId: string, key: string, restart: boolean) {
   // Seules les metadonnees de la ligne servent ici (handle, curseur, projet) :
   // inutile de rapatrier les videos de tous les comptes pour en synchroniser un.
-  const target = targetIn(await readStoreSlice(["accounts", "channels"]), userId, key);
+  const target = targetIn(await readStoreSlice(["accounts", "channels"], { userId }), userId, key);
   if (!target) throw new Error("missing");
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;
@@ -65,7 +65,7 @@ async function syncPage(userId: string, key: string, restart: boolean) {
     // le profil public. Sans cela un chiffre faux ecrit une fois restait a vie.
     const publicProfile = !channel && !cursor && target.handle
       ? await fetchTikTokProfile(target.handle.replace(/^@/, "")).catch(() => null) : null;
-    await updateStore(data => {
+    await updateStore(userId, data => {
       const current = targetIn(data, userId, key);
       if (!current) return;
       // Ignore an obsolete response if another instance already advanced.
@@ -96,7 +96,7 @@ async function syncPage(userId: string, key: string, restart: boolean) {
     });
   } catch (error) {
     const code = error instanceof Error && "code" in error ? String(error.code) : error instanceof Error && error.message === "connection_required" ? error.message : "sync_failed";
-    await updateStore(data => {
+    await updateStore(userId, data => {
       const current = targetIn(data, userId, key);
       if (!current || current.videoSync?.updatedAt !== target.videoSync?.updatedAt) return;
       current.videoSync = { source, cursor, hasMore: true, complete: false, seenIds: previous?.seenIds || [], updatedAt: new Date().toISOString(), error: code } satisfies VideoSync;

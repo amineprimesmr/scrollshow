@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { database, databaseEnabled } from "./database";
-import { updateStoreSlice } from "./store";
+import { updateStoreSlice, usingRowsEngine } from "./store";
 
 /**
  * Compteur a fenetre glissante.
@@ -24,7 +24,7 @@ export async function consumeLimit(key: string, limit: number, windowMs: number)
       const code = (error as { code?: string })?.code;
       // Seul cas ou l'ancien chemin se justifie : la table n'existe pas et ce
       // role ne peut pas la creer. Il compte juste, mais reecrit tout le document.
-      if (code === "42501" || code === "42P01") {
+      if ((code === "42501" || code === "42P01") && !(await usingRowsEngine())) {
         warnOnce(`rate_limit_table_unavailable ${code}`);
         return consumeInDatabase(hash, limit, windowMs, now);
       }

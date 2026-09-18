@@ -20,6 +20,7 @@ try {
     await tx`CREATE TABLE IF NOT EXISTS scrollshow_state (id integer PRIMARY KEY CHECK (id = 1), data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`;
     await tx`LOCK TABLE scrollshow_state IN EXCLUSIVE MODE`;
     if ((await tx`SELECT id FROM scrollshow_state LIMIT 1`).length) throw new Error("restore_target_not_empty");
+    if ((await tx`SELECT to_regclass('scrollshow_rows') IS NOT NULL AS ok`)[0].ok) throw new Error("restore_target_not_empty_rows");
     // Existing exact bytes allow retry after a failed upload without overwriting
     // another file. The database stays empty if any media fails verification.
     const targetStorage = {
@@ -36,6 +37,7 @@ try {
     // Unique id conflict aborts the whole transaction. Never overwrite data.
     await tx`INSERT INTO scrollshow_state (id,data) VALUES (1,${tx.json(snapshot)})`;
   });
+  console.log("Restaure en mode document. Pour repasser au moteur lignes : npm run db:rows -- --apply.");
   console.log(`Encrypted snapshot and ${fileCount} media files restored and verified. Access, API keys and publishing are quarantined. Reconcile external billing, account deletions and publication status before clearing restoreReviewRequired.`);
 } finally { await sql.end(); }
 }

@@ -101,10 +101,13 @@ export function applyManageAction(
       const gone = new Set(result.removedChannels.map((row) => row.id));
       data.channels = data.channels.filter((row) => !mine(row, wanted.connected));
       data.accounts = data.accounts.filter((row) => !mine(row, wanted.tracked));
-      // Les instantanes quotidiens d'un compte supprime ne servent plus a rien.
+      // Les instantanes quotidiens (collections sans proprietaire) sont nettoyes par
+      // la route, hors de cette ecriture portee ; ici seulement si la tranche les porte.
       if (gone.size) {
-        data.videoStats = data.videoStats?.filter((row) => !gone.has(row.channelId));
-        data.channelStats = data.channelStats?.filter((row) => !gone.has(row.channelId));
+        try {
+          data.videoStats = data.videoStats?.filter((row) => !gone.has(row.channelId));
+          data.channelStats = data.channelStats?.filter((row) => !gone.has(row.channelId));
+        } catch { /* tranche sans ces collections */ }
       }
     }
     result.changed = found;

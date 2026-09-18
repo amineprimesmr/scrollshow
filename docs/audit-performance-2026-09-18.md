@@ -116,7 +116,10 @@ client), puis correction. Les nouvelles requêtes SQL ont été rejouées sur un
 
 ## Ce qui reste à faire — par priorité
 
-1. **Le store est un document JSONB unique : c'est LA limite.** Estimation de la relecture : il tient
+1. ~~Le store est un document JSONB unique~~ **FAIT le même jour** : moteur « une ligne par
+   enregistrement » avec portée par utilisateur, validé sur un vrai Postgres avec le store réel
+   (différentiel, concurrence, bascule à chaud). Reste à **exécuter la bascule en production** :
+   `docs/migration-store-lignes-2026-09-18.md`. Ancien constat, pour mémoire : Estimation de la relecture : il tient
    quelques **centaines** d'utilisateurs, pas des milliers. Chaque écriture de n'importe qui invalide le
    cache de toutes les instances et prend l'unique verrou du produit ; 1 à 4 Mo par utilisateur actif ;
    mur dur à ~255 Mo (conteneur jsonb) et, avant, mémoire d'une fonction à ~200–300 Mo. Les caches et
