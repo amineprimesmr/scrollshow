@@ -20,3 +20,7 @@ out
 artifacts/
 
 .claude/buzz/
+
+# Sauvegardes de variables d'environnement : jamais versionnees
+.env*.bak*
+.env.production.local
