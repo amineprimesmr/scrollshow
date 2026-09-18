@@ -138,7 +138,8 @@ async function runDirect(endpoint: string, queryParams: Record<string, unknown>,
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(queryParams)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
   try {
-    const res = await fetch(`${base()}${endpoint}?${query}`, { headers: headers(), cache: "no-store", signal: deadline });
+    // GET sans `Content-Type` : la source repond 400 a un GET qui en porte un (verifie le 18 septembre 2026).
+    const res = await fetch(`${base()}${endpoint}?${query}`, { headers: { Authorization: headers().Authorization, Accept: "application/json" }, cache: "no-store", signal: deadline });
     if (res.status === 401 || res.status === 403) throw new MetricsError("no_key", "provider rejected the key");
     if (res.status === 402) blocked("http 402");
     const body: any = await res.json().catch(() => null);
