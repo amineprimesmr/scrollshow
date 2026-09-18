@@ -1,5 +1,6 @@
 import { inScope } from "./projects";
 import { publicChannel } from "./tiktok";
+import { isFollowedAccount } from "./account-origin";
 import type { SessionUser, StoreData } from "./types";
 
 /**
@@ -19,7 +20,8 @@ export function ownedChannels(data: StoreData, user: Pick<SessionUser, "id" | "p
   // sinon masquer l'un ferait reapparaitre l'autre.
   const seen = new Set(mine.map((item) => `${item.platform}:${item.handle.toLowerCase()}`));
   const tracked = (data.accounts || [])
-    .filter((item) => inScope(item, user) && !item.hidden)
+    // Jamais un compte trouve par la Recherche : c'est un concurrent, pas un compte a soi.
+    .filter((item) => inScope(item, user) && isFollowedAccount(item))
     .filter((item) => !seen.has(`tiktok:${item.handle.toLowerCase()}`))
     .map((item) =>
       publicChannel({

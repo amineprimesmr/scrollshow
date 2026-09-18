@@ -11,7 +11,7 @@ import { sound } from "@/lib/sound";
 import { setStoredTheme } from "@/lib/theme";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
 import { AddChannelModal } from "./AddChannelModal";
 import { CreatePostModal } from "./CreatePostModal";
 import { IconLock, IconLogout, IconMenu, IconPlus, IconX, NavIcon } from "./icons";
@@ -110,7 +110,7 @@ function SidebarProfile() {
   );
 }
 
-function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; pathname: string; english: boolean }) {
+function NavLink({ entry, pathname, english, onGo }: { entry: (typeof STUDIO_NAV)[0]; pathname: string; english: boolean; onGo: (href: string) => void }) {
   const active = navActive(pathname, entry.href);
   const label = english ? entry.en : entry.fr;
   const router = useRouter();
@@ -146,7 +146,14 @@ function NavLink({ entry, pathname, english }: { entry: (typeof STUDIO_NAV)[0]; 
   return (
     <Link
       href={entry.href}
-      onClick={() => !active && sound.nav()}
+      onClick={(event) => {
+        if (active) return;
+        sound.nav();
+        // Clic modifie (nouvel onglet, fenetre) : le navigateur garde la main.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        onGo(entry.href);
+      }}
       {...dropProps}
       className={[
         "ss-sidebar-link",
@@ -189,6 +196,24 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/app/warmed-accounts");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  // L'etat actif suit le clic, pas la fin du chargement : `pathname` ne change
+  // qu'une fois la page prete, la pastille restait donc sur l'ancienne entree
+  // pendant toute l'attente. La valeur optimiste se resout seule quand la
+  // transition de navigation se termine (ou echoue).
+  const router = useRouter();
+  const [, startNav] = useTransition();
+  const [navPath, setNavPath] = useOptimistic(pathname);
+  const go = useCallback(
+    (href: string) => {
+      setMobileNavOpen(false);
+      startNav(() => {
+        setNavPath(href);
+        router.push(href);
+      });
+    },
+    [router, setNavPath],
+  );
+
   // The saved preference wins over whatever this browser last stored.
   useEffect(() => {
     if (user?.settings?.theme) setStoredTheme(user.settings.theme);
@@ -227,14 +252,14 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             <IconX size={18} />
           </button>
         </div>
-        <NavPill className="ss-sidebar__nav" activeKey={pathname}>
+        <NavPill className="ss-sidebar__nav" activeKey={navPath}>
           {mainNav.map((entry) => (
-            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
+            <NavLink key={entry.href} entry={entry} pathname={navPath} english={english} onGo={go} />
           ))}
         </NavPill>
         <nav className="ss-sidebar__bottom">
           {bottomNav.map((entry) => (
-            <NavLink key={entry.href} entry={entry} pathname={pathname} english={english} />
+            <NavLink key={entry.href} entry={entry} pathname={navPath} english={english} onGo={go} />
           ))}
         </nav>
         <SidebarProfile />

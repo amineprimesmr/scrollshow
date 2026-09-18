@@ -97,7 +97,6 @@ html[data-theme="dark"] .ss-studio {
 }
 
 /* ── Shell: sidebar, rail, channels ────────────────────────────────────── */
-.ss-sidebar,
 .ss-rail,
 .ss-channels {
   background: rgb(var(--lg-rgb) / 0.62);
@@ -107,18 +106,43 @@ html[data-theme="dark"] .ss-studio {
   box-shadow: inset -1px 0 0 rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.4));
 }
 
-.ss-sidebar-link.is-active,
-.ss-sidebar-link:hover {
-  background: var(--lg-knob);
-  box-shadow:
-    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
-    inset 1px 1.5px 0 -1px rgb(var(--lg-hi) / var(--lg-hi-a)),
-    0 1px 2px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.5));
+/* La barre de navigation est volontairement opaque (fond carte, blanc en
+   clair) : elle ne recouvre jamais de contenu, donc un flou plein-hauteur ne
+   montrait rien et coutait une passe GPU a chaque image. */
+.ss-sidebar {
+  --ss-side-hover: color-mix(in srgb, var(--ss-ink) 4%, transparent);
+  --ss-side-active: color-mix(in srgb, var(--ss-ink) 7%, transparent);
+  /* Blanche dans les DEUX themes (demande d'Amine) : on re-pose ici les jetons
+     clairs de theme.css, tout ce qui vit dans la barre (liens, profil, menu)
+     suit sans regle par theme. A tenir en phase avec le bloc :root. */
+  --ss-card: #fff;
+  --ss-soft: #f4f4f5;
+  --ss-ink: #0a0a0a;
+  --ss-on-ink: #fff;
+  --ss-muted: #52525b;
+  --ss-muted-2: #a1a1aa;
+  --ss-line: #ececec;
+  --ss-err-fg: #b91c1c;
+  --ss-warn-fg: #b45309;
+  --lg-rgb: 255 255 255;
+  --lg-alpha: 0.58;
+  --lg-hi: 255 255 255;
+  --lg-hi-a: 0.85;
+  --lg-shade: 12 12 16;
+  --lg-shade-a: 0.1;
+  --lg-knob: rgb(255 255 255 / 0.92);
+  color-scheme: light;
+  color: var(--ss-ink);
+  background: var(--ss-card);
+  border-right: 1px solid var(--ss-line);
+}
+
+.ss-sidebar-link.is-active {
+  background: var(--ss-side-active);
 }
 
 .ss-sidebar-link:hover:not(.is-active) {
-  box-shadow: none;
-  background: rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.4));
+  background: var(--ss-side-hover);
 }
 
 /* ── Sticky top bar: content scrolls under it ──────────────────────────── */
@@ -394,7 +418,6 @@ html.lg-refract .ss-segment button.is-active {
   }
 
   .ss-sidebar {
-    background: rgb(var(--lg-rgb) / 0.72);
     box-shadow: 8px 0 32px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 1.4));
     transition: transform 0.42s cubic-bezier(0.2, 1.2, 0.4, 1);
   }

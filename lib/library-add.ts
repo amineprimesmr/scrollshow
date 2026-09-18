@@ -1,6 +1,7 @@
 import { canAddAccount } from "./auth";
 import { inScope } from "./projects";
 import { updateStoreSlice } from "./store";
+import { isResearchAccount } from "./account-origin";
 const updateStore = <T>(fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["accounts"], fn);
 import { fetchTikTokProfile, normalizeHandle, ProfileError } from "./tiktok-profile";
 import type { SessionUser } from "./types";
@@ -75,6 +76,8 @@ export async function addLibraryAccount(
   const result = await updateStore((data) => {
     if (!canAddAccount(user.plan)) return { error: "limit" as const };
     const existing = data.accounts.find((item) => inScope(item, user) && item.handle === (profile?.handle || handle));
+    // Deja connu du moteur de Recherche : le suivre expres en fait un compte suivi.
+    if (existing && isResearchAccount(existing)) { existing.origin = "manual"; existing.hidden = undefined; Object.assign(existing, extra); return { account: existing }; }
     if (existing) return { error: "exists" as const, account: existing };
     const created = {
       id: crypto.randomUUID(),
@@ -88,6 +91,7 @@ export async function addLibraryAccount(
       verdict: extra.verdict || "watch",
       notes: extra.notes || "",
       createdAt: new Date().toISOString(),
+      origin: "manual" as const,
       nickname: profile?.nickname,
       avatar: profile?.avatar,
       bio: profile?.bio,

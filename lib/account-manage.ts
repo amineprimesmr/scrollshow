@@ -1,4 +1,5 @@
 import { inScope } from "./projects";
+import { isResearchAccount } from "./account-origin";
 import type { Account, Channel, SessionUser, StoreData } from "./types";
 
 /**
@@ -13,7 +14,8 @@ import type { Account, Channel, SessionUser, StoreData } from "./types";
  *   jeton est aussi revoque chez la plateforme par la route (hors verrou du store).
  *   Les posts du calendrier ne sont jamais supprimes : ils perdent seulement leur cible.
  */
-export type ManagedKind = "connected" | "tracked";
+/** `research` = compte trouve par le moteur de Recherche : listable et supprimable ici, jamais affiche comme un compte a soi. */
+export type ManagedKind = "connected" | "tracked" | "research";
 export type ManagedAccount = {
   key: string;
   kind: ManagedKind;
@@ -35,7 +37,8 @@ export type ManagedAccount = {
 export type ManageAction = "hide" | "show" | "remove";
 export const MANAGE_MAX_KEYS = 500;
 
-export function parseManagedKey(key: string): { kind: ManagedKind; id: string } | null {
+/** La cle ne dit que la collection : `ch:` = compte connecte, `ac:` = ligne de `accounts` (suivi OU recherche). */
+export function parseManagedKey(key: string): { kind: "connected" | "tracked"; id: string } | null {
   if (key.startsWith("ch:") && key.length > 3) return { kind: "connected", id: key.slice(3) };
   if (key.startsWith("ac:") && key.length > 3) return { kind: "tracked", id: key.slice(3) };
   return null;
@@ -59,7 +62,7 @@ export function listManagedAccounts(data: StoreData, user: Pick<SessionUser, "id
     ...(data.accounts || [])
       .filter((item) => inScope(item, user))
       .map((a): ManagedAccount => ({
-        key: `ac:${a.id}`, kind: "tracked", platform: "tiktok", handle: a.handle, name: a.nickname || a.handle,
+        key: `ac:${a.id}`, kind: isResearchAccount(a) ? "research" : "tracked", platform: "tiktok", handle: a.handle, name: a.nickname || a.handle,
         avatar: a.avatar || "", followers: a.followers || 0, likes: a.likes || 0, posts: a.posts || 0,
         connected: false,
         // Un compte suivi double par sa version connectee est deja invisible dans le studio.

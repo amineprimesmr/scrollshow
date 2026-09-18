@@ -11,7 +11,7 @@ import { Orb } from "@/components/fx/Orb";
 import "./accounts-manager.css";
 
 export type FanSort = "followers" | "likes" | "posts";
-type Filter = "all" | "connected" | "tracked" | "hidden";
+type Filter = "all" | "connected" | "tracked" | "research" | "hidden";
 
 /** Mot a recopier avant une suppression lourde : dix comptes, ou un compte connecte. */
 const CONFIRM_WORD = { fr: "SUPPRIMER", en: "DELETE" };
@@ -84,6 +84,7 @@ export function AccountsManager({
       all: list.length,
       connected: list.filter((item) => item.kind === "connected").length,
       tracked: list.filter((item) => item.kind === "tracked").length,
+      research: list.filter((item) => item.kind === "research").length,
       hidden: list.filter((item) => item.hidden).length,
     };
   }, [items]);
@@ -180,7 +181,7 @@ export function AccountsManager({
         <header className="ss-am__head">
           <div>
             <h2>{t("Gérer mes comptes", "Manage my accounts", en)}</h2>
-            <p>{t("Masquer est réversible. Supprimer efface le compte de ScrollShow.", "Hiding is reversible. Deleting removes the account from ScrollShow.", en)}</p>
+            <p>{t("Tes comptes = connectés + suivis. Ceux trouvés par la Recherche ne s'affichent nulle part ailleurs qu'ici et dans Recherche.", "Your accounts = connected + followed. Those found by Research show only here and in Research.", en)}</p>
           </div>
           <button type="button" className="ss-am__close lg-press" onClick={onClose} aria-label={t("Fermer", "Close", en)}>
             <IconX size={16} />
@@ -194,9 +195,9 @@ export function AccountsManager({
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Chercher un compte", "Search an account", en)} />
           </label>
           <div className="ss-am__seg" role="group" aria-label={t("Filtrer", "Filter", en)}>
-            {(["all", "connected", "tracked", "hidden"] as const).map((id) => (
+            {(["all", "connected", "tracked", "research", "hidden"] as const).map((id) => (
               <button key={id} type="button" className={filter === id ? "is-on" : ""} aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                {id === "all" ? t("Tous", "All", en) : id === "connected" ? t("Connectés", "Connected", en) : id === "tracked" ? t("Suivis", "Followed", en) : t("Masqués", "Hidden", en)}
+                {id === "all" ? t("Tous", "All", en) : id === "connected" ? t("Connectés", "Connected", en) : id === "tracked" ? t("Suivis", "Followed", en) : id === "research" ? t("Recherche", "Research", en) : t("Masqués", "Hidden", en)}
                 <em>{counts[id]}</em>
               </button>
             ))}
@@ -250,7 +251,7 @@ export function AccountsManager({
                   <span className={`ss-am__tag${item.kind === "connected" ? (item.connected ? " is-live" : " is-warn") : ""}`}>
                     {item.kind === "connected"
                       ? item.connected ? t("Connecté", "Connected", en) : t("Connexion expirée", "Connection expired", en)
-                      : t("Suivi", "Followed", en)}
+                      : item.kind === "research" ? t("Trouvé par la Recherche", "Found by Research", en) : t("Suivi", "Followed", en)}
                   </span>
                   {item.hidden ? <span className="ss-am__tag is-muted">{t("Masqué", "Hidden", en)}</span> : null}
                   {item.scheduledPosts ? (

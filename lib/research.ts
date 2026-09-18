@@ -33,7 +33,7 @@ export async function analyzeResearchAccount(user: SessionUser, query: string, n
   const account = await updateStoreSlice(["accounts"], data => {
     let a = data.accounts.find(a => inScope(a, user) && a.handle.toLowerCase() === profile.handle.toLowerCase());
     if (!a) {
-      a = { id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, handle: profile.handle, niche, followers: 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now };
+      a = { id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, handle: profile.handle, niche, followers: 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now, origin: "research" };
       data.accounts.unshift(a);
     }
     Object.assign(a, { nickname: profile.nickname, avatar: profile.avatar, bio: profile.bio, followers: profile.followers, likes: profile.likes, posts: profile.videos, verified: profile.verified, lastSyncAt: now, syncError: undefined });

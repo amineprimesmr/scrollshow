@@ -200,6 +200,13 @@ export type Account = {
   researchCoverage?: { complete: boolean; pages: number; windowDays: number; measuredAt: string; reason: string; loaded?: number };
   /** Masque : le compte reste dans ScrollShow mais n'apparait plus que dans le gestionnaire de comptes. */
   hidden?: boolean;
+  /**
+   * D'ou vient ce compte. `research` = trouve et mesure par le moteur de Recherche :
+   * c'est une DONNEE de recherche (un concurrent), jamais un compte de l'utilisateur.
+   * Il n'apparait ni dans l'Overview, ni dans le calendrier, ni dans le composeur, ni
+   * chez l'agent. `manual` = ajoute expres (formulaire, raccourci iOS, « Suivre »).
+   */
+  origin?: "research" | "manual";
 };
 
 export type Run = {

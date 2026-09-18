@@ -19,6 +19,15 @@ Barres collantes, sidebars/rails, menus et popovers, feuilles/modales et leur
 scrim, contrôles segmentés, boutons fantômes, interrupteurs, pilules
 flottantes, bannières, chrome mobile fixe.
 
+**Exception : la sidebar du studio (`.ss-sidebar`) est opaque**, fond
+blanc **dans les deux thèmes** (les jetons clairs sont re-posés sur `.ss-sidebar` dans `liquid-glass.css`), 196 px (`--ss-sidebar`), à la demande d'Amine.
+Elle ne recouvre aucun contenu : le flou plein-hauteur ne montrait rien et
+coûtait une passe GPU. Ses états passent par `--ss-side-hover` /
+`--ss-side-active` (`color-mix` sur `--ss-ink`) — `--lg-knob` est blanc, donc
+invisible sur ce fond. Le rail des comptes et le tiroir mobile gardent leurs règles.
+L'entrée active suit **le clic** (`useOptimistic` + `router.push` dans une
+transition, `StudioShell`), pas `pathname` qui n'arrive qu'à la fin du chargement.
+
 ### Où ne PAS en mettre (contenu)
 Cartes de contenu, tableaux, formulaires, listes, cartes de post, images.
 Le contenu reste opaque (`var(--ss-card)`), sinon rien n'est lisible.
@@ -386,6 +395,22 @@ Détail et mesures : `docs/audit-performance-2026-09-18.md`. Tests : `tests/perf
   lointains de l'éventail réduits à une silhouette (`DETAIL_REACH`), composants de liste en `memo`.
 - Le document unique était la limite (quelques centaines d'utilisateurs) : le moteur lignes la lève,
   voir la section « Store : une ligne par enregistrement ».
+
+## À qui est un compte : connecté, suivi, ou trouvé par la Recherche
+`lib/account-origin.ts` (tests : `tests/account-origin.test.ts`). La collection `accounts` mélangeait
+deux choses : les comptes **suivis exprès** (formulaire, raccourci iOS) et les **concurrents trouvés
+par le moteur de Recherche**. Chaque recherche ajoutait donc ses comptes à l'Overview, au calendrier,
+au composeur et à l'agent : 94 des 99 « comptes » d'Amine venaient de « sleepmaxing », « football »…
+- `Account.origin` : `"research"` (posé par `lib/research/jobs.ts` et `lib/research.ts`) ou `"manual"`
+  (`lib/library-add.ts`). Suivre exprès un compte déjà trouvé le repasse en `manual`.
+- **Partout où l'on montre « les comptes de l'utilisateur », filtrer par `isFollowedAccount`** :
+  `ownedChannels` (Overview, calendrier, composeur, agent), `GET /api/accounts` (Overview, Shadowban,
+  Comptes suivis), part du réseau des insights, analyse Shadowban en lot. Seuls la page Recherche
+  (`researchLibrary`) et le gestionnaire (onglet « Recherche », pour purger) voient les autres.
+- Données antérieures : `backfillAccountOrigins` (couverture de recherche, ou `niche` = mot-clé d'une
+  recherche du même utilisateur). Local : `scripts/backfill-account-origin.ts --apply` ; production :
+  route d'admin `{"action":"origins"}`.
+- L'éventail trie les comptes **connectés d'abord**.
 
 ## Gestion des comptes (Overview → « Gérer »)
 `lib/account-manage.ts` (logique pure, testée) + `app/api/studio/accounts/manage` +

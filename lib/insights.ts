@@ -3,6 +3,7 @@ import { readRowVideos, readStoreSlice } from "./store";
 import { withPublicationText } from "./publication-text";
 import type { Account, AccountVideo, Channel, SessionUser, StudioPost } from "./types";
 import { inScope } from "./projects";
+import { isFollowedAccount } from "./account-origin";
 
 export type InsightFormat = { id: string; label: string; count: number; views: number; avgViews: number; bestViews: number };
 export type InsightHook = { hook: string; count: number; avgViews: number };
@@ -215,8 +216,10 @@ export async function accountInsights(user: SessionUser, key: string, days: numb
   const owned = parsed.kind === "clipper" ? accounts.some((a) => a.id === parsed.id) : channels.some((c) => c.id === parsed.id);
   if (!owned) return null;
   const rowVideos = await readRowVideos(parsed.kind === "clipper" ? "accounts" : "channels", parsed.id) as AccountVideo[];
+  // « Part du reseau » = part parmi SES comptes : les comptes trouves par la Recherche
+  // (des concurrents a plusieurs millions d'abonnes) ne font pas partie du reseau.
   const networkFollowers =
-    channels.reduce((n, c) => n + (c.followers || 0), 0) + accounts.reduce((n, a) => n + (a.followers || 0), 0);
+    channels.reduce((n, c) => n + (c.followers || 0), 0) + accounts.filter(isFollowedAccount).reduce((n, a) => n + (a.followers || 0), 0);
 
   if (parsed.kind === "clipper") {
     const account = accounts.find((a) => a.id === parsed.id);

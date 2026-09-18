@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { consumeLimit } from "@/lib/rate-limit";
 import { withMetricsUser } from "@/lib/metrics-guard";
 import { inScope } from "@/lib/projects";
+import { isFollowedAccount } from "@/lib/account-origin";
 
 function errorCode(error: unknown) {
   if (error instanceof ShadowbanLookupError) return error.code;
@@ -34,7 +35,9 @@ export async function GET(request: Request) {
   // fois ferait passer des centaines de Mo pour analyser 46 comptes.
   // Un seul compte demande : seules SES videos sont lues (voir `readRowVideos`).
   const store = await readStoreSlice(["accounts"], { videos: !id, userId: user.id });
-  const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (!id || a.id === id));
+  // Sans identifiant : seulement les comptes suivis expres. Analyser les comptes
+  // trouves par la Recherche, c'etait un appel payant par concurrent a chaque visite.
+  const accounts = kind === "ch" ? [] : store.accounts.filter((a) => inScope(a, user) && (id ? a.id === id : isFollowedAccount(a)));
   if (id) for (const account of accounts) account.videos = await readRowVideos("accounts", account.id) as typeof account.videos;
   if (key && !channels.length && !accounts.length) return NextResponse.json({ error: "missing" }, { status: 404 });
 

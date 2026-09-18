@@ -3,6 +3,7 @@ import { addLibraryAccount } from "@/lib/library-add";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inScope } from "@/lib/projects";
+import { isFollowedAccount } from "@/lib/account-origin";
 
 // Les compteurs ne sont plus acceptes de l'appelant : ils sont mesures sur le
 // profil public. Un agent qui les envoyait ecrivait des chiffres inventes dans
@@ -23,8 +24,9 @@ export async function GET() {
   const { readStoreSlice } = await import("@/lib/store");
   const data = await readStoreSlice(["accounts"], { userId: user.id });
   return NextResponse.json({
-    // Les comptes masques ne se voient que dans le gestionnaire de comptes.
-    accounts: data.accounts.filter((item) => inScope(item, user) && !item.hidden),
+    // Les comptes SUIVIS expres. Ni les masques (gestionnaire de comptes), ni ceux
+    // trouves par le moteur de Recherche (ils vivent dans la page Recherche).
+    accounts: data.accounts.filter((item) => inScope(item, user) && isFollowedAccount(item)),
   });
 }
 

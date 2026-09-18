@@ -107,7 +107,7 @@ button.ss-btn-ghost:active {
 
 .ss-studio {
   --ss-radius: 22px;
-  --ss-sidebar: 220px;
+  --ss-sidebar: 196px;
   display: grid;
   grid-template-columns: var(--ss-sidebar) minmax(0, 1fr);
   height: 100dvh;
@@ -3423,7 +3423,7 @@ a.ss-btn-ghost {
 }
 
 .ss-sidebar__head {
-  padding: 16px 16px 10px;
+  padding: 12px 8px 8px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -3466,14 +3466,14 @@ a.ss-btn-ghost {
 .ss-sidebar__nav {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 10px;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .ss-sidebar__bottom {
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-top: 1px solid var(--ss-line);
   display: flex;
   flex-direction: column;
@@ -3483,15 +3483,16 @@ a.ss-btn-ghost {
 .ss-sidebar-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 12px;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 10px;
   text-decoration: none;
   color: var(--ss-muted);
   font-size: 13px;
   font-weight: 600;
   position: relative;
-  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
 }
 
 .ss-sidebar-link:hover {
@@ -3529,7 +3530,7 @@ a.ss-btn-ghost {
 
 .ss-sidebar-profile {
   position: relative;
-  padding: 10px 12px 14px;
+  padding: 6px 8px 10px;
   border-top: 1px solid var(--ss-line);
 }
 
@@ -3588,8 +3589,8 @@ a.ss-btn-ghost {
 
 .ss-sidebar-menu {
   position: absolute;
-  left: 12px;
-  right: 12px;
+  left: 8px;
+  right: 8px;
   bottom: calc(100% + 6px);
   background: var(--ss-card);
   border: 1px solid var(--ss-line);
@@ -7198,14 +7199,13 @@ a.ss-btn-ghost {
   top: 0;
   left: 0;
   display: block;
-  border-radius: 12px;
+  border-radius: 10px;
   pointer-events: none;
-  background: var(--lg-knob);
-  box-shadow:
-    inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)),
-    inset 1px 1.5px 0 -1px rgb(var(--lg-hi) / var(--lg-hi-a)),
-    0 1px 2px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.5));
-  transition: transform 0.5s cubic-bezier(0.2, 1.3, 0.4, 1), width 0.3s ease, height 0.3s ease;
+  background: var(--ss-side-active, var(--ss-soft));
+  will-change: transform;
+  /* Court et a peine elastique : la pastille part au clic, elle ne doit pas
+     encore voyager quand la page est deja la. */
+  transition: transform 0.26s cubic-bezier(0.3, 1.2, 0.4, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

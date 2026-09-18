@@ -183,7 +183,9 @@ export function AccountsFan({ onSelect, onBlankClick }: {
       seen.add(key);
       return true;
     });
-    return unique.sort((a, b) => b[sort] - a[sort]);
+    // Ses comptes connectes d'abord : l'Overview s'ouvre sur un compte a soi, pas sur
+    // le plus gros compte suivi.
+    return unique.sort((a, b) => Number(b.connected) - Number(a.connected) || b[sort] - a[sort]);
   }, [channels, clippers, sort]);
 
   // La recherche filtre l'eventail lui-meme : au-dela d'une dizaine de comptes,

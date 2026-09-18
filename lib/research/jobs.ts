@@ -158,7 +158,9 @@ function saveSearchPosts(data: StoreData, job: ResearchJob, candidate: Candidate
   let account = data.accounts.find(a => a.userId === job.userId && a.projectId === job.projectId && a.handle === candidate.handle);
   if (!account) {
     account = { id: crypto.randomUUID(), userId: job.userId, projectId: job.projectId, handle: candidate.handle,
-      niche: candidate.keyword, followers: candidate.followers ?? 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now };
+      niche: candidate.keyword, followers: candidate.followers ?? 0, avgViews: 0, posts: 0, verdict: "watch", notes: "", createdAt: now,
+      // Donnee de recherche : ne doit jamais apparaitre parmi les comptes de l'utilisateur.
+      origin: "research" };
     data.accounts.unshift(account);
   }
   const cache = new Map((account.videos || []).map(post => [post.id, post]));
@@ -244,7 +246,7 @@ export function applyResearchStep(data:StoreData,j:ResearchJob,task:ResearchTask
     c.cursor=result.cursor;
     const now=stamp(),posts=c.measuredPosts;
     let a=data.accounts.find(a=>a.userId===j.userId&&a.projectId===j.projectId&&a.handle===c.handle);
-    if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now};data.accounts.unshift(a); }
+    if(!a) { a={id:crypto.randomUUID(),userId:j.userId,projectId:j.projectId,handle:c.handle,niche:c.keyword,followers:c.followers??0,avgViews:0,posts:0,verdict:"watch",notes:"",createdAt:now,origin:"research"};data.accounts.unshift(a); }
     // Les carrousels ramenes par le mot-cle sont exactement ce qui a ete
     // demande. Ils etaient ecrases par le feed du compte puis effaces : on les
     // conserve, on les ajoute s'ils sont au-dela des pages lues, et on les
