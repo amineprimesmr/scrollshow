@@ -154,6 +154,11 @@ carrousels est le contenu, le compte n'est qu'une attribution.
   on ne peut pas « chercher via le compte connecté ». Le seul chemin connecté est le
   collecteur Chrome local (`npm run research:browser`), qui lit tiktok.com dans un
   profil Chrome dédié où l'utilisateur s'est connecté lui-même.
+  **Solution pour tous les utilisateurs** : `TIKTOK_SEARCH_COOKIE`, session d'un compte
+  TikTok **dédié**, envoyée au fournisseur seulement quand l'anonyme échoue (préfixe
+  `ck:` dans `searchId` pour les pages suivantes ; jamais en cache ni en log).
+  Procédure et risques : `docs/recherche-session-service-2026-09-18.md`. Session
+  expirée = trace `research_search_cookie_failed` et retour au repli.
   Avant de déboguer un zéro résultat, tester le mot-clé directement chez le fournisseur.
 - **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
   `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq

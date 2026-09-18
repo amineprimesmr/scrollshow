@@ -44,6 +44,18 @@ async function searchPhotosInApp(keyword: string, cursor: number) {
   const parsed=parseSearch({ data:rows, has_more:more?1:0, cursor:next }, keyword);
   return { ...parsed, hasMore:more, cursor:next, searchId:APP_SEARCH };
 }
+const COOKIE_SEARCH="ck:";
+/**
+ * Session TikTok de SERVICE, facultative (`TIKTOK_SEARCH_COOKIE`). La collecte
+ * anonyme du fournisseur echoue sur certains mots-cles que TikTok sert sans
+ * probleme a un compte connecte ; sa doc prevoit ce cas : « provide the cookie
+ * if you encounter an interface error ». Ce doit etre un compte TikTok DEDIE —
+ * jamais celui d'un utilisateur ni le compte principal de l'equipe : la valeur
+ * part chez le fournisseur. Elle ne vit que cote serveur, n'entre ni dans la
+ * cle de cache ni dans un log, et n'est envoyee que lorsque l'anonyme a echoue.
+ */
+function searchCookie() { return (process.env.TIKTOK_SEARCH_COOKIE||"").trim(); }
+
 export async function searchPhotos(keyword: string, cursor=0, searchId?: string) {
   if(!metricsEnabled()) throw new Error("research_provider_not_configured");
   // Meme mot-cle, meme page : servi du cache partage pendant trois heures. Deux
@@ -53,23 +65,41 @@ export async function searchPhotos(keyword: string, cursor=0, searchId?: string)
   // sous ce meme identifiant — une chaine reste coherente de bout en bout.
   return cachedProviderCall("search_photo", { keyword: keyword.trim().toLowerCase(), cursor, searchId: searchId || "" }, PROVIDER_TTL.search, async () => {
     if(searchId===APP_SEARCH) return searchPhotosInApp(keyword, cursor);
-    await allowance();
-    const call=()=>runMetricsTool("/api/v1/tiktok/web/fetch_search_photo", { keyword, offset:cursor, count:20, ...(searchId ? {search_id:searchId}:{} ) }, { timeoutMs: 25000 });
+    // Une recherche commencee avec la session de service continue avec elle : le
+    // prefixe voyage dans `searchId`, le serveur n'a aucun etat a garder.
+    const viaCookie=Boolean(searchId?.startsWith(COOKIE_SEARCH));
+    const providerSearchId=viaCookie ? searchId!.slice(COOKIE_SEARCH.length) : searchId;
+    const call=async(cookie:string)=>{
+      await allowance();
+      return runMetricsTool("/api/v1/tiktok/web/fetch_search_photo", { keyword, offset:cursor, count:20, ...(providerSearchId ? {search_id:providerSearchId}:{} ), ...(cookie ? {cookie}:{} ) }, { timeoutMs: 25000 });
+    };
+    const refused=(error:unknown)=>error instanceof Error&&error.message==="upstream 400";
+    const withCookie=async()=>{ const parsed=parseSearch(await call(searchCookie()),keyword); return { ...parsed, searchId:`${COOKIE_SEARCH}${parsed.searchId||""}` }; };
+    if(viaCookie) {
+      if(!searchCookie()) throw new Error("search_keyword_refused");
+      return withCookie();
+    }
     // La recherche « photos » web du fournisseur repond 400 pour tout mot-cle
     // contenant looksmax, healthmaxing, mewing… (mesure le 18 septembre 2026)
     // alors que softmaxxing, jawline ou glow up passent au meme instant et que
-    // TikTok affiche des resultats. Un second essai (non facture) ecarte l'alea,
-    // puis on passe par la recherche generale de l'application.
-    let raw:unknown;
-    try { raw=await call(); }
+    // TikTok connecte affiche des centaines de resultats. Ordre des replis :
+    // anonyme → session de service si elle est configuree → recherche generale
+    // de l'application (une poignee de carrousels, mais jamais zero par defaut).
+    try { return parseSearch(await call(""),keyword); }
     catch(first) {
-      if(!(first instanceof Error)||first.message!=="upstream 400") throw first;
-      try { raw=await call(); }
-      catch(second) {
-        if(!(second instanceof Error)||second.message!=="upstream 400") throw second;
-        return searchPhotosInApp(keyword, 0);
+      if(!refused(first)) throw first;
+      if(searchCookie()) {
+        try { return await withCookie(); }
+        catch(second) {
+          if(!refused(second)) throw second;
+          // Session expiree ou refusee : a renouveler. Jamais la valeur dans le log.
+          console.error(JSON.stringify({ event:"research_search_cookie_failed", keyword }));
+        }
+      } else {
+        try { return parseSearch(await call(""),keyword); } catch(second) { if(!refused(second)) throw second; }
       }
+      if(cursor>0) throw new Error("search_keyword_refused");
+      return searchPhotosInApp(keyword, 0);
     }
-    return parseSearch(raw,keyword);
   });
 }
