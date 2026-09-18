@@ -8,8 +8,24 @@ import { useEffect, useState } from "react";
 export function StudioFlash() {
   const params = useSearchParams();
   const [english, setEnglish] = useState(false);
-  const connected = params.get("connected");
-  const error = params.get("error");
+  // Le verdict est lu une fois puis RETIRE de l'adresse. Sinon un rechargement,
+  // un favori ou un retour arriere rejouait « Connexion TikTok interrompue »
+  // alors qu'aucune nouvelle tentative n'avait eu lieu — on a cru a un bug
+  // persistant le 18 septembre 2026 alors que la page rejouait une vieille erreur.
+  const [seen, setSeen] = useState<{ connected: string | null; error: string | null }>({ connected: null, error: null });
+  const fromUrl = { connected: params.get("connected"), error: params.get("error") };
+  const connected = fromUrl.connected || seen.connected;
+  const error = fromUrl.error || seen.error;
+
+  useEffect(() => {
+    if (!fromUrl.connected && !fromUrl.error) return;
+    setSeen(fromUrl);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("connected");
+    url.searchParams.delete("error");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromUrl.connected, fromUrl.error]);
 
   useEffect(() => {
     setEnglish(prefersEnglish());
