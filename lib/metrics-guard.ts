@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { database, databaseEnabled } from "./database";
 import { consumeLimit } from "./rate-limit";
+import { readUserScope } from "./store";
+import { emailAvailable, sendAccountEmail } from "./email";
 
 /**
  * Garde-fou des appels PAYANTS au fournisseur de metriques.
@@ -43,17 +45,67 @@ export class MetricsBudgetError extends Error {
   constructor() { super("metrics_user_daily_limit"); }
 }
 
-export function userDailyLimit() {
-  const configured = Number(process.env.METRICS_USER_DAILY_LIMIT || 120);
-  return Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 120;
+function positive(raw: string | undefined, fallback: number) {
+  const value = Number(raw || fallback);
+  return Number.isFinite(value) && value >= 1 ? Math.floor(value) : fallback;
+}
+
+/**
+ * Budget quotidien par OFFRE. Un abonne mensuel (29 EUR) peut couter jusqu'a
+ * 3,60 $ par mois au plafond et rester a 83 % de marge ; un annuel (16,58 EUR/mois)
+ * et un « a vie » (99 EUR une fois) ne peuvent pas suivre le meme rythme sans
+ * passer sous les 80 % vises (`docs/previsionnel-marge-2026-09-18.md`).
+ */
+export function userDailyLimit(plan?: string, interval?: string) {
+  if (plan === "lifetime") return positive(process.env.METRICS_LIFETIME_DAILY_LIMIT, 40);
+  if (interval === "year") return positive(process.env.METRICS_YEARLY_DAILY_LIMIT, 80);
+  return positive(process.env.METRICS_USER_DAILY_LIMIT, 120);
+}
+/** Plafond MENSUEL en plus du journalier : borne le pire cas (1 500 appels ≈ 1,50 $). */
+export function userMonthlyLimit() { return positive(process.env.METRICS_USER_MONTHLY_LIMIT, 1500); }
+
+type Plan = { plan?: string; interval?: string };
+const planCache = new Map<string, { at: number; plan: Plan }>();
+async function planOf(userId: string): Promise<Plan> {
+  const hit = planCache.get(userId);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.plan;
+  let plan: Plan = {};
+  try {
+    const user = (await readUserScope(userId)).users[0];
+    plan = { plan: user?.plan, interval: user?.billingInterval };
+  } catch { /* sans lecture : budget par defaut */ }
+  planCache.set(userId, { at: Date.now(), plan });
+  if (planCache.size > 5000) planCache.delete(planCache.keys().next().value as string);
+  return plan;
 }
 
 /** A appeler juste avant un VRAI appel payant (jamais pour un resultat du cache). */
 export async function consumeUserBudget() {
   const { userId } = metricsContext();
   if (!userId) return;
-  const day = new Date().toISOString().slice(0, 10);
-  if (!(await consumeLimit(`metrics-user:${userId}:${day}`, userDailyLimit(), 86_400_000))) throw new MetricsBudgetError();
+  const now = new Date().toISOString();
+  const day = now.slice(0, 10), month = now.slice(0, 7);
+  const { plan, interval } = await planOf(userId);
+  if (!(await consumeLimit(`metrics-user:${userId}:${day}`, userDailyLimit(plan, interval), 86_400_000))) throw new MetricsBudgetError();
+  if (!(await consumeLimit(`metrics-user-month:${userId}:${month}`, userMonthlyLimit(), 32 * 86_400_000))) throw new MetricsBudgetError();
+  void alertIfSpending(day);
+}
+
+/**
+ * Alerte de depense : le jour ou le nombre d'appels payes depasse
+ * `METRICS_ALERT_DAILY_CALLS` (500 par defaut ≈ 0,50 $), UN email part a
+ * `OPS_ALERT_EMAIL` (sinon `EMAIL_FROM`). Un seul par jour, au mieux.
+ */
+async function alertIfSpending(day: string) {
+  const threshold = positive(process.env.METRICS_ALERT_DAILY_CALLS, 500);
+  try {
+    if (await consumeLimit(`metrics-alert-count:${day}`, threshold, 86_400_000)) return;
+    if (!(await consumeLimit(`metrics-alert-sent:${day}`, 1, 86_400_000))) return;
+    const to = process.env.OPS_ALERT_EMAIL || process.env.EMAIL_FROM;
+    if (!to || !emailAvailable()) { console.error("metrics_spend_alert", { day, threshold }); return; }
+    await sendAccountEmail(to, `ScrollShow : plus de ${threshold} appels payants aujourd'hui`,
+      `Le fournisseur de metriques a recu plus de ${threshold} appels payants le ${day} (≈ ${(threshold * 0.001).toFixed(2)} $ au tarif direct). Verifie le solde et lance « npm run metrics:usage » pour voir quels utilisateurs consomment. Le plafond global METRICS_PROVIDER_DAILY_LIMIT arrete tout au-dela de sa valeur.`);
+  } catch { /* au mieux */ }
 }
 
 /* ------------------------------------------------------------------ */

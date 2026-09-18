@@ -394,7 +394,11 @@ Détail et mesures : `docs/audit-performance-2026-09-18.md`. Tests : `tests/perf
 - Tout appel payant passe par `cachedProviderCall` : **cache partagé entre utilisateurs**, par
   requête (compte + curseur, mot-clé + page + session). On met en cache le résultat normalisé.
 - Tout point d'entrée enveloppe son travail dans `withMetricsUser({ userId })` : sans lui, pas de
-  budget par utilisateur (`METRICS_USER_DAILY_LIMIT`, 120) ni de ligne dans le registre d'usage.
+  budget par utilisateur ni de ligne dans le registre d'usage. Budget **par offre** : mensuel 120,
+  annuel 80, à vie 40 appels payés/jour (`METRICS_*_DAILY_LIMIT`), plus 1 500/mois ; un email
+  d'alerte par jour au-delà de `METRICS_ALERT_DAILY_CALLS` (500) vers `OPS_ALERT_EMAIL`.
+- **Mode direct actif** (`METRICS_API_MODE=direct`, base `https://api.tikhub.io`) : un GET **sans**
+  `Content-Type` (la source répond 400 sinon). Une page = ~33 posts, pas 50.
 - **Jamais de boucle « tant qu'il reste des pages » déclenchée par un affichage.** L'Overview lit
   2 pages en automatique, 6 par clic. Ouvrir @nike aspirait tout l'historique, page payante
   après page payante.

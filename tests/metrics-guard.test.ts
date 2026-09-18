@@ -73,3 +73,29 @@ test("deux demandes identiques simultanees ne font qu'un appel ; un echec n'est 
   await assert.rejects(failing());
   assert.equal(failures, 2, "une erreur se retente, elle ne se sert pas du cache");
 });
+
+test("le budget suit l'offre : un abonne a vie a le plus petit, un mensuel le plus grand", async t => {
+  const calls = await setup(t, "120");
+  process.env.METRICS_LIFETIME_DAILY_LIMIT = "1"; process.env.METRICS_YEARLY_DAILY_LIMIT = "2";
+  const { writeFile } = await import("node:fs/promises");
+  const path = await import("node:path");
+  await writeFile(path.join(process.env.SCROLLSHOW_DATA_DIR!, "store.json"), JSON.stringify({
+    users: [
+      { id: "life", email: "l@x.invalid", name: "L", plan: "lifetime", createdAt: "2026-01-01" },
+      { id: "year", email: "y@x.invalid", name: "Y", plan: "pro", billingInterval: "year", createdAt: "2026-01-01" },
+      { id: "month", email: "m@x.invalid", name: "M", plan: "pro", billingInterval: "month", createdAt: "2026-01-01" },
+    ], accounts: [], runs: [], channels: [], posts: [], media: [], apiKeys: [],
+  }));
+  const { userDailyLimit } = await import("../lib/metrics-guard");
+  assert.deepEqual([userDailyLimit("lifetime"), userDailyLimit("pro", "year"), userDailyLimit("pro", "month")], [1, 2, 120]);
+  await withMetricsUser({ userId: "life" }, () => fetchAccountVideoPage("l1"));
+  await assert.rejects(withMetricsUser({ userId: "life" }, () => fetchAccountVideoPage("l2")), (e: unknown) => e instanceof MetricsError && e.code === "budget", "a vie : 1 appel puis stop");
+  await withMetricsUser({ userId: "year" }, () => fetchAccountVideoPage("y1"));
+  await withMetricsUser({ userId: "year" }, () => fetchAccountVideoPage("y2"));
+  await assert.rejects(withMetricsUser({ userId: "year" }, () => fetchAccountVideoPage("y3")), (e: unknown) => e instanceof MetricsError && e.code === "budget", "annuel : 2 appels puis stop");
+  await withMetricsUser({ userId: "month" }, () => fetchAccountVideoPage("m1"));
+  await withMetricsUser({ userId: "month" }, () => fetchAccountVideoPage("m2"));
+  await withMetricsUser({ userId: "month" }, () => fetchAccountVideoPage("m3"));
+  assert.equal(calls.length, 6, "3 utilisateurs, 6 appels payes, 2 refuses sans appel");
+  delete process.env.METRICS_LIFETIME_DAILY_LIMIT; delete process.env.METRICS_YEARLY_DAILY_LIMIT;
+});
