@@ -409,7 +409,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       invalid_handle: tr("Ce @compte n'est pas valide.", "That @account is not valid."),
       research_cursor_stalled: tr("TikTok a interrompu la pagination. Relance.", "TikTok stopped paginating. Try again."),
       profile_posts_unavailable: tr("Les publications de ce compte sont illisibles.", "That account's posts are unreadable."),
-      search_keyword_refused: tr("TikTok ne renvoie aucun carrousel pour ce mot-clé : il fait partie des termes qu'il restreint. Essaie un synonyme (« glow up », « jawline », « skincare »…).", "TikTok returns no carousels for this keyword: it is one of the terms it restricts. Try a synonym (\"glow up\", \"jawline\", \"skincare\"…)."),
+      search_keyword_refused: tr("TikTok n'a pas répondu pour ce mot-clé. Réessaie dans un moment ou essaie une autre orthographe.", "TikTok did not answer for this keyword. Try again in a moment or try another spelling."),
       search_provider_rejected: tr("TikTok a refusé la recherche. Réessaie.", "TikTok refused the search. Try again."),
       search_time_limit: tr("Le délai de recherche a été atteint. Les résultats trouvés sont conservés.", "The search time limit was reached. Results found so far are kept."),
       search_version_changed: tr("Cette ancienne recherche doit être relancée avec le nouveau moteur.", "Restart this older search with the new search engine."),

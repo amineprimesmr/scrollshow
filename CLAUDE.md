@@ -140,13 +140,20 @@ carrousels est le contenu, le compte n'est qu'une attribution.
   recherche a trouvé. Un **tri** (`.ss-rs__sort` : vues, likes, commentaires,
   partages, récents) n'apparaît qu'une fois la recherche **terminée** — trier un
   mur qui se remplit ferait sauter les tuiles.
-- **Mot-clé refusé par TikTok** : toute la famille « looksmax » renvoie 400 chez le
-  fournisseur alors que « glow up » passe au même instant (vérifié le 18 septembre
-  2026). `searchPhotos` réessaie une fois (non facturé) puis lève
-  `search_keyword_refused` ; `applyResearchStep` **termine** alors la recherche avec
-  ce motif au lieu de la mettre « en pause » — « Reprendre » échouait à l'infini et
-  faisait croire à une panne du moteur. Avant de déboguer une recherche à zéro
-  résultat, tester le mot-clé directement chez le fournisseur.
+- **La recherche « photos » du fournisseur échoue pour certains mots-clés** :
+  400 sur healthmaxing, looksmax, mewing alors que sleepmaxing et glow up passent au
+  même instant, et que TikTok affiche bien des résultats (mesuré le 18 septembre
+  2026). Ce n'est **pas** un terme restreint par TikTok — cette première explication
+  était fausse — c'est la collecte web du fournisseur qui casse ; ses autres
+  recherches web échouent pareil, la forme `#mot` répond 200 mais vide.
+  `searchPhotos` réessaie une fois (non facturé) puis se replie sur
+  `searchPhotosByHashtag` : hashtags du mot-clé via l'API applicative
+  (`fetch_hashtag_search_result` → `fetch_hashtag_video_list`, 4 hashtags × 2 pages,
+  9 appels au plus), `parseSearch` ne garde que les carrousels. Rendement faible
+  (4 carrousels pour « looksmax ») mais jamais zéro par défaut. `search_keyword_refused`
+  ne subsiste que si le repli lui-même est impossible ; il **termine** la recherche
+  au lieu de la laisser « en pause » avec un « Reprendre » qui échouait à l'infini.
+  Avant de déboguer un zéro résultat, tester le mot-clé directement chez le fournisseur.
 - **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
   `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq
   carrousels au-dessus de 100k — porte bien trop étroite. La pastille pilote
@@ -515,8 +522,39 @@ au composeur et à l'agent : 94 des 99 « comptes » d'Amine venaient de « slee
 - Les API officielles TikTok ne donnent que les vidéos du compte **connecté** : elles ne peuvent
   pas remplacer le fournisseur pour des comptes tiers ni pour la recherche.
 
+## Recréer un TikTok depuis son lien (banque d'images)
+`lib/image-bank.ts` (tests : `tests/image-bank.test.ts`) + outils MCP `view_slides`, `find_images`,
+`gallery_add`, `gallery_search` + section « Recreate a TikTok from its link » du skill.
+Mesures, coûts et décisions : `docs/previsionnel-recreation-tiktok-2026-09-18.md`.
+- **On recrée le format, pas la photo** (décision d'Amine) : nombre de slides, format, textes (place,
+  taille, style) identiques ; l'image doit être belle et vraie, illustrer le texte, laisser de la place
+  au texte, rester cohérente. Ne pas revenir à une recherche « même pose ».
+- **L'agent doit voir** : ces outils renvoient une **image** (planche numérotée, slide avec grille en %),
+  jamais seulement des URL. Aucun LLM serveur : le serveur filtre, l'agent de l'utilisateur juge à l'œil.
+- **Recherche d'images = requête publique Pinterest, en direct, gratuite** (`searchPinterest`). Sans
+  l'en-tête `X-Pinterest-PWS-Handler` elle répond 403. Testée depuis Vercel (15/15). Apify coûtait
+  0,002 $/image (0,60 $ le TikTok) pour faire la même requête : ne pas y revenir sauf blocage.
+- **Filtre qualité** (`keepCandidate`) : Pinterest est inondé d'images IA non étiquetées (60 % des
+  résultats créés dans l'année, la moitié à ≤ 2 réactions). On écarte pubs, boutiques, vidéos,
+  largeur < 700, et les épingles récentes sans réaction. Le filtre ne suffit pas : la règle « rejette
+  ce qui a l'air IA » vit dans le skill. Les mots-clés « candid », « iphone photo » changent tout.
+- Banque = `MediaItem` enrichi (`source`, `sourceUrl`, `tags`, `note`, `width`, `height`). Les rendus
+  sont marqués `source: "render"` et exclus de la banque. Certaines originales Pinterest sont en
+  HEIF (illisible par sharp) : `galleryAdd` retombe sur `fallback` (736 px).
+- Rendu : `aspect` par slide (`9:16`, `3:4`, `4:5`, `1:1`, largeur toujours 1080), `crop` focal,
+  `textStyle` (`outline` historique, `shadow` = texte natif TikTok), `strokeColor`/`strokeWidth`
+  (gros contour TikTok), police TikTok Sans. Pas d'emoji. Les défauts restent les anciens.
+- **Slides « design »** (fond blanc + objets détourés, infographies) : aucune recherche photo ne les
+  produit. L'agent les génère avec un outil d'images connecté chez l'utilisateur (MCP Higgsfield, à
+  ses frais) puis `gallery_add`. Pas de clé tierce stockée chez nous.
+- OAuth = **tout le compte** (plus de sélecteur de projet) : `list_projects` / `switch_project`
+  changent le projet courant de l'autorisation. Une clé API reste liée à un projet.
+- Le skill (`.cursor/skills/scrollshow/SKILL.md` = `public/skill.md`) et les `instructions` du serveur
+  MCP décrivent ce parcours : tout changement d'outil s'y répercute, sinon les utilisateurs n'ont
+  pas les mêmes résultats que nous.
+
 ## Build et vérification
-`npm run typecheck`, `npm test` (207 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
+`npm run typecheck`, `npm test` (290 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
