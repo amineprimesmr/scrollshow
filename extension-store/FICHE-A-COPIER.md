@@ -8,7 +8,7 @@ Chrome interdit à toute extension (donc à Claude) d'agir sur ces pages : à re
 - **Adresse e-mail de contact** : ajoute-la puis clique le lien de vérification reçu (obligatoire pour publier).
 
 ## 1. Téléverser
-Fichier : `extension-store/scrollshow-extension-1.0.1.zip`
+Fichier : `extension-store/scrollshow-extension-1.0.2.zip`
 
 ## 2. Fiche du Store (Store listing)
 - **Langue** : English (la fiche anglaise est lue partout ; ajoute le français ensuite si tu veux)

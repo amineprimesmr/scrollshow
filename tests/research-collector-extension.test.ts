@@ -8,6 +8,8 @@ const read = (file: string) => readFileSync(new URL(`../extension/${file}`, impo
 test("the extension only touches TikTok search and the ScrollShow origins", () => {
   const manifest = JSON.parse(read("manifest.json"));
   assert.equal(manifest.manifest_version, 3);
+  assert.ok(manifest.description.length <= 132, "the Chrome Web Store rejects a manifest description over 132 characters");
+  assert.ok(manifest.name.length <= 75);
   assert.deepEqual(manifest.host_permissions.sort(), ["http://localhost:3000/*", "https://scrollshow.io/*", "https://www.tiktok.com/*"]);
   assert.deepEqual(manifest.permissions, ["tabs"]);
   for (const script of manifest.content_scripts.filter((s: { matches: string[] }) => s.matches[0].includes("tiktok")))
