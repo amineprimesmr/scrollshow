@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "ScrollShow — TikTok research",
+  "short_name": "ScrollShow",
+  "version": "1.0.0",
+  "description": "Runs your ScrollShow searches inside your own TikTok session, in your browser. Nothing is sent anywhere except your ScrollShow account.",
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_title": "ScrollShow", "default_popup": "popup.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://www.tiktok.com/*",
+    "https://scrollshow.io/*",
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://scrollshow.io/app/*", "http://localhost:3000/app/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.tiktok.com/search/*"],
+      "js": ["hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.tiktok.com/search/*"],
+      "js": ["collect.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

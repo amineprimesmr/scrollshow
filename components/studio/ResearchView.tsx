@@ -410,6 +410,9 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       research_cursor_stalled: tr("TikTok a interrompu la pagination. Relance.", "TikTok stopped paginating. Try again."),
       profile_posts_unavailable: tr("Les publications de ce compte sont illisibles.", "That account's posts are unreadable."),
       search_keyword_refused: tr("TikTok n'a pas répondu pour ce mot-clé. Réessaie dans un moment ou essaie une autre orthographe.", "TikTok did not answer for this keyword. Try again in a moment or try another spelling."),
+      tiktok_requires_attention: tr("TikTok demande une connexion ou une vérification. Connecte-toi à tiktok.com dans ce navigateur, puis relance la recherche.", "TikTok asks for a login or a verification. Sign in to tiktok.com in this browser, then run the search again."),
+      tiktok_login_needed: tr("Tu n'es pas connecté à TikTok dans ce navigateur : TikTok n'a donné que la première page. Connecte-toi à tiktok.com puis clique sur Actualiser.", "You are not signed in to TikTok in this browser: TikTok only gave the first page. Sign in to tiktok.com, then click Refresh."),
+      extension_unreachable: tr("L'extension ScrollShow ne répond pas. Recharge la page, ou réinstalle l'extension.", "The ScrollShow extension is not responding. Reload the page, or reinstall the extension."),
       search_provider_rejected: tr("TikTok a refusé la recherche. Réessaie.", "TikTok refused the search. Try again."),
       search_time_limit: tr("Le délai de recherche a été atteint. Les résultats trouvés sont conservés.", "The search time limit was reached. Results found so far are kept."),
       search_version_changed: tr("Cette ancienne recherche doit être relancée avec le nouveau moteur.", "Restart this older search with the new search engine."),
@@ -428,6 +431,36 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
 
   const isHandle = query.trim().startsWith("@");
 
+  // Extension Chrome ScrollShow : quand elle est installee, une recherche par
+  // mots-cles tourne dans le TikTok CONNECTE de l'utilisateur (volume reel, aucun
+  // appel paye). Sans elle on garde la collecte serveur, plus pauvre sur certains
+  // mots-cles. La page ne connait pas l'identifiant de l'extension : tout passe
+  // par window.postMessage, relaye par son script de contenu.
+  const [extension, setExtension] = useState<string | null>(null);
+  const [live, setLive] = useState<{ jobId: string; pages: number; posts: number } | null>(null);
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window || event.data?.source !== "scrollshow-ext") return;
+      const message = event.data as { type: string; version?: string; jobId?: string; pages?: number; posts?: number; error?: string; blocked?: string };
+      if (message.type === "ready") setExtension(message.version || "1");
+      if (message.type === "progress" && message.jobId) setLive({ jobId: message.jobId, pages: message.pages || 0, posts: message.posts || 0 });
+      if ((message.type === "finished" || message.type === "error") && message.jobId) {
+        setLive(null);
+        if (message.type === "error") setSyncError(message.error || "collector_failed");
+        // Non connecte a TikTok : TikTok ne sert que la premiere page. On garde
+        // ce qui a ete lu et on dit quoi faire pour avoir le reste.
+        else if (message.blocked === "login") setError("tiktok_login_needed");
+        else if (message.blocked === "captcha") setError("tiktok_requires_attention");
+        void api(`/api/research/jobs/${message.jobId}`).then((job: Job) => applyJobs([{ ...job, hasPostDetails: true }])).catch(() => {});
+      }
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "scrollshow-web", type: "ping" }, window.location.origin);
+    return () => window.removeEventListener("message", onMessage);
+  }, [applyJobs]);
+  const liveRun = live && run && live.jobId === run.id ? live : null;
+  const collectInBrowser = (jobId: string) => window.postMessage({ source: "scrollshow-web", type: "collect", jobId }, window.location.origin);
+
   async function start(event?: React.FormEvent, refresh = false) {
     event?.preventDefault();
     const input = refresh && run ? run.input.keywords.map((word) => run.input.kind === "analyze" ? `@${word}` : word).join(", ") : query;
@@ -441,7 +474,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       const job = await api("/api/research/jobs", {
         kind: analyze ? "analyze" : "discover",
         mode: analyze ? "accounts" : "posts",
-        source: "provider",
+        source: extension && !analyze ? "browser" : "provider",
         keywords: words,
         target: 5,
         maxPages: 2,
@@ -460,6 +493,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       });
       setLastRun(job.id);
       applyJobs([{ ...job, hasPostDetails: true }]);
+      if (job.input?.source === "browser" && ["queued", "running"].includes(job.status)) collectInBrowser(job.id);
       setScope("run");
       setShown(PAGE);
       setNow(Date.now());
@@ -521,6 +555,7 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
     try {
       const job: Job = await api(`/api/research/jobs/${run.id}`, { action: "resume" });
       applyJobs([job]);
+      if (job.input?.source === "browser" && ["queued", "running"].includes(job.status)) collectInBrowser(job.id);
       setLastRun(job.id);
       setScope("run");
       setMonitorKey((key) => key + 1);
@@ -639,6 +674,14 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
           })}
         </nav>
 
+        {!extension && !hunting ? (
+          <p className="ss-rs__ext">
+            {tr("Résultats limités sur certains mots-clés.", "Results are limited on some keywords.")}{" "}
+            <a href="/extension" target="_blank" rel="noreferrer">{tr("Installe l'extension ScrollShow", "Install the ScrollShow extension")}</a>{" "}
+            {tr("pour chercher directement dans ton TikTok, sans limite.", "to search straight inside your TikTok, without limits.")}
+          </p>
+        ) : null}
+
         {run && hunting && !disconnected ? (
           <div className="ss-rs__hunt">
             <TikTokScanLine
@@ -646,10 +689,14 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
               target={run.current.label}
               done={run.current.kind === "search" ? run.progress.pagesDone : run.progress.measured}
               total={run.current.kind === "search" ? run.progress.pagesTotal : Math.max(1, run.progress.candidates)}
-              fr={run.current.kind === "search"
+              fr={liveRun
+                ? `Lecture dans ton TikTok · « ${run.input.keywords.join(", ")} » · ${liveRun.pages} ${liveRun.pages > 1 ? "pages" : "page"} · ${liveRun.posts} carrousels lus`
+                : run.current.kind === "search"
                 ? `Recherche « ${run.current.label || run.input.keywords.join(", ")} » · ${run.progress.pagesDone} / ${run.progress.pagesTotal} pages lues`
                 : `Lecture de @${run.current.label || run.input.keywords[0]} · ${run.progress.measured} / ${run.progress.candidates} comptes`}
-              en={run.current.kind === "search"
+              en={liveRun
+                ? `Reading in your TikTok · “${run.input.keywords.join(", ")}” · ${liveRun.pages} ${liveRun.pages > 1 ? "pages" : "page"} · ${liveRun.posts} carousels read`
+                : run.current.kind === "search"
                 ? `Searching “${run.current.label || run.input.keywords.join(", ")}” · ${run.progress.pagesDone} / ${run.progress.pagesTotal} pages read`
                 : `Reading @${run.current.label || run.input.keywords[0]} · ${run.progress.measured} / ${run.progress.candidates} accounts`}
               english={english}

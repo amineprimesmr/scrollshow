@@ -79,6 +79,10 @@
 .ss-rs__sort button:active { transform: scale(0.96); }
 .ss-rs__sort button.is-on { color: var(--ss-ink); background: var(--lg-knob); box-shadow: inset 0 0 0 1px rgb(var(--lg-hi) / calc(var(--lg-hi-a) * 0.35)), 0 1px 2px rgb(var(--lg-shade) / calc(var(--lg-shade-a) * 0.5)); }
 
+/* Invitation a installer l'extension : une ligne, un vrai lien (bleu, souligne). */
+.ss-rs__ext { grid-column: 1 / -1; margin: 0; max-width: 680px; text-align: center; font-size: 12px; line-height: 1.5; color: var(--ss-muted); }
+.ss-rs__ext a { color: var(--ss-link); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ── La chasse en direct ───────────────────────────────────────────────── */
 .ss-rs__hunt { grid-column: 1 / -1; }
 

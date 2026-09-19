@@ -1,0 +1,16 @@
+/* Page d'installation de l'extension. Une feuille de verre sur le fond anime. */
+.ss-ext { position: relative; min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px; background: #000; color: #fafafa; color-scheme: dark; font-family: var(--font-sans), Inter, system-ui, sans-serif; letter-spacing: -0.02em; }
+.ss-ext__card { position: relative; z-index: 1; width: min(560px, 100%); padding: 32px; border-radius: 24px; display: grid; gap: 16px;
+  --lg-rgb: 26 26 30; --lg-alpha: 0.55; --lg-hi: 255 255 255; --lg-hi-a: 0.22; --lg-shade: 0 0 0; --lg-shade-a: 0.55; }
+.ss-ext h1 { margin: 6px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -0.04em; }
+.ss-ext__lead { margin: 0; font-size: 15px; line-height: 1.55; color: #c4c4cc; }
+.ss-ext__lead b { color: #fff; }
+.ss-ext__cta { justify-self: start; display: inline-flex; align-items: center; min-height: 46px; padding: 0 22px; border-radius: 999px; background: #fafafa; color: #000; font-size: 14px; font-weight: 700; text-decoration: none; transition: transform 0.34s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.ss-ext__cta:active { transform: scale(0.96); }
+.ss-ext__steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 14px; }
+.ss-ext__steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ss-ext__steps span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgb(255 255 255 / 0.1); font-size: 12px; font-weight: 700; }
+.ss-ext__steps b { font-size: 14px; }
+.ss-ext__steps p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: #a1a1aa; }
+.ss-ext__foot { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: #a1a1aa; }
+.ss-ext__foot a { color: #6aa8ff; text-decoration: underline; text-underline-offset: 3px; }

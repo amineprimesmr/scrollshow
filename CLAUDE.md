@@ -166,6 +166,17 @@ carrousels est le contenu, le compte n'est qu'une attribution.
   Procédure et risques : `docs/recherche-session-service-2026-09-18.md`. Session
   expirée = trace `research_search_cookie_failed` et retour au repli.
   Avant de déboguer un zéro résultat, tester le mot-clé directement chez le fournisseur.
+- **Extension Chrome = le chemin principal de la recherche par mots-clés**
+  (`extension/`, `docs/extension-recherche-2026-09-19.md`) : comme scroll.show, la
+  recherche tourne dans le TikTok **connecté** de l'utilisateur — volume réel sur tous
+  les mots-clés, zéro appel payé. La page détecte l'extension par `window.postMessage`
+  (`bridge.js`), crée la recherche en `source: "browser"`, et l'extension rend les pages
+  **brutes** à `POST /api/research/collector` (`complete_raw`, session ou clé API) ; la
+  normalisation reste serveur (`parseSearch`). Sans extension : collecte serveur + ligne
+  d'invitation vers `/extension`. Les scripts TikTok sont inertes hors d'une fenêtre
+  marquée `#scrollshow-collect` ; captcha et connexion sont signalés, jamais contournés.
+  Tout changement de `extension/` = `npm run extension:build` (régénère
+  `public/scrollshow-extension.zip`) **et** une nouvelle version sur le Store.
 - **Piège `minPostViews` × `minPosts`** : `evaluateResearch` teste
   `strongPosts < minPosts`. Un plancher à 100k avec `minPosts: 5` exige cinq
   carrousels au-dessus de 100k — porte bien trop étroite. La pastille pilote
@@ -566,7 +577,7 @@ Mesures, coûts et décisions : `docs/previsionnel-recreation-tiktok-2026-09-18.
   pas les mêmes résultats que nous.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (290 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
+`npm run typecheck`, `npm test` (295 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
