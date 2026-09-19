@@ -23,9 +23,16 @@
     return { status_code: d.status_code, has_more: d.has_more, cursor: d.cursor, item_list: list.map(slimItem).filter(Boolean) };
   };
 
+  const seenCursors = new Set();
   window.addEventListener("message", (event) => {
-    if (event.source !== window || !event.data || event.data.__scrollshow !== "payload" || ended) return;
+    if (event.source !== window || !event.data || ended) return;
+    // hook.js a fini de demander les pages suivantes : plus rien a attendre.
+    if (event.data.__scrollshow === "paged") { exhausted = true; return; }
+    if (event.data.__scrollshow !== "payload") return;
     const payload = slim(event.data.data || {});
+    // Le defilement et la pagination directe peuvent lire la meme page.
+    const mark = `${payload.cursor}:${payload.item_list.length && payload.item_list[0].id}`;
+    if (seenCursors.has(mark)) return; seenCursors.add(mark);
     if (!payload.item_list.length && pages > 0) { exhausted = true; return; }
     pages += 1; lastPayloadAt = Date.now();
     if (payload.has_more === 0 || payload.has_more === false) exhausted = true;

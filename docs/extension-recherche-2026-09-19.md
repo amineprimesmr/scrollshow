@@ -27,6 +27,16 @@ appel payé, aucun cookie transmis à un tiers.
 6. Sans extension : collecte serveur comme avant, plus une ligne d'invitation vers
    `/extension`. L'analyse `@compte` reste côté serveur.
 
+## Pagination : demandée, pas défilée (v1.0.1)
+Premier test réel (extension installée, TikTok connecté, « looksmax ») : tout le
+parcours fonctionne, mais **une seule page** lue. Chrome ne rend pas une fenêtre en
+arrière-plan ou recouverte (occlusion macOS) : le défilement n'y déclenche aucun
+chargement. `hook.js` demande donc lui-même les pages suivantes avec la requête de la
+page (`offset`/`cursor` + `search_id`, paramètres de signature retirés : le `fetch` de
+TikTok re-signe). Mesuré dans un TikTok connecté : **46 carrousels uniques en 4 pages**,
+puis TikTok annonce lui-même la fin (`has_more: 0`). Le `status_code: 403` reste présent
+même connecté : il ne dépend pas de la connexion. Le défilement reste en secours.
+
 ## Garde-fous
 - Les scripts TikTok ne font **rien** hors d'une fenêtre ouverte par ScrollShow
   (marqueur `#scrollshow-collect`) et ne sont déclarés que sur `/search/*`.
@@ -46,8 +56,9 @@ appel payé, aucun cookie transmis à un tiers.
 - Scripts `hook.js` + `collect.js` exécutés sur tiktok.com dans un navigateur **non
   connecté** : première page capturée (12 carrousels, 76 Ko allégés), mur de connexion
   détecté, arrêt propre.
-- **Non vérifié** : l'extension installée dans Chrome avec un TikTok connecté, de bout en
-  bout (pagination réelle sur plusieurs pages). C'est le premier test à faire.
+- Extension installée chez Amine, TikTok connecté : détection, fenêtre, collecte, rendu →
+  12 carrousels (v1.0.0, une page). Pagination directe validée à la main dans le même
+  TikTok (46 carrousels). **Non vérifié** : la v1.0.1 installée, de bout en bout.
 
 ## Installer (en attendant le Chrome Web Store)
 Page `/extension` : télécharger `public/scrollshow-extension.zip`, décompresser,
