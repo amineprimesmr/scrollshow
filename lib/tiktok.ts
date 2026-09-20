@@ -86,6 +86,8 @@ export function buildAuthorizeUrl(state: string) {
   const url = new URL(AUTH_URL);
   url.searchParams.set("client_key", clientKey);
   url.searchParams.set("response_type", "code");
+  // Show consent/account switching even when TikTok has a valid prior grant.
+  url.searchParams.set("disable_auto_auth", "1");
   url.searchParams.set("scope", oauthScopes());
   url.searchParams.set("redirect_uri", uri);
   url.searchParams.set("state", state);
