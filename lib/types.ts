@@ -326,6 +326,8 @@ export type StudioPost = {
   createdAt?: string;
   /** Creator's explicit Direct Post choices, captured on the Post to TikTok page. */
   tiktok?: import("./tiktok-compliance").TikTokPostOptions;
+  /** Set only by the studio's Post to TikTok page: the creator saw the preview and chose these options themselves. */
+  tiktokApprovedAt?: string;
   publishId?: string;
   previousPublishId?: string;
   publishState?: string;

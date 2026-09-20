@@ -1,5 +1,6 @@
 import type { StoreData, StudioPost } from "./types";
 import { inScope } from "./projects";
+import { coerceOptions, isCreatorApproved, validatePostOptions } from "./tiktok-compliance";
 
 export class PostValidationError extends Error {
   status = 400;
@@ -30,6 +31,9 @@ export function validatePost(data: StoreData, post: StudioPost) {
   if (post.status === "scheduled") {
     if (post.channelIds.length !== 1) throw new PostValidationError("select_one_connected_tiktok_account");
     if (!post.tiktok?.privacy) throw new PostValidationError("tiktok_options_required");
+    if (!isCreatorApproved(post)) throw new PostValidationError("tiktok_approval_required");
+    const broken = validatePostOptions(coerceOptions(post.tiktok, post.body), null);
+    if (broken) throw new PostValidationError(broken);
     if (!data.channels.some(c => c.id === post.channelIds[0] && c.platform === "tiktok" && c.connected && c.accessToken)) throw new PostValidationError("tiktok_not_connected");
   }
 }

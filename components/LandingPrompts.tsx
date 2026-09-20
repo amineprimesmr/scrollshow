@@ -38,8 +38,8 @@ const EXAMPLES: Example[] = [
     agent: { name: "Codex", icon: "/assets/ai/codex-transparent.png" },
     glow: "#d97757",
     prompt: {
-      fr: "Reprends le meilleur format et crée un carrousel de 5 slides pour mon app.",
-      en: "Take the best format and create a 5-slide carousel for my app.",
+      fr: "Inspire-toi du meilleur format et crée un carrousel de 5 slides pour mon app.",
+      en: "Use the best format as inspiration and create an original 5-slide carousel for my app.",
     },
     steps: [
       { tool: "get_content_brief", detail: { fr: "Formats étudiés", en: "Studied formats" } },
@@ -62,7 +62,7 @@ const EXAMPLES: Example[] = [
       { tool: "create_post", detail: { fr: "7 carrousels créés", en: "7 carousels created" } },
       { tool: "update_post", detail: { fr: "Planifiés · 18:00", en: "Scheduled · 6:00 pm" } },
     ],
-    summary: { fr: "Ta semaine est planifiée. Chaque post part tout seul.", en: "Your week is scheduled. Every post goes out on its own." },
+    summary: { fr: "Ta semaine est planifiée. Chaque post part à l'heure que tu as validée.", en: "Your week is scheduled. Every post goes out at the time you approved." },
   },
   {
     id: "analyse",

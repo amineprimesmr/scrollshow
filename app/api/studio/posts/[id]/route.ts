@@ -50,6 +50,7 @@ export async function PATCH(
     assertEditable(found);
     const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
     Object.assign(found, rest);
+    if (rest.tiktok) found.tiktokApprovedAt = rest.tiktok.privacy ? new Date().toISOString() : undefined;
     // Un simple deplacement (date/heure) ne rejoue pas toute la validation de
     // publication : un post planifie a l'ancienne (sans options TikTok) doit
     // pouvoir bouger dans le calendrier, il sera revalide a la publication.

@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       inCalendar: true,
       createdAt: new Date().toISOString(),
       tiktok: parsed.data.tiktok,
+      tiktokApprovedAt: parsed.data.tiktok?.privacy ? new Date().toISOString() : undefined,
     };
     validatePost(data, created);
     data.posts.unshift(created);

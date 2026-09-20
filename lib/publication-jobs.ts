@@ -6,7 +6,7 @@ import { hasStudioAccess } from "./plans";
 import { ensureRecipe, needsRasterize, photosOf } from "./recipe";
 import { rasterizeRecipe } from "./render-slide";
 import { directPostPhotos, PublishError } from "./tiktok-publish";
-import { coerceOptions } from "./tiktok-compliance";
+import { coerceOptions, isCreatorApproved } from "./tiktok-compliance";
 
 export async function dispatchPost(userId: string, id: string) {
   if (!publishingEnabled()) throw new Error("tiktok_approval_pending");
@@ -22,6 +22,7 @@ export async function dispatchPost(userId: string, id: string) {
     if (p.publishLeaseUntil && p.publishLeaseUntil > Date.now()) throw new Error("publication_busy");
     if (p.channelIds.length !== 1 || !data.channels.some(c => c.id === p.channelIds[0] && c.userId === userId && c.projectId === p.projectId && c.platform === "tiktok" && c.accessToken && c.connected !== false)) throw new Error("select_one_connected_tiktok_account");
     if (!p.tiktok?.privacy) throw new Error("tiktok_options_required");
+    if (!isCreatorApproved(p)) throw new Error("tiktok_approval_required");
     p.publishClaim = claim;
     p.publishLeaseUntil = Date.now() + 300000;
     p.publishState = "PREPARING";

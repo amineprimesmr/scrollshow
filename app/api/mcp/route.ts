@@ -238,7 +238,7 @@ const handler = createMcpHandler(
             })
             .optional()
             .describe(
-              "Direct Post choices the user made: privacy (required before a scheduled post can go out), allowComment (off unless the user asked), commercial + brandOrganic/brandContent disclosure.",
+              "Only `title` is kept. Privacy, comments and commercial disclosure must be chosen by the creator on the Post to TikTok page (TikTok requirement); values sent here are ignored.",
             ),
         }),
       },
@@ -278,7 +278,7 @@ const handler = createMcpHandler(
             })
             .optional()
             .describe(
-              "Direct Post choices the user made: privacy (required before a scheduled post can go out), allowComment (off unless the user asked), commercial + brandOrganic/brandContent disclosure.",
+              "Only `title` is kept. Privacy, comments and commercial disclosure must be chosen by the creator on the Post to TikTok page (TikTok requirement); values sent here are ignored.",
             ),
         }),
       },
@@ -381,7 +381,7 @@ const handler = createMcpHandler(
       {
         title: "Publish to TikTok now",
         description:
-          "Direct-post a photo carousel to the connected TikTok account right now. Only use when the user explicitly asked to publish AND told you the privacy level — never pick one for them. Pass id of an editable post to rasterize overlays into fresh PNGs automatically. Comments stay off and no commercial disclosure is set unless the user asked. TikTok processes the post asynchronously: it may take a few minutes to appear on the profile.",
+          "Prepare a carousel for publication. Nothing is sent to TikTok by this tool: it saves the draft and returns approve_url. Give that link to the user — there they see the preview, choose who can view the post, comments and commercial disclosure themselves, and click Post to TikTok. TikTok requires the creator to make these choices in person, so never claim the post is published; use publish_status after the user confirms.",
         inputSchema: z.object({
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
@@ -391,7 +391,7 @@ const handler = createMcpHandler(
           image: z.string().optional(),
           privacy_level: z
             .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"])
-            .describe("The privacy the user chose. Required."),
+            .optional().describe("Ignored: the creator picks privacy on the Post to TikTok page."),
           allow_comment: z.boolean().optional().describe("Allow comments. Default false."),
           commercial_content: z.boolean().optional().describe("User disclosed commercial content."),
           brand_organic: z.boolean().optional().describe("Promotes the user's own brand ('Promotional content' label)."),
@@ -598,7 +598,7 @@ const handler = createMcpHandler(
     serverInfo: { name: "scrollshow", version: "1.0.0" },
     instructions:
       "Use start_scrollshow for the first-carousel workflow. Read whoami and get_content_brief; inspect list_posts to avoid duplicates. Finish requested carousels in the calendar, including completed forks via set_calendar. Reuse existing scheduling authorization and publication choices. Queue with status=scheduled only when those choices are known; otherwise save complete content with a proposed date and report what is missing. Do not add unrelated deletion or public sharing. Confirm writes only from successful tool responses and inspect existing posts before retrying uncertain writes. Never request API keys in chat. " +
-      "Always answer the user in their own language, the one they write to you in; most ScrollShow users write French. You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami first: it returns the user's business profile (name, kind, link, keywords, goal, TikTok stats) that every carousel must be written for, and whether TikTok is connected. Marketplace: import_tiktok copies a public TikTok (slides + caption). The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. Use publish_now with the post id when they asked to publish now (it rasterizes editable overlays). Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
+      "Always answer the user in their own language, the one they write to you in; most ScrollShow users write French. You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami first: it returns the user's business profile (name, kind, link, keywords, goal, TikTok stats) that every carousel must be written for, and whether TikTok is connected. Marketplace: import_tiktok saves a public TikTok as a private reference to study its format (slide count, layout, text placement). Never republish someone else's images or caption: the carousel the user posts must be original content made for their business. The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. A post only goes to TikTok after the user approves it in the studio: create_post and publish_now save a draft and return/allow an approval link (https://scrollshow.io/app?post=<id>) where the user picks privacy, comments and disclosure and clicks Post to TikTok or Schedule. Never say a post is scheduled or published before publish_status confirms it. Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
   },
 );
 

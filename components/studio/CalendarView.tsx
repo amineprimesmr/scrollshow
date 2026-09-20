@@ -221,6 +221,18 @@ export function CalendarView() {
     setPostOpen(true);
   }
 
+  // Lien d'approbation rendu a l'agent (`?post=<id>`) : ouvre le composeur sur
+  // ce post pour que le createur choisisse lui-meme la visibilite et publie.
+  useEffect(() => {
+    if (!loaded) return;
+    const id = new URLSearchParams(window.location.search).get("post");
+    const post = id ? posts.find((item) => item.id === id) : null;
+    if (!post) return;
+    openPost(post);
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, posts.length]);
+
   function newPost(date?: string) {
     setEditing(null);
     setComposeDate(date || null);

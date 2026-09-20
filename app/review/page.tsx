@@ -1,13 +1,8 @@
-import { TikTokReview } from "@/components/TikTokReview";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "TikTok review demo",
-  description:
-    "Public ScrollShow mockup of Login Kit + Content Posting API: profile, stats, video.list, upload, and publish.",
-  robots: { index: false, follow: false },
-};
-
+// The public mockup that used to live here simulated a TikTok publish with a
+// preselected privacy and no creator_info — the opposite of TikTok's required
+// UX. A reviewer must only ever see the real flow, so the URL now lands on it.
 export default function ReviewPage() {
-  return <TikTokReview />;
+  redirect("/login?next=/app");
 }

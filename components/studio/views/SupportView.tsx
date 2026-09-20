@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { IconChevron } from "../icons";
 import { useStudio } from "../StudioContext";
+import { STUDIO_TOOLS, TOOLS_ENABLED } from "@/lib/studio-nav";
+
+const toolLink = (href?: string) => Boolean(href && STUDIO_TOOLS.some((tool) => tool.href === href));
 
 type FaqItem = { q: { fr: string; en: string }; a: { fr: string; en: string }; href?: string };
 type FaqBlock = { section: { fr: string; en: string }; items: FaqItem[] };
@@ -189,7 +192,7 @@ export function SupportView() {
           {FAQ.map((block) => (
             <div key={block.section.en} className="ss-faq-section">
               <h3>{t(block.section.fr, block.section.en, en)}</h3>
-              {block.items.map((item) => {
+              {block.items.filter((item) => TOOLS_ENABLED || !toolLink(item.href)).map((item) => {
                 const key = `${block.section.en}-${item.q.en}`;
                 const open = openFaq === key;
                 return (
@@ -220,12 +223,16 @@ export function SupportView() {
       <div className="ss-panel">
         <h2>{t("Ressources", "Resources", en)}</h2>
         <ul className="ss-feat">
-          <li>
-            <Link href="/app/post-us">{t("Guide : développer une audience US", "Guide: grow a US audience", en)}</Link>
-          </li>
-          <li>
-            <Link href="/app/unshadowban">{t("Détecteur de shadowban", "Shadowban detector", en)}</Link>
-          </li>
+          {TOOLS_ENABLED ? (
+            <>
+              <li>
+                <Link href="/app/post-us">{t("Guide : développer une audience US", "Guide: grow a US audience", en)}</Link>
+              </li>
+              <li>
+                <Link href="/app/unshadowban">{t("Détecteur de shadowban", "Shadowban detector", en)}</Link>
+              </li>
+            </>
+          ) : null}
           <li>
             <Link href="/app/mcp">{t("Brancher ton IA (MCP)", "Connect your AI (MCP)", en)}</Link>
           </li>

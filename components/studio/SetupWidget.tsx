@@ -1,5 +1,6 @@
 "use client";
 
+import { TOOLS_ENABLED } from "@/lib/studio-nav";
 import { t } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -38,7 +39,7 @@ export function SetupWidget() {
       { id: "connect", label: t("Connecte tes comptes TikTok", "Connect your TikTok accounts", en), href: "/app/integrations", done: channels.some((c) => c.connected) },
       { id: "mcp", label: t("Connecte le MCP à ton IA", "Connect MCP to your AI", en), href: "/app/mcp", done: hasKey },
       { id: "post", label: t("Crée et publie depuis ton IA", "Create and publish from your AI", en), href: "/app/mcp", done: posts.some((p) => p.origin === "ai") },
-      { id: "us", label: t("Prépare ton compte pour les US", "Prepare your account for the US", en), href: "/app/post-us", done: usProgress > 0 },
+      ...(TOOLS_ENABLED ? [{ id: "us", label: t("Prépare ton compte pour les US", "Prepare your account for the US", en), href: "/app/post-us", done: usProgress > 0 }] : []),
     ],
     [channels, posts, hasKey, usProgress, en],
   );

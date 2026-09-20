@@ -143,3 +143,22 @@ export function coerceOptions(input: Partial<TikTokPostOptions> | null | undefin
     brandContent: Boolean(input?.brandContent),
   };
 }
+
+/**
+ * Guideline 5: the creator must have "full awareness and control" of what is
+ * posted. Privacy, comments and disclosure therefore only count when they were
+ * chosen on the Post to TikTok page (studio session), never when an agent or
+ * API caller supplied them. Posts saved before the cutoff predate the marker.
+ */
+const APPROVAL_CUTOFF = "2026-09-21";
+
+export function isCreatorApproved(post: { tiktok?: { privacy?: string }; tiktokApprovedAt?: string; createdAt?: string }) {
+  if (!post.tiktok?.privacy) return false;
+  if (post.tiktokApprovedAt) return true;
+  return Boolean(post.createdAt && post.createdAt.slice(0, 10) < APPROVAL_CUTOFF);
+}
+
+/** What a non-studio caller may pre-fill: the editable title, nothing the guidelines require the creator to pick. */
+export function agentProposal(input: Partial<TikTokPostOptions> | null | undefined, fallbackTitle = ""): TikTokPostOptions {
+  return { ...EMPTY_OPTIONS, title: String(input?.title ?? "").trim().slice(0, 90) || fallbackTitle.slice(0, 90) };
+}

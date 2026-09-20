@@ -11,7 +11,12 @@ export type NavItem = {
   section?: "main" | "bottom" | "menu";
 };
 
-export const STUDIO_NAV: NavItem[] = [
+// Outils (Poster aux US, Shadowban, Comptes warmes) retires le temps de l'audit
+// Direct Post de TikTok, a la demande d'Amine. Remettre `true` pour tout rouvrir :
+// l'entree de menu et les quatre routes reviennent, rien d'autre n'a ete supprime.
+export const TOOLS_ENABLED = false;
+
+const ALL_NAV: NavItem[] = [
   { href: "/app/home", fr: "Overview", en: "Overview", icon: "home", section: "main" },
   { href: "/app", fr: "Calendrier", en: "Calendar", icon: "calendar", section: "main" },
   // Inspiration = Recherche + Bibliotheque : une seule entree, deux onglets
@@ -27,6 +32,7 @@ export const STUDIO_NAV: NavItem[] = [
   { href: "/app/settings", fr: "Réglages", en: "Settings", icon: "settings", section: "bottom" },
 ];
 
+export const STUDIO_NAV: NavItem[] = ALL_NAV.filter((item) => TOOLS_ENABLED || item.href !== "/app/tools");
 
 // Le cadenas d'un outil doit dire la meme chose que sa carte « bientot disponible ».
 export const STUDIO_TOOLS: (NavItem & { frHint: string; enHint: string })[] = [

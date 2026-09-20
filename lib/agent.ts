@@ -25,7 +25,7 @@ import { importTikTokFromUrl, resolveUrl } from "./tiktok-import";
 import { reconstructRecipe, ReconstructError } from "./reconstruct";
 import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
-import { coerceOptions, type TikTokPostOptions } from "./tiktok-compliance";
+import { agentProposal, coerceOptions, isCreatorApproved, type TikTokPostOptions } from "./tiktok-compliance";
 import { directPostPhotos, PublishError } from "./tiktok-publish";
 import { readStoreSlice, updateStoreSlice, localStoreEnabled } from "./store";
 import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
@@ -164,8 +164,11 @@ export async function agentCreatePost(
       visibility: "private",
       inCalendar: true,
       createdAt: now.toISOString(),
-      tiktok: input.tiktok ? coerceOptions(input.tiktok, caption) : undefined,
+      tiktok: input.tiktok ? agentProposal(input.tiktok, caption) : undefined,
     };
+    // An agent cannot schedule on its own: privacy, comments and disclosure are
+    // the creator's to pick on the Post to TikTok page. Saved as a draft.
+    if (created.status === "scheduled") created.status = "draft";
     validatePost(data, created);
     data.posts.unshift(created);
     return created;
@@ -195,10 +198,15 @@ export async function agentUpdatePost(
     assertEditable(found);
     assertMediaReferences(data, input, user);
     if (input.caption) found.body = input.caption.slice(0, 2200);
-    if (input.tiktok) found.tiktok = coerceOptions({ ...found.tiktok, ...input.tiktok }, found.body);
+    if (input.tiktok?.title !== undefined) found.tiktok = { ...coerceOptions(found.tiktok, found.body), title: String(input.tiktok.title).trim().slice(0, 90) };
+    // What the creator approved is no longer what would be posted.
+    if (input.caption || input.tiktok || input.recipe || input.photo_images?.length || input.image || input.channelId) {
+      if (found.tiktokApprovedAt) { found.tiktokApprovedAt = undefined; if (found.tiktok) found.tiktok = agentProposal(found.tiktok, found.body); }
+      if (found.status === "scheduled") found.status = "draft";
+    }
     if (input.date) found.date = input.date;
     if (input.time) found.time = input.time;
-    if (input.status) found.status = input.status;
+    if (input.status) found.status = input.status === "scheduled" && !isCreatorApproved(found) ? "draft" : input.status;
     if (input.channelId) found.channelIds = [input.channelId];
     if (input.origin) found.origin = input.origin;
     validatePost(data, found);
@@ -513,12 +521,23 @@ export async function agentDeletePost(user: SessionUser, id: string) {
   return { ok: true, id };
 }
 
+export const approveUrl = (id: string) => `${process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"}/app?post=${encodeURIComponent(id)}`;
+
+/**
+ * `via: "studio"` = the creator clicked "Post to TikTok" on the compliant page,
+ * so their options are an approval. Any other caller (MCP, REST) only prepares
+ * the draft: TikTok requires the creator to see the preview, pick the privacy
+ * and consent themselves, which a chat instruction cannot prove.
+ */
 export async function agentPublish(user: SessionUser, input: {
   caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
-  privacy_level: string; allow_comment?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
-}) {
-  const options = coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment,
-    commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption);
+  privacy_level?: string; allow_comment?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
+}, via: "studio" | "agent" = "agent") {
+  const studio = via === "studio";
+  const options = studio
+    ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment,
+        commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption)
+    : agentProposal({ title: input.title }, input.caption);
   let id: string;
   if (input.id) {
     const found = (await readStore()).posts.find(p => inScope(p, user) && (p.id === input.id || p.shareId === input.id));
@@ -527,6 +546,8 @@ export async function agentPublish(user: SessionUser, input: {
       const p = data.posts.find(p => p.id === found.id)!;
       if (p.publishId || ["PREPARING", "INITIATING", "PROCESSING", "REVIEW_REQUIRED"].includes(p.publishState || "")) throw new AgentError("publication_already_started", 409);
       p.body = input.caption; p.tiktok = options;
+      p.tiktokApprovedAt = studio ? new Date().toISOString() : undefined;
+      if (!studio && p.status === "scheduled") p.status = "draft";
       if (input.channelId) p.channelIds = [input.channelId];
     });
     id = found.id;
@@ -538,6 +559,11 @@ export async function agentPublish(user: SessionUser, input: {
     const p = await agentCreatePost(user, { caption: input.caption, channelId: target, status: "draft",
       photo_images: input.photo_images, image: input.image, tiktok: options });
     id = p.id;
+    if (studio) await updateStore(data => { const row = data.posts.find(x => x.id === id); if (row) { row.tiktok = options; row.tiktokApprovedAt = new Date().toISOString(); } });
+  }
+  if (!studio) {
+    return { ok: true, published: false, needs_approval: true, post_id: id, approve_url: approveUrl(id),
+      note: "Nothing was sent to TikTok. The carousel is saved as a draft. Give the user approve_url: there they see the preview, choose who can view the post, comments and commercial disclosure themselves, then click Post to TikTok. TikTok requires these choices to be made by the creator, never by an agent." };
   }
   const { dispatchPost } = await import("./publication-jobs");
   const result = await dispatchPost(user.id, id);

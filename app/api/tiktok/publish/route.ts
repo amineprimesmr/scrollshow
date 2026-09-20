@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const result = await agentPublish(user, { id: p.post_id, channelId: p.channel_id, caption: p.description, photo_images: p.photo_images,
       title: p.options.title, privacy_level: p.options.privacy, allow_comment: p.options.allowComment,
-      commercial_content: p.options.commercial, brand_organic: p.options.brandOrganic, brand_content: p.options.brandContent });
-    return NextResponse.json({ ...result, post_id: result.post?.id });
+      commercial_content: p.options.commercial, brand_organic: p.options.brandOrganic, brand_content: p.options.brandContent }, "studio");
+    return NextResponse.json({ ...result, post_id: "post" in result ? result.post?.id : undefined });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "publish_failed" }, { status: 400 }); }
 }

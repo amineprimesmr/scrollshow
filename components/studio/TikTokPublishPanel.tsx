@@ -126,9 +126,9 @@ type Props = {
 
 export function TikTokPublishPanel({ english, creatorState, options, setOptions, onRefresh }: Props) {
   const { creator, loading, blocked, error, connected } = creatorState;
-  const privacyOptions = creator?.privacyOptions.length
-    ? creator.privacyOptions
-    : PRIVACY_LEVELS.map((item) => item.id);
+  // Guideline 2b: only what creator_info returned, never a list of our own.
+  const privacyOptions = creator?.privacyOptions ?? [];
+  const brandedLocksPrivate = options.commercial && options.brandContent;
   const label = commercialLabel(options);
   const declaration = declarationFor(options);
   const invalid = validatePostOptions(options, creator);
@@ -204,7 +204,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
 
       <label className="ss-ttp__field">
         <span>{t("Qui peut voir ce post", "Who can view this post", english)}</span>
-        <select value={options.privacy} onChange={(event) => choosePrivacy(event.target.value)} required>
+        <select value={options.privacy} onChange={(event) => choosePrivacy(event.target.value)} disabled={!privacyOptions.length} required>
           <option value="" disabled>
             {t("Sélectionner…", "Select privacy…", english)}
           </option>
@@ -224,6 +224,9 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
             );
           })}
         </select>
+        {brandedLocksPrivate && privacyOptions.includes("SELF_ONLY") ? (
+          <small>{t("La visibilité d'un contenu de marque ne peut pas être privée.", "Branded content visibility cannot be set to private.", english)}</small>
+        ) : null}
       </label>
 
       <label className={`ss-ttp__check${commentDisabled ? " is-disabled" : ""}`} title={commentDisabled ? t("Désactivé dans tes réglages TikTok", "Disabled in your TikTok settings", english) : undefined}>
@@ -270,7 +273,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
             </label>
             <label
               className={`ss-ttp__check${isPrivate ? " is-disabled" : ""}`}
-              title={isPrivate ? t("La visibilité d'un contenu de marque ne peut pas être privée.", "Branded content visibility can't be private.", english) : undefined}
+              title={isPrivate ? t("La visibilité d'un contenu de marque ne peut pas être privée.", "Branded content visibility cannot be set to private.", english) : undefined}
             >
               <input
                 type="checkbox"
@@ -281,7 +284,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
               <span>{t("Contenu de marque", "Branded content", english)}</span>
               <small>
                 {isPrivate
-                  ? t("La visibilité d'un contenu de marque ne peut pas être privée.", "Branded content visibility can't be private.", english)
+                  ? t("La visibilité d'un contenu de marque ne peut pas être privée.", "Branded content visibility cannot be set to private.", english)
                   : t("Tu fais la promotion d'une autre marque ou d'un tiers.", "You are promoting another brand or a third party.", english)}
               </small>
             </label>
