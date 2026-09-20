@@ -46,8 +46,12 @@ async function syncPage(userId: string, key: string, restart: boolean) {
   const previous = restart ? undefined : target.videoSync;
   if (previous?.complete) return;
   const channel = key.startsWith("ch:") ? await loadTikTokChannel(userId, key.slice(3), target.projectId) : null;
-  const source = previous?.source || (metricsEnabled() && target.handle && target.handle !== "tiktok" ? "api" : "tiktok");
-  const cursor = previous?.cursor;
+  // Un compte connecte lit ses propres posts par l'API officielle (video.list) :
+  // c'est la seule source qui voit un compte prive, et le fournisseur public y
+  // echoue. Une synchro « api » restee en erreur repart donc sur TikTok.
+  const official = Boolean(channel?.accessToken) && (!previous || (previous.source === "api" && Boolean(previous.error)));
+  const source = official ? "tiktok" : previous?.source || (metricsEnabled() && target.handle && target.handle !== "tiktok" ? "api" : "tiktok");
+  const cursor = official ? undefined : previous?.cursor;
   try {
     let page: { videos: AccountVideo[]; hasMore: boolean; cursor?: number };
     if (source === "api") {
