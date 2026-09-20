@@ -78,3 +78,15 @@ Fichiers déjà modifiés sauvegardés hors dépôt ; seuls les changements de l
 - Le segment existant a été inspecté : la seconde moitié montre l'ancien Overview en erreur. Un export coupé à 65 s est préparé ; il montre l'ancienne demande de six scopes, donc ne doit pas être présenté comme la nouvelle configuration OAuth à cinq scopes.
 - Brouillon portail : catégorie Photo & Video ; description proposée de 116 caractères. Soumission et Reapply attendent impérativement la relecture d'Amine.
 - Outils masqués et anglais conservés pendant la préparation de l'audit ; restaurer après la phase d'audit demandée par Amine.
+
+## Résultat réel et compléments — 20 septembre, fin de session
+
+- **Publication réussie après correction du format** : le composeur affiche `Posted to TikTok.` après `PUBLISH_COMPLETE`. Le carrousel original est visible sur le profil, avec les deux slides prévues, la mention **Privé** et **Contenu promotionnel** : https://www.tiktok.com/@mannyprcs/photo/7687641957006314774.
+- Choix effectués à l'écran : titre `One idea at a time`, visibilité `Only me`, commentaires activés, musique désactivée, commercial activé puis `Your brand`. Le blocage sans sous-option commerciale et la déclaration ont été montrés avant le clic autorisé.
+- `ec0a582` : un nouveau carrousel et chaque nouvelle slide démarrent sur un fond uni sans image présélectionnée. Avant ce correctif, des images de galerie étaient reprises implicitement. Typecheck réussi et comportement vérifié en production.
+- `1610bbe` : OAuth demande `disable_auto_auth=1` pour montrer le consentement TikTok même lorsqu'un compte a déjà été autorisé. Les cinq permissions demandées sont visibles. Source : https://developers.tiktok.com/docs/en/login-kit-web.
+- **Vignettes anciennes non résolues** : essai `1e0dcdc` de rafraîchissement officiel par `video/query`, validé par test ciblé puis déployé, sans résolution réelle. Retiré par `0b36abe` pour éviter les requêtes inutiles. Les compteurs et la liste officielle fonctionnent ; le carrousel nouvellement créé s'affiche. Ne pas annoncer un mur de vignettes entièrement fonctionnel.
+- Vidéo principale vérifiée : `/Users/amine/Desktop/scrollshow-demo/02-create-publish-result.mp4` (environ 3,3 Mo, 160 secondes). Elle montre la création originale, les réglages, le résultat de publication et le post TikTok privé. Aucun état n'est simulé.
+- Les captures utilisent la fenêtre Chrome réelle, avec sa barre d'adresse, via ScreenCaptureKit. Sélectionner explicitement le bon onglet dans la fenêtre native : piloter un onglet en arrière-plan ne le rend pas automatiquement visible dans l'enregistrement.
+- Brouillon du portail enregistré : catégorie `Photo & Video`, description centrée sur la création originale, texte sans lien `/review`. **Ni Submit for review ni Reapply n'ont été cliqués.**
+- Téléversement bloqué par l'accès aux fichiers locaux désactivé dans l'extension Chrome. Amine a autorisé l'activation, mais l'outil navigateur refuse l'accès à `chrome://extensions` par sa politique de sécurité. Activation manuelle nécessaire ; ne pas contourner ce refus.
