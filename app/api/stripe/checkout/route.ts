@@ -12,7 +12,7 @@ import { applySubscription } from "@/lib/billing";
  * la nouvelle requete pendant 30 minutes : une cle d'idempotence ne peut pas
  * etre reutilisee avec des parametres differents.
  */
-const CHECKOUT_SHAPE = "v3";
+const CHECKOUT_SHAPE = "v4";
 
 export async function POST(request: Request) {
   const user = await readSession();
@@ -55,6 +55,10 @@ export async function POST(request: Request) {
     const session = await client.checkout.sessions.create({
       mode: expected.interval ? "subscription" : "payment", customer: stored.stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
+      // Codes promo (comptes de demonstration, partenaires) : un code a 100 %
+      // ne doit pas exiger de carte, d'ou la collecte « si necessaire ».
+      allow_promotion_codes: true,
+      ...(expected.interval ? { payment_method_collection: "if_required" as const } : {}),
       success_url: `${siteUrl()}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl()}/onboarding?step=payment&canceled=1&offer=${offer}`, client_reference_id: user.id,
       subscription_data: expected.interval ? { metadata: { userId: user.id, plan: "pro" } } : undefined,
