@@ -299,22 +299,6 @@ export async function listVideoPage(accessToken: string, cursor?: number) {
     max_count: 20, ...(cursor === undefined ? {} : { cursor }),
   }));
   if (!Array.isArray(data.videos)) throw new TikTokApiError("invalid_response", "Missing video list");
-  // Some photo covers from video.list carry an unusable private-CDN URL.
-  // video/query is TikTok's documented way to refresh cover-image URLs.
-  const privateCovers = data.videos.filter((video: TikTokVideo) => {
-    try { return new URL(video.cover_image_url || "").hostname === "p0-common-image-private-useastred.tiktokv.eu"; }
-    catch { return false; }
-  });
-  if (privateCovers.length) {
-    try {
-      const refreshed = assertOk(await tiktokPost("https://open.tiktokapis.com/v2/video/query/?fields=id,cover_image_url", accessToken, {
-        filters: { video_ids: privateCovers.slice(0, 20).map((video: TikTokVideo) => video.id) },
-      }));
-      const covers = new Map((Array.isArray(refreshed.videos) ? refreshed.videos : [])
-        .filter((video: TikTokVideo) => video.cover_image_url).map((video: TikTokVideo) => [video.id, video.cover_image_url]));
-      for (const video of data.videos) if (covers.has(video.id)) video.cover_image_url = covers.get(video.id);
-    } catch { /* Preserve the successful list if a cover refresh is unavailable. */ }
-  }
   const hasMore = data.has_more === true;
   const next = Number(data.cursor);
   if (hasMore && (!Number.isFinite(next) || next <= 0 || (cursor !== undefined && next >= cursor))) {
