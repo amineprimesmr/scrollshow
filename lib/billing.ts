@@ -17,9 +17,15 @@ export function applySubscription(data: StoreData, subscription: Stripe.Subscrip
 
 export function applyLifetime(data: StoreData, session: Stripe.Checkout.Session) {
   const paymentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
-  if (!paymentId || data.refundedLifetimePayments?.includes(paymentId)) return false;
-  if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid" ||
-    session.metadata?.offer !== "lifetime" || session.amount_total !== PLAN.lifetime || session.currency !== "eur") return false;
+  const discount = session.total_details?.amount_discount || 0;
+  const discounted = session.amount_subtotal === PLAN.lifetime && discount > 0 &&
+    discount <= PLAN.lifetime && session.amount_total === PLAN.lifetime - discount;
+  const freeOrder = discounted && session.amount_total === 0 &&
+    (session.payment_status === "no_payment_required" || session.payment_status === "paid");
+  if (!freeOrder && (!paymentId || session.payment_status !== "paid")) return false;
+  if (paymentId && data.refundedLifetimePayments?.includes(paymentId)) return false;
+  if (session.mode !== "payment" || session.status !== "complete" ||
+    session.metadata?.offer !== "lifetime" || (!discounted && session.amount_total !== PLAN.lifetime) || session.currency !== "eur") return false;
   const user = data.users.find(u => u.id === session.client_reference_id);
   if (!user) return false;
   const customer = typeof session.customer === "string" ? session.customer : session.customer?.id;
