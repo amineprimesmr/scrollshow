@@ -118,14 +118,15 @@ export function CreatePostModal() {
       return;
     }
     const settings = user?.settings;
-    const first = media[0]?.url || "";
     setBody("");
     setDate(composeDate || dateInTimeZone(settings?.timezone || "Europe/Paris"));
     setComposeDate(null);
     setTime(settings?.defaultPostTime || "18:00");
     setStatus(availability?.tiktokPublishing && connected.length ? settings?.defaultStatus || "scheduled" : "draft");
-    const draft = recipeFromPhotos([first], "manual");
-    if (!first) { draft.slides[0].backgroundColor = "#111111"; draft.slides[0].keepPhoto = false; draft.editable = true; }
+    const draft = recipeFromPhotos([""], "manual");
+    draft.slides[0].backgroundColor = "#111111";
+    draft.slides[0].keepPhoto = false;
+    draft.editable = true;
     resetRecipe(draft);
     setSlideIndex(0);
     setChannelIds(
@@ -259,10 +260,10 @@ export function CreatePostModal() {
   }
 
   function addSlide() {
-    const url = media.find((item) => !recipe.slides.some((slideItem) => slideItem.image === item.url))?.url || media[0]?.url;
     if (recipe.slides.length >= 35) return;
-    const next = defaultSlide(url || "");
-    if (!url) { next.backgroundColor = "#111111"; next.keepPhoto = false; }
+    const next = defaultSlide("");
+    next.backgroundColor = "#111111";
+    next.keepPhoto = false;
     setRecipe((current) => ({ ...current, slides: [...current.slides, next] }));
     setSlideIndex(recipe.slides.length);
   }
@@ -555,7 +556,8 @@ export function CreatePostModal() {
                 </button>
               ) : null}
             </label>
-            <select value={slide.image} onChange={(event) => patchSlide(slide.id, { image: event.target.value, sourceImage: event.target.value, keepPhoto: true })}>
+            <select aria-label={t("Image de la slide", "Slide image", english)} value={slide.image} onChange={(event) => patchSlide(slide.id, { image: event.target.value, sourceImage: event.target.value, keepPhoto: Boolean(event.target.value) })}>
+              <option value="">{t("Sans image — fond uni", "No image — solid background", english)}</option>
               {media.map((item) => (
                 <option key={item.id} value={item.url}>
                   {item.name}
