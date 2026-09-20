@@ -64,6 +64,15 @@ Fichiers déjà modifiés sauvegardés hors dépôt ; seuls les changements de l
 
 ## À terminer avant soumission
 
+### Vérification réelle après déploiement
+
+- `9ccaa7b` déployé en production le 20 septembre à 15:18 UTC. Infobulle du bouton désactivé confirmée visuellement ; musique explicitement décochée ; OAuth à cinq scopes confirmé et reconnexion réussie.
+- Les couvertures restent indisponibles malgré l'autorisation de l'hôte : le proxy répond `unavailable`, et le lien officiel ouvert directement répond **403 Forbidden** chez TikTok. La signature n'est pas expirée (`x-orig-expires`). Ne pas présenter ce défaut comme résolu.
+- Premier essai réel du carrousel original « One idea at a time » (2 slides texte/fond), Only me, commentaires ON, musique OFF, Your brand ON : TikTok répond **file_format_check_failed**. Aucun succès de publication à ce stade.
+- Cause supplémentaire identifiée : le renderer produit du PNG alors que le Media Transfer Guide autorise seulement JPEG/WebP pour les photos. Commit `efc5e09` : livraison des médias internes à TikTok en WebP sans perte, avec les mêmes signatures d'accès, sans toucher au renderer déjà modifié par l'autre session. Test de décodage comparant les pixels + tests d'approbation/recovery (4 tests) et typecheck réussis.
+- Les prises `segA-login-kit-v2.mov` et `segC-create-publish.mov` sont **inutilisables pour la soumission** : la capture système filme Codex resté au premier plan, tandis que les interactions Chrome s'exécutent en arrière-plan. Refaire après confirmation du cadrage réel. Le segment historique reste conservé.
+- Source complémentaire : https://developers.tiktok.com/docs/en/content-posting-api-media-transfer-guide (formats photo et contraintes de transfert).
+
 - Vérification du déploiement, vignettes, infobulle et publication réelle en SELF_ONLY.
 - Vidéo : Login Kit actuel, Overview réel, création originale, aperçu/options/consentement, statut final, profil TikTok.
 - Le segment existant a été inspecté : la seconde moitié montre l'ancien Overview en erreur. Un export coupé à 65 s est préparé ; il montre l'ancienne demande de six scopes, donc ne doit pas être présenté comme la nouvelle configuration OAuth à cinq scopes.
