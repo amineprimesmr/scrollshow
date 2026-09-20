@@ -357,7 +357,7 @@ function OnboardingInner() {
       : [t("Bienvenue sur ScrollShow", "Welcome to ScrollShow"), t("Colle le lien de ton business. On remplit le reste pour toi.", "Paste your business link. We fill in the rest for you.")],
     1: [t("On a rempli ce qu’on a trouvé", "We filled in what we found"), t("Vérifie, corrige si besoin. C’est tout ce qu’on te demande.", "Check it, fix anything that is off. That is all we ask.")],
     2: [tiktokAccounts.length > 1 ? t("Tes comptes TikTok", "Your TikTok accounts") : t("Ton compte TikTok", "Your TikTok account"), t("On lit tes stats publiques pour caler le ton et le rythme. Facultatif.", "We read your public stats to set the tone and rhythm. Optional.")],
-    3: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex créent et planifient tes carrousels directement depuis la conversation.", "Claude, Cursor or Codex create and schedule your carousels straight from the chat.")],
+    3: [t("Branche ton IA", "Plug in your AI"), t("Claude, Cursor ou Codex préparent tes brouillons. Vérifie le contenu et choisis tes réglages dans le studio avant de publier ou de planifier.", "Claude, Cursor or Codex prepare your drafts. Review the content and choose your settings in the studio before publishing or scheduling.")],
     4: [t("Dernière question", "One last thing"), t("Comment as-tu connu ScrollShow ?", "How did you hear about ScrollShow?")],
     5: [t("Active ton espace", "Activate your workspace"), t("Dernière étape : ton accès à ScrollShow.", "Last step: your access to ScrollShow.")],
   };
