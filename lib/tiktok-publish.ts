@@ -9,6 +9,7 @@ import { readStoreSlice } from "./store";
 const readStore = (_fresh?: boolean) => readStoreSlice([]);
 import { hasStudioAccess } from "./plans";
 import { signedMediaUrl } from "./media-access";
+import { tiktokImageUrl } from "./tiktok-image";
 import { absoluteAssetUrl, initPhotoPost, queryCreatorInfo, TikTokApiError } from "./tiktok";
 import { loadTikTokChannel } from "./tiktok-account";
 import {
@@ -69,7 +70,7 @@ export async function directPostPhotos(
       source_info: {
         source: "PULL_FROM_URL",
         photo_cover_index: 0,
-        photo_images: input.photos.map(url => signedMediaUrl(absoluteAssetUrl(url), process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io")),
+        photo_images: input.photos.map(url => tiktokImageUrl(signedMediaUrl(absoluteAssetUrl(url), process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"))),
       },
       post_mode: "DIRECT_POST",
       media_type: "PHOTO",

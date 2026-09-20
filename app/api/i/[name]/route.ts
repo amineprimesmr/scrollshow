@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { readSession } from "@/lib/auth";
 import { readStoreSlice } from "@/lib/store";
 import { validMediaSignature } from "@/lib/media-access";
+import { tiktokImage } from "@/lib/tiktok-image";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
@@ -15,9 +16,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   }
   const file = await readImportedFile(name);
   if (!file) return NextResponse.json({ error: "missing" }, { status: 404 });
-  return new NextResponse(new Uint8Array(file.bytes), {
+  const forTikTok = url.searchParams.get("format") === "tiktok";
+  const bytes = forTikTok ? await tiktokImage(file.bytes) : file.bytes;
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
-      "Content-Type": file.contentType,
+      "Content-Type": forTikTok ? "image/webp" : file.contentType,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
