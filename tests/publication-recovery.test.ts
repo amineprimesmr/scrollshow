@@ -21,7 +21,7 @@ test("publication distinguishes preflight rejection, definitive refusal, uncerta
   data.users = [{ id: "u", email: "u@example.invalid", name: "Test", createdAt: "2026-01-01", emailVerifiedAt: "2026-01-01", plan: "lifetime", settings: { notifyPublishFailure: false, notifyPublishSuccess: false } } as User];
   backfillProjects(data);
   data.channels = [{ id: "c", userId: "u", projectId: "prj_u_1", platform: "tiktok", accessToken: "synthetic", connected: true } as never];
-  data.posts = [{ id: "p", userId: "u", projectId: "prj_u_1", channelIds: ["c"], body: "Fixture", status: "draft", date: "2026-09-12", time: "18:00", recipe: recipeFromPhotos(["https://example.invalid/fixture.jpg"], "manual"), tiktok: { ...EMPTY_OPTIONS, privacy: "SELF_ONLY", title: "" }, tiktokApprovedAt: "2026-09-21T00:00:00.000Z" } as StudioPost];
+  data.posts = [{ id: "p", userId: "u", projectId: "prj_u_1", channelIds: ["c"], body: "Fixture", status: "draft", date: "2026-09-12", time: "18:00", recipe: recipeFromPhotos(["https://scrollshow.io/fixture.jpg"], "manual"), tiktok: { ...EMPTY_OPTIONS, privacy: "SELF_ONLY", title: "" }, tiktokApprovedAt: "2026-09-21T00:00:00.000Z" } as StudioPost];
   let initCalls = 0;
   let outcome = "refused";
   globalThis.fetch = async input => {

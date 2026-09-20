@@ -6,6 +6,7 @@ import { updateStoreSlice } from "@/lib/store";
 const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media"], fn, { userId });
 import type { StudioPost } from "@/lib/types";
 import { NextResponse } from "next/server";
+import { validateStudioSchedule } from "@/lib/tiktok-publish";
 import { z } from "zod";
 import { validatePost, postErrorResponse } from "@/lib/post-validation";
 import { inScope } from "@/lib/projects";
@@ -25,6 +26,7 @@ const schema = z.object({
       title: z.string().max(90),
       privacy: z.string(),
       allowComment: z.boolean(),
+      autoAddMusic: z.boolean().default(false),
       commercial: z.boolean(),
       brandOrganic: z.boolean(),
       brandContent: z.boolean(),
@@ -37,6 +39,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
+  try { await validateStudioSchedule(user.id, parsed.data, user.projectId); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "creator_unavailable" }, { status: 400 }); }
 
   const origin = parsed.data.origin || "manual";
   const photos = parsed.data.photo_images?.length
@@ -70,7 +74,7 @@ export async function POST(request: Request) {
       inCalendar: true,
       createdAt: new Date().toISOString(),
       tiktok: parsed.data.tiktok,
-      tiktokApprovedAt: parsed.data.tiktok?.privacy ? new Date().toISOString() : undefined,
+      tiktokApprovedAt: parsed.data.status === "scheduled" && parsed.data.tiktok?.privacy ? new Date().toISOString() : undefined,
     };
     validatePost(data, created);
     data.posts.unshift(created);

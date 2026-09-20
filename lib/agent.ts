@@ -25,8 +25,7 @@ import { importTikTokFromUrl, resolveUrl } from "./tiktok-import";
 import { reconstructRecipe, ReconstructError } from "./reconstruct";
 import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
-import { agentProposal, coerceOptions, isCreatorApproved, type TikTokPostOptions } from "./tiktok-compliance";
-import { directPostPhotos, PublishError } from "./tiktok-publish";
+import { agentProposal, coerceOptions, revokeCreatorApproval, type TikTokPostOptions } from "./tiktok-compliance";
 import { readStoreSlice, updateStoreSlice, localStoreEnabled } from "./store";
 import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
 import type { RecipeInput } from "./recipe";
@@ -200,13 +199,10 @@ export async function agentUpdatePost(
     if (input.caption) found.body = input.caption.slice(0, 2200);
     if (input.tiktok?.title !== undefined) found.tiktok = { ...coerceOptions(found.tiktok, found.body), title: String(input.tiktok.title).trim().slice(0, 90) };
     // What the creator approved is no longer what would be posted.
-    if (input.caption || input.tiktok || input.recipe || input.photo_images?.length || input.image || input.channelId) {
-      if (found.tiktokApprovedAt) { found.tiktokApprovedAt = undefined; if (found.tiktok) found.tiktok = agentProposal(found.tiktok, found.body); }
-      if (found.status === "scheduled") found.status = "draft";
-    }
+    if (Object.keys(input).some(key => input[key as keyof typeof input] !== undefined)) revokeCreatorApproval(found);
     if (input.date) found.date = input.date;
     if (input.time) found.time = input.time;
-    if (input.status) found.status = input.status === "scheduled" && !isCreatorApproved(found) ? "draft" : input.status;
+    if (input.status) found.status = input.status === "scheduled" ? "draft" : input.status;
     if (input.channelId) found.channelIds = [input.channelId];
     if (input.origin) found.origin = input.origin;
     validatePost(data, found);
@@ -257,6 +253,7 @@ export async function agentUpdateRecipe(
     if (!found) return null;
     assertEditable(found);
     assertMediaReferences(data, input, user);
+    revokeCreatorApproval(found);
     found.recipe = applyRecipePatch(ensureRecipe(found), input);
     found.image = coverOf(found);
     if (input.caption) found.body = input.caption.slice(0, 2200);
@@ -282,6 +279,7 @@ export async function agentReconstructPost(user: SessionUser, idOrShare: string)
       const item = store.posts.find((entry) => entry.id === found.id && inScope(entry, user));
       if (!item) return null;
       assertEditable(item);
+      revokeCreatorApproval(item);
       item.recipe = recipe;
       item.image = coverOf(item);
       return item;
@@ -531,11 +529,13 @@ export const approveUrl = (id: string) => `${process.env.NEXT_PUBLIC_SITE_URL ||
  */
 export async function agentPublish(user: SessionUser, input: {
   caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
-  privacy_level?: string; allow_comment?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
+  privacy_level?: string; allow_comment?: boolean; auto_add_music?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
+  recipe?: RecipeInput;
 }, via: "studio" | "agent" = "agent") {
   const studio = via === "studio";
+  if (studio) await validateMediaInput(input, user);
   const options = studio
-    ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment,
+    ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment, autoAddMusic: input.auto_add_music,
         commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption)
     : agentProposal({ title: input.title }, input.caption);
   let id: string;
@@ -545,7 +545,13 @@ export async function agentPublish(user: SessionUser, input: {
     await updateStore(data => {
       const p = data.posts.find(p => p.id === found.id)!;
       if (p.publishId || ["PREPARING", "INITIATING", "PROCESSING", "REVIEW_REQUIRED"].includes(p.publishState || "")) throw new AgentError("publication_already_started", 409);
+      assertMediaReferences(data, input, user);
       p.body = input.caption; p.tiktok = options;
+      // Persist precisely the preview accepted by the creator, before dispatch.
+      if (input.recipe) p.recipe = applyRecipePatch(ensureRecipe(p), { ...input.recipe, replaceSlides: true });
+      else if (input.photo_images?.length) p.recipe = recipeFromPhotos(input.photo_images, p.origin || "manual");
+      else if (input.image) p.recipe = recipeFromPhotos([input.image], p.origin || "manual");
+      p.image = coverOf(p);
       p.tiktokApprovedAt = studio ? new Date().toISOString() : undefined;
       if (!studio && p.status === "scheduled") p.status = "draft";
       if (input.channelId) p.channelIds = [input.channelId];
@@ -557,7 +563,7 @@ export async function agentPublish(user: SessionUser, input: {
     const target = input.channelId || (connected.length === 1 ? connected[0].id : undefined);
     if (!target) throw new AgentError("channel_required");
     const p = await agentCreatePost(user, { caption: input.caption, channelId: target, status: "draft",
-      photo_images: input.photo_images, image: input.image, tiktok: options });
+      photo_images: input.photo_images, image: input.image, recipe: input.recipe, tiktok: options });
     id = p.id;
     if (studio) await updateStore(data => { const row = data.posts.find(x => x.id === id); if (row) { row.tiktok = options; row.tiktokApprovedAt = new Date().toISOString(); } });
   }

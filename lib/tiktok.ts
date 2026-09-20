@@ -17,11 +17,10 @@ export const OAUTH_SCOPES_PRODUCTION = [
   "user.info.profile",
   "user.info.stats",
   "video.list",
-  "video.upload",
   "video.publish",
 ].join(",");
 
-export const OAUTH_SCOPES_SANDBOX = ["user.info.basic", "video.upload", "video.publish"].join(",");
+export const OAUTH_SCOPES_SANDBOX = ["user.info.basic", "video.publish"].join(",");
 
 export const USER_INFO_FIELDS = [
   "open_id",

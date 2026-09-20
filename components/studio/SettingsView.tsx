@@ -763,12 +763,7 @@ export function SettingsView() {
                   </button>
                 </div>
               </div>
-              <Switch
-                on={autoAddMusic}
-                set={setAutoAddMusic}
-                title={t("Ajouter la musique auto", "Auto-add music", english)}
-                hint={t("TikTok auto_add_music sur les carrousels photo.", "TikTok auto_add_music on photo carousels.", english)}
-              />
+              <p>{t("La musique se choisit pour chaque carrousel dans le composeur TikTok.", "Choose music for each carousel in the TikTok composer.", english)}</p>
             </div>
 
             <div className="ss-form-actions ss-settings-save">

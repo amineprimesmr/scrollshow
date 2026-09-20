@@ -173,7 +173,7 @@ function PhoneMockup({ english }: { english: boolean }) {
         </div>
         <span className="af-ld-spot__badge" aria-hidden="true">
           <span className="af-ld-spot__badge-dot" />
-          {t("Automatisé", "Automated", english)}
+          {t("Validé par le créateur", "Creator approved", english)}
         </span>
       </div>
     </div>
@@ -325,13 +325,13 @@ export function LandingSpotlight({ english }: { english: boolean }) {
           </h2>
 
           <figure className="af-ld-spot__lede" data-i="2">
-            <blockquote>
+            <p>
               {t(
-                "« Ça me prend 3 minutes par semaine. Je lance l’agent, il crée et programme mes 35 slideshows, et je n’y retouche plus. Honnêtement ça change la vie. »",
-                "“It takes me 3 minutes a week. I start the agent, it creates and schedules my 35 slideshows, and I never touch them again. Honestly, it changes everything.”",
+                "Prépare tes carrousels originaux avec ton agent. Relis chaque post et choisis ses options TikTok dans le studio avant de publier.",
+                "Draft original carousels with your agent. Review each post and choose its TikTok settings in the studio before publishing.",
                 english,
               )}
-            </blockquote>
+            </p>
           </figure>
 
           <AnalyticsPanel english={english} shown={shown} />

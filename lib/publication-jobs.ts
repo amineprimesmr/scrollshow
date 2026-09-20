@@ -34,7 +34,7 @@ export async function dispatchPost(userId: string, id: string) {
     const recipe = ensureRecipe(post);
     const photos = needsRasterize(recipe) ? await rasterizeRecipe(recipe, { id: userId, projectId: post.projectId }) : photosOf(recipe);
     if (!photos.length) throw new Error("photos_required");
-    const { publishId } = await directPostPhotos(userId, { photos, description: post.body, options: coerceOptions(post.tiktok), channelId: post.channelIds[0], projectId: post.projectId }, async () => {
+    const { publishId } = await directPostPhotos(userId, { photos, description: post.body, options: coerceOptions(post.tiktok), channelId: post.channelIds[0], projectId: post.projectId, tiktokApprovedAt: post.tiktokApprovedAt }, async () => {
       await updateStore(data => {
         const p = data.posts.find(p => p.id === id && p.publishClaim === claim);
         if (!p) throw new Error("publication_claim_lost");

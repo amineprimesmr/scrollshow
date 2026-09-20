@@ -60,9 +60,9 @@ const EXAMPLES: Example[] = [
     steps: [
       { tool: "list_posts", detail: { fr: "Créneaux libres repérés", en: "Free slots found" } },
       { tool: "create_post", detail: { fr: "7 carrousels créés", en: "7 carousels created" } },
-      { tool: "update_post", detail: { fr: "Planifiés · 18:00", en: "Scheduled · 6:00 pm" } },
+      { tool: "update_post", detail: { fr: "Brouillons à relire · 18:00", en: "Drafts to review · 6:00 pm" } },
     ],
-    summary: { fr: "Ta semaine est planifiée. Chaque post part à l'heure que tu as validée.", en: "Your week is scheduled. Every post goes out at the time you approved." },
+    summary: { fr: "Tes brouillons sont prêts. Relis chaque post et choisis ses options TikTok dans le studio avant de le planifier.", en: "Your drafts are ready. Review each post and choose its TikTok settings in the studio before scheduling it." },
   },
   {
     id: "analyse",

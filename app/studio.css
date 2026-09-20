@@ -8134,3 +8134,9 @@ body.ss-dragging .ss-day:hover {
 @media (prefers-reduced-motion: no-preference) {
   .ss-sidebar-link.is-drop { transition: background 0.16s ease, box-shadow 0.16s ease; }
 }
+
+/* Disabled controls delegate hover to their focusable explanation wrapper. */
+.ss-ttp__publish { position: relative; }
+.ss-ttp__publish button:disabled { pointer-events: none; }
+.ss-ttp__tooltip { display: none; position: absolute; z-index: 10; bottom: calc(100% + 8px); right: 0; width: 260px; max-width: 70vw; padding: 10px 12px; border-radius: 12px; color: var(--ss-ink); font-size: 12px; line-height: 1.4; }
+.ss-ttp__publish:hover .ss-ttp__tooltip, .ss-ttp__publish:focus .ss-ttp__tooltip { display: block; }

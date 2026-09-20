@@ -61,7 +61,7 @@ export function PricingCards({ english = false, destination = "/signup", hasAcce
     t("Analyse de comptes TikTok", "TikTok account analysis", english),
     t("Bibliothèque de formats", "Slideshow format library", english),
     t("Création de carrousels", "Carousel creation", english),
-    t("Duplication de slideshows", "Slideshow duplication", english),
+    t("Modèles de carrousels originaux", "Original carousel templates", english),
     t("Calendrier et publication TikTok", "Calendar and TikTok publishing", english),
     t("Claude, Codex et Cursor via MCP", "Claude, Codex and Cursor via MCP", english),
     t("Sans renouvellement", "No renewal", english),

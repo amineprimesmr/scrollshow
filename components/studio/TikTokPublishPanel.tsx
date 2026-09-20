@@ -36,6 +36,7 @@ export type CreatorState = {
 export function useTikTokCreator(active: boolean, channelId?: string): CreatorState & { refresh: () => void } {
   const [state, setState] = useState<CreatorState>({ loading: false, connected: false, creator: null, blocked: null, error: "", handle: "" });
   const [tick, setTick] = useState(0);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const refresh = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export function useTikTokCreator(active: boolean, channelId?: string): CreatorSt
           setState({ loading: false, connected: true, creator: null, blocked: null, error: String(json.error || "creator"), handle: "" });
           return;
         }
+        setLoadedFor(channelId || "");
         setState({
           loading: false,
           connected: Boolean(json.connected),
@@ -67,7 +69,7 @@ export function useTikTokCreator(active: boolean, channelId?: string): CreatorSt
     };
   }, [active, tick, channelId]);
 
-  return { ...state, refresh };
+  return { ...state, ...(loadedFor !== (channelId || "") ? { creator: null, loading: active && !state.error } : {}), refresh };
 }
 
 export function optionsErrorCopy(code: OptionsError | string, english: boolean) {
@@ -204,7 +206,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
 
       <label className="ss-ttp__field">
         <span>{t("Qui peut voir ce post", "Who can view this post", english)}</span>
-        <select value={options.privacy} onChange={(event) => choosePrivacy(event.target.value)} disabled={!privacyOptions.length} required>
+        <select title={brandedLocksPrivate ? optionsErrorCopy("branded_content_private", english) : undefined} value={options.privacy} onChange={(event) => choosePrivacy(event.target.value)} disabled={!privacyOptions.length} required>
           <option value="" disabled>
             {t("Sélectionner…", "Select privacy…", english)}
           </option>
@@ -238,6 +240,12 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
         />
         <span>{t("Autoriser les commentaires", "Allow comment", english)}</span>
         {commentDisabled ? <small>{t("Désactivé dans tes réglages TikTok", "Disabled in your TikTok settings", english)}</small> : null}
+      </label>
+
+      <label className="ss-ttp__check">
+        <input type="checkbox" checked={options.autoAddMusic === true} onChange={event => patch({ autoAddMusic: event.target.checked })} />
+        <span>{t("Ajouter une musique recommandée par TikTok", "Add music recommended by TikTok", english)}</span>
+        <small>{t("TikTok choisira la musique de ce carrousel.", "TikTok will choose the music for this carousel.", english)}</small>
       </label>
 
       <div className="ss-ttp__disclose">

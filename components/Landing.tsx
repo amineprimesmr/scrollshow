@@ -74,7 +74,7 @@ function ViewsHero({ english }: { english: boolean }) {
       <div className="af-ld-stage">
         <div className="af-ld-stage__copy">
           <h1 className="af-ld-views__title">
-            <span className="af-ld-title-line">Automatise la distribution de</span>{" "}
+            <span className="af-ld-title-line">Crée les carrousels de</span>{" "}
             <span className="af-ld-title-line">ton app mobile avec <span className="af-ld-title-accent">ton agent</span></span>
           </h1>
           <HeroSkill english={english} />
@@ -172,7 +172,7 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
                   <span className="af-ld-step-verdict is-ok">{t("3 min par semaine", "3 min a week", english)}</span>
                 </div>
                 <h3>{t("ScrollShow dans ton agent", "ScrollShow inside your agent", english)}</h3>
-                <p>{t("Le même Claude, branché sur ton compte. Il crée les slideshows, les programme et publie — tu ne fais que valider.", "The same Claude, connected to your account. It creates the slideshows, schedules them and publishes — you only approve.", english)}</p>
+                <p>{t("Le même Claude, branché sur ton compte. Il prépare tes carrousels originaux. Tu les relis dans le studio, choisis les options TikTok et décides de publier.", "The same Claude, connected to your account. It drafts original carousels. Review them in the studio, choose the TikTok settings and decide when to publish.", english)}</p>
               </article></Beam>
             </div>
           </div>

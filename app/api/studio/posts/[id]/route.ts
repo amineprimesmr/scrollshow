@@ -6,6 +6,7 @@ import { updateStoreSlice } from "@/lib/store";
 // suppression des medias est globale : elle s'ecrit a part, apres.
 const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T>>[1]) => updateStoreSlice(["posts", "channels", "accounts", "media"], fn, { userId });
 import { NextResponse } from "next/server";
+import { validateStudioSchedule } from "@/lib/tiktok-publish";
 import { z } from "zod";
 import { queueDeletedMedia } from "@/lib/media-cleanup";
 import { assertEditable, validatePost, validateSchedule, postErrorResponse } from "@/lib/post-validation";
@@ -26,6 +27,7 @@ const schema = z.object({
       title: z.string().max(90),
       privacy: z.string(),
       allowComment: z.boolean(),
+      autoAddMusic: z.boolean().default(false),
       commercial: z.boolean(),
       brandOrganic: z.boolean(),
       brandContent: z.boolean(),
@@ -42,6 +44,8 @@ export async function PATCH(
   const { id } = await params;
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
+  try { await validateStudioSchedule(user.id, parsed.data, user.projectId); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "creator_unavailable" }, { status: 400 }); }
 
   const post = await updateStore(user.id, (data) => {
     assertMediaReferences(data, parsed.data, user);
@@ -50,7 +54,12 @@ export async function PATCH(
     assertEditable(found);
     const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
     Object.assign(found, rest);
-    if (rest.tiktok) found.tiktokApprovedAt = rest.tiktok.privacy ? new Date().toISOString() : undefined;
+    if (rest.tiktok) found.tiktokApprovedAt = found.status === "scheduled" && rest.tiktok.privacy ? new Date().toISOString() : undefined;
+    else if (parsed.data.body !== undefined || parsed.data.channelIds || recipePatch || photo_images || image) {
+      found.tiktokApprovedAt = undefined;
+      if (found.status === "scheduled") found.status = "draft";
+    }
+    if (found.status === "draft") found.tiktokApprovedAt = undefined;
     // Un simple deplacement (date/heure) ne rejoue pas toute la validation de
     // publication : un post planifie a l'ancienne (sans options TikTok) doit
     // pouvoir bouger dans le calendrier, il sera revalide a la publication.

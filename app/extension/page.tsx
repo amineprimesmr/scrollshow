@@ -26,7 +26,7 @@ export default function ExtensionPage() {
         <h1>L&apos;extension ScrollShow</h1>
         <p className="ss-ext__lead">
           Tes recherches tournent dans <b>ton</b> TikTok, dans ton navigateur : les mêmes résultats que sur tiktok.com,
-          sur tous les mots-clés, sans limite. Rien ne part ailleurs que sur ton compte ScrollShow.
+          selon les résultats disponibles et les limites de TikTok. Rien ne part ailleurs que sur ton compte ScrollShow.
         </p>
         <a className="ss-ext__cta lg-press" href="/scrollshow-extension.zip" download>
           Télécharger l&apos;extension

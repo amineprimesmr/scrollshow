@@ -4,6 +4,8 @@
  * allowlist below is what keeps that proxy from becoming an open relay.
  */
 const HOSTS = [
+  // Exact host observed in official video.list for EEA photo covers.
+  "p0-common-image-private-useastred.tiktokv.eu",
   "tiktokcdn.com",
   "tiktokcdn-us.com",
   "tiktokcdn-eu.com",

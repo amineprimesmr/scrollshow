@@ -7,7 +7,6 @@ import {
   defaultOverlay,
   defaultSlide,
   ensureRecipe,
-  needsRasterize,
   needsReconstruct,
   photosOf,
   RECIPE_FONTS,
@@ -15,7 +14,7 @@ import {
 } from "@/lib/recipe";
 import { dateInTimeZone } from "@/lib/settings";
 import { sound } from "@/lib/sound";
-import { coerceOptions, EMPTY_OPTIONS, type TikTokPostOptions, validatePostOptions } from "@/lib/tiktok-compliance";
+import { coerceOptions, EMPTY_OPTIONS, isCreatorApproved, type TikTokPostOptions, validatePostOptions } from "@/lib/tiktok-compliance";
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 import { useEffect, useRef, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
@@ -59,7 +58,8 @@ export function CreatePostModal() {
   const optionsError = validatePostOptions(options, creatorState.creator);
   const canPublish =
     availability?.tiktokPublishing === true &&
-    connected.length > 0 &&
+    channelIds.length === 1 && connected.some(channel => channel.id === channelIds[0]) &&
+    !uploading &&
     !creatorState.loading &&
     !creatorState.blocked &&
     Boolean(creatorState.creator) &&
@@ -109,7 +109,7 @@ export function CreatePostModal() {
       setSlideIndex(0);
       setMessage("");
       setShowOriginal(Boolean(next.slides.some((item) => item.keepPhoto)));
-      setOptions(editing.tiktok ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS });
+      setOptions(isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS, title: editing.tiktok?.title || "" });
       setProgress(
         editing.publishId && editing.publishState && editing.publishState !== "FAILED"
           ? { publishId: editing.publishId, status: editing.publishState, tiktokId: editing.tiktokId }
@@ -337,9 +337,9 @@ export function CreatePostModal() {
     if (rebuilding) return;
     // A scheduled post goes out unattended, so the creator's choices must be
     // complete now — the scheduler never fills them in.
-    if (status === "scheduled" && channelIds.some((id) => connected.some((channel) => channel.id === id)) && optionsError) {
+    if (status === "scheduled" && !canPublish) {
       sound.error();
-      setMessage(optionsErrorCopy(optionsError, english));
+      setMessage(optionsError ? optionsErrorCopy(optionsError, english) : t("Attends la vérification du compte TikTok.", "Wait for TikTok account verification.", english));
       return;
     }
     setPending(true);
@@ -414,32 +414,19 @@ export function CreatePostModal() {
     try {
 
     if (!canPublish) {
-      if (optionsError) setMessage(optionsErrorCopy(optionsError, english));
+      if (optionsError) setMessage(optionsError ? optionsErrorCopy(optionsError, english) : t("Attends la vérification du compte TikTok.", "Wait for TikTok account verification.", english));
       return;
     }
     setPending(true);
     setMessage("");
-    let photos = photosOf(recipe);
-    if (needsRasterize(recipe)) {
-      const raster = await fetch(editing?.id ? `/api/studio/posts/${editing.id}/rasterize` : "/api/studio/rasterize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipe }),
-      });
-      const rasterJson = await raster.json().catch(() => ({}));
-      if (!raster.ok || !Array.isArray(rasterJson.photo_images) || !rasterJson.photo_images.length) {
-        setPending(false);
-        setMessage(t("Impossible de générer les images avec le nouveau texte.", "Could not render images with the new text.", english));
-        return;
-      }
-      photos = rasterJson.photo_images;
-    }
+    const photos = photosOf(recipe);
     // Guideline 5c: nothing is sent to TikTok before this explicit click.
     const res = await fetch("/api/tiktok/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         photo_images: photos,
+        recipe: { ...recipe, replaceSlides: true },
         description: body,
         options,
         post_id: editing?.id,
@@ -684,7 +671,7 @@ export function CreatePostModal() {
                       name="publish-channel"
                       checked={channelIds.includes(channel.id)}
                       onChange={(event) => {
-                        if (event.target.checked) setChannelIds([channel.id]);
+                        if (event.target.checked) { setChannelIds([channel.id]); setOptions({ ...EMPTY_OPTIONS, title: options.title }); }
                       }}
                     />
                     {channel.name} · {platformName(channel.platform)}
@@ -708,11 +695,13 @@ export function CreatePostModal() {
                   {t("Supprimer", "Delete", english)}
                 </button>
               ) : null}
-              <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding}>
-                {pending ? "…" : editing || status === "draft" ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
+              <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding || uploading || (status === "scheduled" && !canPublish)}>
+                {pending ? "…" : status === "draft" ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
               </button>
               <span
                 className="ss-ttp__publish"
+                tabIndex={optionsError ? 0 : undefined}
+                aria-describedby={optionsError ? "tiktok-publish-reason" : undefined}
                 title={
                   optionsError === "commercial_choice_required"
                     ? optionsErrorCopy(optionsError, english)
@@ -721,6 +710,7 @@ export function CreatePostModal() {
                       : undefined
                 }
               >
+                {optionsError ? <span role="tooltip" id="tiktok-publish-reason" className="ss-ttp__tooltip lg">{optionsErrorCopy(optionsError, english)}</span> : null}
                 <Metal preset="chromatic" strength={canPublish ? 0.95 : 0.35}>
                   <button className="ss-btn-purple" type="button" disabled={!canPublish} onClick={publishNow}>
                     {pending ? <Orb size={20} state="connecting" invert /> : null}

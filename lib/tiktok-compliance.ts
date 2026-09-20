@@ -25,6 +25,8 @@ export type TikTokPostOptions = {
   privacy: string;
   /** "Allow comment" — unchecked by default per guideline 2c. */
   allowComment: boolean;
+  /** Explicit per-post choice; never read from mutable account settings at dispatch. */
+  autoAddMusic: boolean;
   /** "Content disclosure" toggle — off by default per guideline 3a. */
   commercial: boolean;
   /** "Your brand" → brand_organic_toggle. */
@@ -37,6 +39,7 @@ export const EMPTY_OPTIONS: TikTokPostOptions = {
   title: "",
   privacy: "",
   allowComment: false,
+  autoAddMusic: false,
   commercial: false,
   brandOrganic: false,
   brandContent: false,
@@ -98,7 +101,7 @@ export type OptionsError =
 export function validatePostOptions(options: TikTokPostOptions, creator: CreatorSnapshot | null): OptionsError | null {
   if (!options.title.trim()) return "title_required";
   if (!options.privacy) return "privacy_required";
-  if (creator?.privacyOptions.length && !creator.privacyOptions.includes(options.privacy)) return "privacy_not_allowed";
+  if (creator && !creator.privacyOptions.includes(options.privacy)) return "privacy_not_allowed";
   if (options.commercial && !options.brandOrganic && !options.brandContent) return "commercial_choice_required";
   if (options.commercial && options.brandContent && options.privacy === "SELF_ONLY") return "branded_content_private";
   if (options.allowComment && creator?.commentDisabled) return "comment_disabled_by_creator";
@@ -119,14 +122,14 @@ export function commercialLabel(options: TikTokPostOptions): "promotional" | "pa
 }
 
 /** Builds the post_info block for a PHOTO direct post. Duet/stitch do not apply to photos. */
-export function photoPostInfo(options: TikTokPostOptions, description: string, autoAddMusic: boolean) {
+export function photoPostInfo(options: TikTokPostOptions, description: string) {
   const commercial = options.commercial;
   return {
     title: options.title.trim().slice(0, 90),
     description: description.slice(0, 2200),
     privacy_level: options.privacy,
     disable_comment: !options.allowComment,
-    auto_add_music: autoAddMusic,
+    auto_add_music: options.autoAddMusic === true,
     brand_content_toggle: commercial && options.brandContent,
     brand_organic_toggle: commercial && options.brandOrganic,
   };
@@ -138,6 +141,7 @@ export function coerceOptions(input: Partial<TikTokPostOptions> | null | undefin
     title: String(input?.title ?? "").trim() || fallbackTitle.slice(0, 90),
     privacy: String(input?.privacy ?? ""),
     allowComment: Boolean(input?.allowComment),
+    autoAddMusic: input?.autoAddMusic === true,
     commercial: Boolean(input?.commercial) || Boolean(input?.brandOrganic) || Boolean(input?.brandContent),
     brandOrganic: Boolean(input?.brandOrganic),
     brandContent: Boolean(input?.brandContent),
@@ -148,17 +152,21 @@ export function coerceOptions(input: Partial<TikTokPostOptions> | null | undefin
  * Guideline 5: the creator must have "full awareness and control" of what is
  * posted. Privacy, comments and disclosure therefore only count when they were
  * chosen on the Post to TikTok page (studio session), never when an agent or
- * API caller supplied them. Posts saved before the cutoff predate the marker.
+ * API caller supplied them. Legacy posts must also be reviewed in the studio.
  */
-const APPROVAL_CUTOFF = "2026-09-21";
-
 export function isCreatorApproved(post: { tiktok?: { privacy?: string }; tiktokApprovedAt?: string; createdAt?: string }) {
   if (!post.tiktok?.privacy) return false;
-  if (post.tiktokApprovedAt) return true;
-  return Boolean(post.createdAt && post.createdAt.slice(0, 10) < APPROVAL_CUTOFF);
+  return Boolean(post.tiktokApprovedAt && Number.isFinite(Date.parse(post.tiktokApprovedAt)));
 }
 
 /** What a non-studio caller may pre-fill: the editable title, nothing the guidelines require the creator to pick. */
 export function agentProposal(input: Partial<TikTokPostOptions> | null | undefined, fallbackTitle = ""): TikTokPostOptions {
   return { ...EMPTY_OPTIONS, title: String(input?.title ?? "").trim().slice(0, 90) || fallbackTitle.slice(0, 90) };
+}
+
+/** Any agent edit requires a new review and an explicit publish/schedule action. */
+export function revokeCreatorApproval(post: { tiktokApprovedAt?: string; tiktok?: TikTokPostOptions; status: string; body: string }) {
+  post.tiktokApprovedAt = undefined;
+  if (post.tiktok) post.tiktok = agentProposal(post.tiktok, post.body);
+  if (post.status === "scheduled") post.status = "draft";
 }
