@@ -55,6 +55,7 @@ test("publication distinguishes preflight rejection, definitive refusal, uncerta
     outcome = "accepted";
     await dispatchPost("u", "p");
     assert.equal((await post()).publishState, "PROCESSING");
+    assert.deepEqual((await post()).publishedPhotos, ["https://scrollshow.io/fixture.jpg"]);
     await reconcilePublishId("u", "synthetic_publish");
     const failed = await post();
     assert.equal(failed.status, "draft"); assert.equal(failed.publishId, undefined); assert.equal(failed.previousPublishId, "synthetic_publish");

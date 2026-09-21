@@ -329,6 +329,8 @@ export type StudioPost = {
   /** Set only by the studio's Post to TikTok page: the creator saw the preview and chose these options themselves. */
   tiktokApprovedAt?: string;
   publishId?: string;
+  /** Exact rendered images handed to TikTok, retained for the published preview. */
+  publishedPhotos?: string[];
   previousPublishId?: string;
   publishState?: string;
   publishChannelId?: string;

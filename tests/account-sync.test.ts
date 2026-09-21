@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { emptyStore, readStore } from "../lib/store";
+import { emptyStore, readStore, updateStoreSlice } from "../lib/store";
+import { usedMediaUrls } from "../lib/media-usage";
 import { syncAccountPosts, officialAccountVideo } from "../lib/account-sync";
 import { listVideoPage } from "../lib/tiktok";
 import { accountInsights } from "../lib/insights";
@@ -91,4 +92,18 @@ test("official photo cover identifies a carousel even when TikTok returns a vide
   assert.equal(officialAccountVideo({ ...value, cover_image_url: "https://p0-common-image-private-useastred.tiktokv.eu/tos-useast2a-i-photomode-euttp/cover.webp" }, "creator").kind, "photo");
   assert.equal(officialAccountVideo({ ...value, cover_image_url: "https://p16-sign.tiktokcdn.com/video/cover.webp?caption=photomode" }, "creator").kind, "video");
   assert.equal(officialAccountVideo({ ...value, cover_image_url: "invalid" }, "creator").kind, "video");
+});
+
+test("published previews retain the sent images instead of editable backgrounds or an unavailable API cover", async () => {
+  await fixture();
+  await updateStoreSlice(["posts", "channels"], data => {
+    data.channels[0].videos = [{ id: "123", title: "Official", cover: "https://example.invalid/expired.webp", kind: "video", createdAt: 1, views: 10, likes: 2, comments: 0, shares: 0, url: "https://www.tiktok.com/@creator/video/123" }];
+    data.posts.push({ id: "post", userId: user.id, channelIds: ["channel"], status: "published", tiktokId: "123", image: "/background.png", publishedPhotos: ["/api/i/final-1.webp", "/api/i/final-2.webp"], body: "Original", date: "2026-09-21", time: "12:00", views: 0, likes: 0, comments: 0, shares: 0 });
+  });
+  const result = await accountInsights(user as never, "ch:channel", null);
+  assert.equal(result!.videos[0].cover, "/api/i/final-1.webp");
+  assert.deepEqual(result!.videos[0].images, ["/api/i/final-1.webp", "/api/i/final-2.webp"]);
+  assert.equal(result!.videos[0].kind, "photo");
+  assert.equal(result!.videos[0].views, 10);
+  assert.equal(usedMediaUrls((await readStore()).posts).has("/api/i/final-2.webp"), true);
 });

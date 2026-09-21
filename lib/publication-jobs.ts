@@ -40,6 +40,7 @@ export async function dispatchPost(userId: string, id: string) {
         if (!p) throw new Error("publication_claim_lost");
         p.publishState = "INITIATING";
         p.publishChannelId = post.channelIds[0];
+        p.publishedPhotos = [...photos];
       });
       initiated = true;
     });

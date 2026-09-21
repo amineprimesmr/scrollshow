@@ -323,8 +323,8 @@ async function channelInsights(
       {
         id: p.tiktokId || p.id,
         title: p.body.slice(0, 140),
-        cover: p.image,
-        images: p.recipe?.slides.map(s => s.image),
+        cover: p.publishedPhotos?.[0] || p.image,
+        images: p.publishedPhotos?.length ? p.publishedPhotos : undefined,
         views: p.views,
         likes: p.likes,
         comments: p.comments,
@@ -335,6 +335,14 @@ async function channelInsights(
       },
       false,
     );
+    // The publication receipt has the final pixels, unlike the editable recipe's
+    // background images. Prefer these even when TikTok's cover URL is present.
+    if (p.publishedPhotos?.length) {
+      const saved = merged.get(p.tiktokId || p.id)!;
+      saved.cover = p.publishedPhotos[0];
+      saved.images = p.publishedPhotos;
+      saved.kind = "photo";
+    }
   }
 
   const cutoff = days ? Date.now() / 1000 - days * 86400 : 0;

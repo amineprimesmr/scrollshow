@@ -6,6 +6,7 @@ export function usedMediaUrls(posts: StudioPost[]) {
   const used = new Set<string>();
   for (const post of posts) {
     if (post.image) used.add(post.image);
+    for (const url of post.publishedPhotos || []) used.add(url);
     const recipe = ensureRecipe(post);
     for (const url of photosOf(recipe)) used.add(url);
     for (const slide of recipe.slides) if (slide.sourceImage) used.add(slide.sourceImage);
