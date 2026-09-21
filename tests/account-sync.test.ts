@@ -85,3 +85,10 @@ test("official posts use lifetime counters and share URL format",()=>{
   const video=officialAccountVideo({...raw("1"),share_url:"https://www.tiktok.com/@creator/photo/1"},"creator");
   assert.equal(video.kind,"photo");assert.equal(video.views,100);
 });
+
+test("official photo cover identifies a carousel even when TikTok returns a video share URL", () => {
+  const value = { ...raw("photo"), share_url: "https://www.tiktok.com/@creator/video/123" };
+  assert.equal(officialAccountVideo({ ...value, cover_image_url: "https://p0-common-image-private-useastred.tiktokv.eu/tos-useast2a-i-photomode-euttp/cover.webp" }, "creator").kind, "photo");
+  assert.equal(officialAccountVideo({ ...value, cover_image_url: "https://p16-sign.tiktokcdn.com/video/cover.webp?caption=photomode" }, "creator").kind, "video");
+  assert.equal(officialAccountVideo({ ...value, cover_image_url: "invalid" }, "creator").kind, "video");
+});

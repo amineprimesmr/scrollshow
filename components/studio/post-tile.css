@@ -11,6 +11,30 @@
   overflow: hidden;
 }
 
+.ss-posttile__unavailable {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ss-posttile__unavailable strong { color: var(--ss-ink); }
+.ss-posttile__unavailable > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.ss-posttile__unavailable small { text-decoration: underline; }
+
 /* Pastille posée sur la couverture : elle flotte, donc verre autorisé. */
 .ss-posttile__badge {
   position: absolute;

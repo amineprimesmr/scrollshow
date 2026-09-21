@@ -334,6 +334,11 @@ export function AccountPanel({
               </div>
             ) : null}
           </div>
+          {data?.canFetch && !data.sync?.complete ? (
+            <button type="button" className="ss-acc__pill lg lg--lens lg-press" disabled={fetching} onClick={() => void fetchVideos(true, true)}>
+              {t("Actualiser", "Refresh", en)}
+            </button>
+          ) : null}
           {data?.canFetch ? (
             <button type="button" className="ss-acc__pill lg lg--lens lg-press" disabled={fetching} onClick={() => void fetchVideos(false, true)}
               title={data.fetchedAt ? `${t("Lu le", "Read on", en)} ${new Date(data.fetchedAt).toLocaleDateString(en ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}` : undefined}>

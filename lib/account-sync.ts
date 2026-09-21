@@ -8,12 +8,16 @@ const updateStore = <T>(userId: string, fn: Parameters<typeof updateStoreSlice<T
 import type { AccountVideo, StoreData, VideoSync } from "./types";
 
 export function officialAccountVideo(v: TikTokVideo, handle: string): AccountVideo {
+  // TikTok can return a /video/ share URL for photo posts. Its photo-mode
+  // cover path is an additional positive signal, not a missing-duration guess.
+  let photoCover = false;
+  try { photoCover = /(?:^|[-/])photomode(?:[-/]|$)/.test(new URL(v.cover_image_url || "").pathname); } catch {}
   return {
     id: String(v.id), title: v.title || v.video_description || "", cover: v.cover_image_url || "",
     missingMetrics: (["views", "likes", "comments", "shares"] as const).filter((_, index) => !Number.isFinite([v.view_count, v.like_count, v.comment_count, v.share_count][index])),
     views: Number(v.view_count ?? 0), likes: Number(v.like_count ?? 0),
     comments: Number(v.comment_count ?? 0), shares: Number(v.share_count ?? 0),
-    kind: v.share_url?.includes("/photo/") ? "photo" : "video",
+    kind: v.share_url?.includes("/photo/") || photoCover ? "photo" : "video",
     createdAt: Number(v.create_time || 0),
     url: v.share_url || `https://www.tiktok.com/@${handle}/video/${v.id}`,
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { AccountVideo } from "@/lib/types";
 import { compact } from "./AccountsFan";
 import { avatarSrc, coverSrc } from "./cover";
@@ -35,6 +35,8 @@ export function PostTile({
   footer?: ReactNode;
 }) {
   const slides = post.kind === "photo" && post.images?.length ? post.images : null;
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const unavailable = !post.cover || failedCover === post.cover;
   const unknown = (key: "views" | "likes") => post.missingMetrics?.includes(key);
 
   return (
@@ -58,17 +60,19 @@ export function PostTile({
             <span className="ss-posttile__placeholder" aria-hidden>
               {post.kind === "photo" ? "▦" : "▶"}
             </span>
-            {post.cover ? (
+            {unavailable ? <span className="ss-posttile__unavailable">
+              <strong>{en ? "Preview unavailable" : "Aperçu indisponible"}</strong>
+              <span>{post.title || (en ? "TikTok post" : "Publication TikTok")}</span>
+              <small>{en ? "View post details" : "Voir les détails"}</small>
+            </span> : (
               <img
                 src={coverSrc(post.cover, 240)}
                 decoding="async"
                 alt=""
                 loading="lazy"
-                onError={(event) => {
-                  event.currentTarget.hidden = true;
-                }}
+                onError={() => setFailedCover(post.cover)}
               />
-            ) : null}
+            )}
           </button>
         )}
         {badge ? <span className="ss-posttile__badge">{badge}</span> : null}
