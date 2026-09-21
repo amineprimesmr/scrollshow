@@ -335,6 +335,9 @@ export function CreatePostModal() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    // Direct Post already persisted this carousel. Never create another draft
+    // from the still-open composer while its publication is in progress/done.
+    if (progress && progress.status !== "FAILED") return;
     if (rebuilding) return;
     // A scheduled post goes out unattended, so the creator's choices must be
     // complete now — the scheduler never fills them in.
@@ -448,6 +451,7 @@ export function CreatePostModal() {
       return;
     }
     sound.notify();
+    baseline.current = latestDraft.current;
     setProgress({ publishId: String(json.publish_id || ""), status: "PROCESSING" });
     reload();
 
@@ -697,7 +701,7 @@ export function CreatePostModal() {
                   {t("Supprimer", "Delete", english)}
                 </button>
               ) : null}
-              <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding || uploading || (status === "scheduled" && !canPublish)}>
+              <button className="ss-btn-ghost" type="submit" disabled={pending || rebuilding || uploading || Boolean(progress && progress.status !== "FAILED") || (status === "scheduled" && !canPublish)}>
                 {pending ? "…" : status === "draft" ? t("Enregistrer", "Save", english) : t("Planifier", "Schedule", english)}
               </button>
               <span
