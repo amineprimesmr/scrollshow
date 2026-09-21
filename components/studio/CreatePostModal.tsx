@@ -84,11 +84,6 @@ export function CreatePostModal() {
     setPostOpen(false); setEditing(null);
   };
   const closeRef = useRef(closeEditor); closeRef.current = closeEditor;
-  useEffect(() => {
-    if (!postOpen) return;
-    const frame = requestAnimationFrame(() => { baseline.current = latestDraft.current; });
-    return () => cancelAnimationFrame(frame);
-  }, [postOpen, initKey]);
   useEffect(() => { setSlideIndex(index => Math.max(0, Math.min(index, recipe.slides.length - 1))); }, [recipe.slides.length]);
   useEffect(() => {
     if (!postOpen) {
@@ -115,6 +110,13 @@ export function CreatePostModal() {
           ? { publishId: editing.publishId, status: editing.publishState, tiktokId: editing.tiktokId }
           : null,
       );
+      baseline.current = JSON.stringify({
+        body: editing.body, date: editing.date, time: editing.time,
+        status: editing.status === "published" ? "scheduled" : editing.status,
+        channelIds: editing.channelIds,
+        options: isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS, title: editing.tiktok?.title || "" },
+        recipe: next,
+      });
       return;
     }
     const settings = user?.settings;
@@ -140,6 +142,13 @@ export function CreatePostModal() {
     setRebuildError("");
     setShowOriginal(false);
     setRebuilding(false);
+    baseline.current = JSON.stringify({
+      body: "", date: composeDate || dateInTimeZone(settings?.timezone || "Europe/Paris"),
+      time: settings?.defaultPostTime || "18:00",
+      status: availability?.tiktokPublishing && connected.length ? settings?.defaultStatus || "scheduled" : "draft",
+      channelIds: activeChannel === "all" ? connected.slice(0, 1).map(item => item.id) : [activeChannel],
+      options: { ...EMPTY_OPTIONS }, recipe: draft,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postOpen, initKey]);
 
