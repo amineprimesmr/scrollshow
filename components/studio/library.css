@@ -398,6 +398,11 @@
 .ss-lib-tag.is-published { background: var(--ss-ok-bg); color: var(--ss-ok-fg); }
 .ss-lib-tag.is-scheduled { background: var(--ss-info-bg); color: var(--ss-info-fg); }
 .ss-lib-tag.is-draft { background: var(--ss-soft); color: var(--ss-muted); }
+/* Raccourci iPhone : post a recreer par l'agent, et lien vers le brouillon recree. */
+.ss-lib-tag.is-recreate-queued,
+.ss-lib-tag.is-recreate-running { background: var(--ss-warn-bg); color: var(--ss-warn-fg); }
+.ss-lib-tag.is-recreate-failed { background: var(--ss-err-bg, var(--ss-soft)); color: var(--ss-err-fg); }
+.ss-lib-tag.is-recreated { background: var(--ss-ok-bg); color: var(--ss-ok-fg); text-decoration: none; }
 
 .ss-lib-card__handle {
   font-size: 11px;

@@ -44,7 +44,8 @@ export async function POST(request: Request) {
   const code = await issueCode({
     clientId: client.id,
     userId: user.id,
-    projectId: value("project_id") || user.projectId,
+    // L'autorisation vaut pour tout le compte ; le projet n'est que le point de depart de l'agent.
+    projectId: user.projectId,
     redirectUri,
     codeChallenge,
     resource,

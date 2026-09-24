@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { emptyStore, readStore, updateStore, updateStoreSlice, readStoreSlice } from "../lib/store";
 import { backfillProjects, createProject, archiveProject } from "../lib/projects";
-import { issueTokens, resolveOAuthUser, rotateRefreshToken, revokeAllForUser, MCP_RESOURCE } from "../lib/oauth";
+import { issueTokens, resolveOAuthUser, switchGrantProject, rotateRefreshToken, revokeAllForUser, MCP_RESOURCE } from "../lib/oauth";
 import { createApiKey, resolveApiKey } from "../lib/api-keys";
 import { htmlSafeJson } from "../lib/safe-json";
 import { mayReadMedia, assertMediaReferences } from "../lib/media-permissions";
@@ -46,12 +46,15 @@ test("OAuth is bound to the consented workspace and refresh rotation cannot resu
   assert.equal((await readStore()).oauthTokens?.length, 0);
 }));
 
-test("archived workspace keys and OAuth grants fail closed instead of following the last workspace", async () => fixture(async () => {
+test("an archived workspace kills its API key; an account-wide OAuth grant moves to a remaining workspace of the same user", async () => fixture(async () => {
   const key = await createApiKey("u", "test", "prj_u_1");
   const token = await issueTokens({ clientId: "c", userId: "u", projectId: "prj_u_1", resource: MCP_RESOURCE, scope: "scrollshow" });
   await updateStore(data => { createProject(data, data.users[0], { name: "Second" }); archiveProject(data, "u", "prj_u_1"); });
   assert.equal(await resolveApiKey(key!.token), null);
-  assert.equal(await resolveOAuthUser(token.accessToken, MCP_RESOURCE), null);
+  const moved = await resolveOAuthUser(token.accessToken, MCP_RESOURCE);
+  assert.equal(moved?.id, "u");
+  assert.notEqual(moved?.projectId, "prj_u_1");
+  assert.equal(await switchGrantProject(token.accessToken, "prj_v_1"), null);
   assert.equal(await createApiKey("u", "invalid", "prj_v_1"), null);
 }));
 

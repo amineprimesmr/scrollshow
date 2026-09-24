@@ -15,6 +15,7 @@ import {
   agentMedia,
   agentChannels,
   agentPublish,
+  agentRasterizePost,
   agentReconstructPost,
   agentReport,
   agentShadowbanCheck,
@@ -26,10 +27,15 @@ import {
 } from "@/lib/agent";
 import { agentOptions, headerToken } from "@/lib/agent-http";
 import { resolveApiKey } from "@/lib/api-keys";
-import { MCP_RESOURCE, OAUTH_SCOPE, resolveOAuthUser } from "@/lib/oauth";
-import { publicUser } from "@/lib/store";
+import { MCP_RESOURCE, OAUTH_SCOPE, resolveOAuthUser, switchGrantProject } from "@/lib/oauth";
+import { publicUser, readStoreSlice } from "@/lib/store";
 import { hasStudioAccess } from "@/lib/plans";
-import { recipeInputSchema } from "@/lib/recipe";
+import { recipeInputSchema, ensureRecipe } from "@/lib/recipe";
+import { claimRecreation, completeRecreation, listRecreations, agentPrompt } from "@/lib/shortcut-recreate";
+import { findImages, galleryAdd, gallerySearch, gallerySheet, contactSheet } from "@/lib/image-bank";
+import { readSlideBytes } from "@/lib/media-files";
+import { withMediaUser } from "@/lib/media-permissions";
+import sharp from "sharp";
 import type { SessionUser } from "@/lib/types";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
@@ -42,7 +48,7 @@ import { loadCreator } from "@/lib/tiktok-publish";
 import { readStore } from "@/lib/store";
 import { consumeLimit } from "@/lib/rate-limit";
 import { scrollshowStarterPrompt } from "@/lib/assistant-prompts";
-import { inScope } from "@/lib/projects";
+import { inScope, listProjects } from "@/lib/projects";
 import { businessDashboard, registerLink, registerCost, registerExperiment } from "@/lib/business-analytics/service";
 import { linkSchema, costSchema, experimentSchema } from "@/lib/business-analytics/validation";
 import { scopeFor } from "@/lib/business-analytics/api";
@@ -53,6 +59,33 @@ const statusSchema = z.enum(["draft", "scheduled", "published"]);
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+/** Les agents choisissent et controlent a l'oeil : ces outils renvoient une image, pas une URL. */
+function withImages(data: unknown, images: Array<Buffer | null | undefined>) {
+  return { content: [
+    ...images.filter((image): image is Buffer => Boolean(image)).map(image => ({ type: "image" as const, data: image.toString("base64"), mimeType: "image/jpeg" })),
+    { type: "text" as const, text: JSON.stringify(data, null, 2) },
+  ] };
+}
+
+/** Une slide avec une grille en pourcentage : l'agent y lit la place et la taille des textes. */
+async function gridded(bytes: Buffer) {
+  const base = await sharp(bytes).rotate().resize({ width: 900 }).jpeg().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H } = base.info; let lines = "";
+  for (let i = 1; i < 10; i++) lines += `<line x1="${(W * i) / 10}" y1="0" x2="${(W * i) / 10}" y2="${H}" stroke="rgba(255,255,0,.45)"/><line x1="0" y1="${(H * i) / 10}" x2="${W}" y2="${(H * i) / 10}" stroke="rgba(255,255,0,.45)"/><text x="3" y="${(H * i) / 10 - 3}" font-family="Arial" font-size="15" fill="#ff0">${i * 10}</text><text x="${(W * i) / 10 + 3}" y="15" font-family="Arial" font-size="15" fill="#ff0">${i * 10}</text>`;
+  return sharp(base.data).composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${lines}</svg>`) }]).jpeg({ quality: 82 }).toBuffer();
+}
+
+async function postSlides(user: SessionUser, id: string, which: "source" | "rendered") {
+  if (which === "rendered") return (await agentRasterizePost(user, id)).photo_images;
+  const found = (await readStore()).posts.find(item => inScope(item, user) && (item.id === id || item.shareId === id));
+  if (!found) throw new Error("post_missing");
+  return ensureRecipe(found).slides.map(slide => slide.sourceImage || slide.image).filter(Boolean);
+}
+
+async function slideBuffers(user: SessionUser, urls: string[]) {
+  return withMediaUser(user, () => Promise.all(urls.map(async url => (await readSlideBytes(url))?.bytes || null)));
 }
 
 function fail(error: unknown) {
@@ -144,6 +177,158 @@ const handler = createMcpHandler(
       if (!post) throw new Error("post_missing");
       return text({ recipe: await agentGetRecipe(user, args.id), downloadUrl: `${process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"}/api/studio/posts/${encodeURIComponent(args.id)}/export` });
     } catch (e) { return fail(e); } });
+    server.registerTool(
+      "view_slides",
+      {
+        title: "Look at a post's slides",
+        description: "SEE a post. which='source' shows the original slides of an imported TikTok (what you must reproduce); which='rendered' renders the current recipe exactly as it will be published (use it to check your work before calling a carousel done). Without `slide` you get one numbered contact sheet of all slides. With `slide` (1-based) you get that slide large with a 0-100 percent grid: read overlay x/y from it, and estimate fontSize as (text width in % of the slide × 10.8) ÷ (number of characters × 0.52).",
+        inputSchema: z.object({ id: z.string(), which: z.enum(["source", "rendered"]).optional(), slide: z.number().int().min(1).max(35).optional() }),
+      },
+      async (args, ctx) => {
+        try {
+          const user = userFrom(ctx);
+          const urls = await postSlides(user, args.id, args.which || "source");
+          const buffers = await slideBuffers(user, args.slide ? urls.slice(args.slide - 1, args.slide) : urls.slice(0, 20));
+          const sizes = await Promise.all(buffers.map(async bytes => { if (!bytes) return null; const meta = await sharp(bytes).metadata(); return { width: meta.width, height: meta.height }; }));
+          if (args.slide) return withImages({ slide: args.slide, size: sizes[0], grid: "yellow lines every 10 % of width and height" }, [buffers[0] ? await gridded(buffers[0]) : null]);
+          const sheet = await contactSheet(buffers.flatMap((bytes, index) => bytes ? [{ bytes, label: `slide ${index + 1} · ${sizes[index]?.width}x${sizes[index]?.height}` }] : []));
+          return withImages({ slides: urls.length, sizes, note: "Sheet tiles are numbered from 0; slide numbers are in each label." }, [sheet]);
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "find_images",
+      {
+        title: "Find images",
+        description: "Search real photos for a slide. Returns the project's image bank matches first, then a numbered contact sheet of web candidates (already filtered: no ads, no shops, no tiny images, no fresh zero-engagement pins). LOOK at the sheet and pick by eye: 1) a real, good-looking photo — reject anything that looks AI-generated (plastic skin, studio-perfect light, stock look); 2) it illustrates the slide's text; 3) it leaves a calm area where the text goes; 4) it matches the other slides (same world, light, type of person). It does NOT need to copy the reference photo. Write queries the way people caption real photos ('candid', 'iphone photo', 'pov'), never 'aesthetic model'. Then call gallery_add with the chosen candidate's image, fallback and page.",
+        inputSchema: z.object({ query: z.string().min(2).max(120), limit: z.number().int().min(4).max(20).optional() }),
+      },
+      async (args, ctx) => {
+        try {
+          const { sheet, ...result } = await findImages(userFrom(ctx), args);
+          return withImages(result, [sheet]);
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "gallery_add",
+      {
+        title: "Add an image to the image bank",
+        description: "Save an image into the project's image bank from any public URL: a find_images candidate, or an image you generated with another connected tool (an image-generation MCP, for cut-outs on white backgrounds, recurring characters, infographics). Always tag it (subject, setting, light, mood, niche) so later carousels can reuse it for free. Returns the stored url to put in recipe.slides[].image and sourceImage.",
+        inputSchema: z.object({ url: z.string().url(), fallback: z.string().url().optional(), page: z.string().url().optional(), tags: z.array(z.string().max(40)).max(20).optional(), note: z.string().max(300).optional(), source: z.enum(["pinterest", "generated", "web"]).optional() }),
+      },
+      async (args, ctx) => {
+        try {
+          return text({ image: await galleryAdd(userFrom(ctx), args) });
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "gallery_search",
+      {
+        title: "Search the image bank",
+        description: "Search the project's own image bank by tags/notes and SEE the matches as a contact sheet. Always try this before find_images: bank images are free, already approved, and keep the account visually consistent.",
+        inputSchema: z.object({ query: z.string().max(120).optional() }),
+      },
+      async (args, ctx) => {
+        try {
+          const user = userFrom(ctx);
+          const images = await gallerySearch(user, args.query || "");
+          return withImages({ images }, [await gallerySheet(user, images.slice(0, 20))]);
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerPrompt("recreate_tiktok", {
+      title: "Recreate a TikTok for my business",
+      description: "Recreate a TikTok carousel shared with the ScrollShow iPhone shortcut (or any TikTok link) as an original draft for the user's business.",
+      argsSchema: z.object({ request: z.string().max(80).optional(), url: z.string().max(400).optional() }),
+    }, ({ request, url }) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text:
+      request ? agentPrompt(request, false)
+      : url ? `Recrée ce TikTok pour mon business avec ScrollShow : ${url}. import_tiktok, puis claim_recreation sur le post importé et suis ses étapes ; brouillon dans le calendrier, puis complete_recreation.`
+      : "Traite mes demandes de recréation ScrollShow en attente : list_recreation_requests, puis pour chacune claim_recreation, suis les étapes, brouillon dans le calendrier et complete_recreation." } }] }));
+
+    server.registerTool(
+      "list_recreation_requests",
+      {
+        title: "TikToks waiting to be recreated",
+        description: "List the TikToks the user shared with the ScrollShow iPhone shortcut (Share → ScrollShow) that wait for you to recreate them, across all their projects. Each request is an imported source post (id) with the TikTok account the user was browsing with (target.sharer), whether that account is connected to ScrollShow (target.link: connected, tracked = followed without publishing rights, unlinked = not in ScrollShow, unknown), the channel the draft must go to, and its project. Oldest first. Then claim_recreation(id).",
+        inputSchema: z.object({ status: z.enum(["pending", "all"]).optional() }),
+        annotations: { readOnlyHint: true },
+      },
+      async (args, ctx) => { try { return text(await listRecreations(userFrom(ctx), args.status || "pending")); } catch (error) { return fail(error); } },
+    );
+
+    server.registerTool(
+      "claim_recreation",
+      {
+        title: "Start recreating a shared TikTok",
+        description: "Take a recreation request (id from list_recreation_requests, or any imported post id) so no other agent does it twice (30-minute lease), and get the exact steps: study the source with view_slides, recreate the format for the user's business with original copy and real photos, save a DRAFT in the calendar on the target channel, check the render, then complete_recreation. Fails with switch_project_required when the request belongs to another project: call switch_project first. force=true makes a new version of an already recreated post.",
+        inputSchema: z.object({ id: z.string().min(4), force: z.boolean().optional() }),
+      },
+      async (args, ctx) => { try { return text(await claimRecreation(userFrom(ctx), args.id, args.force === true)); } catch (error) { return fail(error); } },
+    );
+
+    server.registerTool(
+      "complete_recreation",
+      {
+        title: "Finish a recreation",
+        description: "Close a claimed recreation: pass postId = the new draft you created (it is placed in the calendar, never published) and the user gets a push notification with the approval link; or pass error = a short reason when you could not recreate it (the user can retry from Settings). Call it exactly once per claimed request.",
+        inputSchema: z.object({ id: z.string().min(4), postId: z.string().min(4).optional(), error: z.string().min(3).max(300).optional() }),
+      },
+      async (args, ctx) => { try { return text(await completeRecreation(userFrom(ctx), args)); } catch (error) { return fail(error); } },
+    );
+
+    server.registerTool(
+      "list_projects",
+      {
+        title: "List projects",
+        description: "List the user's projects (one project = one business) and which one is current. Every other tool works inside the current project.",
+        inputSchema: z.object({}),
+      },
+      async (_args, ctx) => {
+        try {
+          const user = userFrom(ctx);
+          const data = await readStoreSlice([], { userId: user.id });
+          return text({ current: user.projectId, projects: listProjects(data, user.id).map(p => ({ id: p.id, name: p.name, business: p.business?.tagline || p.business?.url || null, current: p.id === user.projectId })) });
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
+    server.registerTool(
+      "switch_project",
+      {
+        title: "Switch project",
+        description: "Make another of the user's projects current for this connection. Use when the user names a different business. Call whoami afterwards.",
+        inputSchema: z.object({ projectId: z.string() }),
+      },
+      async (args, ctx) => {
+        try {
+          userFrom(ctx);
+          const token = ctx.http?.authInfo?.token || "";
+          if (!token.startsWith("ss_at_")) throw new Error("api_key_is_bound_to_one_project");
+          const project = await switchGrantProject(token, args.projectId);
+          if (!project) throw new Error("project_missing");
+          return text({ current: project.id, name: project.name });
+        } catch (error) {
+          return fail(error);
+        }
+      },
+    );
+
     server.registerTool(
       "whoami",
       {
@@ -595,9 +780,21 @@ const handler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: "scrollshow", version: "1.0.0" },
+    // Titre, site et icones : c'est ce que les clients MCP affichent dans leur liste de connecteurs.
+    serverInfo: {
+      name: "scrollshow",
+      title: "ScrollShow",
+      version: "1.0.0",
+      websiteUrl: "https://scrollshow.io",
+      icons: [
+        { src: "https://scrollshow.io/icon-1024.png", mimeType: "image/png", sizes: ["1024x1024"] },
+        { src: "https://scrollshow.io/favicon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+      ],
+      // mcp-handler type encore l'ancienne forme { name, version } ; le SDK renvoie l'objet tel quel.
+    } as { name: string; version: string },
     instructions:
       "Use start_scrollshow for the first-carousel workflow. Read whoami and get_content_brief; inspect list_posts to avoid duplicates. Finish requested carousels in the calendar, including completed forks via set_calendar. Reuse existing scheduling authorization and publication choices. Queue with status=scheduled only when those choices are known; otherwise save complete content with a proposed date and report what is missing. Do not add unrelated deletion or public sharing. Confirm writes only from successful tool responses and inspect existing posts before retrying uncertain writes. Never request API keys in chat. " +
+      "To recreate a TikTok from its link: import_tiktok, LOOK at it with view_slides (source), measure each text on the gridded slide, take images from gallery_search then find_images (pick by eye: real, good-looking, fits the text, calm area for the text; it need not resemble the reference photo), save them with gallery_add, create_post with per-slide aspect/crop and overlay textStyle, then view_slides (rendered) and fix what you see before reporting. Designed slides (cut-outs on white, infographics) need an image-generation tool connected in the host; add its output with gallery_add. An OAuth connection covers every project of the account: list_projects / switch_project. TikToks shared from the iPhone shortcut wait in list_recreation_requests (whoami.recreations.pending counts them): claim_recreation returns the steps, finish with complete_recreation. When the sharing TikTok account is not linked to ScrollShow (target.link unlinked or tracked), tell the user. " +
       "Always answer the user in their own language, the one they write to you in; most ScrollShow users write French. You are connected to the user's ScrollShow workspace. Create, schedule, and publish TikTok photo carousels, read analytics, search the research library, and write reports. Call whoami first: it returns the user's business profile (name, kind, link, keywords, goal, TikTok stats) that every carousel must be written for, and whether TikTok is connected. Marketplace: import_tiktok saves a public TikTok as a private reference to study its format (slide count, layout, text placement). Never republish someone else's images or caption: the carousel the user posts must be original content made for their business. The copy is NOT editable yet — text is baked into the JPEGs. Call reconstruct_post (or import_tiktok with reconstruct=true) to decompose each slide into background + text overlays, then update_recipe to change texts, fonts or images. list_marketplace lists private or public formats. Use create_post to draft or schedule. A post only goes to TikTok after the user approves it in the studio: create_post and publish_now save a draft and return/allow an approval link (https://scrollshow.io/app?post=<id>) where the user picks privacy, comments and disclosure and clicks Post to TikTok or Schedule. Never say a post is scheduled or published before publish_status confirms it. Prefer get_report when they want a full picture. Present findings in plain language with tables, not raw JSON dumps.",
   },
 );

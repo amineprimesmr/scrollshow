@@ -149,7 +149,25 @@ type GrantInput = { clientId: string; userId: string; projectId?: string; resour
 function activeGrant(data: StoreData, grant: GrantInput) {
   const user = data.users.find(item => item.id === grant.userId);
   return !data.restoreReviewRequired && user?.emailVerifiedAt && !user.deletionPendingAt
-    && findProject(data, grant.userId, grant.projectId);
+    && grantProject(data, grant);
+}
+
+/** L'autorisation couvre le compte : le projet enregistre n'est que le projet courant de l'agent.
+ * S'il a ete archive depuis, on retombe sur le dernier ouvert au lieu de couper la connexion. */
+function grantProject(data: StoreData, grant: Pick<GrantInput, "userId" | "projectId">) {
+  return findProject(data, grant.userId, grant.projectId) || resolveProject(data, grant.userId);
+}
+
+/** Change le projet courant de toute l'autorisation (tous ses jetons, renouvellements compris). */
+export async function switchGrantProject(accessToken: string, projectId: string) {
+  const hash = hashSecret(accessToken);
+  return updateStore((data) => {
+    const found = (data.oauthTokens || []).find(item => item.accessHash === hash);
+    const project = found && findProject(data, found.userId, projectId);
+    if (!found || !project) return null;
+    for (const item of data.oauthTokens || []) if (item.grantId === found.grantId) item.projectId = project.id;
+    return project;
+  });
 }
 
 function appendTokens(data: StoreData, input: GrantInput): IssuedTokens {
@@ -221,7 +239,7 @@ export async function resolveOAuthUser(token: string, resource: string): Promise
   const grant = data.oauthTokens?.find(item => item.accessHash === hashSecret(token));
   if (!grant || grant.accessExpiresAt <= Date.now() || grant.resource !== resource || !activeGrant(data, grant)) return null;
   const user = data.users.find(item => item.id === grant.userId)!;
-  return withProject(publicUser(user), findProject(data, user.id, grant.projectId));
+  return withProject(publicUser(user), grantProject(data, grant));
 }
 
 /* ── Autorisations accordees ───────────────────────────────────────────── */

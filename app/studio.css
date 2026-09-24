@@ -7619,6 +7619,46 @@ html[data-theme="dark"] .ss-fan {
   vertical-align: middle;
 }
 
+/* Raccourci iPhone → recréation (components/studio/ShortcutSettings.tsx). Carte de contenu : opaque. */
+.ss-sc__key { margin: 8px 0 0; }
+.ss-sc__mode { margin: 12px 0 0; }
+.ss-sc__chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 14px; }
+.ss-sc__chip {
+  padding: 5px 11px;
+  border: 1px solid var(--ss-line);
+  border-radius: 999px;
+  background: var(--ss-soft);
+  color: var(--ss-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ss-sc__chip.is-ok { border-color: var(--ss-ok-line); background: var(--ss-ok-bg); color: var(--ss-ok-fg); }
+.ss-sc__chip.is-warn { border-color: var(--ss-warn-line); background: var(--ss-warn-bg); color: var(--ss-warn-fg); }
+.ss-sc__auto { margin: 14px 0 0; padding: 14px 16px; border: 1px solid var(--ss-line); border-radius: 16px; background: var(--ss-soft); }
+.ss-sc__auto summary { cursor: pointer; font-size: 14px; font-weight: 650; }
+.ss-sc__auto[open] summary { margin-bottom: 8px; }
+.ss-sc__auto .ss-steps { margin-top: 10px; }
+.ss-sc__form { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 8px; margin-top: 8px; }
+.ss-sc__form input { min-width: 0; }
+.ss-sc__routine { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.ss-sc__routine > span { flex: 1 1 220px; }
+.ss-sc__routine b, .ss-sc__routine span span { display: block; }
+.ss-sc__routine span span { color: var(--ss-muted); font-size: 12px; }
+.ss-sc__link { color: var(--ss-link); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.ss-sc__note { margin: 10px 0 0; color: var(--ss-muted); font-size: 13px; }
+.ss-sc__sub { margin: 18px 0 2px; font-size: 14px; letter-spacing: -0.02em; }
+.ss-sc__list li { flex-wrap: wrap; }
+.ss-sc__list li > span:first-child { flex: 1 1 200px; min-width: 0; }
+.ss-sc__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.ss-settings-list .ss-sc__actions button { margin-left: 0; }
+.ss-sc__state { font-style: normal; font-weight: 650; }
+.ss-sc__state.is-done { color: var(--ss-ok-fg); }
+.ss-sc__state.is-failed { color: var(--ss-err-fg); }
+.ss-sc__state.is-running, .ss-sc__state.is-queued { color: var(--ss-warn-fg); }
+@media (max-width: 640px) {
+  .ss-sc__form { grid-template-columns: 1fr; }
+}
+
 /* ---- Calendrier : glisser-deposer, filtre par compte, bandeau jour ---- */
 
 .ss-post.is-draggable {

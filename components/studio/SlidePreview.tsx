@@ -1,6 +1,6 @@
 "use client";
 
-import { fontStack, GOOGLE_FONTS_HREF, overlayStyle } from "@/lib/recipe";
+import { fontStack, GOOGLE_FONTS_HREF, overlayStyle, slideSize } from "@/lib/recipe";
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 
 export function SlidePreview({
@@ -14,7 +14,9 @@ export function SlidePreview({
   width?: number;
   original?: boolean;
 }) {
-  const height = Math.round((width * 16) / 9);
+  const size = slideSize(slide, recipe);
+  const height = Math.round((width * size.height) / size.width);
+  const crop = original ? undefined : slide.crop;
   const html = slide.html || recipe.html;
   if (html) {
     const css = [recipe.css, slide.css].filter(Boolean).join("\n");
@@ -40,7 +42,7 @@ export function SlidePreview({
     : slide.backgroundColor || "#111";
   return (
     <div className="ss-slide-preview" style={{ width, height, fontFamily: fontStack(recipe.fontFamily), background }}>
-      {photo ? <img src={photo} alt="" loading="lazy" decoding="async" onError={event => { if (!event.currentTarget.src.endsWith("/logo.png")) { event.currentTarget.src = "/logo.png"; event.currentTarget.alt = "Image indisponible"; event.currentTarget.style.objectFit = "contain"; } }} /> : <div className="ss-slide-preview__empty" style={{ background: "transparent" }} />}
+      {photo ? <img src={photo} alt="" loading="lazy" decoding="async" style={crop ? { objectPosition: `${crop.x}% ${crop.y}%`, transform: crop.zoom && crop.zoom > 1 ? `scale(${crop.zoom})` : undefined, transformOrigin: `${crop.x}% ${crop.y}%` } : undefined} onError={event => { if (!event.currentTarget.src.endsWith("/logo.png")) { event.currentTarget.src = "/logo.png"; event.currentTarget.alt = "Image indisponible"; event.currentTarget.style.objectFit = "contain"; } }} /> : <div className="ss-slide-preview__empty" style={{ background: "transparent" }} />}
       {!original
         ? slide.overlays
             .filter((overlay) => overlay.text.trim())

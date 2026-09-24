@@ -577,7 +577,7 @@ Mesures, coûts et décisions : `docs/previsionnel-recreation-tiktok-2026-09-18.
   pas les mêmes résultats que nous.
 
 ## Build et vérification
-`npm run typecheck`, `npm test` (295 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
+`npm run typecheck`, `npm test` (317 tests) — et, avec un Postgres isolé, `scripts/test-store-rows.mts`, puis build isolé
 `SCROLLSHOW_BUILD_DIR=.next-verify npx next build` — jamais `npm run build` nu
 pendant qu'un `next dev` tourne, il écrase `.next`.
 
@@ -619,12 +619,35 @@ un compteur « i / n » apparaissent. Les avatars passent par `coverSrc()`.
   lié dans deux projets (dédup par projet).
 - Archiver ne supprime rien ; le dernier projet ne s'archive pas.
 
-## Raccourci iOS (Partager → ScrollShow)
-`scripts/build-ios-shortcut.py` génère et signe (`shortcuts sign --mode anyone`,
-macOS) `public/ScrollShow.shortcut` : question d'import = clé API, puis
-`POST /api/v1/library { url }` (lien profil, vidéo, lien court ou @handle),
-notification avec `message`. Logique partagée avec `/api/accounts` dans
-`lib/library-add.ts` (testé). Tout changement d'endpoint = regénérer le fichier.
+## Raccourci iOS (Partager → ScrollShow) → recréation par l'agent
+`lib/shortcut-recreate.ts` (tests : `tests/shortcut-recreate.test.ts`) + `app/api/v1/shortcut` +
+`app/api/studio/shortcut` + `components/studio/ShortcutSettings.tsx` (Réglages > API) + outils MCP
+`list_recreation_requests`, `claim_recreation`, `complete_recreation` et prompt `recreate_tiktok`.
+Doc : `docs/raccourci-recreation-2026-09-24.md`.
+- `scripts/build-ios-shortcut.py` génère et signe `public/ScrollShow.shortcut` (fr) et
+  `public/ScrollShow-en.shortcut` (en) : clé API (question d'import), `GET /api/v1/shortcut` (préférence),
+  liste « Recréer / Enregistrer » **seulement si** `ask` a une valeur, `POST /api/v1/shortcut { url, mode }`,
+  notification `title` + `message`, puis ouvre `openUrl` s'il existe. Tout changement d'endpoint =
+  regénérer les deux fichiers. L'ancien `POST /api/v1/library` reste pour les raccourcis déjà installés.
+- Préférence `User.shortcutMode` (`ask` par défaut, `recreate`, `save`), réglée dans la carte : un `mode`
+  vide dans le POST applique la préférence ; le choix fait sur le téléphone gagne toujours.
+- Clé du raccourci : `rotateShortcutKey` (nom « Raccourci iPhone », **un an**, une seule par projet : la
+  nouvelle révoque l'ancienne). Les autres clés restent à 90 jours.
+- Bibliothèque : badges « À recréer / Recréation en cours / Recréé → brouillon » sur la source et
+  « Recréation » sur le brouillon (`recreation` et `recreationOf` masqués sur les formats publics).
+- `/api/v1/shortcut` répond **toujours 200** avec `title` et `message` (clé expirée, abonnement, erreur) :
+  un code d'erreur donnait une notification vide.
+- **Compte ouvert sur le téléphone** = `webapp.reflow.global.shareUser` dans la page d'un lien de partage
+  court (vm.tiktok.com / tiktok.com/t/). Absent = `unknown`, jamais « non lié ». `placeSharer` : connecté
+  → cible ce compte ; lié à un **autre projet** → la demande y est rangée ; suivi → brouillon seulement ;
+  inconnu de ScrollShow → avertissement dans le **titre** de la notification.
+- La demande vit sur le post importé (`StudioPost.recreation`, une par post), pas dans une collection.
+  `claim_recreation` = bail exclusif de 30 min ; un refus n'écrit rien. `complete_recreation` pose
+  `recreationOf`, met le brouillon au calendrier (jamais publié ni programmé) et envoie une notification push.
+- Livraison : routine Claude (API `/fire`, jeton scellé AES-GCM, sous-clé HKDF d'`AUTH_SECRET`, jamais
+  rendu au navigateur) → sinon `claude.ai/new?q=` si une autorisation OAuth vit → sinon page Agents.
+  L'URL de routine est validée strictement (`api.anthropic.com/.../trig_…/fire`) : pas de SSRF.
+- Aucun LLM serveur : c'est l'agent de l'utilisateur qui recrée, avec le parcours du skill.
 
 ## RevenueCat (revenus ScrollShow)
 `lib/revenuecat.ts` + branchement dans `app/api/stripe/webhook/route.ts` +

@@ -4,6 +4,8 @@ import type {
   CarouselRecipe,
   CarouselSlide,
   OverlayAlign,
+  OverlayTextStyle,
+  SlideAspect,
   SlideOverlay,
   StudioPost,
 } from "./types";
@@ -21,7 +23,13 @@ export const overlayInputSchema = z.object({
   width: z.number().optional(),
   lineHeight: z.number().optional(),
   backdrop: z.string().optional(),
+  textStyle: z.enum(["outline", "shadow", "plain"]).optional(),
+  strokeColor: z.string().max(32).optional(),
+  strokeWidth: z.number().min(0).max(12).optional(),
 });
+
+const aspectSchema = z.enum(["9:16", "3:4", "4:5", "1:1"]);
+const cropSchema = z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100), zoom: z.number().min(1).max(4).optional() });
 
 export const slideInputSchema = z.object({
   id: z.string().optional(),
@@ -30,6 +38,8 @@ export const slideInputSchema = z.object({
   backgroundColor: z.string().optional(),
   backgroundColor2: z.string().optional(),
   keepPhoto: z.boolean().optional(),
+  aspect: aspectSchema.optional(),
+  crop: cropSchema.optional(),
   html: z.string().optional(),
   css: z.string().optional(),
   overlays: z.array(overlayInputSchema).max(30).optional(),
@@ -39,6 +49,7 @@ export const recipeInputSchema = z.object({
   version: z.literal(1).optional(),
   origin: z.enum(["ai", "manual", "import", "fork"]).optional(),
   fontFamily: z.string().optional(),
+  aspect: aspectSchema.optional(),
   html: z.string().optional(),
   css: z.string().optional(),
   prompt: z.string().optional(),
@@ -50,6 +61,7 @@ export const recipeInputSchema = z.object({
 export type RecipeInput = z.infer<typeof recipeInputSchema>;
 
 export const RECIPE_FONTS = [
+  "TikTok Sans",
   "Inter",
   "Montserrat",
   "Poppins",
@@ -64,9 +76,46 @@ export const RECIPE_FONTS = [
 ] as const;
 
 export const GOOGLE_FONTS_HREF =
-  "https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=DM+Sans:wght@400;700;800&family=Montserrat:wght@400;700;800;900&family=Oswald:wght@400;600;700&family=Outfit:wght@400;700;800&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@400;600;700;800&display=swap";
+  "https://fonts.googleapis.com/css2?family=TikTok+Sans:wght@400;500;700&family=Anton&family=Bebas+Neue&family=DM+Sans:wght@400;700;800&family=Montserrat:wght@400;700;800;900&family=Oswald:wght@400;600;700&family=Outfit:wght@400;700;800&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@400;600;700;800&display=swap";
 
 const DEFAULT_FONT = "Montserrat";
+
+/** Toutes les slides font 1080 px de large : fontSize garde le meme sens quel que soit le format. */
+export const SLIDE_WIDTH = 1080;
+const ASPECT_HEIGHT: Record<SlideAspect, number> = { "9:16": 1920, "3:4": 1440, "4:5": 1350, "1:1": 1080 };
+
+export function slideAspect(slide: Pick<CarouselSlide, "aspect">, recipe?: Pick<CarouselRecipe, "aspect">): SlideAspect {
+  return slide.aspect || recipe?.aspect || "9:16";
+}
+
+export function slideSize(slide: Pick<CarouselSlide, "aspect">, recipe?: Pick<CarouselRecipe, "aspect">) {
+  return { width: SLIDE_WIDTH, height: ASPECT_HEIGHT[slideAspect(slide, recipe)] };
+}
+
+/** Format le plus proche d'une image mesuree (import, banque d'images). */
+export function closestAspect(width: number, height: number): SlideAspect {
+  const ratio = height / Math.max(1, width);
+  return (Object.keys(ASPECT_HEIGHT) as SlideAspect[]).reduce((best, key) =>
+    Math.abs(ASPECT_HEIGHT[key] / SLIDE_WIDTH - ratio) < Math.abs(ASPECT_HEIGHT[best] / SLIDE_WIDTH - ratio) ? key : best, "9:16" as SlideAspect);
+}
+
+export function textShadowFor(overlay: Pick<SlideOverlay, "backdrop" | "textStyle" | "strokeColor" | "strokeWidth">, scale = 1) {
+  const style: OverlayTextStyle = overlay.textStyle || "outline";
+  if (overlay.backdrop || style === "plain") return "none";
+  if (style === "shadow") return "0 1px 3px rgba(0,0,0,0.55), 0 0 12px rgba(0,0,0,0.35)";
+  if (!overlay.strokeColor && !overlay.strokeWidth) return "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 10px rgba(0,0,0,0.45)";
+  // Contour epais facon texte TikTok : un anneau d'ombres nettes, 16 directions par pixel de rayon.
+  const color = overlay.strokeColor || "#000";
+  const width = Math.max(0.5, (overlay.strokeWidth ?? 1) * scale);
+  const ring: string[] = [];
+  for (let radius = Math.min(1, width); radius <= width + 0.01; radius += 1) {
+    for (let step = 0; step < 16; step++) {
+      const angle = (step / 16) * Math.PI * 2;
+      ring.push(`${(Math.cos(angle) * radius).toFixed(2)}px ${(Math.sin(angle) * radius).toFixed(2)}px 0 ${color}`);
+    }
+  }
+  return ring.join(", ");
+}
 
 export function newId() {
   return crypto.randomUUID();
@@ -97,11 +146,15 @@ export function defaultOverlay(partial?: Partial<SlideOverlay>): SlideOverlay {
     width: partial?.width ?? 86,
     lineHeight: partial?.lineHeight ?? 1.05,
     backdrop: partial?.backdrop,
+    textStyle: partial?.textStyle,
+    strokeColor: partial?.strokeColor,
+    strokeWidth: partial?.strokeWidth,
   };
 }
 
 export function closestFont(name: string) {
   const n = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (n.includes("tiktok") || n.includes("proxima")) return "TikTok Sans";
   const exact = RECIPE_FONTS.find((font) => font.toLowerCase().replace(/[^a-z0-9]+/g, "") === n);
   if (exact) return exact;
   if (n.includes("bebas")) return "Bebas Neue";
@@ -127,6 +180,8 @@ export function defaultSlide(
     backgroundColor: partial?.backgroundColor,
     backgroundColor2: partial?.backgroundColor2,
     keepPhoto: partial?.keepPhoto,
+    aspect: partial?.aspect,
+    crop: partial?.crop,
     html: partial?.html,
     css: partial?.css,
     overlays: (partial?.overlays || []).map((overlay) => defaultOverlay(overlay)),
@@ -171,6 +226,8 @@ export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | u
         backgroundColor: slide.backgroundColor || (blank ? "#111111" : undefined),
         backgroundColor2: slide.backgroundColor2,
         keepPhoto: slide.keepPhoto,
+        aspect: slide.aspect,
+        crop: slide.crop,
         overlays: slide.overlays,
       });
     })
@@ -179,6 +236,7 @@ export function normalizeRecipe(input: Partial<CarouselRecipe> | RecipeInput | u
     version: 1,
     origin: input?.origin || origin,
     fontFamily: input?.fontFamily || DEFAULT_FONT,
+    aspect: input?.aspect,
     html: input?.html,
     css: input?.css,
     prompt: input?.prompt,
@@ -219,6 +277,7 @@ export function applyRecipePatch(
     ...current,
     origin: patch.origin || current.origin,
     fontFamily: patch.fontFamily || current.fontFamily,
+    aspect: patch.aspect || current.aspect,
     html: patch.html ?? current.html,
     css: patch.css ?? current.css,
     prompt: patch.prompt ?? current.prompt,
@@ -241,6 +300,8 @@ export function applyRecipePatch(
       backgroundColor: incoming.backgroundColor ?? slide.backgroundColor,
       backgroundColor2: incoming.backgroundColor2 ?? slide.backgroundColor2,
       keepPhoto: incoming.keepPhoto ?? slide.keepPhoto,
+      aspect: incoming.aspect ?? slide.aspect,
+      crop: incoming.crop ?? slide.crop,
       overlays: mergeOverlays(slide.overlays, incoming.overlays),
     });
   });
@@ -293,9 +354,7 @@ export function overlayStyle(overlay: SlideOverlay, canvasWidth: number) {
     fontWeight: overlay.fontWeight,
     lineHeight: overlay.lineHeight ?? 1.05,
     whiteSpace: "pre-wrap" as const,
-    textShadow: overlay.backdrop
-      ? "none"
-      : "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 10px rgb(0 0 0 / 0.45)",
+    textShadow: textShadowFor(overlay, scale),
     background: overlay.backdrop || "transparent",
     padding: overlay.backdrop ? "0.12em 0.4em" : undefined,
     borderRadius: overlay.backdrop ? 12 : undefined,

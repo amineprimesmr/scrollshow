@@ -18,7 +18,12 @@ export function publicApiKey(key: ApiKey) {
   };
 }
 
-export async function createApiKey(userId: string, name: string, projectId?: string) {
+/** Duree de vie par defaut d'une cle ; celle du raccourci iPhone vit un an (la changer oblige a reinstaller). */
+export const API_KEY_DAYS = 90;
+export const SHORTCUT_KEY_DAYS = 365;
+export const SHORTCUT_KEY_NAME = "Raccourci iPhone";
+
+export async function createApiKey(userId: string, name: string, projectId?: string, days = API_KEY_DAYS) {
   const secret = randomBytes(24).toString("base64url");
   const token = `${PREFIX}${secret}`;
   const item: ApiKey = {
@@ -29,7 +34,7 @@ export async function createApiKey(userId: string, name: string, projectId?: str
     prefix: `${PREFIX}${secret.slice(0, 4)}`,
     hash: hashApiKey(token),
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
+    expiresAt: new Date(Date.now() + days * 86400000).toISOString(),
   };
   const created = await updateStoreSlice(["apiKeys"], (data) => {
     // Sans projet demande, la cle suit le projet actif du compte.
@@ -68,6 +73,16 @@ export async function rotateOnboardingKey(userId: string) {
 }
 
 export const ONBOARDING_KEY_NAME = "ScrollShow";
+
+/** Une seule cle de raccourci par projet : la nouvelle remplace l'ancienne (et ne bute jamais sur la limite de 10). */
+export async function rotateShortcutKey(userId: string, projectId?: string) {
+  const project = resolveProject(await readStoreSlice([], { userId }), userId, projectId || null);
+  if (!project) return null;
+  await updateStore((data) => {
+    data.apiKeys = (data.apiKeys || []).filter((key) => !(key.userId === userId && key.projectId === project.id && key.name === SHORTCUT_KEY_NAME));
+  });
+  return createApiKey(userId, SHORTCUT_KEY_NAME, project.id, SHORTCUT_KEY_DAYS);
+}
 
 export async function revokeApiKey(userId: string, id: string) {
   await updateStore((data) => {

@@ -576,6 +576,16 @@ export function MarketplaceView() {
                       ) : null}
                       <span className="ss-lib-tag">{originLabel(item, english)}</span>
                       {item.visibility === "public" && mine ? <span className="ss-lib-tag">{t("Public", "Public", english)}</span> : null}
+                      {mine && item.recreation?.status === "done" && item.recreation.resultPostId ? (
+                        <a className="ss-lib-tag is-recreated" href={`/app?post=${encodeURIComponent(item.recreation.resultPostId)}`}>{t("Recréé → brouillon", "Recreated → draft", english)}</a>
+                      ) : mine && item.recreation ? (
+                        <span className={`ss-lib-tag is-recreate-${item.recreation.status}`}>
+                          {item.recreation.status === "running" ? t("Recréation en cours", "Recreating", english)
+                            : item.recreation.status === "failed" ? t("Recréation échouée", "Recreation failed", english)
+                            : t("À recréer", "To recreate", english)}
+                        </span>
+                      ) : null}
+                      {mine && item.recreationOf ? <span className="ss-lib-tag is-recreated">{t("Recréation", "Recreation", english)}</span> : null}
                       {item.authorHandle ? <span className="ss-lib-card__handle">@{item.authorHandle}</span> : null}
                     </div>
 

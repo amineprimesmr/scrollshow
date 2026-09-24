@@ -28,6 +28,7 @@ import {
 } from "./icons";
 import { useStudio } from "./StudioContext";
 import { ProjectSettings } from "./ProjectSettings";
+import { ShortcutSettings } from "./ShortcutSettings";
 
 type Tab =
   | "project"
@@ -148,6 +149,7 @@ export function SettingsView() {
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [keyName, setKeyName] = useState("Studio");
   const [revealed, setRevealed] = useState("");
+  const [revealedFor, setRevealedFor] = useState("");
 
   const live = channels.filter((item) => item.connected);
   const initials = (user?.name || user?.email || "S")
@@ -346,14 +348,14 @@ export function SettingsView() {
     } catch { setError(t("L’action n’a pas abouti. Vérifie ta connexion puis réessaie.", "The action failed. Check your connection and try again.", english)); } finally { setBusy(""); }
   }
 
-  async function createKey(name = keyName) {
+  async function createKey(name = keyName, purpose?: "shortcut") {
     try {
 
     setBusy("key");
     const res = await checkedFetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, purpose }),
     });
     const json = await res.json().catch(() => ({}));
     setBusy("");
@@ -362,6 +364,7 @@ export function SettingsView() {
       return;
     }
     setRevealed(typeof json.token === "string" && json.token.startsWith("ss_live_") ? json.token : "");
+    setRevealedFor(purpose || "");
     setNotice(t("Clé créée. Copie-la maintenant, elle ne sera plus visible.", "Key created. Copy it now — it won’t be shown again.", english));
     await loadKeys();
 
@@ -788,11 +791,12 @@ export function SettingsView() {
               keyName={keyName}
               setKeyName={setKeyName}
               busy={busy}
-              createKey={(name) => void createKey(name)}
+              createKey={(name, purpose) => void createKey(name, purpose)}
               revokeKey={(id) => void revokeKey(id)}
               copied={copied}
               copy={copy}
               revealed={revealed}
+              revealedFor={revealedFor}
             />
           </div>
         ) : null}
@@ -958,17 +962,19 @@ function ApiTab({
   copied,
   copy,
   revealed,
+  revealedFor,
 }: {
   english: boolean;
   keys: ApiKeyRow[];
   keyName: string;
   setKeyName: (value: string) => void;
   busy: string;
-  createKey: (name?: string) => void;
+  createKey: (name?: string, purpose?: "shortcut") => void;
   revokeKey: (id: string) => void;
   copied: string;
   copy: (id: string, value: string) => void;
   revealed: string;
+  revealedFor: string;
 }) {
   return (
     <>
@@ -987,7 +993,7 @@ function ApiTab({
           </button>
         ))}
       </div>
-      {revealed ? (
+      {revealed && revealedFor !== "shortcut" ? (
         <div className="ss-reveal">
           <code>{revealed}</code>
           <button className="ss-btn-ghost" type="button" onClick={() => copy("token", revealed)}>
@@ -1031,36 +1037,7 @@ function ApiTab({
         {t("Gérer les agents", "Manage agents", english)}
       </a>
     </div>
-    <div className="ss-set-card">
-      <h2>
-        <IconPlug size={16} /> {t("Raccourci iPhone", "iPhone shortcut", english)}
-      </h2>
-      <p className="ss-lead">
-        {t(
-          "Dans TikTok, Partager → ScrollShow importe le post (vidéo ou carrousel) dans ta Bibliothèque, comme « Importer un TikTok ». Sans partage, le raccourci lit le lien copié dans le presse-papiers.",
-          "In TikTok, Share → ScrollShow imports the post (video or carousel) into your Library, like “Import a TikTok”. Run it without input and it reads the link from your clipboard.",
-          english,
-        )}
-      </p>
-      <ol className="ss-steps">
-        <li>
-          {t("Crée une clé pour ton iPhone et copie-la.", "Create a key for your iPhone and copy it.", english)}{" "}
-          <button className="ss-btn-ghost" type="button" disabled={busy === "key"} onClick={() => createKey("iPhone")}>
-            {busy === "key" ? <span className="ss-spin" /> : t("Créer la clé iPhone", "Create iPhone key", english)}
-          </button>
-        </li>
-        <li>
-          {t("Ouvre ce lien sur l’iPhone et touche « Ajouter ». Colle la clé quand elle est demandée.", "Open this link on the iPhone and tap “Add”. Paste the key when asked.", english)}{" "}
-          <a className="ss-btn-ghost" href="/ScrollShow.shortcut" download="ScrollShow.shortcut">
-            {t("Installer le raccourci", "Install the shortcut", english)}
-          </a>
-        </li>
-        <li>{t("Sur un post TikTok : Partager → ScrollShow. Une notification confirme l’import.", "On a TikTok post: Share → ScrollShow. A notification confirms the import.", english)}</li>
-      </ol>
-      <p className="ss-muted">
-        {t("Le raccourci est signé et partageable tel quel : chaque personne colle sa propre clé à l’installation.", "The shortcut is signed and shareable as is: each person pastes their own key on install.", english)}
-      </p>
-    </div>
+    <ShortcutSettings english={english} busyKey={busy === "key"} revealed={revealedFor === "shortcut" ? revealed : ""} copied={copied === "token"} onCopy={() => copy("token", revealed)} onCreateKey={() => createKey("iPhone", "shortcut")} />
     </>
   );
 }

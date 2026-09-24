@@ -84,6 +84,11 @@ export async function agentWhoami(user: SessionUser) {
           followers: channel.followers || 0,
         }
       : { connected: false },
+    // Posts partages avec le raccourci iPhone et pas encore recrees : l'agent les traite avec claim_recreation.
+    recreations: {
+      pending: data.posts.filter((post) => post.userId === user.id && post.recreation && (post.recreation.status === "queued" || (post.recreation.status === "running" && (post.recreation.leaseUntil || 0) < Date.now()))).length,
+      next: "list_recreation_requests",
+    },
   };
 }
 
@@ -298,11 +303,11 @@ export async function agentRasterizePost(user: SessionUser, idOrShare: string, r
     (item) => inScope(item, user) && (item.id === idOrShare || item.shareId === idOrShare),
   );
   if (!found) throw new AgentError("post_missing", 404);
-  if (!(await consumeLimit(`render:${user.id}`, 30, 86400000))) throw new AgentError("daily_render_limit", 429);
+  if (!(await consumeLimit(`render:${user.id}`, 80, 86400000))) throw new AgentError("daily_render_limit", 429);
   const recipe = recipePatch || ensureRecipe(found!);
   const photo_images = await rasterizeRecipe(recipe, user);
   if (!photo_images.length) throw new AgentError("photos_required");
-  await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => inScope(m, user) && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, url, name: `Slide ${index+1}`, createdAt: new Date().toISOString() }); }));
+  await updateStore(data => photo_images.forEach((url, index) => { if (!data.media.some(m => inScope(m, user) && m.url === url)) data.media.push({ id: crypto.randomUUID(), userId: user.id, projectId: user.projectId, url, name: `Slide ${index+1}`, source: "render", createdAt: new Date().toISOString() }); }));
   return { photo_images, recipe };
 }
 
@@ -455,6 +460,8 @@ export function marketplaceCard(post: StudioPost, userId: string) {
   const recipe = ensureRecipe(post);
   return {
     ...publicPost(post),
+    // Les demandes de recreation sont privees : un format public n'en montre rien.
+    ...(post.userId === userId ? {} : { recreation: null, recreationOf: null }),
     mine: post.userId === userId,
     slideCount: recipe.slides.length,
   };
@@ -1014,6 +1021,9 @@ function publicPost(post: StudioPost) {
     musicAuthor: post.musicAuthor || null,
     clones: post.clones || 0,
     forkedFrom: post.forkedFrom || null,
+    recreationOf: post.recreationOf || null,
+    // Un bail expire (agent coupe) redevient « en attente » : meme regle que lib/shortcut-recreate.ts.
+    recreation: post.recreation ? { status: post.recreation.status === "running" && (post.recreation.leaseUntil || 0) < Date.now() ? "queued" as const : post.recreation.status, resultPostId: post.recreation.resultPostId || null } : null,
     createdAt: post.createdAt || null,
   };
 }

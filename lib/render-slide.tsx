@@ -1,11 +1,16 @@
 import { withMediaUser, validateMediaInput, type MediaUser } from "./media-permissions";
 import { readSlideBytes, savePublicImage } from "./media-files";
-import { needsRasterize } from "./recipe";
+import { needsRasterize, slideSize, textShadowFor } from "./recipe";
 import type { CarouselRecipe, CarouselSlide } from "./types";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
 
-const FONT_URLS: Record<string, Array<{ weight: 400 | 700 | 800; url: string }>> = {
+const FONT_URLS: Record<string, Array<{ weight: 400 | 500 | 700 | 800; url: string }>> = {
+  "TikTok Sans": [
+    { weight: 400, url: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@latest/latin-400-normal.ttf" },
+    { weight: 500, url: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@latest/latin-500-normal.ttf" },
+    { weight: 700, url: "https://cdn.jsdelivr.net/fontsource/fonts/tiktok-sans@latest/latin-700-normal.ttf" },
+  ],
   Inter: [
     { weight: 400, url: "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.ttf" },
     { weight: 700, url: "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.ttf" },
@@ -53,7 +58,7 @@ async function loadFont(url: string) {
 async function fontsFor(recipe: CarouselRecipe, slide: CarouselSlide) {
   if (!slide.overlays.some(overlay => overlay.text.trim())) return [];
   const names = new Set<string>([recipe.fontFamily, ...slide.overlays.map((overlay) => overlay.fontFamily)]);
-  const fonts: Array<{ name: string; data: ArrayBuffer; weight: 400 | 700 | 800; style: "normal" }> = [];
+  const fonts: Array<{ name: string; data: ArrayBuffer; weight: 400 | 500 | 700 | 800; style: "normal" }> = [];
   for (const name of names) {
     const files = FONT_URLS[name] || FONT_URLS.Montserrat;
     for (const file of files) {
@@ -73,26 +78,41 @@ function alignTransform(align: CarouselSlide["overlays"][number]["align"]) {
   return "translate(-50%, -50%)";
 }
 
-async function dataUrl(url?: string) {
+/** Region de la source a garder : couvre le cadre, centree sur le point focal, bornee a l'image. */
+export function cropRegion(src: { width: number; height: number }, frame: { width: number; height: number }, crop?: CarouselSlide["crop"]) {
+  const zoom = Math.max(1, crop?.zoom ?? 1);
+  const scale = Math.min(src.width / frame.width, src.height / frame.height) / zoom;
+  const width = Math.max(1, Math.round(frame.width * scale));
+  const height = Math.max(1, Math.round(frame.height * scale));
+  const cx = ((crop?.x ?? 50) / 100) * src.width;
+  const cy = ((crop?.y ?? 50) / 100) * src.height;
+  const left = Math.round(Math.min(Math.max(0, cx - width / 2), src.width - width));
+  const top = Math.round(Math.min(Math.max(0, cy - height / 2), src.height - height));
+  return { left, top, width, height };
+}
+
+async function dataUrl(url: string | undefined, frame: { width: number; height: number }, crop?: CarouselSlide["crop"]) {
   if (!url) return "";
   const file = await readSlideBytes(url);
   if (!file) throw new Error("media_unavailable");
   // Satori cannot decode WebP data URIs. Normalize uploaded and remote images
   // before composition, keeping dimensions bounded and applying EXIF rotation.
-  const bytes = await sharp(file.bytes, { limitInputPixels: 40_000_000 })
-    .rotate().resize(1080, 1920, { fit: "cover" }).png().toBuffer();
+  const upright = await sharp(file.bytes, { limitInputPixels: 40_000_000 }).rotate().toBuffer({ resolveWithObject: true });
+  const bytes = await sharp(upright.data)
+    .extract(cropRegion(upright.info, frame, crop)).resize(frame.width, frame.height, { fit: "fill" }).png().toBuffer();
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }
 
 export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecipe) {
   const keepPhoto = Boolean(slide.keepPhoto);
-  const photo = keepPhoto ? await dataUrl(slide.sourceImage || slide.image) : "";
+  const size = slideSize(slide, recipe);
+  const photo = keepPhoto ? await dataUrl(slide.sourceImage || slide.image, size, slide.crop) : "";
   const background = slide.backgroundColor || "#111111";
   const fonts = await fontsFor(recipe, slide);
   const gradient = slide.backgroundColor2 && !keepPhoto;
   const outerStyle: Record<string, unknown> = {
-    width: 1080,
-    height: 1920,
+    width: size.width,
+    height: size.height,
     display: "flex",
     position: "relative",
     backgroundColor: background,
@@ -107,7 +127,7 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
     (
       <div style={outerStyle}>
         {photo ? (
-          <img src={photo} width={1080} height={1920} style={{ position: "absolute", inset: 0, objectFit: "cover" }} />
+          <img src={photo} width={size.width} height={size.height} style={{ position: "absolute", inset: 0, objectFit: "cover" }} />
         ) : null}
         {slide.overlays
           .filter((overlay) => (overlay.text || "").trim())
@@ -130,9 +150,7 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
                 lineHeight: overlay.lineHeight ?? 1.05,
                 textAlign: overlay.align,
                 whiteSpace: "pre-wrap",
-                textShadow: overlay.backdrop
-                  ? "none"
-                  : "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 10px rgba(0,0,0,0.45)",
+                textShadow: textShadowFor(overlay),
                 background: overlay.backdrop || "transparent",
                 padding: overlay.backdrop ? 16 : 0,
                 borderRadius: overlay.backdrop ? 16 : 0,
@@ -143,7 +161,7 @@ export async function rasterizeSlide(slide: CarouselSlide, recipe: CarouselRecip
           ))}
       </div>
     ),
-    { width: 1080, height: 1920, fonts },
+    { width: size.width, height: size.height, fonts },
   );
   const bytes = Buffer.from(await png.arrayBuffer());
   return savePublicImage(bytes, "image/png");

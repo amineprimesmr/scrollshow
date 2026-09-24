@@ -113,6 +113,44 @@ export type User = {
   /** Dernier projet ouvert : sert de repli quand aucun projet n'est demande. */
   lastProjectId?: string;
   onboarding?: OnboardingState;
+  /** Routine Claude declenchee par le raccourci iPhone (URL + jeton scelle). Voir lib/shortcut-recreate.ts. */
+  agentTrigger?: AgentTrigger;
+  /** Raccourci iPhone : demander a chaque partage (defaut), toujours recreer, ou toujours enregistrer. */
+  shortcutMode?: "ask" | "recreate" | "save";
+};
+
+export type AgentTrigger = {
+  url: string;
+  /** Jeton de la routine, chiffre (AES-GCM, cle derivee d'AUTH_SECRET) : jamais rendu au navigateur. */
+  tokenSealed: string;
+  tokenHint: string;
+  createdAt: string;
+  lastFiredAt?: string;
+  lastSessionUrl?: string;
+  lastError?: string;
+};
+
+/** D'ou vient le compte TikTok qui a partage le post, compare aux comptes ScrollShow. */
+export type SharerLink = "connected" | "tracked" | "unlinked" | "unknown";
+
+/** Demande de recreation posee sur le post importe (une par post source). */
+export type RecreationRequest = {
+  status: "queued" | "running" | "done" | "failed";
+  via: "shortcut" | "agent";
+  requestedAt: string;
+  sharer?: { handle: string; nickname?: string; avatar?: string } | null;
+  link: SharerLink;
+  /** Vrai quand le compte qui partage est lie a un AUTRE projet : la demande y a ete rangee. */
+  routed?: boolean;
+  /** Compte cible du brouillon, quand le compte qui partage est connu du projet. */
+  channelId?: string;
+  claimedAt?: string;
+  leaseUntil?: number;
+  attempts?: number;
+  resultPostId?: string;
+  completedAt?: string;
+  error?: string;
+  trigger?: { at: string; ok: boolean; sessionUrl?: string; error?: string };
 };
 
 export type WarmedOrderStatus = "requested" | "contacted" | "delivered" | "cancelled";
@@ -265,7 +303,17 @@ export type SlideOverlay = {
   width?: number;
   lineHeight?: number;
   backdrop?: string;
+  /** "outline" (defaut historique : contour noir), "shadow" (texte natif TikTok : blanc, ombre douce), "plain". */
+  textStyle?: OverlayTextStyle;
+  /** Contour du style "outline" : couleur (defaut noir) et epaisseur en px a 1080 de large (defaut 1). */
+  strokeColor?: string;
+  strokeWidth?: number;
 };
+
+export type OverlayTextStyle = "outline" | "shadow" | "plain";
+export type SlideAspect = "9:16" | "3:4" | "4:5" | "1:1";
+/** Point focal du recadrage : x/y en % de la photo source, zoom >= 1. */
+export type SlideCrop = { x: number; y: number; zoom?: number };
 
 export type CarouselSlide = {
   id: string;
@@ -274,6 +322,9 @@ export type CarouselSlide = {
   backgroundColor?: string;
   backgroundColor2?: string;
   keepPhoto?: boolean;
+  /** Format de la slide ; absent = celui de la recette, sinon 9:16. Un carrousel TikTok peut les melanger. */
+  aspect?: SlideAspect;
+  crop?: SlideCrop;
   html?: string;
   css?: string;
   overlays: SlideOverlay[];
@@ -283,6 +334,7 @@ export type CarouselOrigin = "ai" | "manual" | "import" | "fork";
 
 export type CarouselRecipe = {
   version: 1;
+  aspect?: SlideAspect;
   origin: CarouselOrigin;
   fontFamily: string;
   html?: string;
@@ -340,6 +392,10 @@ export type StudioPost = {
   shareEnabled?: boolean;
   publishError?: string;
   publishedAt?: string;
+  /** Post importe par le raccourci iPhone et a recreer par l'agent. */
+  recreation?: RecreationRequest;
+  /** Id du post source quand ce carrousel est une recreation. */
+  recreationOf?: string;
 };
 
 export type MediaItem = {
@@ -350,6 +406,13 @@ export type MediaItem = {
   url: string;
   name: string;
   createdAt: string;
+  /** Banque d'images : d'ou vient l'image, sa page d'origine, ses etiquettes et sa taille mesuree. */
+  source?: "upload" | "pinterest" | "generated" | "web" | "render";
+  sourceUrl?: string;
+  tags?: string[];
+  note?: string;
+  width?: number;
+  height?: number;
 };
 
 export type ApiKey = {
