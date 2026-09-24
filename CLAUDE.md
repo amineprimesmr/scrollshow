@@ -648,6 +648,11 @@ Doc : `docs/raccourci-recreation-2026-09-24.md`.
   rendu au navigateur) → sinon `claude.ai/new?q=` si une autorisation OAuth vit → sinon page Agents.
   L'URL de routine est validée strictement (`api.anthropic.com/.../trig_…/fire`) : pas de SSRF.
 - Aucun LLM serveur : c'est l'agent de l'utilisateur qui recrée, avec le parcours du skill.
+- **OAuth MCP : fenêtre de réutilisation de 60 s** (`REFRESH_REUSE_GRACE_MS`, `lib/oauth.ts`). Un connecteur
+  Claude sert sur Mac, web, iPhone et Claude Code : deux renouvellements simultanés du même jeton coupaient
+  toute l'autorisation (connecteur « installé » côté Claude mais refusé, pastille « Claude non connecté »).
+  Même client dans la fenêtre = nouvelle paire ; autre client ou hors fenêtre = révocation. Un refus est
+  tracé `oauth_refresh_rejected` avec son verdict (`replay`, `expired`, `unknown`).
 
 ## RevenueCat (revenus ScrollShow)
 `lib/revenuecat.ts` + branchement dans `app/api/stripe/webhook/route.ts` +
