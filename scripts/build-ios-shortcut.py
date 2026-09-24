@@ -88,7 +88,8 @@ def build(lang, conf):
         }
 
     def end_if(group):
-        return {"WFWorkflowActionIdentifier": "is.workflow.actions.conditional", "WFWorkflowActionParameters": {"GroupingIdentifier": group, "WFControlFlowMode": 2}}
+        # Comme un raccourci exporte par Apple : la fin de bloc porte son propre UUID.
+        return {"WFWorkflowActionIdentifier": "is.workflow.actions.conditional", "WFWorkflowActionParameters": {"GroupingIdentifier": group, "UUID": new_uuid(), "WFControlFlowMode": 2}}
 
     actions = [
         {"WFWorkflowActionIdentifier": "is.workflow.actions.gettext", "WFWorkflowActionParameters": {"UUID": key, "WFTextActionText": "ss_live_..."}},
@@ -98,14 +99,19 @@ def build(lang, conf):
         },
         value_for("ask", ask, cfg),
         if_has_value(if_ask, ask),
-        {"WFWorkflowActionIdentifier": "is.workflow.actions.list", "WFWorkflowActionParameters": {"UUID": lst, "WFItems": conf["choices"]}},
+        {
+            # Format actuel de l'app Raccourcis : chaque element est un dictionnaire. Une liste de chaines
+            # nues empechait l'import (« Ajouter ce raccourci » ne faisait rien).
+            "WFWorkflowActionIdentifier": "is.workflow.actions.list",
+            "WFWorkflowActionParameters": {"UUID": lst, "CustomOutputName": "List", "WFItems": [{"WFItemType": 0, "WFValue": item} for item in conf["choices"]]},
+        },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.choosefromlist",
             "WFWorkflowActionParameters": {"UUID": choice, "WFInput": attachment(output(lst, "List")), "WFChooseFromListActionPrompt": "ScrollShow"},
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.setvariable",
-            "WFWorkflowActionParameters": {"WFVariableName": "Mode", "WFInput": attachment(output(choice, "Chosen Item"))},
+            "WFWorkflowActionParameters": {"WFVariableName": "Mode", "WFInput": attachment(output(choice, "Chosen Item")), "WFSerializationType": "WFTextTokenAttachment"},
         },
         end_if(if_ask),
         {
