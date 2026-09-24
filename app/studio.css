@@ -7620,7 +7620,8 @@ html[data-theme="dark"] .ss-fan {
 }
 
 /* Raccourci iPhone → recréation (components/studio/ShortcutSettings.tsx). Carte de contenu : opaque. */
-.ss-sc__key { margin: 8px 0 0; }
+.ss-sc__key { margin: 8px 0; }
+.ss-sc__hint { display: block; margin-top: 8px; color: var(--ss-muted); font-size: 13px; }
 .ss-sc__mode { margin: 12px 0 0; }
 .ss-sc__chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 14px; }
 .ss-sc__chip {

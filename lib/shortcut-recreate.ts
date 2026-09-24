@@ -131,14 +131,17 @@ export function resolveMode(choice: unknown, preference: ShortcutPreference | un
   return preference === "save" ? "save" : "recreate";
 }
 
-export type Delivery = "saved" | "video" | "already" | "routine" | "claude" | "connect_agent";
+export type Delivery = "saved" | "video" | "already" | "routine" | "claude" | "agent_later" | "connect_agent";
 
-export function planDelivery(input: { mode: ShortcutMode; kind?: string; already?: boolean; hasTrigger: boolean; agentConnected: boolean }): Delivery {
+export function planDelivery(input: { mode: ShortcutMode; kind?: string; already?: boolean; hasTrigger: boolean; agentConnected: boolean; agentByKey?: boolean }): Delivery {
   if (input.mode === "save") return "saved";
   if (input.kind === "video") return "video";
   if (input.already) return "already";
   if (input.hasTrigger) return "routine";
-  return input.agentConnected ? "claude" : "connect_agent";
+  if (input.agentConnected) return "claude";
+  // Agent branche par cle (Claude Code, Cursor, Codex) : on ne peut pas l'ouvrir depuis le telephone,
+  // la demande l'attend (whoami.recreations.pending la lui signale).
+  return input.agentByKey ? "agent_later" : "connect_agent";
 }
 
 /** Une demande « running » dont le bail a expire est de nouveau prenable (agent coupe, routine morte). */
@@ -240,8 +243,10 @@ export function shortcutMessage(input: MessageInput): { title: string; message: 
       return { title, message: (e ? `Your agent is recreating ${who} carousel${slides}. The draft lands in your calendar in a few minutes.` : `Ton agent recrée le carrousel de ${who}${slides}. Le brouillon arrive dans ton calendrier d'ici quelques minutes.`) + note };
     case "claude":
       return { title, message: (e ? `${who} carousel${slides} is ready to recreate. Claude opens: send the message.` : `Carrousel de ${who}${slides} prêt à recréer. Claude s'ouvre : envoie le message.`) + failed + note };
+    case "agent_later":
+      return { title, message: (e ? `${who} carousel${slides} is waiting for your agent: it will recreate it at its next session.` : `Carrousel de ${who}${slides} en attente : ton agent le recréera à sa prochaine session.`) + note };
     case "connect_agent":
-      return { title, message: (e ? `${who} carousel saved. Connect Claude to ScrollShow so it can recreate it.` : `Carrousel de ${who} enregistré. Connecte Claude à ScrollShow pour qu'il le recrée.`) + note };
+      return { title, message: (e ? `${who} carousel saved. Add ScrollShow to Claude (Connectors) so it can recreate it.` : `Carrousel de ${who} enregistré. Ajoute ScrollShow dans Claude (Connecteurs) pour qu'il le recrée.`) + note };
   }
 }
 
@@ -296,10 +301,24 @@ export async function resolveShare(link: string): Promise<{ url: string; sharer:
   }
 }
 
+/** Connecteur claude.ai (ou tout client OAuth) encore autorise : c'est lui que le raccourci peut ouvrir. */
 function agentIsConnected(data: StoreData, userId: string) {
   const now = Date.now();
   return (data.oauthTokens || []).some(token => token.userId === userId && token.refreshExpiresAt > now);
 }
+
+/** Cles de raccourci : elles ne prouvent pas qu'un agent tourne. */
+const SHORTCUT_KEY_NAMES = new Set(["Raccourci iPhone", "iPhone"]);
+
+/** Agent branche par cle API (Claude Code, Cursor, Codex) et utilise ces 30 derniers jours. */
+export function agentKeyActive(data: Pick<StoreData, "apiKeys">, userId: string, now = Date.now()) {
+  return (data.apiKeys || []).some(key => key.userId === userId && !SHORTCUT_KEY_NAMES.has(key.name)
+    && Boolean(key.lastUsedAt) && now - Date.parse(key.lastUsedAt as string) < 30 * 86400000
+    && (!key.expiresAt || Date.parse(key.expiresAt) > now));
+}
+
+/** Ajout direct d'un connecteur personnalise sur claude.ai (fonctionne aussi dans Safari sur iPhone). */
+export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors?modal=add-custom-connector";
 
 type FireResult = { ok: boolean; sessionUrl?: string; error?: string };
 
@@ -369,7 +388,7 @@ export async function handleShortcut(user: SessionUser, input: { text: string; c
     return refusal("rate_limited", e ? "Too many shares in a row. Try again in a few minutes." : "Trop de partages d'affilée. Réessaie dans quelques minutes.");
   }
   const share = await resolveShare(postLink);
-  const data = await readStoreSlice(["channels", "accounts", "oauthTokens"], { userId: user.id });
+  const data = await readStoreSlice(["channels", "accounts", "oauthTokens", "apiKeys"], { userId: user.id });
   const mode = resolveMode(input.choice, data.users.find(item => item.id === user.id)?.shortcutMode);
   const current = user.projectId || listProjects(data, user.id)[0]?.id || "";
   const placement = placeSharer(data, user.id, current, share.sharer?.handle);
@@ -408,7 +427,8 @@ export async function handleShortcut(user: SessionUser, input: { text: string; c
     }, { userId: user.id });
   }
 
-  let delivery = planDelivery({ mode, kind: post.kind, already, hasTrigger: Boolean(trigger), agentConnected });
+  const agentByKey = agentKeyActive(data, user.id);
+  let delivery = planDelivery({ mode, kind: post.kind, already, hasTrigger: Boolean(trigger), agentConnected, agentByKey });
   let openUrl: string | undefined;
   let sessionUrl: string | undefined;
   let triggerError: string | undefined;
@@ -416,10 +436,10 @@ export async function handleShortcut(user: SessionUser, input: { text: string; c
     const fired = await fireRoutine(trigger, user.id, `ScrollShow recreation request ${post.id} (project ${placement.projectId}). Source: ${post.tiktokUrl || share.url}`);
     await recordFire(user.id, post.id, fired);
     if (fired.ok) sessionUrl = fired.sessionUrl;
-    else { triggerError = fired.error; delivery = agentConnected ? "claude" : "connect_agent"; }
+    else { triggerError = fired.error; delivery = agentConnected ? "claude" : agentByKey ? "agent_later" : "connect_agent"; }
   }
   if (delivery === "claude") openUrl = claudeUrl(post.id, e);
-  if (delivery === "connect_agent") openUrl = `${SITE}/app/settings?tab=agents`;
+  if (delivery === "connect_agent") openUrl = CLAUDE_CONNECTORS_URL;
 
   const text = shortcutMessage({
     delivery, english: e, author: post.authorHandle, slides: post.photo_images?.length, placement,
@@ -566,7 +586,7 @@ export async function pendingRecreationCount(user: SessionUser) {
 // ---------------------------------------------------------------------------
 
 export async function shortcutStatus(user: SessionUser, english: boolean) {
-  const data = await readStoreSlice(["posts", "oauthTokens"], { userId: user.id });
+  const data = await readStoreSlice(["posts", "oauthTokens", "apiKeys"], { userId: user.id });
   const owner = data.users.find(item => item.id === user.id);
   const trigger = owner?.agentTrigger;
   const now = Date.now();
@@ -592,6 +612,9 @@ export async function shortcutStatus(user: SessionUser, english: boolean) {
   return {
     shortcutMode: owner?.shortcutMode || "ask",
     agentConnected: agentIsConnected(data, user.id),
+    agentByKey: agentKeyActive(data, user.id),
+    mcpUrl: `${SITE}/api/mcp`,
+    connectorsUrl: CLAUDE_CONNECTORS_URL,
     trigger: trigger ? { configured: true, url: trigger.url, tokenHint: trigger.tokenHint, createdAt: trigger.createdAt, lastFiredAt: trigger.lastFiredAt || null, lastError: trigger.lastError || null, lastSessionUrl: trigger.lastSessionUrl || null } : { configured: false },
     routinePrompt: routinePrompt(english),
     requests,

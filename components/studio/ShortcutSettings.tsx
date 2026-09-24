@@ -22,6 +22,9 @@ type RequestRow = {
 type Status = {
   shortcutMode: "ask" | "recreate" | "save";
   agentConnected: boolean;
+  agentByKey: boolean;
+  mcpUrl: string;
+  connectorsUrl: string;
   trigger: { configured: false } | { configured: true; url: string; tokenHint: string; createdAt: string; lastFiredAt: string | null; lastError: string | null; lastSessionUrl: string | null };
   routinePrompt: string;
   requests: RequestRow[];
@@ -63,6 +66,7 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
+  const [addressCopied, setAddressCopied] = useState(false);
   const lang = english ? "?lang=en" : "";
 
   useEffect(() => {
@@ -100,6 +104,11 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
     try { await navigator.clipboard.writeText(status.routinePrompt); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 1600); } catch { /* presse-papiers refuse */ }
   }
 
+  async function copyAddress() {
+    if (!status) return;
+    try { await navigator.clipboard.writeText(status.mcpUrl); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 1600); } catch { /* presse-papiers refuse */ }
+  }
+
   const trigger = status?.trigger;
   const auto = trigger?.configured === true;
 
@@ -117,12 +126,15 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
       </p>
 
       <div className="ss-sc__chips" role="list">
-        <span role="listitem" className={`ss-sc__chip ${status?.agentConnected ? "is-ok" : "is-warn"}`}>
-          {status?.agentConnected ? t("Claude connecté", "Claude connected", english) : t("Claude non connecté", "Claude not connected", english)}
+        <span role="listitem" className={`ss-sc__chip ${status?.agentConnected || status?.agentByKey ? "is-ok" : "is-warn"}`}>
+          {status?.agentConnected ? t("Claude connecté", "Claude connected", english)
+            : status?.agentByKey ? t("Agent connecté par clé", "Agent connected by key", english)
+            : t("Claude non connecté", "Claude not connected", english)}
         </span>
         <span role="listitem" className={`ss-sc__chip ${auto ? "is-ok" : ""}`}>
           {auto ? t("Mode automatique", "Automatic mode", english)
             : status?.agentConnected ? t("Mode : Claude s’ouvre", "Mode: Claude opens", english)
+            : status?.agentByKey ? t("Mode : à la prochaine session de l’agent", "Mode: at the agent’s next session", english)
             : t("Mode : en attente de Claude", "Mode: waiting for Claude", english)}
         </span>
       </div>
@@ -147,10 +159,25 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
           </a>
         </li>
         <li>
-          {status?.agentConnected
-            ? t("Claude est connecté à ScrollShow : c’est lui qui recrée.", "Claude is connected to ScrollShow: it does the recreation.", english)
-            : t("Connecte Claude à ScrollShow (connecteur claude.ai) : c’est lui qui recrée.", "Connect Claude to ScrollShow (claude.ai connector): it does the recreation.", english)}{" "}
-          {!status?.agentConnected ? <a className="ss-btn-ghost" href="/app/settings?tab=agents">{t("Connecter Claude", "Connect Claude", english)}</a> : null}
+          {status?.agentConnected ? (
+            t("Claude est connecté à ScrollShow : c’est lui qui recrée.", "Claude is connected to ScrollShow: it does the recreation.", english)
+          ) : (
+            <>
+              {t(
+                "Ajoute ScrollShow dans Claude : Réglages → Connecteurs → « Ajouter un connecteur personnalisé », nom ScrollShow, avec cette adresse, puis « Se connecter ». C’est Claude qui recrée.",
+                "Add ScrollShow to Claude: Settings → Connectors → “Add custom connector”, name ScrollShow, with this address, then “Connect”. Claude does the recreation.",
+                english,
+              )}
+              <span className="ss-reveal ss-sc__key">
+                <code>{status?.mcpUrl || "https://scrollshow.io/api/mcp"}</code>
+                <button className="ss-btn-ghost" type="button" onClick={() => void copyAddress()}>{addressCopied ? t("Copié", "Copied", english) : t("Copier", "Copy", english)}</button>
+              </span>
+              <a className="ss-btn-ghost" href={status?.connectorsUrl || "https://claude.ai/customize/connectors?modal=add-custom-connector"} target="_blank" rel="noreferrer">{t("Ouvrir les connecteurs Claude", "Open Claude connectors", english)}</a>
+              {status?.agentByKey ? (
+                <span className="ss-sc__hint">{t("Ton agent branché par clé (Claude Code, Cursor…) traitera aussi les demandes à sa prochaine session.", "Your key-connected agent (Claude Code, Cursor…) will also handle requests at its next session.", english)}</span>
+              ) : null}
+            </>
+          )}
         </li>
       </ol>
       <p className="ss-muted">

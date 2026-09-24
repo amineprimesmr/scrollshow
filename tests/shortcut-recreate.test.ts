@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { emptyStore, readStoreSlice } from "../lib/store";
 import {
   agentPrompt, claimRecreation, completeRecreation, findPostLink, fireRoutine, listRecreations, openToken, parseShareUser,
-  placeSharer, planDelivery, recreationState, resolveMode, sealToken, shortcutMessage, shortcutMode, validRoutine, RECREATION_LEASE_MS,
+  agentKeyActive, placeSharer, planDelivery, recreationState, resolveMode, sealToken, shortcutMessage, shortcutMode, validRoutine, RECREATION_LEASE_MS,
 } from "../lib/shortcut-recreate";
 import type { StoreData } from "../lib/types";
 
@@ -87,9 +87,20 @@ test("livraison : routine d'abord, sinon Claude, sinon connecter l'agent", () =>
   assert.equal(planDelivery({ ...base, hasTrigger: true, agentConnected: true }), "routine");
   assert.equal(planDelivery({ ...base, agentConnected: true }), "claude");
   assert.equal(planDelivery(base), "connect_agent");
+  assert.equal(planDelivery({ ...base, agentByKey: true }), "agent_later", "un agent par cle n'est pas ouvrable depuis le telephone");
   assert.equal(planDelivery({ ...base, kind: "video", hasTrigger: true }), "video");
   assert.equal(planDelivery({ ...base, mode: "save", hasTrigger: true }), "saved");
   assert.equal(planDelivery({ ...base, already: true, hasTrigger: true }), "already");
+});
+
+test("un agent par cle compte s'il a servi ces 30 jours, jamais la cle du raccourci", () => {
+  const now = Date.parse("2026-09-24T00:00:00Z");
+  const key = (name: string, lastUsedAt?: string, expiresAt?: string) => ({ id: name, userId: "u1", name, prefix: "", hash: "", createdAt: "", lastUsedAt, expiresAt });
+  assert.equal(agentKeyActive({ apiKeys: [key("Claude Code", "2026-09-20T00:00:00Z")] }, "u1", now), true);
+  assert.equal(agentKeyActive({ apiKeys: [key("Claude Code", "2026-07-01T00:00:00Z")] }, "u1", now), false);
+  assert.equal(agentKeyActive({ apiKeys: [key("Raccourci iPhone", "2026-09-23T00:00:00Z")] }, "u1", now), false);
+  assert.equal(agentKeyActive({ apiKeys: [key("Cursor", "2026-09-23T00:00:00Z", "2026-09-01T00:00:00Z")] }, "u1", now), false);
+  assert.equal(agentKeyActive({ apiKeys: [key("Cursor", "2026-09-23T00:00:00Z")] }, "u2", now), false);
 });
 
 test("un bail expire rend la demande de nouveau prenable", () => {
