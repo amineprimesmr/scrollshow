@@ -131,16 +131,21 @@ export function resolveMode(choice: unknown, preference: ShortcutPreference | un
   return preference === "save" ? "save" : "recreate";
 }
 
-export type Delivery = "saved" | "video" | "already" | "routine" | "claude" | "agent_later" | "connect_agent";
+/**
+ * Le raccourci n'ouvre JAMAIS Claude (decision d'Amine) : l'agent de l'utilisateur travaille en
+ * arriere-plan via sa routine Claude (mode automatique), a ses frais, zero cout pour ScrollShow.
+ * Sans routine, la demande attend l'agent et la notification dit quoi brancher.
+ */
+export type Delivery = "saved" | "video" | "already" | "routine" | "agent_later" | "setup_routine" | "connect_agent";
 
 export function planDelivery(input: { mode: ShortcutMode; kind?: string; already?: boolean; hasTrigger: boolean; agentConnected: boolean; agentByKey?: boolean }): Delivery {
   if (input.mode === "save") return "saved";
   if (input.kind === "video") return "video";
   if (input.already) return "already";
   if (input.hasTrigger) return "routine";
-  if (input.agentConnected) return "claude";
-  // Agent branche par cle (Claude Code, Cursor, Codex) : on ne peut pas l'ouvrir depuis le telephone,
-  // la demande l'attend (whoami.recreations.pending la lui signale).
+  // Connecteur Claude branche mais pas de routine : rien ne peut tourner seul, il faut la brancher.
+  if (input.agentConnected) return "setup_routine";
+  // Agent branche par cle (Claude Code, Cursor, Codex) : la demande l'attend (whoami.recreations.pending).
   return input.agentByKey ? "agent_later" : "connect_agent";
 }
 
@@ -231,7 +236,7 @@ export function shortcutMessage(input: MessageInput): { title: string; message: 
       title = e ? `ScrollShow · ${sharer}` : `ScrollShow · ${sharer}`;
     }
   }
-  const failed = input.triggerError ? (e ? " Your routine did not start, so Claude opens instead." : " Ta routine n'a pas démarré : Claude s'ouvre à la place.") : "";
+  const failed = input.triggerError ? (e ? " Your Claude routine did not start: check it in Settings → API." : " Ta routine Claude n'a pas démarré : vérifie-la dans Réglages → API.") : "";
   switch (input.delivery) {
     case "saved":
       return { title, message: e ? `${who} post saved to your Library.` : `Post de ${who} enregistré dans ta Bibliothèque.` };
@@ -241,8 +246,8 @@ export function shortcutMessage(input: MessageInput): { title: string; message: 
       return { title, message: (e ? `Your agent is already recreating ${who} carousel. The draft will be in your calendar (Drafts).` : `Ton agent recrée déjà le carrousel de ${who}. Le brouillon arrivera dans ton calendrier (Brouillons).`) + note };
     case "routine":
       return { title, message: (e ? `Your agent is recreating ${who} carousel${slides}. You'll get a notification when the draft is in your calendar.` : `Ton agent recrée le carrousel de ${who}${slides}. Tu seras notifié quand le brouillon sera dans ton calendrier.`) + note };
-    case "claude":
-      return { title, message: (e ? `${who} carousel${slides} is ready to recreate. Claude opens: send the message, the draft lands in your calendar.` : `Carrousel de ${who}${slides} prêt à recréer. Claude s'ouvre : envoie le message, le brouillon arrivera dans ton calendrier.`) + failed + note };
+    case "setup_routine":
+      return { title, message: (e ? `${who} carousel${slides} is waiting. To have it recreated automatically, turn on automatic mode: ScrollShow → Settings → API.` : `Carrousel de ${who}${slides} en attente. Pour qu'il soit recréé tout seul, branche le mode automatique : ScrollShow → Réglages → API.`) + failed + note };
     case "agent_later":
       return { title, message: (e ? `${who} carousel${slides} is waiting for your agent: it will recreate it at its next session.` : `Carrousel de ${who}${slides} en attente : ton agent le recréera à sa prochaine session.`) + note };
     case "connect_agent":
@@ -439,21 +444,20 @@ export async function handleShortcut(user: SessionUser, input: { text: string; c
 
   const agentByKey = agentKeyActive(data, user.id);
   let delivery = planDelivery({ mode, kind: post.kind, already, hasTrigger: Boolean(trigger), agentConnected, agentByKey });
-  let openUrl: string | undefined;
+  const openUrl: string | undefined = undefined;
   let sessionUrl: string | undefined;
   let triggerError: string | undefined;
   if (delivery === "routine" && trigger) {
     const fired = await fireRoutine(trigger, user.id, `ScrollShow recreation request ${post.id} (project ${placement.projectId}). Source: ${post.tiktokUrl || share.url}`);
     await recordFire(user.id, post.id, fired);
     if (fired.ok) sessionUrl = fired.sessionUrl;
-    else { triggerError = fired.error; delivery = agentConnected ? "claude" : agentByKey ? "agent_later" : "connect_agent"; }
+    else { triggerError = fired.error; delivery = "setup_routine"; }
   }
-  if (delivery === "claude") openUrl = claudeUrl(post.id, e);
-  if (delivery === "connect_agent") openUrl = CLAUDE_CONNECTORS_URL;
+  // Rien ne s'ouvre sur le telephone : la notification suffit, l'utilisateur reste dans TikTok.
 
   const text = shortcutMessage({
     delivery, english: e, author: post.authorHandle, slides: post.photo_images?.length, placement,
-    sharer: share.sharer?.handle, projectName: project?.name, triggerError: delivery === "claude" ? triggerError : undefined,
+    sharer: share.sharer?.handle, projectName: project?.name, triggerError,
   });
   return { ok: true, ...text, openUrl, delivery, postId: post.id, sharer: share.sharer, link: placement.link, projectId: placement.projectId, sessionUrl };
 }

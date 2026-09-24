@@ -85,7 +85,7 @@ test("sans choix sur le telephone, la preference du compte s'applique", () => {
 test("livraison : routine d'abord, sinon Claude, sinon connecter l'agent", () => {
   const base = { mode: "recreate" as const, kind: "photo", hasTrigger: false, agentConnected: false };
   assert.equal(planDelivery({ ...base, hasTrigger: true, agentConnected: true }), "routine");
-  assert.equal(planDelivery({ ...base, agentConnected: true }), "claude");
+  assert.equal(planDelivery({ ...base, agentConnected: true }), "setup_routine", "le raccourci n'ouvre jamais Claude");
   assert.equal(planDelivery(base), "connect_agent");
   assert.equal(planDelivery({ ...base, agentByKey: true }), "agent_later", "un agent par cle n'est pas ouvrable depuis le telephone");
   assert.equal(planDelivery({ ...base, kind: "video", hasTrigger: true }), "video");
@@ -114,7 +114,7 @@ test("les avertissements de compte sont dans le titre de la notification", () =>
   const unlinked = shortcutMessage({ delivery: "routine", english: false, author: "nike", slides: 7, sharer: "perso", placement: { link: "unlinked", projectId: "p1", routed: false } });
   assert.match(unlinked.title, /@perso n'est pas lié/);
   assert.match(unlinked.message, /Ton agent recrée le carrousel de @nike \(7 slides\)/);
-  const routed = shortcutMessage({ delivery: "claude", english: false, author: "nike", sharer: "glow.daily", projectName: "Glow", placement: { link: "connected", projectId: "p2", routed: true } });
+  const routed = shortcutMessage({ delivery: "setup_routine", english: false, author: "nike", sharer: "glow.daily", projectName: "Glow", placement: { link: "connected", projectId: "p2", routed: true } });
   assert.match(routed.title, /Rangé dans « Glow »/);
   const saved = shortcutMessage({ delivery: "saved", english: false, author: "nike", sharer: "perso", placement: { link: "unlinked", projectId: "p1", routed: false } });
   assert.equal(saved.title, "ScrollShow", "un simple enregistrement n'a pas besoin d'avertir");

@@ -7636,8 +7636,8 @@ html[data-theme="dark"] .ss-fan {
 .ss-sc__chip.is-ok { border-color: var(--ss-ok-line); background: var(--ss-ok-bg); color: var(--ss-ok-fg); }
 .ss-sc__chip.is-warn { border-color: var(--ss-warn-line); background: var(--ss-warn-bg); color: var(--ss-warn-fg); }
 .ss-sc__auto { margin: 14px 0 0; padding: 14px 16px; border: 1px solid var(--ss-line); border-radius: 16px; background: var(--ss-soft); }
-.ss-sc__auto summary { cursor: pointer; font-size: 14px; font-weight: 650; }
-.ss-sc__auto[open] summary { margin-bottom: 8px; }
+.ss-sc__auto.is-todo { border-color: var(--ss-warn-line); }
+.ss-sc__auto-title { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 650; }
 .ss-sc__auto .ss-steps { margin-top: 10px; }
 .ss-sc__form { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 8px; margin-top: 8px; }
 .ss-sc__form input { min-width: 0; }

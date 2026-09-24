@@ -55,9 +55,9 @@ function fireError(code: string | null | undefined, english: boolean) {
 }
 
 /**
- * Reglages → API → Raccourci iPhone. Le raccourci envoie un post TikTok ; l'agent
- * de l'utilisateur le recree en brouillon. Deux modes : Claude s'ouvre avec le
- * message pret, ou une routine Claude (claude.ai/code/routines) travaille seule.
+ * Reglages → API → Raccourci iPhone. Le raccourci envoie un post TikTok ; la routine Claude de
+ * l'utilisateur (claude.ai/code/routines, declenchee par API) le recree en arriere-plan, a ses frais.
+ * Rien ne s'ouvre sur le telephone.
  */
 export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copied, onCopy }: { english: boolean; busyKey: boolean; onCreateKey: () => void; revealed: string; copied: boolean; onCopy: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
@@ -72,6 +72,16 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
   useEffect(() => {
     void checkedFetch(`/api/studio/shortcut${lang}`).then(res => res.json()).then(setStatus).catch(() => setStatus(null));
   }, [lang]);
+
+  // Tant qu'une recreation attend ou tourne, la liste se met a jour seule : on voit l'agent avancer.
+  const waiting = Boolean(status?.requests.some(item => item.status === "queued" || item.status === "running"));
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => {
+      void fetch(`/api/studio/shortcut${lang}`).then(res => (res.ok ? res.json() : null)).then(next => { if (next) setStatus(next); }).catch(() => undefined);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [waiting, lang]);
 
   async function act(action: string, extra: Record<string, string> = {}) {
     setBusy(action + (extra.id || ""));
@@ -112,6 +122,47 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
   const trigger = status?.trigger;
   const auto = trigger?.configured === true;
 
+  const requests = status?.requests.length ? (
+    <>
+      <h3 className="ss-sc__sub">{t("Derniers partages", "Recent shares", english)}</h3>
+      <ul className="ss-settings-list ss-sc__list">
+        {status.requests.map(item => (
+          <li key={item.id}>
+            <span>
+              <b>
+                {item.author ? `@${item.author}` : "TikTok"}
+                {item.slides > 1 ? ` · ${item.slides} slides` : ""}
+              </b>
+              <span>
+                <em className={`ss-sc__state is-${item.status}`}>{english ? STATUS_LABEL[item.status][1] : STATUS_LABEL[item.status][0]}</em>
+                {item.status === "queued" && !auto ? ` · ${t("branche le mode automatique pour qu’elle parte seule", "turn on automatic mode so it runs on its own", english)}` : ""}
+                {item.sharer ? ` · ${t("depuis", "from", english)} @${item.sharer}` : ""}
+                {item.link === "unlinked" ? ` (${t("non lié", "not linked", english)})` : item.link === "tracked" ? ` (${t("non connecté", "not connected", english)})` : ""}
+                {item.projectName ? ` · ${item.projectName}` : ""}
+                {item.error ? ` · ${item.error}` : ""}
+                {item.trigger && !item.trigger.ok ? ` · ${fireError(item.trigger.error, english)}` : ""}
+              </span>
+            </span>
+            <span className="ss-sc__actions">
+              {item.resultPostId ? <a className="ss-btn-ghost" href={`/app?post=${encodeURIComponent(item.resultPostId)}`}>{t("Voir le brouillon", "Open draft", english)}</a> : null}
+              {item.trigger?.sessionUrl && item.status !== "done" ? <a className="ss-sc__link" href={item.trigger.sessionUrl} target="_blank" rel="noreferrer">{t("Voir l’agent travailler", "Watch the agent", english)}</a> : null}
+              {(item.status === "queued" || item.status === "failed") && auto ? (
+                <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("retry", { id: item.id })}>
+                  {busy === `retry${item.id}` ? <span className="ss-spin" /> : t("Relancer", "Retry", english)}
+                </button>
+              ) : null}
+              {item.status !== "running" && item.status !== "done" ? (
+                <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("cancel", { id: item.id })}>
+                  {t("Retirer", "Remove", english)}
+                </button>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
+  ) : null;
+
   return (
     <div className="ss-set-card ss-sc">
       <h2>
@@ -119,26 +170,86 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
       </h2>
       <p className="ss-lead">
         {t(
-          "Sur un post TikTok : Partager → ScrollShow → « Recréer pour mon business ». Ton agent analyse le carrousel et le recrée pour ton business, en brouillon dans ton calendrier, sur le compte TikTok ouvert sur ton téléphone.",
-          "On a TikTok post: Share → ScrollShow → “Recreate for my business”. Your agent studies the carousel and recreates it for your business as a draft in your calendar, on the TikTok account open on your phone.",
+          "Sur un post TikTok : Partager → ScrollShow. Rien ne s’ouvre : ton agent Claude recrée le carrousel pour ton business en arrière-plan, avec ton abonnement Claude, et le range en brouillon dans ton calendrier.",
+          "On a TikTok post: Share → ScrollShow. Nothing opens: your Claude agent recreates the carousel for your business in the background, on your Claude plan, and saves it as a draft in your calendar.",
           english,
         )}
       </p>
 
       <div className="ss-sc__chips" role="list">
-        <span role="listitem" className={`ss-sc__chip ${status?.agentConnected || status?.agentByKey ? "is-ok" : "is-warn"}`}>
-          {status?.agentConnected ? t("Claude connecté", "Claude connected", english)
-            : status?.agentByKey ? t("Agent connecté par clé", "Agent connected by key", english)
-            : t("Claude non connecté", "Claude not connected", english)}
+        <span role="listitem" className={`ss-sc__chip ${auto ? "is-ok" : "is-warn"}`}>
+          {auto ? t("Mode automatique branché", "Automatic mode on", english) : t("Mode automatique à brancher", "Automatic mode not set up", english)}
         </span>
-        <span role="listitem" className={`ss-sc__chip ${auto ? "is-ok" : ""}`}>
-          {auto ? t("Mode automatique", "Automatic mode", english)
-            : status?.agentConnected ? t("Mode : Claude s’ouvre", "Mode: Claude opens", english)
-            : status?.agentByKey ? t("Mode : à la prochaine session de l’agent", "Mode: at the agent’s next session", english)
-            : t("Mode : en attente de Claude", "Mode: waiting for Claude", english)}
+        <span role="listitem" className={`ss-sc__chip ${status?.agentConnected || status?.agentByKey ? "is-ok" : "is-warn"}`}>
+          {status?.agentConnected ? t("Connecteur Claude actif", "Claude connector active", english)
+            : status?.agentByKey ? t("Agent connecté par clé", "Agent connected by key", english)
+            : t("Connecteur Claude inactif", "Claude connector inactive", english)}
         </span>
       </div>
 
+      <div className={`ss-sc__auto${auto ? "" : " is-todo"}`}>
+        <b className="ss-sc__auto-title">
+          {auto ? t("Mode automatique", "Automatic mode", english) : t("À faire une fois : brancher le mode automatique (2 minutes)", "Do once: turn on automatic mode (2 minutes)", english)}
+        </b>
+        {auto && trigger?.configured ? (
+          <div className="ss-sc__routine">
+            <span>
+              <b>{t("Ta routine Claude est branchée", "Your Claude routine is connected", english)}</b>
+              <span>
+                {t("jeton", "token", english)} {trigger.tokenHint}
+                {trigger.lastFiredAt ? ` · ${t("dernier lancement", "last run", english)} ${new Date(trigger.lastFiredAt).toLocaleString(english ? "en-US" : "fr-FR")}` : ""}
+                {trigger.lastError ? ` · ${fireError(trigger.lastError, english)}` : ""}
+              </span>
+            </span>
+            {trigger.lastSessionUrl ? <a className="ss-sc__link" href={trigger.lastSessionUrl} target="_blank" rel="noreferrer">{t("Dernière session", "Last session", english)}</a> : null}
+            <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("test")}>
+              {busy === "test" ? <span className="ss-spin" /> : t("Tester", "Test", english)}
+            </button>
+            <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("remove")}>
+              {t("Débrancher", "Disconnect", english)}
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="ss-muted">
+              {t(
+                "Une routine Claude, c’est ton agent qui tourne dans le cloud d’Anthropic. ScrollShow la déclenche à chaque partage : zéro frais ScrollShow, ça compte dans ton usage Claude (offres Pro, Max, Team).",
+                "A Claude routine is your agent running in Anthropic’s cloud. ScrollShow starts it on every share: no ScrollShow fee, it counts toward your Claude usage (Pro, Max, Team plans).",
+                english,
+              )}
+            </p>
+            <ol className="ss-steps">
+              <li>
+                {t("Ouvre les routines Claude et touche « New routine ».", "Open Claude routines and tap “New routine”.", english)}{" "}
+                <a className="ss-btn-ghost" href="https://claude.ai/code/routines" target="_blank" rel="noreferrer">{t("Ouvrir les routines", "Open routines", english)}</a>
+              </li>
+              <li>
+                {t("Nom : ScrollShow. Colle ces instructions dans le champ du prompt.", "Name: ScrollShow. Paste these instructions into the prompt field.", english)}{" "}
+                <button className="ss-btn-ghost" type="button" onClick={() => void copyPrompt()} disabled={!status}>
+                  {promptCopied ? t("Copié", "Copied", english) : t("Copier les instructions", "Copy instructions", english)}
+                </button>
+                <span className="ss-sc__hint">{t("Si un dépôt GitHub est demandé, choisis n’importe lequel : l’agent n’y touche pas. En bas, garde le connecteur ScrollShow coché.", "If a GitHub repository is required, pick any: the agent never touches it. At the bottom, keep the ScrollShow connector checked.", english)}</span>
+              </li>
+              <li>{t("« Select a trigger » → « API ». Crée la routine, puis dans le déclencheur API touche « Generate token ».", "“Select a trigger” → “API”. Create the routine, then in the API trigger tap “Generate token”.", english)}</li>
+              <li>
+                {t("Colle l’URL et le jeton ici, puis « Brancher » (le jeton est chiffré et ne ressort jamais).", "Paste the URL and token here, then “Connect” (the token is encrypted and never shown again).", english)}
+                <div className="ss-sc__form">
+                  <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" aria-label={t("URL de la routine", "Routine URL", english)} spellCheck={false} autoComplete="off" />
+                  <input value={token} onChange={e => setToken(e.target.value)} placeholder="sk-ant-oat01-…" type="password" aria-label={t("Jeton de la routine", "Routine token", english)} autoComplete="off" />
+                  <button className="ss-btn-purple" type="button" disabled={Boolean(busy) || !url || !token} onClick={() => void act("save", { url, token })}>
+                    {busy === "save" ? <span className="ss-spin" /> : t("Brancher", "Connect", english)}
+                  </button>
+                </div>
+              </li>
+            </ol>
+          </>
+        )}
+      </div>
+      {note ? <p className="ss-sc__note" role="status">{note}</p> : null}
+
+      {requests}
+
+      <h3 className="ss-sc__sub">{t("Installer le raccourci", "Install the shortcut", english)}</h3>
       <ol className="ss-steps">
         <li>
           {t("Crée la clé de ton iPhone (valable un an, elle remplace la précédente) et copie-la.", "Create your iPhone key (valid for a year, it replaces the previous one) and copy it.", english)}{" "}
@@ -158,34 +269,27 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
             {t("Installer le raccourci", "Install the shortcut", english)}
           </a>
         </li>
-        <li>
-          {status?.agentConnected ? (
-            t("Claude est connecté à ScrollShow : c’est lui qui recrée.", "Claude is connected to ScrollShow: it does the recreation.", english)
-          ) : (
-            <>
+        {!status?.agentConnected ? (
+          <li>
+            {t(
+              "Ajoute ScrollShow dans Claude (Réglages → Connecteurs → « Ajouter un connecteur personnalisé ») avec cette adresse, puis « Se connecter ». La routine s’en sert.",
+              "Add ScrollShow to Claude (Settings → Connectors → “Add custom connector”) with this address, then “Connect”. The routine uses it.",
+              english,
+            )}
+            <span className="ss-reveal ss-sc__key">
+              <code>{status?.mcpUrl || "https://scrollshow.io/api/mcp"}</code>
+              <button className="ss-btn-ghost" type="button" onClick={() => void copyAddress()}>{addressCopied ? t("Copié", "Copied", english) : t("Copier", "Copy", english)}</button>
+            </span>
+            <a className="ss-btn-ghost" href={status?.connectorsUrl || "https://claude.ai/customize/connectors?modal=add-custom-connector"} target="_blank" rel="noreferrer">{t("Ouvrir les connecteurs Claude", "Open Claude connectors", english)}</a>
+            <span className="ss-sc__hint">
               {t(
-                "Ajoute ScrollShow dans Claude : Réglages → Connecteurs → « Ajouter un connecteur personnalisé », nom ScrollShow, avec cette adresse, puis « Se connecter ». C’est Claude qui recrée.",
-                "Add ScrollShow to Claude: Settings → Connectors → “Add custom connector”, name ScrollShow, with this address, then “Connect”. Claude does the recreation.",
+                "ScrollShow est déjà dans tes connecteurs ? Son autorisation a expiré : ouvre-le, « Se déconnecter », puis « Se connecter ».",
+                "ScrollShow already in your connectors? Its authorization expired: open it, “Disconnect”, then “Connect”.",
                 english,
               )}
-              <span className="ss-reveal ss-sc__key">
-                <code>{status?.mcpUrl || "https://scrollshow.io/api/mcp"}</code>
-                <button className="ss-btn-ghost" type="button" onClick={() => void copyAddress()}>{addressCopied ? t("Copié", "Copied", english) : t("Copier", "Copy", english)}</button>
-              </span>
-              <a className="ss-btn-ghost" href={status?.connectorsUrl || "https://claude.ai/customize/connectors?modal=add-custom-connector"} target="_blank" rel="noreferrer">{t("Ouvrir les connecteurs Claude", "Open Claude connectors", english)}</a>
-              <span className="ss-sc__hint">
-                {t(
-                  "ScrollShow est déjà dans tes connecteurs Claude ? Son autorisation a expiré : ouvre-le, « Se déconnecter », puis « Se connecter ».",
-                  "ScrollShow already in your Claude connectors? Its authorization expired: open it, “Disconnect”, then “Connect”.",
-                  english,
-                )}
-              </span>
-              {status?.agentByKey ? (
-                <span className="ss-sc__hint">{t("Ton agent branché par clé (Claude Code, Cursor…) traitera aussi les demandes à sa prochaine session.", "Your key-connected agent (Claude Code, Cursor…) will also handle requests at its next session.", english)}</span>
-              ) : null}
-            </>
-          )}
-        </li>
+            </span>
+          </li>
+        ) : null}
       </ol>
       <p className="ss-muted">
         {t(
@@ -208,98 +312,6 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
           ))}
         </div>
       </div>
-
-      <details className="ss-sc__auto" open={auto}>
-        <summary>{t("Mode automatique : l’agent travaille seul", "Automatic mode: the agent works on its own", english)}</summary>
-        <p className="ss-muted">
-          {t(
-            "Avec une routine Claude (offres Pro, Max, Team), le partage lance l’agent dans le cloud : rien ne s’ouvre sur ton téléphone et tu reçois une notification quand le brouillon est prêt. Chaque recréation compte dans ton usage Claude.",
-            "With a Claude routine (Pro, Max, Team plans), sharing starts the agent in the cloud: nothing opens on your phone and you get a notification when the draft is ready. Each recreation counts toward your Claude usage.",
-            english,
-          )}
-        </p>
-        {auto && trigger?.configured ? (
-          <div className="ss-sc__routine">
-            <span>
-              <b>{t("Routine branchée", "Routine connected", english)}</b>
-              <span>
-                {t("jeton", "token", english)} {trigger.tokenHint}
-                {trigger.lastFiredAt ? ` · ${t("dernier lancement", "last run", english)} ${new Date(trigger.lastFiredAt).toLocaleString(english ? "en-US" : "fr-FR")}` : ""}
-                {trigger.lastError ? ` · ${fireError(trigger.lastError, english)}` : ""}
-              </span>
-            </span>
-            {trigger.lastSessionUrl ? <a className="ss-sc__link" href={trigger.lastSessionUrl} target="_blank" rel="noreferrer">{t("Dernière session", "Last session", english)}</a> : null}
-            <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("test")}>
-              {busy === "test" ? <span className="ss-spin" /> : t("Tester", "Test", english)}
-            </button>
-            <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("remove")}>
-              {t("Débrancher", "Disconnect", english)}
-            </button>
-          </div>
-        ) : (
-          <ol className="ss-steps">
-            <li>
-              {t("Sur claude.ai/code/routines : « New routine », colle ces instructions, garde le connecteur ScrollShow.", "On claude.ai/code/routines: “New routine”, paste these instructions, keep the ScrollShow connector.", english)}{" "}
-              <button className="ss-btn-ghost" type="button" onClick={() => void copyPrompt()} disabled={!status}>
-                {promptCopied ? t("Copié", "Copied", english) : t("Copier les instructions", "Copy instructions", english)}
-              </button>{" "}
-              <a className="ss-sc__link" href="https://claude.ai/code/routines" target="_blank" rel="noreferrer">claude.ai/code/routines</a>
-            </li>
-            <li>{t("Dans « Select a trigger », ajoute « API », enregistre, puis « Generate token ».", "Under “Select a trigger”, add “API”, save, then “Generate token”.", english)}</li>
-            <li>
-              {t("Colle ici l’URL et le jeton (le jeton est chiffré et ne ressort jamais).", "Paste the URL and token here (the token is encrypted and never shown again).", english)}
-              <div className="ss-sc__form">
-                <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" aria-label={t("URL de la routine", "Routine URL", english)} spellCheck={false} autoComplete="off" />
-                <input value={token} onChange={e => setToken(e.target.value)} placeholder="sk-ant-oat01-…" type="password" aria-label={t("Jeton de la routine", "Routine token", english)} autoComplete="off" />
-                <button className="ss-btn-purple" type="button" disabled={Boolean(busy) || !url || !token} onClick={() => void act("save", { url, token })}>
-                  {busy === "save" ? <span className="ss-spin" /> : t("Brancher", "Connect", english)}
-                </button>
-              </div>
-            </li>
-          </ol>
-        )}
-      </details>
-      {note ? <p className="ss-sc__note" role="status">{note}</p> : null}
-
-      {status?.requests.length ? (
-        <>
-          <h3 className="ss-sc__sub">{t("Derniers partages", "Recent shares", english)}</h3>
-          <ul className="ss-settings-list ss-sc__list">
-            {status.requests.map(item => (
-              <li key={item.id}>
-                <span>
-                  <b>
-                    {item.author ? `@${item.author}` : "TikTok"}
-                    {item.slides > 1 ? ` · ${item.slides} slides` : ""}
-                  </b>
-                  <span>
-                    <em className={`ss-sc__state is-${item.status}`}>{english ? STATUS_LABEL[item.status][1] : STATUS_LABEL[item.status][0]}</em>
-                    {item.sharer ? ` · ${t("depuis", "from", english)} @${item.sharer}` : ""}
-                    {item.link === "unlinked" ? ` (${t("non lié", "not linked", english)})` : item.link === "tracked" ? ` (${t("non connecté", "not connected", english)})` : ""}
-                    {item.projectName ? ` · ${item.projectName}` : ""}
-                    {item.error ? ` · ${item.error}` : ""}
-                    {item.trigger && !item.trigger.ok ? ` · ${fireError(item.trigger.error, english)}` : ""}
-                  </span>
-                </span>
-                <span className="ss-sc__actions">
-                  {item.resultPostId ? <a className="ss-btn-ghost" href={`/app?post=${encodeURIComponent(item.resultPostId)}`}>{t("Voir le brouillon", "Open draft", english)}</a> : null}
-                  {item.trigger?.sessionUrl && item.status !== "done" ? <a className="ss-sc__link" href={item.trigger.sessionUrl} target="_blank" rel="noreferrer">{t("Session", "Session", english)}</a> : null}
-                  {item.status === "queued" || item.status === "failed" ? (
-                    <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("retry", { id: item.id })}>
-                      {busy === `retry${item.id}` ? <span className="ss-spin" /> : t("Relancer", "Retry", english)}
-                    </button>
-                  ) : null}
-                  {item.status !== "running" && item.status !== "done" ? (
-                    <button className="ss-btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("cancel", { id: item.id })}>
-                      {t("Retirer", "Remove", english)}
-                    </button>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
     </div>
   );
 }

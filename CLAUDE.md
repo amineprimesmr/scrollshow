@@ -644,8 +644,11 @@ Doc : `docs/raccourci-recreation-2026-09-24.md`.
 - La demande vit sur le post importé (`StudioPost.recreation`, une par post), pas dans une collection.
   `claim_recreation` = bail exclusif de 30 min ; un refus n'écrit rien. `complete_recreation` pose
   `recreationOf`, met le brouillon au calendrier (jamais publié ni programmé) et envoie une notification push.
-- Livraison : routine Claude (API `/fire`, jeton scellé AES-GCM, sous-clé HKDF d'`AUTH_SECRET`, jamais
-  rendu au navigateur) → sinon `claude.ai/new?q=` si une autorisation OAuth vit → sinon page Agents.
+- Livraison : **routine Claude de l'utilisateur** (API `/fire`, jeton scellé AES-GCM, sous-clé HKDF
+  d'`AUTH_SECRET`, jamais rendu au navigateur). C'est l'agent de l'utilisateur, sur son abonnement :
+  **zéro frais IA pour ScrollShow** (décision d'Amine, ne pas ajouter de moteur IA serveur payé par nous).
+  **Le raccourci n'ouvre jamais Claude ni aucune page** (décision d'Amine) : sans routine, la demande
+  attend (`setup_routine` / `agent_later`) et la notification dit de brancher le mode automatique.
   L'URL de routine est validée strictement (`api.anthropic.com/.../trig_…/fire`) : pas de SSRF.
 - Aucun LLM serveur : c'est l'agent de l'utilisateur qui recrée, avec le parcours du skill.
 - **OAuth MCP : fenêtre de réutilisation de 60 s** (`REFRESH_REUSE_GRACE_MS`, `lib/oauth.ts`). Un connecteur
