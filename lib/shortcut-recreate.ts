@@ -680,8 +680,8 @@ export async function removeTrigger(user: SessionUser) {
   }, { userId: user.id });
 }
 
-/** Filet de securite de la routine creee par l'agent : un passage toutes les 6 h rattrape un partage manque. */
-export const ROUTINE_SWEEP_CRON = "0 */6 * * *";
+/** Filet de securite de la routine creee par l'agent : un passage toutes les 2 h rattrape un partage manque. */
+export const ROUTINE_SWEEP_CRON = "0 */2 * * *";
 
 /** Ce dont un agent a besoin pour creer lui-meme la routine du mode automatique (Claude Code : routines / RemoteTrigger). */
 export async function routineSetup(user: SessionUser) {
@@ -693,7 +693,7 @@ export async function routineSetup(user: SessionUser) {
     configured,
     name: "ScrollShow",
     prompt: routinePrompt(english),
-    schedule: { cron: ROUTINE_SWEEP_CRON, why: "Safety sweep every 6 hours; the API trigger added by the user starts it instantly on each share." },
+    schedule: { cron: ROUTINE_SWEEP_CRON, why: "Safety sweep every 2 hours; the API trigger added by the user starts it instantly on each share." },
     connector: { name: "scrollshow", url: `${SITE}/api/mcp`, note: "Attach the user's claude.ai ScrollShow connector (routines only see claude.ai connectors, not local MCP servers)." },
     routinesUrl: "https://claude.ai/code/routines",
     settingsUrl: `${SITE}/app/settings?tab=api`,

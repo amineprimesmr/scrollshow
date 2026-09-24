@@ -652,7 +652,7 @@ Doc : `docs/raccourci-recreation-2026-09-24.md`.
 - **Mise en place de la routine** : impossible à 100 % automatique, Anthropic ne génère le jeton `/fire`
   que dans son interface web (affiché une fois, aucune API). L'agent de l'utilisateur (Claude Code) crée
   la routine à l'installation via `get_routine_setup` (skill, section « Automatic mode ») avec un
-  passage de sécurité toutes les 6 h ; il ne reste à l'utilisateur que « Generate token » + un collage
+  passage de sécurité toutes les 2 h ; il ne reste à l'utilisateur que « Generate token » + un collage
   (`parseRoutinePaste` retrouve URL et jeton dans n'importe quel texte copié, commande curl comprise).
   L'URL de routine est validée strictement (`api.anthropic.com/.../trig_…/fire`) : pas de SSRF.
 - Aucun LLM serveur : c'est l'agent de l'utilisateur qui recrée, avec le parcours du skill.
