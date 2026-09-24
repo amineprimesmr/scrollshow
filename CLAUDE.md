@@ -649,6 +649,11 @@ Doc : `docs/raccourci-recreation-2026-09-24.md`.
   **zéro frais IA pour ScrollShow** (décision d'Amine, ne pas ajouter de moteur IA serveur payé par nous).
   **Le raccourci n'ouvre jamais Claude ni aucune page** (décision d'Amine) : sans routine, la demande
   attend (`setup_routine` / `agent_later`) et la notification dit de brancher le mode automatique.
+- **Mise en place de la routine** : impossible à 100 % automatique, Anthropic ne génère le jeton `/fire`
+  que dans son interface web (affiché une fois, aucune API). L'agent de l'utilisateur (Claude Code) crée
+  la routine à l'installation via `get_routine_setup` (skill, section « Automatic mode ») avec un
+  passage de sécurité toutes les 6 h ; il ne reste à l'utilisateur que « Generate token » + un collage
+  (`parseRoutinePaste` retrouve URL et jeton dans n'importe quel texte copié, commande curl comprise).
   L'URL de routine est validée strictement (`api.anthropic.com/.../trig_…/fire`) : pas de SSRF.
 - Aucun LLM serveur : c'est l'agent de l'utilisateur qui recrée, avec le parcours du skill.
 - **OAuth MCP : fenêtre de réutilisation de 60 s** (`REFRESH_REUSE_GRACE_MS`, `lib/oauth.ts`). Un connecteur
