@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { t } from "@/lib/i18n";
 import { useStudio } from "./StudioContext";
 import { PostTile } from "./PostTile";
+import { signedUrlExpired } from "./cover";
 import { PostViewer } from "./PostViewer";
 import { TikTokScanLine } from "./TikTokScan";
 import { IconCheck } from "./icons";
@@ -503,6 +504,20 @@ function ResearchWorkspace({ cacheKey }: { cacheKey: string }) {
       setBusy(false);
     }
   }
+
+  // Les liens d'images TikTok sont signes et meurent en un a deux jours : une
+  // recherche rouverte depuis l'historique n'affichait que des tuiles
+  // « indisponible ». On la relance une fois, en contournant le cache.
+  const revived = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!run || run.status !== "done" || busy || !available || revived.current.has(run.id)) return;
+    const sample = wall.slice(0, 12);
+    const dead = sample.filter((row) => signedUrlExpired(row.post.images?.[0] || row.post.cover)).length;
+    if (!sample.length || dead * 2 < sample.length) return;
+    revived.current.add(run.id);
+    void start(undefined, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id, run?.status, wall, busy, available]);
 
   const keep = useCallback(async ({ post, url }: { post: AccountVideo; url: string }) => {
     if (!url || keepingRef.current) return;

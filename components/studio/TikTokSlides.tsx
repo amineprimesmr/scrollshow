@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { coverSrc } from "./cover";
+import { coverSrc, signedUrlExpired } from "./cover";
 
 export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false, initialIndex = 0 }: {
   images: string[];
@@ -61,7 +61,7 @@ export function TikTokSlides({ images, en, onOpen, onSlideChange, large = false,
         <button type="button" className="ss-slides__image" aria-disabled={!onOpen} tabIndex={onOpen && i === index ? 0 : -1}
           aria-label={en ? `Open slide ${i + 1}` : `Agrandir la slide ${i + 1}`}
           onClick={() => { if (!drag.current?.moved) onOpen?.(i); drag.current = null; }}>
-          {failed[url] ? <span className="ss-slides__unavailable">{en ? "Image unavailable · refresh the account" : "Image indisponible · actualise le compte"}</span> : Math.abs(i - index) <= (armed ? 1 : 0) ?
+          {failed[url] ? <span className="ss-slides__unavailable">{signedUrlExpired(url) ? (en ? "Image link expired · refresh" : "Lien d'image expiré · actualise") : (en ? "Image unavailable" : "Image indisponible")}</span> : Math.abs(i - index) <= (armed ? 1 : 0) ?
             <img src={coverSrc(url, large ? 480 : 240)} decoding="async" alt={en ? `Slide ${i + 1} of ${images.length}` : `Slide ${i + 1} sur ${images.length}`} draggable={false} loading="lazy" onError={() => setFailed(prev => ({ ...prev, [url]: true }))} /> : null}
         </button>
       </div>)}
