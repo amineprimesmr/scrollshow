@@ -238,11 +238,11 @@ export function shortcutMessage(input: MessageInput): { title: string; message: 
     case "video":
       return { title, message: e ? `${who} video saved to your Library. Recreation works on photo carousels only.` : `Vidéo de ${who} enregistrée dans ta Bibliothèque. La recréation ne marche que pour les carrousels photo.` };
     case "already":
-      return { title, message: (e ? `${who} carousel is already being recreated.` : `Le carrousel de ${who} est déjà en cours de recréation.`) + note };
+      return { title, message: (e ? `Your agent is already recreating ${who} carousel. The draft will be in your calendar (Drafts).` : `Ton agent recrée déjà le carrousel de ${who}. Le brouillon arrivera dans ton calendrier (Brouillons).`) + note };
     case "routine":
-      return { title, message: (e ? `Your agent is recreating ${who} carousel${slides}. The draft lands in your calendar in a few minutes.` : `Ton agent recrée le carrousel de ${who}${slides}. Le brouillon arrive dans ton calendrier d'ici quelques minutes.`) + note };
+      return { title, message: (e ? `Your agent is recreating ${who} carousel${slides}. You'll get a notification when the draft is in your calendar.` : `Ton agent recrée le carrousel de ${who}${slides}. Tu seras notifié quand le brouillon sera dans ton calendrier.`) + note };
     case "claude":
-      return { title, message: (e ? `${who} carousel${slides} is ready to recreate. Claude opens: send the message.` : `Carrousel de ${who}${slides} prêt à recréer. Claude s'ouvre : envoie le message.`) + failed + note };
+      return { title, message: (e ? `${who} carousel${slides} is ready to recreate. Claude opens: send the message, the draft lands in your calendar.` : `Carrousel de ${who}${slides} prêt à recréer. Claude s'ouvre : envoie le message, le brouillon arrivera dans ton calendrier.`) + failed + note };
     case "agent_later":
       return { title, message: (e ? `${who} carousel${slides} is waiting for your agent: it will recreate it at its next session.` : `Carrousel de ${who}${slides} en attente : ton agent le recréera à sa prochaine session.`) + note };
     case "connect_agent":
@@ -412,7 +412,17 @@ export async function handleShortcut(user: SessionUser, input: { text: string; c
     already = await updateStoreSlice(["posts"], (store) => {
       const row = store.posts.find(item => item.id === post.id && item.userId === user.id);
       if (!row) return false;
-      if (isPendingRecreation(row.recreation)) return true;
+      // Seule une demande qu'un agent tient vraiment est « en cours ». Une demande en attente (jamais
+      // prise, ou bail expire) est relancee : repartager doit reveiller l'agent, pas repondre « deja en cours ».
+      const state = recreationState(row.recreation);
+      if (state === "running") return true;
+      if (state === "queued" && row.recreation) {
+        row.recreation.status = "queued";
+        row.recreation.leaseUntil = undefined;
+        row.recreation.sharer = share.sharer ? { handle: share.sharer.handle, nickname: share.sharer.nickname, avatar: share.sharer.avatar } : row.recreation.sharer;
+        if (share.sharer) { row.recreation.link = placement.link; row.recreation.channelId = placement.channelId; row.recreation.routed = placement.routed || undefined; }
+        return false;
+      }
       row.recreation = {
         status: "queued",
         via: "shortcut",
