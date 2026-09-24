@@ -517,7 +517,8 @@ export type StoreData = {
   oauthCodes?: OAuthCode[];
   oauthTokens?: OAuthToken[];
   /** Jetons de renouvellement deja consommes : un rejeu revoque toute l'autorisation. */
-  oauthUsedRefresh?: { hash: string; grantId: string }[];
+  /** `at` et `clientId` : un meme client peut rejouer son jeton pendant REFRESH_REUSE_GRACE_MS (course entre ses appareils). */
+  oauthUsedRefresh?: { hash: string; grantId: string; at?: number; clientId?: string }[];
   pushSubscriptions?: PushSubscriptionRecord[];
   videoStats?: VideoStatSnapshot[];
   channelStats?: ChannelStatSnapshot[];

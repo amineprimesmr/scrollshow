@@ -28,6 +28,13 @@ export const OAUTH_SCOPE = "scrollshow";
 const CODE_TTL = 60_000;
 const ACCESS_TTL = 3_600_000;
 const REFRESH_TTL = 60 * 86_400_000;
+/**
+ * Un connecteur Claude sert a plusieurs endroits a la fois (Mac, web, iPhone, Claude Code) et reessaie
+ * un renouvellement perdu par le reseau : deux echanges du MEME jeton a quelques secondes d'ecart sont
+ * normaux. Dans cette fenetre, pour le meme client, on delivre une nouvelle paire au lieu de couper
+ * l'autorisation (« reuse interval » d'Auth0 / Okta). Au-dela, un rejeu reste traite comme un vol.
+ */
+export const REFRESH_REUSE_GRACE_MS = 60_000;
 
 const ACCESS_PREFIX = "ss_at_";
 const REFRESH_PREFIX = "ss_rt_";
@@ -191,7 +198,8 @@ export async function issueTokens(input: GrantInput): Promise<IssuedTokens> {
 
 /**
  * Renouvellement avec rotation. Un jeton de renouvellement deja consomme est le
- * signe d'un vol : on coupe toute l'autorisation plutot que de servir le voleur.
+ * signe d'un vol : on coupe toute l'autorisation plutot que de servir le voleur —
+ * sauf dans la fenetre REFRESH_REUSE_GRACE_MS, pour le meme client (course entre ses appareils).
  */
 export async function rotateRefreshToken(refreshToken: string, clientId: string, resource?: string) {
   const hash = hashSecret(refreshToken);
@@ -201,6 +209,12 @@ export async function rotateRefreshToken(refreshToken: string, clientId: string,
     if (!found) {
       const replayed = (data.oauthUsedRefresh || []).find((item) => item.hash === hash);
       if (!replayed) return "unknown" as const;
+      const sibling = list.find((item) => item.grantId === replayed.grantId && item.clientId === clientId);
+      if (replayed.at && Date.now() - replayed.at <= REFRESH_REUSE_GRACE_MS && replayed.clientId === clientId && sibling
+        && (!resource || canonicalResource(resource) === sibling.resource) && activeGrant(data, sibling) && sibling.refreshExpiresAt > Date.now()) {
+        // Course legitime : le jeton suivant de la meme autorisation existe encore, on en delivre un autre.
+        return { grant: sibling, tokens: appendTokens(data, sibling), reused: true };
+      }
       // Deux copies du meme jeton circulent : on ne sait pas laquelle est
       // legitime, donc on coupe l'autorisation entiere plutot que de servir
       // le voleur. L'utilisateur devra reautoriser depuis son agent.
@@ -211,7 +225,7 @@ export async function rotateRefreshToken(refreshToken: string, clientId: string,
     if (!activeGrant(data, found)) return "unknown" as const;
     if (found.refreshExpiresAt <= Date.now()) return "expired" as const;
     data.oauthTokens = list.filter((item) => item.refreshHash !== hash);
-    data.oauthUsedRefresh = [...(data.oauthUsedRefresh || []), { hash, grantId: found.grantId }].slice(-5000);
+    data.oauthUsedRefresh = [...(data.oauthUsedRefresh || []), { hash, grantId: found.grantId, at: Date.now(), clientId }].slice(-5000);
     return { grant: found, tokens: appendTokens(data, found) };
   });
 

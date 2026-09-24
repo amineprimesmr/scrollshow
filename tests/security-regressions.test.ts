@@ -39,10 +39,22 @@ test("OAuth is bound to the consented workspace and refresh rotation cannot resu
   const tokens = await issueTokens({ clientId: "c", userId: "u", projectId: "prj_u_1", resource: MCP_RESOURCE, scope: "scrollshow" });
   await updateStore(data => { createProject(data, data.users[0], { name: "Second" }); });
   assert.equal((await resolveOAuthUser(tokens.accessToken, MCP_RESOURCE))?.projectId, "prj_u_1");
+  // Deux appareils du meme client renouvellent en meme temps : ce n'est pas un vol, l'autorisation survit.
   const [a,b] = await Promise.all([rotateRefreshToken(tokens.refreshToken, "c"), rotateRefreshToken(tokens.refreshToken, "c")]);
-  const success = "tokens" in a ? a : "tokens" in b ? b : null;
-  assert.ok(success);
-  assert.equal(await resolveOAuthUser(success.tokens.accessToken, MCP_RESOURCE), null);
+  assert.ok("tokens" in a && "tokens" in b);
+  assert.equal((await resolveOAuthUser(a.tokens.accessToken, MCP_RESOURCE))?.id, "u");
+  assert.equal((await resolveOAuthUser(b.tokens.accessToken, MCP_RESOURCE))?.id, "u");
+  // Un autre client ne profite jamais de la fenetre.
+  assert.deepEqual(await rotateRefreshToken(tokens.refreshToken, "other"), { error: "replay" });
+  assert.equal((await readStore()).oauthTokens?.length, 0, "rejeu par un autre client : toute l'autorisation tombe");
+
+  // Hors fenetre, un rejeu du meme client coupe aussi tout.
+  const fresh = await issueTokens({ clientId: "c", userId: "u", projectId: "prj_u_1", resource: MCP_RESOURCE, scope: "scrollshow" });
+  const next = await rotateRefreshToken(fresh.refreshToken, "c");
+  assert.ok("tokens" in next);
+  await updateStore(data => { for (const item of data.oauthUsedRefresh || []) item.at = Date.now() - 120_000; });
+  assert.deepEqual(await rotateRefreshToken(fresh.refreshToken, "c"), { error: "replay" });
+  assert.equal(await resolveOAuthUser(next.tokens.accessToken, MCP_RESOURCE), null);
   assert.equal((await readStore()).oauthTokens?.length, 0);
 }));
 

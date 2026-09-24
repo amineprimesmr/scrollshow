@@ -173,6 +173,13 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
                 <button className="ss-btn-ghost" type="button" onClick={() => void copyAddress()}>{addressCopied ? t("Copié", "Copied", english) : t("Copier", "Copy", english)}</button>
               </span>
               <a className="ss-btn-ghost" href={status?.connectorsUrl || "https://claude.ai/customize/connectors?modal=add-custom-connector"} target="_blank" rel="noreferrer">{t("Ouvrir les connecteurs Claude", "Open Claude connectors", english)}</a>
+              <span className="ss-sc__hint">
+                {t(
+                  "ScrollShow est déjà dans tes connecteurs Claude ? Son autorisation a expiré : ouvre-le, « Se déconnecter », puis « Se connecter ».",
+                  "ScrollShow already in your Claude connectors? Its authorization expired: open it, “Disconnect”, then “Connect”.",
+                  english,
+                )}
+              </span>
               {status?.agentByKey ? (
                 <span className="ss-sc__hint">{t("Ton agent branché par clé (Claude Code, Cursor…) traitera aussi les demandes à sa prochaine session.", "Your key-connected agent (Claude Code, Cursor…) will also handle requests at its next session.", english)}</span>
               ) : null}

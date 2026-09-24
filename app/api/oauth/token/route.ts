@@ -67,6 +67,8 @@ async function exchange(request: Request) {
     if (!refresh) return fail("invalid_request", "Missing refresh_token.");
     const outcome = await rotateRefreshToken(refresh, clientId, value("resource"));
     if ("error" in outcome) {
+      // Sans cette trace, une autorisation coupee ne laissait qu'un 400 anonyme dans les journaux.
+      console.warn("oauth_refresh_rejected", { verdict: outcome.error, clientId });
       return fail("invalid_grant", outcome.error === "replay"
         ? "This refresh token was already used. The whole authorization has been revoked."
         : "The refresh token is unknown or expired.");
