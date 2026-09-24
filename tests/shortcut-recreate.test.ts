@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { emptyStore, readStoreSlice } from "../lib/store";
 import {
   agentPrompt, claimRecreation, completeRecreation, findPostLink, fireRoutine, listRecreations, openToken, parseShareUser,
-  agentKeyActive, placeSharer, planDelivery, recreationState, resolveMode, sealToken, shortcutMessage, shortcutMode, validRoutine, RECREATION_LEASE_MS,
+  agentKeyActive, parseRoutinePaste, placeSharer, planDelivery, recreationState, resolveMode, sealToken, shortcutMessage, shortcutMode, validRoutine, RECREATION_LEASE_MS,
 } from "../lib/shortcut-recreate";
 import type { StoreData } from "../lib/types";
 
@@ -130,6 +130,14 @@ test("routine : URL et jeton stricts, jeton scelle par utilisateur", () => {
   assert.ok(!sealed.includes("secret"));
   assert.equal(openToken(sealed, "u1"), "sk-ant-oat01-secret");
   assert.throws(() => openToken(sealed, "u2"), /trigger_token_invalid/);
+});
+
+test("un seul collage suffit : URL et jeton retrouves dans la commande curl du modal", () => {
+  const modal = `curl -X POST https://api.anthropic.com/v1/claude_code/routines/trig_01ABCDEFGHJKLMNOP/fire \\
+  -H "Authorization: Bearer sk-ant-oat01-AbC_def-1234567890abcdefXYZ" -H "anthropic-version: 2023-06-01"`;
+  assert.deepEqual(parseRoutinePaste(modal), { url: "https://api.anthropic.com/v1/claude_code/routines/trig_01ABCDEFGHJKLMNOP/fire", token: "sk-ant-oat01-AbC_def-1234567890abcdefXYZ" });
+  assert.equal(parseRoutinePaste("https://api.anthropic.com/v1/claude_code/routines/trig_01ABCDEFGHJKLMNOP/fire"), null, "sans jeton rien n'est branche");
+  assert.equal(parseRoutinePaste("https://evil.example/trig_01ABCDEFGHJKLMNOP/fire sk-ant-oat01-AbC_def-1234567890abcdefXYZ"), null);
 });
 
 test("le message pour Claude nomme la demande et le parcours MCP", () => {

@@ -7641,6 +7641,8 @@ html[data-theme="dark"] .ss-fan {
 .ss-sc__auto .ss-steps { margin-top: 10px; }
 .ss-sc__form { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 8px; margin-top: 8px; }
 .ss-sc__form input { min-width: 0; }
+.ss-sc__form--paste { grid-template-columns: 1fr; }
+.ss-sc__form--paste textarea { min-width: 0; width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .ss-sc__routine { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
 .ss-sc__routine > span { flex: 1 1 220px; }
 .ss-sc__routine b, .ss-sc__routine span span { display: block; }

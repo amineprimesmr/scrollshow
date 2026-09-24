@@ -62,7 +62,6 @@ function fireError(code: string | null | undefined, english: boolean) {
 export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copied, onCopy }: { english: boolean; busyKey: boolean; onCreateKey: () => void; revealed: string; copied: boolean; onCopy: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [url, setUrl] = useState("");
-  const [token, setToken] = useState("");
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
@@ -98,7 +97,7 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
       }
       if (json.status) setStatus(json.status);
       const result = json.result as { ok?: boolean; error?: string; sessionUrl?: string; delivery?: string; openUrl?: string } | undefined;
-      if (action === "save") { setUrl(""); setToken(""); setNote(t("Routine enregistrée. Lance un test pour vérifier.", "Routine saved. Run a test to check it.", english)); }
+      if (action === "save") { setUrl(""); setNote(t("Routine enregistrée. Lance un test pour vérifier.", "Routine saved. Run a test to check it.", english)); }
       if (action === "test") setNote(result?.ok ? t("La routine a démarré : ouvre la session pour voir l’agent travailler.", "The routine started: open the session to watch the agent.", english) : `${t("La routine n’a pas démarré", "The routine did not start", english)} : ${fireError(result?.error, english)}`);
       if (action === "retry" && result?.delivery === "claude" && result.openUrl) window.open(result.openUrl, "_blank", "noopener");
       if (action === "retry" && result?.delivery === "routine") setNote(t("Ton agent a été relancé.", "Your agent was restarted.", english));
@@ -119,6 +118,7 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
     try { await navigator.clipboard.writeText(status.mcpUrl); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 1600); } catch { /* presse-papiers refuse */ }
   }
 
+  const pastedRoutine = /https:\/\/api\.anthropic\.com\/v1\/claude_code\/routines\/trig_[A-Za-z0-9]{8,64}\/fire/.test(url) && /sk-ant-oat01-[A-Za-z0-9_-]{20,}/.test(url);
   const trigger = status?.trigger;
   const auto = trigger?.configured === true;
 
@@ -232,13 +232,22 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
               </li>
               <li>{t("« Select a trigger » → « API ». Crée la routine, puis dans le déclencheur API touche « Generate token ».", "“Select a trigger” → “API”. Create the routine, then in the API trigger tap “Generate token”.", english)}</li>
               <li>
-                {t("Colle l’URL et le jeton ici, puis « Brancher » (le jeton est chiffré et ne ressort jamais).", "Paste the URL and token here, then “Connect” (the token is encrypted and never shown again).", english)}
-                <div className="ss-sc__form">
-                  <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" aria-label={t("URL de la routine", "Routine URL", english)} spellCheck={false} autoComplete="off" />
-                  <input value={token} onChange={e => setToken(e.target.value)} placeholder="sk-ant-oat01-…" type="password" aria-label={t("Jeton de la routine", "Routine token", english)} autoComplete="off" />
-                  <button className="ss-btn-purple" type="button" disabled={Boolean(busy) || !url || !token} onClick={() => void act("save", { url, token })}>
-                    {busy === "save" ? <span className="ss-spin" /> : t("Brancher", "Connect", english)}
-                  </button>
+                {t("Copie l’URL puis le jeton (ou la commande curl affichée) et colle-les ici : ScrollShow les reconnaît tout seul. Le jeton est chiffré et ne ressort jamais.", "Copy the URL then the token (or the curl command shown) and paste them here: ScrollShow recognises them. The token is encrypted and never shown again.", english)}
+                <div className="ss-sc__form ss-sc__form--paste">
+                  <textarea value={url} onChange={e => setUrl(e.target.value)} rows={3} placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire   sk-ant-oat01-…" aria-label={t("URL et jeton de la routine", "Routine URL and token", english)} spellCheck={false} autoComplete="off" />
+                  <div className="ss-sc__actions">
+                    <button className="ss-btn-ghost" type="button" onClick={async () => { try { const text = await navigator.clipboard.readText(); setUrl(current => `${current} ${text}`.trim()); } catch { setNote(t("Colle avec ⌘V dans le champ.", "Paste with ⌘V in the field.", english)); } }}>
+                      {t("Coller", "Paste", english)}
+                    </button>
+                    <button className="ss-btn-purple" type="button" disabled={Boolean(busy) || !pastedRoutine} onClick={() => void act("save", { url, token: "" })}>
+                      {busy === "save" ? <span className="ss-spin" /> : t("Brancher", "Connect", english)}
+                    </button>
+                  </div>
+                  {url && !pastedRoutine ? (
+                    <span className="ss-sc__hint">
+                      {!/trig_[A-Za-z0-9]{8,}\/fire/.test(url) ? t("Il manque l’URL (…/trig_…/fire).", "The URL (…/trig_…/fire) is missing.", english) : t("Il manque le jeton (sk-ant-oat01-…).", "The token (sk-ant-oat01-…) is missing.", english)}
+                    </span>
+                  ) : null}
                 </div>
               </li>
             </ol>

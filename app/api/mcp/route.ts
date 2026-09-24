@@ -31,7 +31,7 @@ import { MCP_RESOURCE, OAUTH_SCOPE, resolveOAuthUser, switchGrantProject } from 
 import { publicUser, readStoreSlice } from "@/lib/store";
 import { hasStudioAccess } from "@/lib/plans";
 import { recipeInputSchema, ensureRecipe } from "@/lib/recipe";
-import { claimRecreation, completeRecreation, listRecreations, agentPrompt } from "@/lib/shortcut-recreate";
+import { claimRecreation, completeRecreation, listRecreations, agentPrompt, routineSetup } from "@/lib/shortcut-recreate";
 import { findImages, galleryAdd, gallerySearch, gallerySheet, contactSheet } from "@/lib/image-bank";
 import { readSlideBytes } from "@/lib/media-files";
 import { withMediaUser } from "@/lib/media-permissions";
@@ -258,6 +258,17 @@ const handler = createMcpHandler(
       request ? agentPrompt(request, false)
       : url ? `Recrée ce TikTok pour mon business avec ScrollShow : ${url}. import_tiktok, puis claim_recreation sur le post importé et suis ses étapes ; brouillon dans le calendrier, puis complete_recreation.`
       : "Traite mes demandes de recréation ScrollShow en attente : list_recreation_requests, puis pour chacune claim_recreation, suis les étapes, brouillon dans le calendrier et complete_recreation." } }] }));
+
+    server.registerTool(
+      "get_routine_setup",
+      {
+        title: "Set up automatic mode for the iPhone shortcut",
+        description: "Return what is needed to create the user's ScrollShow Claude routine (automatic mode): name, prompt, safety schedule, connector, and the step only the user can do. If your host can create Claude Code routines (routines / RemoteTrigger / /schedule), create it for the user with this prompt, the default environment and their claude.ai ScrollShow connector attached, then give them the routine link and remainingForUser. configured=true means it is already done.",
+        inputSchema: z.object({}),
+        annotations: { readOnlyHint: true },
+      },
+      async (_args, ctx) => { try { return text(await routineSetup(userFrom(ctx))); } catch (error) { return fail(error); } },
+    );
 
     server.registerTool(
       "list_recreation_requests",

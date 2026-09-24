@@ -164,6 +164,17 @@ export function isPendingRecreation(request: RecreationRequest | undefined, now 
 export const ROUTINE_URL = /^https:\/\/api\.anthropic\.com\/v1\/claude_code\/routines\/(trig_[A-Za-z0-9]{8,64})\/fire$/;
 export const ROUTINE_TOKEN = /^sk-ant-oat01-[A-Za-z0-9_-]{20,300}$/;
 
+/**
+ * Le modal « API trigger » de claude.ai montre l'URL, un exemple curl et le jeton : l'utilisateur colle
+ * ce qu'il veut (les deux, la commande curl, ou tout le texte copie) et on retrouve URL et jeton.
+ */
+export function parseRoutinePaste(text: string): { url: string; token: string } | null {
+  const value = String(text || "").slice(0, 8000);
+  const url = value.match(/https:\/\/api\.anthropic\.com\/v1\/claude_code\/routines\/trig_[A-Za-z0-9]{8,64}\/fire/)?.[0] || "";
+  const token = value.match(/sk-ant-oat01-[A-Za-z0-9_-]{20,300}/)?.[0] || "";
+  return url && token ? { url, token } : null;
+}
+
 export function validRoutine(url: string, token: string) {
   return ROUTINE_URL.test(url.trim()) && ROUTINE_TOKEN.test(token.trim());
 }
@@ -189,7 +200,7 @@ export function routinePrompt(english: boolean) {
         "2. If it belongs to another project, call switch_project with its projectId first.",
         "3. claim_recreation(id) and follow the steps it returns exactly: study the source slides, recreate the FORMAT for my business with original text and real photos (image bank first), check the rendered slides by eye and fix them.",
         "4. Save the carousel as a draft in my calendar (never schedule or publish), then complete_recreation(id, postId). If something blocks you, complete_recreation(id, error) with the reason.",
-        "Do not touch the repository. Finish with a one-line summary per request.",
+        "If nothing is pending, stop right away. Do not touch the repository. Finish with a one-line summary per request.",
       ].join("\n")
     : [
         "Tu es mon agent de contenu ScrollShow, lancé par mon raccourci iPhone.",
@@ -198,7 +209,7 @@ export function routinePrompt(english: boolean) {
         "2. Si elle appartient à un autre projet, appelle d'abord switch_project avec son projectId.",
         "3. claim_recreation(id) puis suis exactement les étapes renvoyées : étudier les slides source, recréer le FORMAT pour mon business avec un texte original et de vraies photos (banque d'images d'abord), vérifier le rendu à l'œil et corriger.",
         "4. Enregistre le carrousel en brouillon dans mon calendrier (jamais programmé ni publié), puis complete_recreation(id, postId). Si quelque chose bloque, complete_recreation(id, error) avec la raison.",
-        "Ne touche pas au dépôt. Termine par un résumé d'une ligne par demande.",
+        "S'il n'y a aucune demande en attente, arrête-toi tout de suite. Ne touche pas au dépôt. Termine par un résumé d'une ligne par demande.",
       ].join("\n");
 }
 
@@ -636,8 +647,9 @@ export async function shortcutStatus(user: SessionUser, english: boolean) {
 }
 
 export async function saveTrigger(user: SessionUser, url: string, token: string) {
-  const cleanUrl = url.trim();
-  const cleanToken = token.trim();
+  const pasted = parseRoutinePaste(`${url} ${token}`);
+  const cleanUrl = pasted?.url || url.trim();
+  const cleanToken = pasted?.token || token.trim();
   if (!validRoutine(cleanUrl, cleanToken)) throw new AgentError("routine_invalid", 400);
   const trigger: AgentTrigger = { url: cleanUrl, tokenSealed: sealToken(cleanToken, user.id), tokenHint: `…${cleanToken.slice(-4)}`, createdAt: new Date().toISOString() };
   await updateStoreSlice([], (data) => {
@@ -666,6 +678,30 @@ export async function removeTrigger(user: SessionUser) {
     const owner = data.users.find(item => item.id === user.id);
     if (owner) owner.agentTrigger = undefined;
   }, { userId: user.id });
+}
+
+/** Filet de securite de la routine creee par l'agent : un passage toutes les 6 h rattrape un partage manque. */
+export const ROUTINE_SWEEP_CRON = "0 */6 * * *";
+
+/** Ce dont un agent a besoin pour creer lui-meme la routine du mode automatique (Claude Code : routines / RemoteTrigger). */
+export async function routineSetup(user: SessionUser) {
+  const data = await readStoreSlice([], { userId: user.id });
+  const owner = data.users.find(item => item.id === user.id);
+  const english = owner?.settings?.locale === "en";
+  const configured = Boolean(owner?.agentTrigger);
+  return {
+    configured,
+    name: "ScrollShow",
+    prompt: routinePrompt(english),
+    schedule: { cron: ROUTINE_SWEEP_CRON, why: "Safety sweep every 6 hours; the API trigger added by the user starts it instantly on each share." },
+    connector: { name: "scrollshow", url: `${SITE}/api/mcp`, note: "Attach the user's claude.ai ScrollShow connector (routines only see claude.ai connectors, not local MCP servers)." },
+    routinesUrl: "https://claude.ai/code/routines",
+    settingsUrl: `${SITE}/app/settings?tab=api`,
+    remainingForUser: configured ? [] : [
+      "Open the routine on claude.ai/code/routines → Edit → Select a trigger → Add another trigger → API → save → Generate token.",
+      `Copy the URL and the token, paste them in ScrollShow → Settings → API (${SITE}/app/settings?tab=api) → Connect. Anthropic only shows this token in its web page, so no agent can do this step.`,
+    ],
+  };
 }
 
 export async function testTrigger(user: SessionUser) {

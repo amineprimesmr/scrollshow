@@ -11,7 +11,7 @@ const privateHeaders = { "Cache-Control": "private, no-store" };
 const english = (request: Request) => new URL(request.url).searchParams.get("lang") === "en";
 
 const actionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("save"), url: z.string().min(10).max(300), token: z.string().min(10).max(400) }),
+  z.object({ action: z.literal("save"), url: z.string().max(8000).default(""), token: z.string().max(400).default("") }),
   z.object({ action: z.literal("remove") }),
   z.object({ action: z.literal("mode"), mode: z.enum(["ask", "recreate", "save"]) }),
   z.object({ action: z.literal("test") }),
