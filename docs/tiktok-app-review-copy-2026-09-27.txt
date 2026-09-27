@@ -1,0 +1,5 @@
+ScrollShow (scrollshow.io) is a web studio for independent creators and businesses to create and review original photo carousels.
+Login Kit: users authorize their own TikTok account. user.info.basic/profile/stats provide profile information and counters; video.list provides the connected account's posts and metrics.
+video.publish: Calendar > New post > edit slides and caption > preview > Post to TikTok. We fetch creator_info, show the destination account, require manual privacy selection, and provide comments, music and commercial disclosure controls. The creator explicitly authorizes the post. We use PHOTO/DIRECT_POST, poll status and display the result.
+Agents prepare drafts; users review and authorize publication in the studio.
+video.upload is bundled by the portal but is not requested by our default OAuth configuration; no MEDIA_UPLOAD inbox flow is implemented. This submission documents photo Direct Post only.
