@@ -23,7 +23,7 @@ Le nouveau formulaire a été rempli jusqu'à Supporting documents, sans soumiss
 - Le dossier `/Users/amine/Desktop/scrollshow-demo` des notes du 21 septembre n'existe plus.
 - Deux copies de l'ancienne vidéo retrouvées : `docs/scrollshow-tiktok-direct-post-demo.mp4` et Downloads, datées du 7 septembre. Durée 99 s, 2 210 330 octets.
 - Échantillonnage visuel de cette ancienne vidéo : ancien studio, carrousel photo d'une personne, réglages commerciaux, résultat TikTok privé. Cet échantillonnage n'est pas une validation intégrale et n'établit ni originalité ni droits des médias. NE PAS la présenter comme la nouvelle preuve.
-- La vidéo déposée le 22 septembre et son emplacement ont été demandés à Amine. Les timestamps de preuve restent à mesurer sur le fichier réellement examiné, jamais à inventer.
+- Amine confirme ne plus avoir la vidéo déposée et la décrit comme une capture complète de toutes les fonctionnalités du SaaS. Son contenu détaillé ne peut plus être vérifié ; une nouvelle prise centrée sur le parcours Direct Post est nécessaire. Les timestamps de preuve restent à mesurer sur cette nouvelle prise, jamais à inventer.
 
 ## Vérifications actuelles
 
@@ -105,6 +105,10 @@ La présente liste est un scénario, PAS des timestamps d'une vidéo existante.
 ## Incident de navigateur
 
 Après préparation des deux premières étapes du formulaire, le contrôle de Chrome ne répond plus correctement : lectures expirées, puis `Debugger unattached`. Le contrôle natif a encore montré Supporting documents, puis a échoué ou renvoyé une capture vide. Les onglets restaient inventoriés ; cela ne prouve pas que Chrome était fermé. La dernière tentative documentée de reprise du formulaire a également échoué. Tentative Create Revision sans confirmation de succès. Ne pas annoncer la correction du portail comme enregistrée. Les textes locaux sont la copie de reprise.
+
+### Reprise réussie à 16:59
+
+Chrome répond de nouveau après le message d'Amine. Le champ des données conservées a été rempli dans Supporting documents ; aucune pièce jointe ni soumission. Un brouillon de révision de l'app a été créé et la description de 928 caractères enregistrée avec Save. La nouvelle description est visible après enregistrement, le signal de modifications non enregistrées a disparu et l'historique affiche la création du Staging à 16:59. Capture : `output/tiktok-audit-2026-09-27/app-review-draft.png`. Cette correction est dans le brouillon, pas une nouvelle approbation. L'ancienne vidéo reste attachée au brouillon et doit être remplacée avant soumission.
 
 ## Validation locale
 
