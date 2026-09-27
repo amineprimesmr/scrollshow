@@ -12,20 +12,41 @@ jobs:
   maintain:
     if: vars.PRODUCTION_AUTOMATIONS_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    # Backup, a possible scheduler catch-up, and both health checks.
+    timeout-minutes: 12
     steps:
       - name: Encrypted backup and queued media cleanup
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           test -n "$CRON_SECRET"
-          curl --fail --silent --show-error --max-time 290 \
+          curl --fail-with-body --silent --show-error --max-time 290 \
             -H "Authorization: Bearer $CRON_SECRET" \
             https://scrollshow.io/api/cron/maintenance
       - name: Check production health
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl --fail --silent --show-error --max-time 30 \
+          health_file=$(mktemp)
+          trap 'rm -f "$health_file"' EXIT
+          status=$(curl --silent --show-error --max-time 30 \
+            --output "$health_file" --write-out '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" \
-            https://scrollshow.io/api/health
+            https://scrollshow.io/api/health)
+          cat "$health_file"
+
+          # GitHub schedules can be delayed. Recover only an otherwise healthy
+          # scheduler heartbeat by actually processing the approved due queue.
+          # Never suppress backup failures or posts requiring manual review.
+          if [ "$status" = 503 ] && jq -e '.problems == ["publish_stale"]' "$health_file" >/dev/null; then
+            echo 'Scheduler heartbeat is stale; running the due queue before rechecking health.'
+            curl --fail-with-body --silent --show-error --max-time 290 \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              https://scrollshow.io/api/cron/publish
+            curl --fail-with-body --silent --show-error --max-time 30 \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              https://scrollshow.io/api/health
+          else
+            test "$status" = 200
+            jq -e '.ok == true and .problems == []' "$health_file" >/dev/null
+          fi
