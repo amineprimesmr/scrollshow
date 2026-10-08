@@ -116,7 +116,9 @@ export type User = {
   /** Routine Claude declenchee par le raccourci iPhone (URL + jeton scelle). Voir lib/shortcut-recreate.ts. */
   agentTrigger?: AgentTrigger;
   /** Raccourci iPhone : demander a chaque partage (defaut), toujours recreer, ou toujours enregistrer. */
-  shortcutMode?: "ask" | "recreate" | "save";
+  shortcutMode?: "ask" | "recreate" | "save" | "texts";
+  /** Durable intake: the phone can close the share sheet before importing. */
+  shortcutJobs?: ShortcutJob[];
 };
 
 export type AgentTrigger = {
@@ -135,6 +137,7 @@ export type SharerLink = "connected" | "tracked" | "unlinked" | "unknown";
 
 /** Demande de recreation posee sur le post importe (une par post source). */
 export type RecreationRequest = {
+  mode?: "recreate" | "texts";
   status: "queued" | "running" | "done" | "failed";
   via: "shortcut" | "agent";
   requestedAt: string;
@@ -151,6 +154,22 @@ export type RecreationRequest = {
   completedAt?: string;
   error?: string;
   trigger?: { at: string; ok: boolean; sessionUrl?: string; error?: string };
+};
+
+export type ShortcutJob = {
+  id: string;
+  url: string;
+  mode: "recreate" | "save" | "texts";
+  projectId?: string;
+  english: boolean;
+  status: "queued" | "running" | "done" | "failed";
+  createdAt: string;
+  lease?: string;
+  leaseUntil?: number;
+  attempts: number;
+  postId?: string;
+  message?: string;
+  error?: string;
 };
 
 export type WarmedOrderStatus = "requested" | "contacted" | "delivered" | "cancelled";

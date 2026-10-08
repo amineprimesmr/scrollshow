@@ -3,7 +3,6 @@
 import { LandingFAQ, LandingFooter } from "@/components/LandingBottom";
 import { PricingCards } from "@/components/PricingCards";
 import { HeroSkill } from "@/components/HeroSkill";
-import { LandingDemo } from "@/components/LandingDemo";
 import { LandingPrompts } from "@/components/LandingPrompts";
 import { LandingConnections } from "@/components/LandingConnections";
 import { LandingSpotlight } from "@/components/LandingSpotlight";
@@ -79,7 +78,6 @@ function ViewsHero({ english }: { english: boolean }) {
           </h1>
           <HeroSkill english={english} />
           <LandingPrompts english={english} />
-          <LandingDemo />
         </div>
       </div>
     </section>

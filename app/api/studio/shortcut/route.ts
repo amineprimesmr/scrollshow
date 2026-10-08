@@ -2,10 +2,11 @@ import { readStudioSession as readSession } from "@/lib/auth";
 import { AgentError } from "@/lib/agent";
 import { consumeLimit } from "@/lib/rate-limit";
 import { cancelRecreation, saveShortcutMode, removeTrigger, retryRecreation, saveTrigger, shortcutStatus, testTrigger } from "@/lib/shortcut-recreate";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { drainShortcutJobs, retryShortcutJob, shortcutJobs } from "@/lib/shortcut-queue";
 import { z } from "zod";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const privateHeaders = { "Cache-Control": "private, no-store" };
 const english = (request: Request) => new URL(request.url).searchParams.get("lang") === "en";
@@ -13,7 +14,8 @@ const english = (request: Request) => new URL(request.url).searchParams.get("lan
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save"), url: z.string().max(8000).default(""), token: z.string().max(400).default("") }),
   z.object({ action: z.literal("remove") }),
-  z.object({ action: z.literal("mode"), mode: z.enum(["ask", "recreate", "save"]) }),
+  z.object({ action: z.literal("mode"), mode: z.enum(["ask", "recreate", "save", "texts"]) }),
+  z.object({ action: z.literal("retry_import"), id: z.string().uuid() }),
   z.object({ action: z.literal("test") }),
   z.object({ action: z.literal("retry"), id: z.string().min(4).max(80) }),
   z.object({ action: z.literal("cancel"), id: z.string().min(4).max(80) }),
@@ -23,7 +25,8 @@ const actionSchema = z.discriminatedUnion("action", [
 export async function GET(request: Request) {
   const user = await readSession();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
-  return NextResponse.json(await shortcutStatus(user, english(request)), { headers: privateHeaders });
+  after(async () => { await drainShortcutJobs(user); });
+  return NextResponse.json({ ...await shortcutStatus(user, english(request)), imports: await shortcutJobs(user) }, { headers: privateHeaders });
 }
 
 export async function POST(request: Request) {
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400, headers: privateHeaders });
   const input = parsed.data;
   // Un test ou une relance lance une session Claude payee par l'utilisateur : pas de rafale.
-  if ((input.action === "test" || input.action === "retry") && !(await consumeLimit(`shortcut-fire:${user.id}`, 10, 10 * 60 * 1000))) {
+  if ((input.action === "test" || input.action === "retry" || input.action === "retry_import") && !(await consumeLimit(`shortcut-fire:${user.id}`, 10, 10 * 60 * 1000))) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: privateHeaders });
   }
   try {
@@ -44,7 +47,11 @@ export async function POST(request: Request) {
     if (input.action === "test") result = await testTrigger(user);
     if (input.action === "retry") result = await retryRecreation(user, input.id, english(request));
     if (input.action === "cancel") await cancelRecreation(user, input.id);
-    return NextResponse.json({ result, status: await shortcutStatus(user, english(request)) }, { headers: privateHeaders });
+    if (input.action === "retry_import") {
+      await retryShortcutJob(user, input.id);
+      after(async () => { await drainShortcutJobs(user); });
+    }
+    return NextResponse.json({ result, status: { ...await shortcutStatus(user, english(request)), imports: await shortcutJobs(user) } }, { headers: privateHeaders });
   } catch (error) {
     if (error instanceof AgentError) return NextResponse.json({ error: error.message }, { status: error.status, headers: privateHeaders });
     throw error;

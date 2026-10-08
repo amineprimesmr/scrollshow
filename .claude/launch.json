@@ -4,7 +4,10 @@
     {
       "name": "scrollshow",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:local"],
+      "runtimeArgs": [
+        "run",
+        "dev:local"
+      ],
       "port": 3000
     }
   ]

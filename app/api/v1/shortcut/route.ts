@@ -3,8 +3,11 @@ import { resolveApiKey } from "@/lib/api-keys";
 import { hasStudioAccess } from "@/lib/plans";
 import { consumeLimit } from "@/lib/rate-limit";
 import { handleShortcut, shortcutConfig } from "@/lib/shortcut-recreate";
+import { enqueueShortcut, drainShortcutJobs } from "@/lib/shortcut-queue";
+import { AgentError } from "@/lib/agent";
+import { after } from "next/server";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export function OPTIONS() {
   return agentOptions();
@@ -22,11 +25,10 @@ export async function GET(request: Request) {
 }
 
 /**
- * Raccourci iPhone v2 (Partager → ScrollShow). Repond TOUJOURS 200 avec
- * `title` + `message` : le raccourci affiche la notification telle quelle, et
- * un code d'erreur donnerait une notification vide. `openUrl`, quand il est
- * present, est ouvert par le raccourci (Claude pret, ou la page pour connecter
- * l'agent).
+ * Raccourci iPhone v3 (Partager → ScrollShow). Répond toujours 200 avec
+ * title/message pour la notification. background=1 accuse réception après
+ * sauvegarde durable ; l'import continue après la réponse. Les anciens
+ * raccourcis gardent la réponse synchrone. La v3 n'ouvre aucune URL.
  */
 export async function POST(request: Request) {
   const english = String(request.headers.get("accept-language") || "").toLowerCase().startsWith("en");
@@ -46,8 +48,16 @@ export async function POST(request: Request) {
     if (!(await consumeLimit(`api:${user.id}`, 120, 60000))) return say("rate_limited", "ScrollShow", english ? "Too many requests. Try again in a minute." : "Trop de requêtes. Réessaie dans une minute.");
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const text = String(body.url || body.text || "");
+    // Old installed shortcuts keep their synchronous response. v3 opts in.
+    if (body.background === "1" || body.background === true) {
+      const job = await enqueueShortcut(user, { text, choice: body.mode ?? body.choice, english });
+      after(async () => { await drainShortcutJobs(user); });
+      return agentResponse({ ok: true, title: "ScrollShow", jobId: job.id,
+        message: english ? "Request saved. You can keep using TikTok while preparation runs." : "Demande enregistrée. Tu peux continuer à utiliser TikTok pendant la préparation." });
+    }
     return agentResponse(await handleShortcut(user, { text, choice: body.mode ?? body.choice, english }));
   } catch (error) {
+    if (error instanceof AgentError) return say(error.message, "ScrollShow", english ? "Could not queue this request. Share a TikTok post or retry from shortcut settings." : "Demande non enregistrée. Partage un post TikTok ou relance depuis les réglages du raccourci.");
     console.error("shortcut_failed", { message: error instanceof Error ? error.message : "error" });
     return say("temporarily_unavailable", "ScrollShow", english ? "ScrollShow is unavailable right now. Try again in a minute." : "ScrollShow est indisponible pour le moment. Réessaie dans une minute.");
   }

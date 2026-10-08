@@ -20,7 +20,8 @@ type RequestRow = {
 };
 
 type Status = {
-  shortcutMode: "ask" | "recreate" | "save";
+  shortcutMode: "ask" | "recreate" | "save" | "texts";
+  imports?: Array<{ id: string; status: "queued" | "running" | "done" | "failed"; message?: string; error?: string }>;
   agentConnected: boolean;
   agentByKey: boolean;
   mcpUrl: string;
@@ -73,7 +74,7 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
   }, [lang]);
 
   // Tant qu'une recreation attend ou tourne, la liste se met a jour seule : on voit l'agent avancer.
-  const waiting = Boolean(status?.requests.some(item => item.status === "queued" || item.status === "running"));
+  const waiting = Boolean(status?.requests.some(item => item.status === "queued" || item.status === "running") || status?.imports?.some(item => item.status === "queued" || item.status === "running"));
   useEffect(() => {
     if (!waiting) return;
     const timer = setInterval(() => {
@@ -170,11 +171,13 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
       </h2>
       <p className="ss-lead">
         {t(
-          "Sur un post TikTok : Partager → ScrollShow. Rien ne s’ouvre : ton agent Claude recrée le carrousel pour ton business en arrière-plan, avec ton abonnement Claude, et le range en brouillon dans ton calendrier.",
-          "On a TikTok post: Share → ScrollShow. Nothing opens: your Claude agent recreates the carousel for your business in the background, on your Claude plan, and saves it as a draft in your calendar.",
+          "Sur un post TikTok : Partager → ScrollShow. Choisis de le conserver, de le recréer pour ton business ou de reprendre ses textes sans images. Avec ta routine Claude connectée, la préparation continue en arrière-plan et le brouillon arrive dans ScrollShow.",
+          "On a TikTok post: Share → ScrollShow. Save it, recreate it for your business, or keep its texts without images. With your Claude routine connected, preparation runs in the background and the draft appears in ScrollShow.",
           english,
         )}
       </p>
+
+      <p className="ss-muted">{t("Textes seuls : tu peux modifier les textes et ajouter tes images dans ScrollShow. Le transfert automatique vers les brouillons locaux de TikTok n’est pas disponible.", "Texts only: edit the texts and add your images in ScrollShow. Automatic transfer to TikTok’s local drafts is unavailable.", english)}</p>
 
       <div className="ss-sc__chips" role="list">
         <span role="listitem" className={`ss-sc__chip ${auto ? "is-ok" : "is-warn"}`}>
@@ -256,6 +259,14 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
       </div>
       {note ? <p className="ss-sc__note" role="status">{note}</p> : null}
 
+      {status?.imports?.filter(item => item.status !== "done").map(item => (
+        <div key={item.id} className="ss-sc__note" role="status">
+          {item.status === "failed"
+            ? t("Préparation interrompue. Tu peux relancer la demande.", "Preparation interrupted. You can retry the request.", english)
+            : t("Lien enregistré · import en arrière-plan…", "Link saved · importing in the background…", english)}
+          {item.status === "failed" ? <button type="button" className="ss-btn-ghost" disabled={Boolean(busy)} onClick={() => void act("retry_import", { id: item.id })}>{t("Relancer", "Retry", english)}</button> : null}
+        </div>
+      ))}
       {requests}
 
       <h3 className="ss-sc__sub">{t("Installer le raccourci", "Install the shortcut", english)}</h3>
@@ -314,7 +325,7 @@ export function ShortcutSettings({ english, busyKey, onCreateKey, revealed, copi
           <p>{t("Sans « Demander », le raccourci ne pose plus la question.", "Without “Ask”, the shortcut skips the question.", english)}</p>
         </div>
         <div className="ss-seg" role="group" aria-label={t("Quand je partage", "When I share", english)}>
-          {([["ask", "Demander", "Ask"], ["recreate", "Recréer", "Recreate"], ["save", "Enregistrer", "Save"]] as const).map(([id, fr, en]) => (
+          {([["ask", "Demander", "Ask"], ["texts", "Textes seuls", "Texts only"], ["recreate", "Recréer", "Recreate"], ["save", "Enregistrer", "Save"]] as const).map(([id, fr, en]) => (
             <button key={id} type="button" className={(status?.shortcutMode || "ask") === id ? "is-on" : ""} disabled={!status || Boolean(busy)} onClick={() => void act("mode", { mode: id })}>
               {english ? en : fr}
             </button>

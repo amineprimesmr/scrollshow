@@ -72,6 +72,9 @@ test("le choix du raccourci : seul « enregistrer » ne recree pas", () => {
   assert.equal(shortcutMode("Enregistrer seulement"), "save");
   assert.equal(shortcutMode("Just save it"), "save");
   assert.equal(shortcutMode(undefined), "recreate");
+  assert.equal(shortcutMode("Reprendre les textes sans images"), "texts");
+  assert.equal(shortcutMode("Keep texts without images"), "texts");
+  assert.equal(resolveMode("", "texts"), "texts");
 });
 
 test("sans choix sur le telephone, la preference du compte s'applique", () => {

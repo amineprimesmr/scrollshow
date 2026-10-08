@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Construit et signe le raccourci iOS « ScrollShow » (v2 : recréation par l'agent), en français et en anglais.
+"""Construit et signe le raccourci iOS « ScrollShow » (v3 : préparation en arrière-plan), en français et en anglais.
 
 Usage : python3 scripts/build-ios-shortcut.py  (macOS uniquement, utilise `shortcuts sign`)
 Sortie : public/ScrollShow.shortcut (fr) et public/ScrollShow-en.shortcut (en), importables sans lien iCloud.
@@ -7,12 +7,12 @@ Sortie : public/ScrollShow.shortcut (fr) et public/ScrollShow-en.shortcut (en), 
 Flux du raccourci :
   0. Texte = clé API (question d'import : demandée une fois à l'installation)
   1. GET https://scrollshow.io/api/v1/shortcut → { ask } : la préférence du compte (Réglages > API)
-  2. Si `ask` a une valeur : liste « Recréer pour mon business » / « Enregistrer seulement » → variable Mode
-     (sinon Mode reste vide et le serveur applique la préférence : toujours recréer ou toujours enregistrer)
-  3. POST https://scrollshow.io/api/v1/shortcut { url: <entrée>, mode: Mode }
+  2. Si `ask` a une valeur : textes seuls / recréer / enregistrer → variable Mode
+     (sinon Mode reste vide et le serveur applique la préférence du compte)
+  3. POST https://scrollshow.io/api/v1/shortcut { url: <entrée>, mode: Mode, background: "1" }
   4. Notification : titre = `title`, texte = `message` (la route répond toujours 200)
-  5. Si `openUrl` est présent : l'ouvre (Claude avec le message prêt, ou la page pour connecter
-     l'agent). En mode routine, rien ne s'ouvre : l'agent travaille seul.
+  5. Fin : aucune ouverture d'app. La demande durable continue côté serveur.
+Les textes restent modifiables dans ScrollShow. Aucun transfert automatique vers TikTok n'est annoncé.
 Sans entrée (lancé à la main), le raccourci lit le presse-papiers.
 L'ancien raccourci (POST /api/v1/library) continue de fonctionner.
 """
@@ -25,12 +25,12 @@ OBJ = "￼"  # marqueur d'attachement dans les chaînes Shortcuts
 LANGS = {
     "fr": {
         "out": ROOT / "public" / "ScrollShow.shortcut",
-        "choices": ["Recréer pour mon business", "Enregistrer seulement"],
+        "choices": ["Reprendre les textes sans images", "Recréer pour mon business", "Enregistrer seulement"],
         "question": "Colle ta clé ScrollShow (Réglages > API > Raccourci iPhone > Créer la clé iPhone)",
     },
     "en": {
         "out": ROOT / "public" / "ScrollShow-en.shortcut",
-        "choices": ["Recreate for my business", "Just save it"],
+        "choices": ["Keep texts without images", "Recreate for my business", "Just save it"],
         "question": "Paste your ScrollShow key (Settings > API > iPhone shortcut > Create iPhone key)",
     },
 }
@@ -61,7 +61,7 @@ def dictionary(items):
 
 def build(lang, conf):
     key, cfg, ask, lst, choice, req = (new_uuid() for _ in range(6))
-    title, msg, open_, if_ask, if_open = (new_uuid() for _ in range(5))
+    title, msg, if_ask = (new_uuid() for _ in range(3))
     auth = ("Authorization", token("Bearer " + OBJ, {"{7, 1}": output(key, "Text")}))
     language = ("Accept-Language", token(lang, {}))
 
@@ -124,6 +124,7 @@ def build(lang, conf):
                 "WFHTTPBodyType": "JSON",
                 "WFHTTPHeaders": dictionary([auth, language]),
                 "WFJSONValues": dictionary([
+                    ("background", token("1", {})),
                     ("url", token(OBJ, {"{0, 1}": {"Type": "ExtensionInput"}})),
                     ("mode", token(OBJ, {"{0, 1}": {"Type": "Variable", "VariableName": "Mode"}})),
                 ]),
@@ -131,7 +132,6 @@ def build(lang, conf):
         },
         value_for("title", title, req),
         value_for("message", msg, req),
-        value_for("openUrl", open_, req),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
             "WFWorkflowActionParameters": {
@@ -139,9 +139,6 @@ def build(lang, conf):
                 "WFNotificationActionBody": token(OBJ, {"{0, 1}": output(msg, "Dictionary Value")}),
             },
         },
-        if_has_value(if_open, open_),
-        {"WFWorkflowActionIdentifier": "is.workflow.actions.openurl", "WFWorkflowActionParameters": {"WFInput": attachment(output(open_, "Dictionary Value"))}},
-        end_if(if_open),
     ]
 
     workflow = {
