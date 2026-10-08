@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       inCalendar: true,
       createdAt: new Date().toISOString(),
       tiktok: parsed.data.tiktok,
-      tiktokApprovedAt: parsed.data.status === "scheduled" && parsed.data.tiktok?.privacy ? new Date().toISOString() : undefined,
+      tiktokApprovedAt: parsed.data.status === "scheduled" && (parsed.data.tiktok?.privacy || parsed.data.tiktok?.mode === "inbox") ? new Date().toISOString() : undefined,
     };
     validatePost(data, created);
     data.posts.unshift(created);

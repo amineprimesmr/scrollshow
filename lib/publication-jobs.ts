@@ -21,7 +21,7 @@ export async function dispatchPost(userId: string, id: string) {
     if (p.publishId || p.status === "published" || ["INITIATING", "REVIEW_REQUIRED"].includes(p.publishState || "")) throw new Error("publication_already_started");
     if (p.publishLeaseUntil && p.publishLeaseUntil > Date.now()) throw new Error("publication_busy");
     if (p.channelIds.length !== 1 || !data.channels.some(c => c.id === p.channelIds[0] && c.userId === userId && c.projectId === p.projectId && c.platform === "tiktok" && c.accessToken && c.connected !== false)) throw new Error("select_one_connected_tiktok_account");
-    if (!p.tiktok?.privacy) throw new Error("tiktok_options_required");
+    if (!p.tiktok?.privacy && p.tiktok?.mode !== "inbox") throw new Error("tiktok_options_required");
     if (!isCreatorApproved(p)) throw new Error("tiktok_approval_required");
     p.publishClaim = claim;
     p.publishLeaseUntil = Date.now() + 300000;

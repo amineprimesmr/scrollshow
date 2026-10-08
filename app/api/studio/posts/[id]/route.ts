@@ -55,7 +55,7 @@ export async function PATCH(
     assertEditable(found);
     const { recipe: recipePatch, photo_images, image, origin, ...rest } = parsed.data;
     Object.assign(found, rest);
-    if (rest.tiktok) found.tiktokApprovedAt = found.status === "scheduled" && rest.tiktok.privacy ? new Date().toISOString() : undefined;
+    if (rest.tiktok) found.tiktokApprovedAt = found.status === "scheduled" && (rest.tiktok.privacy || rest.tiktok.mode === "inbox") ? new Date().toISOString() : undefined;
     else if (parsed.data.body !== undefined || parsed.data.channelIds || recipePatch || photo_images || image) {
       found.tiktokApprovedAt = undefined;
       if (found.status === "scheduled") found.status = "draft";

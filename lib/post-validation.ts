@@ -30,7 +30,7 @@ export function validatePost(data: StoreData, post: StudioPost) {
   if (post.status === "published" && post.publishState !== "PUBLISH_COMPLETE") throw new PostValidationError("published_status_reserved");
   if (post.status === "scheduled") {
     if (post.channelIds.length !== 1) throw new PostValidationError("select_one_connected_tiktok_account");
-    if (!post.tiktok?.privacy) throw new PostValidationError("tiktok_options_required");
+    if (!post.tiktok?.privacy && post.tiktok?.mode !== "inbox") throw new PostValidationError("tiktok_options_required");
     if (!isCreatorApproved(post)) throw new PostValidationError("tiktok_approval_required");
     const broken = validatePostOptions(coerceOptions(post.tiktok, post.body), null);
     if (broken) throw new PostValidationError(broken);
