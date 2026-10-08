@@ -56,7 +56,9 @@ export async function directPostPhotos(
   if (input.photos.some(photo => new URL(absoluteAssetUrl(photo)).origin !== origin)) throw new PublishError("media_domain_not_verified");
 
   const { creator, blocked } = await loadCreator(channel.accessToken);
-  if (blocked) throw new PublishError(`creator_${blocked}`, 429);
+  // The unaudited "private accounts only" rule is a Direct Post restriction;
+  // Upload to TikTok (inbox) is not subject to it.
+  if (blocked && !(input.options.mode === "inbox" && blocked === "private_account_required")) throw new PublishError(`creator_${blocked}`, 429);
 
   if (!creator) throw new PublishError("creator_unavailable");
   const invalid = validatePostOptions(input.options, creator);
@@ -72,7 +74,7 @@ export async function directPostPhotos(
         photo_cover_index: 0,
         photo_images: input.photos.map(url => tiktokImageUrl(signedMediaUrl(absoluteAssetUrl(url), process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io"))),
       },
-      post_mode: "DIRECT_POST",
+      post_mode: input.options.mode === "inbox" ? "MEDIA_UPLOAD" : "DIRECT_POST",
       media_type: "PHOTO",
     });
   } catch (error) {

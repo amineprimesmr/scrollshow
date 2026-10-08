@@ -33,6 +33,13 @@ export type TikTokPostOptions = {
   brandOrganic: boolean;
   /** "Branded content" → brand_content_toggle. */
   brandContent: boolean;
+  /**
+   * "direct" = Direct Post (video.publish, every choice made here).
+   * "inbox" = Upload to TikTok (video.upload, MEDIA_UPLOAD): the carousel lands
+   * in the creator's TikTok inbox and they finish privacy, music and
+   * disclosure in the TikTok app themselves. Absent = "direct" (legacy posts).
+   */
+  mode?: "direct" | "inbox";
 };
 
 export const EMPTY_OPTIONS: TikTokPostOptions = {
@@ -100,6 +107,7 @@ export type OptionsError =
  */
 export function validatePostOptions(options: TikTokPostOptions, creator: CreatorSnapshot | null): OptionsError | null {
   if (!options.title.trim()) return "title_required";
+  if (options.mode === "inbox") return null;
   if (!options.privacy) return "privacy_required";
   if (creator && !creator.privacyOptions.includes(options.privacy)) return "privacy_not_allowed";
   if (options.commercial && !options.brandOrganic && !options.brandContent) return "commercial_choice_required";
@@ -123,6 +131,8 @@ export function commercialLabel(options: TikTokPostOptions): "promotional" | "pa
 
 /** Builds the post_info block for a PHOTO direct post. Duet/stitch do not apply to photos. */
 export function photoPostInfo(options: TikTokPostOptions, description: string) {
+  // MEDIA_UPLOAD: TikTok asks the creator for everything else in its own app.
+  if (options.mode === "inbox") return { title: options.title.trim().slice(0, 90), description: description.slice(0, 2200) };
   const commercial = options.commercial;
   return {
     title: options.title.trim().slice(0, 90),
@@ -145,6 +155,7 @@ export function coerceOptions(input: Partial<TikTokPostOptions> | null | undefin
     commercial: Boolean(input?.commercial) || Boolean(input?.brandOrganic) || Boolean(input?.brandContent),
     brandOrganic: Boolean(input?.brandOrganic),
     brandContent: Boolean(input?.brandContent),
+    ...(input?.mode === "inbox" ? { mode: "inbox" as const } : {}),
   };
 }
 
@@ -155,7 +166,7 @@ export function coerceOptions(input: Partial<TikTokPostOptions> | null | undefin
  * API caller supplied them. Legacy posts must also be reviewed in the studio.
  */
 export function isCreatorApproved(post: { tiktok?: { privacy?: string }; tiktokApprovedAt?: string; createdAt?: string }) {
-  if (!post.tiktok?.privacy) return false;
+  if (!post.tiktok?.privacy && (post.tiktok as { mode?: string } | undefined)?.mode !== "inbox") return false;
   return Boolean(post.tiktokApprovedAt && Number.isFinite(Date.parse(post.tiktokApprovedAt)));
 }
 

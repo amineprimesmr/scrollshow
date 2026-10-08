@@ -12,7 +12,9 @@ import { hasStudioAccess } from "./plans";
 // TikTok processes a DIRECT_POST asynchronously: content/init only hands back a
 // publish_id. Until status/fetch says otherwise the carousel may still fail
 // (unreachable image, spam filter), so a post is never "published" on init alone.
-const TERMINAL = new Set(["PUBLISH_COMPLETE", "FAILED"]);
+// MEDIA_UPLOAD (Upload to TikTok) ends at SEND_TO_USER_INBOX: the creator
+// finishes the post in the TikTok app, so it is delivered, not published.
+const TERMINAL = new Set(["PUBLISH_COMPLETE", "FAILED", "SEND_TO_USER_INBOX"]);
 
 /** Wall-clock time in a named zone -> the matching UTC instant. */
 export function zonedToUtc(date: string, time: string, timeZone: string) {
@@ -100,6 +102,11 @@ async function settlePost(user: User, post: StudioPost, accessToken: string): Pr
         tiktokId = String(postId);
         current.tiktokId = tiktokId;
       }
+    } else if (state === "SEND_TO_USER_INBOX") {
+      current.status = "draft";
+      current.publishClaim = undefined;
+      current.publishLeaseUntil = undefined;
+      current.publishError = undefined;
     } else if (state === "FAILED") {
       failReason = String(status.fail_reason || "failed").slice(0, 300);
       current.status = "draft";
@@ -114,7 +121,14 @@ async function settlePost(user: User, post: StudioPost, accessToken: string): Pr
   // push service must never hold up the next post's reconciliation.
   const settings = resolveSettings(user);
   const caption = (post.body || "").slice(0, 60);
-  if (state === "PUBLISH_COMPLETE" && settings.notifyPublishSuccess) {
+  if (state === "SEND_TO_USER_INBOX" && settings.notifyPublishSuccess) {
+    void sendPushToUser(user.id, {
+      title: "Carrousel envoyé dans TikTok",
+      body: "Ouvre TikTok : il t'attend dans ta boîte de réception pour être publié.",
+      url: "/app",
+      tag: `publish-${post.id}`,
+    });
+  } else if (state === "PUBLISH_COMPLETE" && settings.notifyPublishSuccess) {
     void sendPushToUser(user.id, {
       title: "Post publié sur TikTok",
       body: caption || "Ton carrousel programmé vient d'être publié.",

@@ -15,3 +15,15 @@ test("an agent may only pre-fill the editable title, never privacy, comments or 
   assert.deepEqual(proposal, { title: "Hello", privacy: "", allowComment: false, autoAddMusic: false, commercial: false, brandOrganic: false, brandContent: false });
   assert.equal(agentProposal(null, "fallback caption").title, "fallback caption");
 });
+
+test("Upload to TikTok (inbox) only needs a title and sends MEDIA_UPLOAD-sized post_info", async () => {
+  const { EMPTY_OPTIONS, validatePostOptions, photoPostInfo, coerceOptions } = await import("../lib/tiktok-compliance");
+  const inbox = { ...EMPTY_OPTIONS, mode: "inbox" as const };
+  assert.equal(validatePostOptions(inbox, null), "title_required");
+  assert.equal(validatePostOptions({ ...inbox, title: "Hi" }, null), null, "privacy is chosen in the TikTok app");
+  assert.deepEqual(photoPostInfo({ ...inbox, title: "Hi", privacy: "PUBLIC_TO_EVERYONE" }, "desc"), { title: "Hi", description: "desc" });
+  assert.equal(coerceOptions({ ...inbox, title: "Hi" }).mode, "inbox");
+  assert.equal(coerceOptions({ title: "Hi" }).mode, undefined, "legacy posts stay Direct Post");
+  assert.equal(isCreatorApproved({ tiktok: { mode: "inbox", privacy: "" } as never, tiktokApprovedAt: "2026-10-08T10:00:00Z" }), true);
+  assert.equal(isCreatorApproved({ tiktok: { mode: "inbox", privacy: "" } as never }), false, "still needs the studio approval");
+});

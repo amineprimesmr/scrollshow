@@ -18,6 +18,7 @@ export const OAUTH_SCOPES_PRODUCTION = [
   "user.info.stats",
   "video.list",
   "video.publish",
+  "video.upload",
 ].join(",");
 
 export const OAUTH_SCOPES_SANDBOX = ["user.info.basic", "video.publish"].join(",");

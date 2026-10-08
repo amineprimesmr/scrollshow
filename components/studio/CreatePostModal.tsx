@@ -15,6 +15,9 @@ import {
 import { dateInTimeZone } from "@/lib/settings";
 import { sound } from "@/lib/sound";
 import { coerceOptions, EMPTY_OPTIONS, isCreatorApproved, type TikTokPostOptions, validatePostOptions } from "@/lib/tiktok-compliance";
+
+// New posts default to Upload to TikTok (inbox draft); the creator can switch to Direct Post.
+const NEW_POST_OPTIONS: TikTokPostOptions = { ...EMPTY_OPTIONS, mode: "inbox" };
 import type { CarouselRecipe, CarouselSlide } from "@/lib/types";
 import { useEffect, useRef, useState } from "react";
 import { SlidePreview } from "./SlidePreview";
@@ -37,7 +40,7 @@ export function CreatePostModal() {
   const [channelIds, setChannelIds] = useState<string[]>([]);
   // Every Direct Post choice starts empty/off: TikTok forbids defaults for
   // privacy, comments and commercial disclosure.
-  const [options, setOptions] = useState<TikTokPostOptions>(EMPTY_OPTIONS);
+  const [options, setOptions] = useState<TikTokPostOptions>(NEW_POST_OPTIONS);
   const [progress, setProgress] = useState<PublishProgress | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -61,7 +64,7 @@ export function CreatePostModal() {
     channelIds.length === 1 && connected.some(channel => channel.id === channelIds[0]) &&
     !uploading &&
     !creatorState.loading &&
-    !creatorState.blocked &&
+    (!creatorState.blocked || (options.mode === "inbox" && creatorState.blocked === "private_account_required")) &&
     Boolean(creatorState.creator) &&
     !optionsError &&
     Boolean(body.trim()) &&
@@ -104,7 +107,7 @@ export function CreatePostModal() {
       setSlideIndex(0);
       setMessage("");
       setShowOriginal(Boolean(next.slides.some((item) => item.keepPhoto)));
-      setOptions(isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS, title: editing.tiktok?.title || "" });
+      setOptions(isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...NEW_POST_OPTIONS, title: editing.tiktok?.title || "" });
       setProgress(
         editing.publishId && editing.publishState && editing.publishState !== "FAILED"
           ? { publishId: editing.publishId, status: editing.publishState, tiktokId: editing.tiktokId }
@@ -114,7 +117,7 @@ export function CreatePostModal() {
         body: editing.body, date: editing.date, time: editing.time,
         status: editing.status === "published" ? "scheduled" : editing.status,
         channelIds: editing.channelIds,
-        options: isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...EMPTY_OPTIONS, title: editing.tiktok?.title || "" },
+        options: isCreatorApproved(editing) ? coerceOptions(editing.tiktok) : { ...NEW_POST_OPTIONS, title: editing.tiktok?.title || "" },
         recipe: next,
       });
       return;
@@ -136,7 +139,7 @@ export function CreatePostModal() {
         ? channels.filter((item) => item.connected).slice(0, 1).map((item) => item.id)
         : [activeChannel],
     );
-    setOptions({ ...EMPTY_OPTIONS });
+    setOptions({ ...NEW_POST_OPTIONS });
     setProgress(null);
     setMessage("");
     setRebuildError("");
@@ -147,7 +150,7 @@ export function CreatePostModal() {
       time: settings?.defaultPostTime || "18:00",
       status: availability?.tiktokPublishing && connected.length ? settings?.defaultStatus || "scheduled" : "draft",
       channelIds: activeChannel === "all" ? connected.slice(0, 1).map(item => item.id) : [activeChannel],
-      options: { ...EMPTY_OPTIONS }, recipe: draft,
+      options: { ...NEW_POST_OPTIONS }, recipe: draft,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postOpen, initKey]);
@@ -191,7 +194,7 @@ export function CreatePostModal() {
   // relancait l'intervalle a chaque reponse et remettait `attempts` a zero — le
   // plafond de 60 essais ne jouait jamais, un statut bloque sondait sans fin.
   const publishId = progress?.publishId || "";
-  const publishDone = progress?.status === "PUBLISH_COMPLETE" || progress?.status === "FAILED";
+  const publishDone = progress?.status === "PUBLISH_COMPLETE" || progress?.status === "FAILED" || progress?.status === "SEND_TO_USER_INBOX";
   useEffect(() => {
     if (!postOpen || !publishId || publishDone) return;
     let cancelled = false;
@@ -213,9 +216,9 @@ export function CreatePostModal() {
         const status = String(json.status || "");
         if (!status) return;
         setProgress({ publishId, status, tiktokId: json.tiktokId, failReason: json.failReason });
-        if (status === "PUBLISH_COMPLETE" || status === "FAILED") {
+        if (status === "PUBLISH_COMPLETE" || status === "FAILED" || status === "SEND_TO_USER_INBOX") {
           clearInterval(timer);
-          if (status === "PUBLISH_COMPLETE") sound.success();
+          if (status !== "FAILED") sound.success();
           else sound.error();
           reload();
         }
@@ -686,7 +689,7 @@ export function CreatePostModal() {
                       name="publish-channel"
                       checked={channelIds.includes(channel.id)}
                       onChange={(event) => {
-                        if (event.target.checked) { setChannelIds([channel.id]); setOptions({ ...EMPTY_OPTIONS, title: options.title }); }
+                        if (event.target.checked) { setChannelIds([channel.id]); setOptions({ ...NEW_POST_OPTIONS, mode: options.mode, title: options.title }); }
                       }}
                     />
                     {channel.name} · {platformName(channel.platform)}
@@ -729,7 +732,7 @@ export function CreatePostModal() {
                 <Metal preset="chromatic" strength={canPublish ? 0.95 : 0.35}>
                   <button className="ss-btn-purple" type="button" disabled={!canPublish} onClick={publishNow}>
                     {pending ? <Orb size={20} state="connecting" invert /> : null}
-                    {pending ? t("Publication…", "Publishing…", english) : t("Publier sur TikTok", "Post to TikTok", english)}
+                    {pending ? t("Envoi…", "Sending…", english) : options.mode === "inbox" ? t("Envoyer dans TikTok", "Send to TikTok", english) : t("Publier sur TikTok", "Post to TikTok", english)}
                   </button>
                 </Metal>
               </span>

@@ -536,14 +536,14 @@ export const approveUrl = (id: string) => `${process.env.NEXT_PUBLIC_SITE_URL ||
  */
 export async function agentPublish(user: SessionUser, input: {
   caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
-  privacy_level?: string; allow_comment?: boolean; auto_add_music?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean;
+  privacy_level?: string; allow_comment?: boolean; auto_add_music?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean; post_mode?: "direct" | "inbox";
   recipe?: RecipeInput;
 }, via: "studio" | "agent" = "agent") {
   const studio = via === "studio";
   if (studio) await validateMediaInput(input, user);
   const options = studio
     ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment, autoAddMusic: input.auto_add_music,
-        commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content }, input.caption)
+        commercial: input.commercial_content || input.brand_organic || input.brand_content, brandOrganic: input.brand_organic, brandContent: input.brand_content, mode: input.post_mode }, input.caption)
     : agentProposal({ title: input.title }, input.caption);
   let id: string;
   if (input.id) {

@@ -31,6 +31,7 @@ const schema = z.object({
       commercial: z.boolean(),
       brandOrganic: z.boolean(),
       brandContent: z.boolean(),
+      mode: z.enum(["direct", "inbox"]).optional(),
     })
     .optional(),
 });

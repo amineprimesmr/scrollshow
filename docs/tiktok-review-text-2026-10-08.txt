@@ -1,0 +1,6 @@
+ScrollShow (scrollshow.io) lets a creator write original photo carousels and post them to their own TikTok account.
+Login Kit / user.info.basic: "Continue with TikTok", consent screen, back to the studio showing the creator's avatar and name.
+user.info.profile + user.info.stats: Overview page shows bio, verified badge, followers, likes and video count of the connected account.
+video.list: the same page lists the creator's own posts.
+video.upload: in the composer the creator picks "Send to TikTok as a draft"; the carousel is sent with MEDIA_UPLOAD and appears in the TikTok inbox.
+video.publish: the creator picks "Post directly"; the page shows the account from creator_info, an editable title, privacy chosen manually from privacy_level_options (no default), comments off by default, commercial disclosure with Your brand / Branded content labels and the matching declaration. "Post to TikTok" sends DIRECT_POST and the status is polled until PUBLISH_COMPLETE.

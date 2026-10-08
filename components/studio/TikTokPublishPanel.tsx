@@ -136,6 +136,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
   const invalid = validatePostOptions(options, creator);
   const commentDisabled = Boolean(creator?.commentDisabled);
   const isPrivate = options.privacy === "SELF_ONLY";
+  const inbox = options.mode === "inbox";
 
   function patch(next: Partial<TikTokPostOptions>) {
     setOptions({ ...options, ...next });
@@ -189,7 +190,20 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
         </button>
       </header>
 
-      {blocked ? <p className="ss-ttp__alert" role="alert">{blockedCopy(blocked, english)}</p> : null}
+      {blocked && !inbox ? <p className="ss-ttp__alert" role="alert">{blockedCopy(blocked, english)}</p> : null}
+
+      <div className="ss-ttp__mode" role="radiogroup" aria-label={t("Comment publier", "How to post", english)}>
+        <label className="ss-ttp__check">
+          <input type="radio" name="ss-ttp-mode" checked={inbox} onChange={() => patch({ mode: "inbox" })} />
+          <span>{t("Envoyer en brouillon dans TikTok", "Send to TikTok as a draft", english)}</span>
+          <small>{t("Le carrousel arrive dans ta boîte de réception TikTok : tu choisis la confidentialité, la musique et tu publies depuis l'app TikTok.", "The carousel lands in your TikTok inbox: you choose privacy and music, then post from the TikTok app.", english)}</small>
+        </label>
+        <label className="ss-ttp__check">
+          <input type="radio" name="ss-ttp-mode" checked={!inbox} onChange={() => patch({ mode: "direct" })} />
+          <span>{t("Publier directement", "Post directly", english)}</span>
+          <small>{t("Tu règles tout ici ; ScrollShow publie sur ton profil.", "You set everything here; ScrollShow posts to your profile.", english)}</small>
+        </label>
+      </div>
 
       <label className="ss-ttp__field">
         <span>{t("Titre", "Title", english)}</span>
@@ -204,6 +218,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
         <small>{options.title.length} / 90</small>
       </label>
 
+      {inbox ? null : (<>
       <label className="ss-ttp__field">
         <span>{t("Qui peut voir ce post", "Who can view this post", english)}</span>
         <select title={brandedLocksPrivate ? optionsErrorCopy("branded_content_private", english) : undefined} value={options.privacy} onChange={(event) => choosePrivacy(event.target.value)} disabled={!privacyOptions.length} required>
@@ -330,6 +345,7 @@ export function TikTokPublishPanel({ english, creatorState, options, setOptions,
           </>
         )}
       </p>
+      </>)}
       <p className="ss-ttp__muted">
         {t(
           "Après la publication, TikTok peut mettre quelques minutes à traiter le contenu avant qu'il apparaisse sur ton profil.",
@@ -360,6 +376,13 @@ export function PublishStatus({ progress, english, handle }: { progress: Publish
             {t("Voir sur TikTok", "View on TikTok", english)}
           </a>
         ) : null}
+      </p>
+    );
+  }
+  if (progress.status === "SEND_TO_USER_INBOX") {
+    return (
+      <p className="ss-ttp__status is-ok" role="status">
+        {t("Envoyé dans TikTok. Ouvre l'app TikTok : le carrousel t'attend dans ta boîte de réception pour être publié.", "Sent to TikTok. Open the TikTok app: the carousel is waiting in your inbox to be posted.", english)}
       </p>
     );
   }
