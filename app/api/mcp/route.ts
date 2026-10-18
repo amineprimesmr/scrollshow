@@ -583,13 +583,14 @@ const handler = createMcpHandler(
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
           id: z.string().optional(),
-          mode: z.enum(["draft", "direct"]).optional().describe("draft = send to the creator's TikTok inbox now (they add music and post in the app). direct (default) = approve_url flow."),
+          mode: z.enum(["draft", "direct", "direct_agent"]).optional().describe("draft = send to the creator's TikTok inbox now (they add music and post in the app). direct (default) = approve_url flow. direct_agent = workspace owner only (else direct_agent_not_allowed): Direct Post now with privacy_level (default PUBLIC_TO_EVERYONE), allow_comment, auto_add_music; a scheduled post (id) is posted at its date instead."),
           channelId: z.string().optional().describe("Destination account from list_channels. Required with multiple connected accounts."),
           photo_images: z.array(z.string()).optional(),
           image: z.string().optional(),
           privacy_level: z
             .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"])
-            .optional().describe("Ignored: the creator picks privacy on the Post to TikTok page."),
+            .optional().describe("Only used with mode direct_agent (default PUBLIC_TO_EVERYONE); otherwise the creator picks privacy on the Post to TikTok page."),
+          auto_add_music: z.boolean().optional().describe("mode direct_agent only: let TikTok add recommended music."),
           allow_comment: z.boolean().optional().describe("Allow comments. Default false."),
           commercial_content: z.boolean().optional().describe("User disclosed commercial content."),
           brand_organic: z.boolean().optional().describe("Promotes the user's own brand ('Promotional content' label)."),

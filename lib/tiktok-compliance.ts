@@ -179,6 +179,15 @@ export function missingUploadScope(scopes?: string) {
   return !scopes.split(/[ ,]+/).includes("video.upload");
 }
 
+/**
+ * Accounts whose owner lets their own agent post and schedule without the
+ * Post to TikTok page (AGENT_DIRECT_POST_USERS, comma-separated user ids).
+ * Never a default: every other ScrollShow user keeps the approval flow.
+ */
+export function agentMayDirectPost(userId: string, allowed = process.env.AGENT_DIRECT_POST_USERS) {
+  return Boolean(userId) && (allowed || "").split(/[ ,]+/).filter(Boolean).includes(userId);
+}
+
 /** What a non-studio caller may pre-fill: the editable title, nothing the guidelines require the creator to pick. */
 export function agentProposal(input: Partial<TikTokPostOptions> | null | undefined, fallbackTitle = ""): TikTokPostOptions {
   return { ...EMPTY_OPTIONS, title: String(input?.title ?? "").trim().slice(0, 90) || fallbackTitle.slice(0, 90) };

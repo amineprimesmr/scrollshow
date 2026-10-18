@@ -25,7 +25,7 @@ import { importTikTokFromUrl, resolveUrl } from "./tiktok-import";
 import { reconstructRecipe, ReconstructError } from "./reconstruct";
 import { rasterizeRecipe } from "./render-slide";
 import { seedStudio } from "./studio-seed";
-import { agentProposal, coerceOptions, revokeCreatorApproval, type TikTokPostOptions } from "./tiktok-compliance";
+import { agentMayDirectPost, agentProposal, coerceOptions, revokeCreatorApproval, type TikTokPostOptions } from "./tiktok-compliance";
 import { readStoreSlice, updateStoreSlice, localStoreEnabled } from "./store";
 import type { CarouselRecipe, SessionUser, StudioPost } from "./types";
 import type { RecipeInput } from "./recipe";
@@ -538,7 +538,7 @@ export async function agentPublish(user: SessionUser, input: {
   caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
   privacy_level?: string; allow_comment?: boolean; auto_add_music?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean; post_mode?: "direct" | "inbox";
   /** Agent only. "draft" = Upload to TikTok: the carousel lands in the creator's TikTok inbox, where they pick privacy, music and post. */
-  mode?: "draft" | "direct";
+  mode?: "draft" | "direct" | "direct_agent";
   recipe?: RecipeInput;
 }, via: "studio" | "agent" = "agent") {
   // A draft sent to the TikTok inbox is not a publication: TikTok has the
@@ -547,7 +547,15 @@ export async function agentPublish(user: SessionUser, input: {
   const draft = via === "agent" && input.mode === "draft";
   if (draft) input = { ...input, post_mode: "inbox", privacy_level: undefined, allow_comment: undefined, auto_add_music: undefined,
     commercial_content: undefined, brand_organic: undefined, brand_content: undefined };
-  const studio = via === "studio" || draft;
+  // "direct_agent": the workspace owner told their own agent to post. Only for
+  // ids listed in AGENT_DIRECT_POST_USERS; the agent's options are recorded as
+  // the owner's approval, then Direct Post now, or at the date if scheduled.
+  const ownerDirect = via === "agent" && input.mode === "direct_agent";
+  if (ownerDirect) {
+    if (!agentMayDirectPost(user.id)) throw new AgentError("direct_agent_not_allowed", 403);
+    input = { ...input, post_mode: "direct", privacy_level: input.privacy_level || "PUBLIC_TO_EVERYONE" };
+  }
+  const studio = via === "studio" || draft || ownerDirect;
   if (studio) await validateMediaInput(input, user);
   const options = studio
     ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment, autoAddMusic: input.auto_add_music,
@@ -585,6 +593,11 @@ export async function agentPublish(user: SessionUser, input: {
   if (!studio) {
     return { ok: true, published: false, needs_approval: true, post_id: id, approve_url: approveUrl(id),
       note: "Nothing was sent to TikTok. The carousel is saved as a draft. Give the user approve_url: there they see the preview, choose who can view the post, comments and commercial disclosure themselves, then click Post to TikTok. TikTok requires these choices to be made by the creator, never by an agent." };
+  }
+  if (ownerDirect) {
+    const row = (await readStore()).posts.find(p => p.id === id);
+    if (row?.status === "scheduled") return { ok: true, mode: "direct_agent", scheduled: true, post_id: id, date: row.date, time: row.time,
+      note: "Approved by the account owner through their agent. The scheduler posts it to TikTok (Direct Post) at that date. Use publish_status once it has run." };
   }
   const { dispatchPost } = await import("./publication-jobs");
   const result = await dispatchPost(user.id, id);

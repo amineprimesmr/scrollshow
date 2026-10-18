@@ -35,3 +35,12 @@ test("an agent draft (Upload to TikTok) needs the video.upload scope on the toke
   assert.equal(missingUploadScope("user.info.basic,video.publish"), true, "reconnect the account");
   assert.equal(missingUploadScope(undefined), false, "unknown scopes: TikTok answers");
 });
+
+test("direct_agent is reserved to the owners listed in AGENT_DIRECT_POST_USERS", async () => {
+  const { agentMayDirectPost } = await import("../lib/tiktok-compliance");
+  assert.equal(agentMayDirectPost("owner-1", "owner-1"), true);
+  assert.equal(agentMayDirectPost("owner-1", "x, owner-1"), true);
+  assert.equal(agentMayDirectPost("someone-else", "owner-1"), false);
+  assert.equal(agentMayDirectPost("owner-1", ""), false, "off by default");
+  assert.equal(agentMayDirectPost("", undefined), false);
+});
