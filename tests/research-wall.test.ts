@@ -69,7 +69,9 @@ test("les cartes d'attente n'annoncent que ce qui passera le filtre", () => {
   const j = job();
   j.phase = "search";
   j.candidates = [{ handle: "jawlmx", keyword: "sleepmaxing", sourceUrl: "https://www.tiktok.com/@jawlmx",
-    posts: [post("faible", 581, 1), post("fort", 200_000, 1), post("vieux", 300_000, 120)] }];
+    // publicJob filtre sur l'horloge réelle : des dates relatives au `now` figé expirent.
+    posts: [post("faible", 581, 1), post("fort", 200_000, 1), post("vieux", 300_000, 120)]
+      .map((p) => ({ ...p, createdAt: p.createdAt + (Date.now() - now) / 1000 })) }];
   const shown = publicJob(j).pending[0].posts.map((p) => p.id);
   assert.deepEqual(shown, ["fort"], "581 vues sous un filtre 100k+ ne doit jamais s'afficher pour disparaitre ensuite");
 });
