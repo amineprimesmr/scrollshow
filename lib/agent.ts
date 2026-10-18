@@ -537,9 +537,17 @@ export const approveUrl = (id: string) => `${process.env.NEXT_PUBLIC_SITE_URL ||
 export async function agentPublish(user: SessionUser, input: {
   caption: string; title?: string; id?: string; channelId?: string; photo_images?: string[]; image?: string;
   privacy_level?: string; allow_comment?: boolean; auto_add_music?: boolean; commercial_content?: boolean; brand_organic?: boolean; brand_content?: boolean; post_mode?: "direct" | "inbox";
+  /** Agent only. "draft" = Upload to TikTok: the carousel lands in the creator's TikTok inbox, where they pick privacy, music and post. */
+  mode?: "draft" | "direct";
   recipe?: RecipeInput;
 }, via: "studio" | "agent" = "agent") {
-  const studio = via === "studio";
+  // A draft sent to the TikTok inbox is not a publication: TikTok has the
+  // creator choose privacy, music and disclosure in its app, so the agent may
+  // dispatch it like the studio's "Envoyer en brouillon dans TikTok" button.
+  const draft = via === "agent" && input.mode === "draft";
+  if (draft) input = { ...input, post_mode: "inbox", privacy_level: undefined, allow_comment: undefined, auto_add_music: undefined,
+    commercial_content: undefined, brand_organic: undefined, brand_content: undefined };
+  const studio = via === "studio" || draft;
   if (studio) await validateMediaInput(input, user);
   const options = studio
     ? coerceOptions({ title: input.title || "", privacy: input.privacy_level, allowComment: input.allow_comment, autoAddMusic: input.auto_add_music,
@@ -580,6 +588,8 @@ export async function agentPublish(user: SessionUser, input: {
   }
   const { dispatchPost } = await import("./publication-jobs");
   const result = await dispatchPost(user.id, id);
+  if (draft) return { ok: true, mode: "draft", publish_id: result.publishId, post_id: id, post: publicPost(result.post),
+    note: "Sent to the creator's TikTok inbox as a draft. They open the TikTok notification, pick the sound, privacy and post themselves. Use publish_status to confirm TikTok received it." };
   return { ok: true, publish_id: result.publishId, post: publicPost(result.post), note: "Processing. Use publish_status to confirm the final result." };
 }
 

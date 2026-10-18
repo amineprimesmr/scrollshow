@@ -27,3 +27,11 @@ test("Upload to TikTok (inbox) only needs a title and sends MEDIA_UPLOAD-sized p
   assert.equal(isCreatorApproved({ tiktok: { mode: "inbox", privacy: "" } as never, tiktokApprovedAt: "2026-10-08T10:00:00Z" }), true);
   assert.equal(isCreatorApproved({ tiktok: { mode: "inbox", privacy: "" } as never }), false, "still needs the studio approval");
 });
+
+test("an agent draft (Upload to TikTok) needs the video.upload scope on the token", async () => {
+  const { missingUploadScope } = await import("../lib/tiktok-compliance");
+  assert.equal(missingUploadScope("user.info.basic,video.publish,video.upload"), false);
+  assert.equal(missingUploadScope("user.info.basic video.upload"), false);
+  assert.equal(missingUploadScope("user.info.basic,video.publish"), true, "reconnect the account");
+  assert.equal(missingUploadScope(undefined), false, "unknown scopes: TikTok answers");
+});

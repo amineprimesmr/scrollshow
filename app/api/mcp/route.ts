@@ -90,7 +90,8 @@ async function slideBuffers(user: SessionUser, urls: string[]) {
 
 function fail(error: unknown) {
   const message = error instanceof Error ? error.message : "error";
-  return { content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }], isError: true as const };
+  const extra = (error as { extra?: Record<string, unknown> } | null)?.extra;
+  return { content: [{ type: "text" as const, text: JSON.stringify({ error: message, ...extra }) }], isError: true as const };
 }
 
 function userFrom(ctx: { http?: { authInfo?: AuthInfo } }): SessionUser {
@@ -577,11 +578,12 @@ const handler = createMcpHandler(
       {
         title: "Publish to TikTok now",
         description:
-          "Prepare a carousel for publication. Nothing is sent to TikTok by this tool: it saves the draft and returns approve_url. Give that link to the user — there they see the preview, choose who can view the post, comments and commercial disclosure themselves, and click Post to TikTok. TikTok requires the creator to make these choices in person, so never claim the post is published; use publish_status after the user confirms.",
+          "Prepare a carousel for publication. mode \"draft\": send the carousel straight to the creator's TikTok inbox (Upload to TikTok); no approve_url, returns publish_id — the creator then picks sound, privacy and posts in the TikTok app; needs the video.upload scope (else reconnect the account). Default mode \"direct\": nothing is sent to TikTok by this tool: it saves the draft and returns approve_url. Give that link to the user — there they see the preview, choose who can view the post, comments and commercial disclosure themselves, and click Post to TikTok. TikTok requires the creator to make these choices in person, so never claim the post is published; use publish_status after the user confirms.",
         inputSchema: z.object({
           caption: z.string().min(1).max(2200),
           title: z.string().max(90).optional(),
           id: z.string().optional(),
+          mode: z.enum(["draft", "direct"]).optional().describe("draft = send to the creator's TikTok inbox now (they add music and post in the app). direct (default) = approve_url flow."),
           channelId: z.string().optional().describe("Destination account from list_channels. Required with multiple connected accounts."),
           photo_images: z.array(z.string()).optional(),
           image: z.string().optional(),

@@ -17,6 +17,7 @@ import {
   type TikTokPostOptions,
   creatorBlockedReason,
   isCreatorApproved,
+  missingUploadScope,
   photoPostInfo,
   validatePostOptions,
 } from "./tiktok-compliance";
@@ -51,6 +52,8 @@ export async function directPostPhotos(
   if (!user || user.deletionPendingAt || !user.emailVerifiedAt || !hasStudioAccess(user.plan)) throw new PublishError("verified_paid_account_required", 403);
   const channel = await loadTikTokChannel(userId, input.channelId, input.projectId);
   if (!channel?.accessToken) throw new PublishError("tiktok_not_connected", 401);
+  if (input.options.mode === "inbox" && missingUploadScope(channel.scopes))
+    throw new PublishError("tiktok_upload_scope_missing", 403, { message: "Ce compte TikTok n'a pas autorisé l'envoi en brouillon (scope video.upload). Reconnecte le compte dans ScrollShow (Comptes → Connecter TikTok)." });
   if (!input.photos.length || input.photos.length > 35) throw new PublishError("photos_required");
   const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://scrollshow.io").origin;
   if (input.photos.some(photo => new URL(absoluteAssetUrl(photo)).origin !== origin)) throw new PublishError("media_domain_not_verified");

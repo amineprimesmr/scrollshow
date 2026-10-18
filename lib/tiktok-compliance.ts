@@ -170,6 +170,15 @@ export function isCreatorApproved(post: { tiktok?: { privacy?: string }; tiktokA
   return Boolean(post.tiktokApprovedAt && Number.isFinite(Date.parse(post.tiktokApprovedAt)));
 }
 
+/**
+ * Upload to TikTok (inbox) needs `video.upload` on the token. `null` = fine;
+ * scopes not recorded (old connections) = let TikTok answer.
+ */
+export function missingUploadScope(scopes?: string) {
+  if (!scopes) return false;
+  return !scopes.split(/[ ,]+/).includes("video.upload");
+}
+
 /** What a non-studio caller may pre-fill: the editable title, nothing the guidelines require the creator to pick. */
 export function agentProposal(input: Partial<TikTokPostOptions> | null | undefined, fallbackTitle = ""): TikTokPostOptions {
   return { ...EMPTY_OPTIONS, title: String(input?.title ?? "").trim().slice(0, 90) || fallbackTitle.slice(0, 90) };
